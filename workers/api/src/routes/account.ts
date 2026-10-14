@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, like } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { DeleteAccountRequest, toApiError, type MeResponse } from "@sroka/shared";
 import type { AppEnv, Env } from "../env.ts";
@@ -52,7 +52,12 @@ export async function deletePrefix(bucket: R2Bucket, prefix: string): Promise<vo
   } while (cursor);
 }
 
-export async function deleteAccountData(env: Env, userId: string, email: string): Promise<void> {
+export async function deleteAccountData(
+  env: Env,
+  userId: string,
+  email: string,
+  afterLibraryWipe?: () => void,
+): Promise<void> {
   const db = drizzle(env.DB, { schema: authSchema });
   // Library first (may fail → user can retry while still signed in).
   const stub = env.LIBRARY.getByName(userId) as unknown as LibraryStub;
@@ -61,11 +66,20 @@ export async function deleteAccountData(env: Env, userId: string, email: string)
   } catch (e) {
     if (!isMissingRpc(e)) throw e;
   }
-  await db.delete(jobs).where(eq(jobs.userId, userId));
-  await db.delete(authSchema.session).where(eq(authSchema.session.userId, userId));
-  await db.delete(authSchema.account).where(eq(authSchema.account.userId, userId));
-  await db.delete(authSchema.verification).where(like(authSchema.verification.identifier, `%${email}%`));
-  await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));
+  afterLibraryWipe?.(); // start the R2 wipe independently of the D1 step
+  // One atomic batch; session last so a failure leaves the user signed in and able to retry.
+  await db.batch([
+    db.delete(jobs).where(eq(jobs.userId, userId)),
+    db.delete(authSchema.account).where(eq(authSchema.account.userId, userId)),
+    db.delete(authSchema.verification).where(
+      inArray(
+        authSchema.verification.identifier,
+        ["sign-in-otp-", "email-verification-otp-", "forget-password-otp-"].map((p) => p + email),
+      ),
+    ),
+    db.delete(authSchema.user).where(eq(authSchema.user.id, userId)),
+    db.delete(authSchema.session).where(eq(authSchema.session.userId, userId)),
+  ]);
 }
 
 accountRoutes.delete("/account", async (c) => {
@@ -75,11 +89,12 @@ accountRoutes.delete("/account", async (c) => {
   const db = drizzle(c.env.DB, { schema: authSchema });
   const u = (await db.select({ email: authSchema.user.email }).from(authSchema.user).where(eq(authSchema.user.id, userId)).limit(1))[0];
   if (!u) return c.json({ error: "unauthorized" }, 401);
-  await deleteAccountData(c.env, userId, u.email);
-  c.executionCtx.waitUntil(
-    Promise.all(
-      [`private/${userId}/`, `raw/${userId}/`, `uploads/${userId}/`].map((p) => deletePrefix(c.env.CONTENT, p)),
-    ).catch((e) => console.error("[sroka] R2 wipe failed", e)),
+  await deleteAccountData(c.env, userId, u.email, () =>
+    c.executionCtx.waitUntil(
+      Promise.all(
+        [`private/${userId}/`, `raw/${userId}/`, `uploads/${userId}/`].map((p) => deletePrefix(c.env.CONTENT, p)),
+      ).catch((e) => console.error("[sroka] R2 wipe failed", e)),
+    ),
   );
   return c.json({ deleted: true as const });
 });

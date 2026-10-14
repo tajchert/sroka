@@ -16,7 +16,7 @@
     "directory": "../../apps/web/dist",
     "binding": "ASSETS",
     "not_found_handling": "none",
-    "run_worker_first": ["/api/*", "/v1/*", "/app/*"]
+    "run_worker_first": true
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "sroka", "database_id": "4909f01f-3368-4169-9af8-e95144376aed", "migrations_dir": "migrations" }

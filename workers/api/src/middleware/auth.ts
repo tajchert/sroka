@@ -12,7 +12,7 @@ export const corsMiddleware = cors({
     if (origin.startsWith("chrome-extension://") || origin.startsWith("moz-extension://")) return origin;
     return null;
   },
-  allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type", "Authorization", "X-Sroka-Device", "X-Turnstile-Token"],
   exposeHeaders: ["set-auth-token", "Retry-After", "X-Retry-After", "Content-Disposition"],
   credentials: false,

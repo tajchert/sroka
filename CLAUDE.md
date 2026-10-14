@@ -16,7 +16,8 @@ Progress ledger: `docs/ledger.md`.
 - Install: `npm install` (root)
 - Typecheck all: `npm run typecheck` · Test all: `npm test`
 - One workspace: `npm test -w @sroka/shared`, `npm run typecheck -w @sroka/api`, etc.
-- Local stack: `npm run dev -w @sroka/api` (wrangler dev :8787, loads parser too) + `npm run dev -w @sroka/web` (vite :5173, proxies /api,/v1)
+- Local stack: `npm run dev:setup` once (.dev.vars, local D1 migrations, web build), then `npm run dev -w @sroka/api` (wrangler dev :8787, api + parser in one process) + optionally `npm run dev -w @sroka/web` (vite :5173, proxies /api,/v1). Details: `workers/api/CLAUDE.md` "Local stack".
+- Local e2e: `DEV_LOG=<wrangler dev log> npm run e2e:local` (`scripts/e2e-local.sh`, curl + jq + node; non-zero exit on failure).
 - Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`
 - Each workspace has its own CLAUDE.md with specifics.
 

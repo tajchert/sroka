@@ -26,6 +26,7 @@
   "durable_objects": { "bindings": [{ "name": "LIBRARY", "class_name": "LibraryDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LibraryDO"] }],
   "queues": { "producers": [{ "queue": "sroka-parse", "binding": "PARSE_QUEUE" }] },
+  "workflows": [{ "name": "sroka-import", "binding": "IMPORT_WORKFLOW", "class_name": "ImportWorkflow" }],
   "send_email": [{ "name": "EMAIL" }],
   "images": { "binding": "IMAGES" },
   "vars": {

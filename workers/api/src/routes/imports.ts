@@ -1,7 +1,7 @@
 import { ImportFormat, LIMITS, uuidv7 } from "@sroka/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
-import { countRecentImports, getJob, insertJob, updateJob } from "../import/jobs.ts";
+import { getJob, reserveImportJob, updateJob } from "../import/jobs.ts";
 import type { ImportParams } from "../import/workflow.ts";
 
 /** POST /v1/imports, GET /v1/imports/:id (api.md §11.1). Mounted at /v1/imports. */
@@ -40,15 +40,23 @@ importsRoutes.post("/", async (c) => {
 
   const userId = c.var.userId;
   const now = Date.now();
-  if ((await countRecentImports(c.env.DB, userId, now - DAY_MS)) >= DAILY_LIMIT) {
+  const id = uuidv7();
+  // Reserve the slot atomically before the upload is stored (no check-then-insert race).
+  if (!(await reserveImportJob(c.env.DB, { id, userId, format: format.data, now, since: now - DAY_MS, limit: DAILY_LIMIT }))) {
     return c.json({ error: "rate_limited", message: "10 imports per day" }, 429, { "Retry-After": "3600" });
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const id = uuidv7();
-  const uploadKey = `uploads/${userId}/${id}.${ext(format.data, bytes)}`;
-  await c.env.CONTENT.put(uploadKey, bytes);
-  await insertJob(c.env.DB, { id, userId, format: format.data, now });
+  let uploadKey: string;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    uploadKey = `uploads/${userId}/${id}.${ext(format.data, bytes)}`;
+    await c.env.CONTENT.put(uploadKey, bytes);
+  } catch (e) {
+    console.error("[sroka] import upload failed", e);
+    // Release the reservation (workflow_unavailable rows don't count toward the daily limit).
+    await updateJob(c.env.DB, id, { status: "failed", error: "workflow_unavailable" });
+    return c.json({ error: "unavailable", message: "could not store the upload" }, 503);
+  }
 
   const params: ImportParams = { userId, importId: id, format: format.data, uploadKey, startedAt: now };
   try {

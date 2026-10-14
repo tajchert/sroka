@@ -8,6 +8,13 @@
       "when": 1792011312948,
       "tag": "0000_warm_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792017190937,
+      "tag": "0001_auth_throttle",
+      "breakpoints": true
     }
   ]
 }

@@ -159,6 +159,12 @@ describe("extractArticle", () => {
 
 describe("sanitizeArticle", () => {
   const S = (h: string) => sanitizeArticle(h, "https://example.com/dir/page");
+  it("keeps mailto: links (allowlisted scheme) and drops malformed ones", () => {
+    const out = S(`<p><a href="mailto:a@b.c">mail</a> <a href=" MAILTO:x@y.z?subject=hi ">m2</a> <a href="mailto:a@b.c&#10;bcc:x">bad</a></p>`).html;
+    expect(out).toContain(`href="mailto:a@b.c"`);
+    expect(out).toContain(`href="mailto:x@y.z?subject=hi"`);
+    expect(out).not.toContain("bcc");
+  });
   it("absolutizes links and images, picks best srcset, drops srcset attr", () => {
     const r = S(`<p><a href="../x">x</a><img src="a.png" srcset="a1.png 100w, a2.png 900w"></p><img srcset="s1.png 100w, s2.png 800w">`);
     expect(r.html).toContain('href="https://example.com/x"');
@@ -316,6 +322,20 @@ describe("buildContent", () => {
     const tr = async () => ({ bytes: new Uint8Array(100).fill(++n), contentType: "image/webp" });
     const r = await processImages({ urls: ["https://a.com/1.png", "https://a.com/2.png", "https://a.com/3.png"], leadCandidates: [], transform: tr, fetchOptions: { fetch: f }, maxTotalBytes: 250, concurrency: 1 });
     expect(r.files.length).toBe(2);
+  });
+
+  it("stops downloading once the budget is spent and only keeps small originals on transform failure", async () => {
+    const fetched: string[] = [];
+    const f = (async (u: string) => {
+      fetched.push(u);
+      return new Response(new Uint8Array(u.includes("big") ? 3 * 1024 * 1024 : 100).fill(u.charCodeAt(u.length - 5)), { headers: { "content-type": "image/png" } });
+    }) as never;
+    const fail = async () => {
+      throw new Error("transform down");
+    };
+    const r = await processImages({ urls: ["https://a.com/big.png", "https://a.com/1.png", "https://a.com/2.png", "https://a.com/3.png", "https://a.com/4.png"], leadCandidates: [], transform: fail, fetchOptions: { fetch: f }, maxTotalBytes: 250, concurrency: 1 });
+    expect(r.files.map((x) => x.bytes.byteLength)).toEqual([100, 100]); // 3 MB original dropped; 3.png over budget
+    expect(fetched).toHaveLength(4); // 4.png never downloaded
   });
 
   it("lower-priority lead candidate finishing last does not overwrite the thumbnail", async () => {

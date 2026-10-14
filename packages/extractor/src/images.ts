@@ -2,8 +2,13 @@ import { FetchError, safeFetch, type SafeFetchOptions } from "./safe-fetch.ts";
 
 export const MAX_IMAGES = 50;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-/** Total bytes of stored images per article (memory budget for the 128 MB isolate). */
-export const MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
+/**
+ * Total bytes of stored images per article (memory budget for the 128 MB isolate: stored images are held
+ * twice at the end — files + stored-level package.zip — next to up to `concurrency` in-flight downloads).
+ */
+export const MAX_TOTAL_IMAGE_BYTES = 16 * 1024 * 1024;
+/** Largest original (untransformed) image kept when the Images transform fails. */
+export const MAX_FALLBACK_IMAGE_BYTES = 2 * 1024 * 1024;
 
 /** Injected by the worker (Cloudflare Images binding). Throw to signal failure (fallback to original is applied). */
 export type ImageTransform = (bytes: Uint8Array, contentType: string, opts: { width: number }) => Promise<{ bytes: Uint8Array; contentType: string }>;
@@ -45,7 +50,8 @@ export interface ProcessImagesOptions {
 
 /**
  * Download, convert (max width 1600 webp) and hash images. Never throws for per-image failures.
- * On transform failure the original is stored when it is a raster image of <= 10 MB (SVG is never stored).
+ * On transform failure the original is stored when it is a raster image of <= 2 MB (SVG is never stored).
+ * Stops downloading once the per-article byte budget is spent.
  */
 export async function processImages(o: ProcessImagesOptions): Promise<ProcessedImages> {
   const max = o.maxImages ?? MAX_IMAGES;
@@ -55,6 +61,7 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
   let thumb: Uint8Array | null = null;
   let thumbFrom: string | null = null;
   let totalBytes = 0;
+  let exhausted = false;
   const budget = o.maxTotalBytes ?? MAX_TOTAL_IMAGE_BYTES;
   const leadSet = new Set(o.leadCandidates);
 
@@ -63,7 +70,7 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
   const leadOnly = o.leadCandidates.filter((u) => !urls.includes(u)).slice(0, 1);
 
   const one = async (url: string, isLeadOnly: boolean) => {
-    let res;
+    let res: { bytes: Uint8Array; contentType: string } | null;
     try {
       res = await safeFetch(url, {
         ...o.fetchOptions,
@@ -105,10 +112,14 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
       stored = { bytes: t.bytes, contentType: t.contentType || "image/webp", ext: "webp" };
     } catch {
       const ext = EXT[ctype];
-      if (ext && res.bytes.byteLength <= MAX_IMAGE_BYTES) stored = { bytes: res.bytes, contentType: ctype, ext };
+      if (ext && res.bytes.byteLength <= MAX_FALLBACK_IMAGE_BYTES) stored = { bytes: res.bytes, contentType: ctype, ext };
     }
+    res = null; // release the download before hashing/storing
     if (!stored) return;
-    if (totalBytes + stored.bytes.byteLength > budget) return; // over the per-article byte budget: skip
+    if (totalBytes + stored.bytes.byteLength > budget) {
+      exhausted = true; // over the per-article byte budget: skip, and stop downloading more
+      return;
+    }
     const sha256 = await sha256Hex(stored.bytes);
     const path = `img/${sha256}.${stored.ext}`;
     const img: StoredImage = { path, bytes: stored.bytes, contentType: stored.contentType, sha256 };
@@ -120,6 +131,7 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
   const queue: Array<[string, boolean]> = [...work.map((u) => [u, false] as [string, boolean]), ...leadOnly.map((u) => [u, true] as [string, boolean])];
   const workers = Array.from({ length: Math.min(o.concurrency ?? 4, queue.length) }, async () => {
     for (;;) {
+      if (exhausted || totalBytes >= budget) return; // budget spent: don't download the rest
       const next = queue.shift();
       if (!next) return;
       await one(next[0], next[1]);

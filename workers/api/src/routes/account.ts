@@ -5,6 +5,9 @@ import { DeleteAccountRequest, toApiError, type MeResponse } from "@sroka/shared
 import type { AppEnv, Env } from "../env.ts";
 import * as authSchema from "../db/auth-schema.ts";
 import { jobs } from "../db/schema.ts";
+import { deletePrefix } from "../r2.ts";
+
+export { deletePrefix };
 
 export const accountRoutes = new Hono<AppEnv>();
 
@@ -40,16 +43,6 @@ accountRoutes.get("/me", async (c) => {
 /** True while LibraryDO lacks the method (placeholder DO before merge). */
 function isMissingRpc(e: unknown): boolean {
   return e instanceof Error && /does not implement|not a function/.test(e.message);
-}
-
-/** Delete all R2 objects under a prefix (paged). */
-export async function deletePrefix(bucket: R2Bucket, prefix: string): Promise<void> {
-  let cursor: string | undefined;
-  do {
-    const page = await bucket.list({ prefix, cursor, limit: 1000 });
-    if (page.objects.length) await bucket.delete(page.objects.map((o) => o.key));
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
 }
 
 export async function deleteAccountData(

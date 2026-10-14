@@ -1,6 +1,13 @@
 import sanitizeHtml from "sanitize-html";
 
+/** Keeps a mailto: link (allowlisted scheme) — no control chars / whitespace, bounded length. */
+function mailtoHref(raw: string): string | undefined {
+  if (raw.length > 2048 || /[\s\u0000-\u001f\u007f<>"]/.test(raw)) return undefined;
+  return "mailto:" + raw.slice("mailto:".length);
+}
+
 /** Resolve `value` against `base`; null if not an http(s) URL. */
+
 export function absolutizeUrl(value: string | undefined, base: string): string | null {
   if (!value) return null;
   const v = value.trim();
@@ -116,7 +123,8 @@ export function sanitizeArticle(contentHtml: string, baseUrl: string): SanitizeR
     nonTextTags: ["script", "style", "textarea", "option", "noscript", "svg", "template", "math", "object", "embed", "select"],
     transformTags: {
       a: (tag, attribs) => {
-        const href = attribs["href"]?.startsWith("#") ? attribs["href"] : absolutizeUrl(attribs["href"], baseUrl);
+        const raw = attribs["href"]?.trim();
+        const href = raw?.startsWith("#") ? raw : raw && /^mailto:/i.test(raw) ? mailtoHref(raw) : absolutizeUrl(raw, baseUrl);
         const out: Record<string, string> = {};
         if (href) {
           out["href"] = href;

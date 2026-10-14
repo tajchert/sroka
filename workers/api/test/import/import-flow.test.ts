@@ -61,6 +61,15 @@ describe("POST /v1/imports", () => {
     expect((await t.raw(`/v1/imports/00000000-0000-0000-0000-000000000000`)).status).toBe(404);
   });
 
+  it("the daily limit holds under concurrent requests (atomic reservation)", async () => {
+    const t = makeApp();
+    const res = await Promise.all(Array.from({ length: 15 }, () => t.raw("/v1/imports", { method: "POST", body: form("pocket_csv", POCKET_CSV) })));
+    const codes = res.map((r) => r.status);
+    expect(codes.filter((c) => c === 202)).toHaveLength(10);
+    expect(codes.filter((c) => c === 429)).toHaveLength(5);
+    expect(t.created).toHaveLength(10);
+  });
+
   it("503s and fails the job when the workflow cannot start", async () => {
     const t = makeApp({ workflowFails: true });
     expect((await t.raw("/v1/imports", { method: "POST", body: form("pocket_csv", POCKET_CSV) })).status).toBe(503);

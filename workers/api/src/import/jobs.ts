@@ -28,26 +28,30 @@ export function rowToJob(r: JobRow): Job {
   };
 }
 
-export async function insertJob(db: D1Database, j: { id: string; userId: string; format: string; now: number }): Promise<void> {
-  await db
-    .prepare(
-      "INSERT INTO jobs (id, user_id, kind, status, format, total, done, skipped, error, created_at, updated_at) VALUES (?, ?, 'import', 'queued', ?, NULL, 0, 0, NULL, ?, ?)",
-    )
-    .bind(j.id, j.userId, j.format, j.now, j.now)
-    .run();
-}
-
 export async function getJob(db: D1Database, userId: string, id: string): Promise<Job | null> {
   const r = await db.prepare("SELECT * FROM jobs WHERE id = ? AND user_id = ?").bind(id, userId).first<JobRow>();
   return r ? rowToJob(r) : null;
 }
 
-export async function countRecentImports(db: D1Database, userId: string, since: number): Promise<number> {
+/**
+ * Atomically reserves an import slot: inserts the job row only while the user has fewer than `limit` imports
+ * since `since` (one statement, so concurrent requests can't all pass a separate count check).
+ * Returns false when the limit is reached.
+ */
+export async function reserveImportJob(
+  db: D1Database,
+  j: { id: string; userId: string; format: string; now: number; since: number; limit: number },
+): Promise<boolean> {
   const r = await db
-    .prepare("SELECT COUNT(*) AS n FROM jobs WHERE user_id = ? AND kind = 'import' AND created_at >= ? AND COALESCE(error, '') != 'workflow_unavailable'")
-    .bind(userId, since)
-    .first<{ n: number }>();
-  return r?.n ?? 0;
+    .prepare(
+      `INSERT INTO jobs (id, user_id, kind, status, format, total, done, skipped, error, created_at, updated_at)
+       SELECT ?1, ?2, 'import', 'queued', ?3, NULL, 0, 0, NULL, ?4, ?4
+       WHERE (SELECT COUNT(*) FROM jobs WHERE user_id = ?2 AND kind = 'import' AND created_at >= ?5
+              AND COALESCE(error, '') != 'workflow_unavailable') < ?6`,
+    )
+    .bind(j.id, j.userId, j.format, j.now, j.since, j.limit)
+    .run();
+  return (r.meta.changes ?? 0) > 0;
 }
 
 export interface JobPatch {

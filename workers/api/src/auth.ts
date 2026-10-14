@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/d1";
 import type { Env } from "./env.ts";
 import * as schema from "./db/auth-schema.ts";
 import { sendOtpEmail } from "./email.ts";
+import { otpThrottleAfter, otpThrottleBefore } from "./auth-throttle.ts";
 
 export type WaitUntil = { waitUntil(p: Promise<unknown>): void };
 
@@ -50,6 +51,8 @@ export function createAuth(env: Env, ctx?: WaitUntil) {
         "/email-otp/send-verification-otp": { window: 60, max: 3 },
       },
     },
+    // Per-email OTP send limit + failed-code lockout (per-IP limits alone allow distributed abuse).
+    hooks: { before: otpThrottleBefore(env.DB), after: otpThrottleAfter(env.DB) },
     advanced: {
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"] },
       defaultCookieAttributes: { sameSite: "lax", secure: !dev, httpOnly: true },

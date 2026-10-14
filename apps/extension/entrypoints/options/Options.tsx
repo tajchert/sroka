@@ -29,7 +29,8 @@ export function Options() {
       if (!granted && !(await chrome.permissions.request({ origins: [origin + "/*"] }))) {
         return setErr("Permission to reach that server was denied, so the URL was not saved.");
       }
-      // A session belongs to one server; queued saves stay.
+      // A session belongs to one server; queued saves stay but are only sent to the server (and account)
+      // that queued them (lib/queue.ts ownedBy).
       await clearSession();
       await clearCache();
       await setSettings({ serverUrl: origin });

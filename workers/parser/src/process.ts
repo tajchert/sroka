@@ -61,7 +61,14 @@ export function ownHosts(env: ParserEnv): string[] {
 
 export function imagesTransform(env: ParserEnv): ImageTransform {
   return async (bytes, _type, { width }) => {
-    const out = await env.IMAGES.input(new Blob([bytes as never]).stream())
+    // Stream the bytes as-is (no Blob copy of a possibly 10 MB download).
+    const input = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(bytes);
+        c.close();
+      },
+    });
+    const out = await env.IMAGES.input(input)
       .transform({ width, fit: "scale-down" })
       .output({ format: "image/webp", quality: 80 });
     const buf = await new Response(out.image()).arrayBuffer();
@@ -109,7 +116,8 @@ interface CachedMeta {
 async function cacheLookup(env: ParserEnv, hash: string, now: number): Promise<{ id: string; meta: CachedMeta } | null> {
   try {
     const row = await env.DB.prepare(
-      "SELECT id FROM content WHERE url_hash = ?1 AND parser_version = ?2 AND status != 'failed' AND parsed_at > ?3 ORDER BY parsed_at DESC LIMIT 1",
+      // Only full ('ok') parses are shared: a 'partial' row is typically a bot wall / consent / paywall page.
+      "SELECT id FROM content WHERE url_hash = ?1 AND parser_version = ?2 AND status = 'ok' AND parsed_at > ?3 ORDER BY parsed_at DESC LIMIT 1",
     )
       .bind(hash, PARSER_VERSION, now - CACHE_TTL_MS)
       .first<{ id: string }>();
@@ -143,10 +151,36 @@ function resultFrom(job: ParseJob, contentId: string, isPrivate: boolean, m: Cac
 }
 
 /**
- * Parse one job. Returns a ParseResult (ok/partial/failed for permanent outcomes).
+ * True when fetching `url` yields exactly what the shared cache key (its canonical form) stands for: same
+ * query parameters in the same order (only the fragment / credentials may differ). Fetches of any other
+ * variant (tracking params that may be echoed into the page, reordered order-sensitive queries) must neither
+ * read nor fill the cache shared by all users.
+ */
+export function sharesCacheKey(url: string, canonical: string): boolean {
+  try {
+    const u = new URL(url.trim());
+    u.hash = "";
+    u.username = "";
+    u.password = "";
+    if (u.hostname.endsWith(".")) u.hostname = u.hostname.replace(/\.+$/, "");
+    if (u.search === "?") u.search = "";
+    return u.href === canonical;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse one job. Returns a ParseResult (ok/partial/failed for permanent outcomes), or null when
+ * `stillWanted` reports (right before the R2 writes) that the job was superseded meanwhile.
  * Throws TransientError / transient FetchError when the job should be retried.
  */
-export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = defaultDeps): Promise<ParseResult> {
+export async function processJob(
+  env: ParserEnv,
+  job: ParseJob,
+  deps: Deps = defaultDeps,
+  stillWanted?: () => Promise<boolean>,
+): Promise<ParseResult | null> {
   const isPrivate = !!job.rawKey;
   let canonical: string;
   try {
@@ -156,8 +190,9 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
   }
   const hash = await urlHash(canonical);
   const now = deps.now();
+  const sharedCache = !isPrivate && sharesCacheKey(job.url, canonical);
 
-  if (!isPrivate && !job.force) {
+  if (sharedCache && !job.force) {
     const hit = await cacheLookup(env, hash, now);
     if (hit) return resultFrom(job, hit.id, false, hit.meta);
   }
@@ -219,6 +254,8 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
     return failedResult(job, "extract_failed");
   }
 
+  if (stillWanted && !(await stillWanted())) return null;
+
   // 3. write R2 (fresh contentId => write-once keys); meta.json last = cache-validity marker
   const dir = r2Keys.contentDir(contentId, isPrivate ? job.userId : null);
   const cached: CachedMeta = {
@@ -233,14 +270,15 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
     ...(built.leadImageKey ? { leadImageKey: built.leadImageKey } : {}),
   };
   try {
-    await Promise.all(built.files.map((f) => env.CONTENT.put(dir + f.path, f.bytes, { httpMetadata: { contentType: f.contentType } })));
+    // One at a time: concurrent puts would keep every request body buffered at once.
+    for (const f of built.files) await env.CONTENT.put(dir + f.path, f.bytes, { httpMetadata: { contentType: f.contentType } });
     await env.CONTENT.put(`${dir}meta.json`, JSON.stringify(cached), { httpMetadata: { contentType: "application/json" } });
   } catch (e) {
     throw new TransientError(`r2 put: ${e}`);
   }
 
-  // 4. shared cache row (public only). Failure here is non-fatal.
-  if (!isPrivate) {
+  // 4. shared cache row (public, canonical fetch, full parse only). Failure here is non-fatal.
+  if (sharedCache && built.status === "ok") {
     try {
       await env.DB.prepare(
         "INSERT INTO content (id, url_hash, canonical_url, parser_version, status, title, word_count, lang, bytes, ref_count, parsed_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)",
@@ -256,8 +294,9 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
 }
 
 /**
- * api.md section 9: the parser ref-counts shared content. Called after markParsed returned ok for a
- * public ok/partial result (fresh parse or cache hit). Errors are swallowed; the cron reconciles drift.
+ * api.md section 9: the parser ref-counts shared content. Called after markParsed returned ok (first accept
+ * for that parse gen) for a public ok/partial result (fresh parse or cache hit). Errors are swallowed.
+ * NOTE: nothing decrements ref_count yet and there is no shared-content GC (see docs/ledger.md).
  */
 export async function incrementRefCount(env: ParserEnv, result: ParseResult): Promise<void> {
   if (result.status === "failed" || result.contentPrivate || !result.contentId) return;

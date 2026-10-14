@@ -37,3 +37,14 @@ export const jobs = sqliteTable(
   },
   (t) => [index("jobs_user").on(t.userId, t.createdAt)],
 );
+
+/** Per-email OTP throttle counters (src/auth-throttle.ts). key = `{kind}:{window}:{email}:{bucket}`. */
+export const authThrottle = sqliteTable(
+  "auth_throttle",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (t) => [index("auth_throttle_expires").on(t.expiresAt)],
+);

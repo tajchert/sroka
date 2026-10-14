@@ -22,6 +22,7 @@ import {
   normalizeTagName,
   pairWins,
   parseClock,
+  r2Keys,
   tagKey,
   uuidv7,
 } from "@sroka/shared";
@@ -65,12 +66,25 @@ export interface TagWithCount {
 
 const MAX_ALIAS_HOPS = 10;
 const MAX_RENAME_HOPS = 10;
+/**
+ * Max rows stamped with one seq. A huge op (tag rename/delete/merge over tens of thousands of carriers) spreads
+ * its rows over several consecutive seqs so a sync pull "seq group" stays bounded (api.md §7.2).
+ */
+export const MAX_SEQ_GROUP = 250;
+/** item.refresh on an item already pending for less than this is coalesced (no new parse job). */
+export const REFRESH_COALESCE_MS = 10 * 60 * 1000;
 
-/** Per-op change context: allocates at most one seq per op and tracks touched rows. */
+/**
+ * Per-op change context: allocates one seq per op (more only for ops touching > MAX_SEQ_GROUP rows) and
+ * tracks touched rows.
+ */
 class OpCtx {
   private seqValue: number | null = null;
+  private rowsInSeq = 0;
   readonly dirtyItems = new Set<string>();
   readonly jobs: ParseJob[] = [];
+  /** R2 keys (or prefixes ending in "/") to delete once the op committed. */
+  readonly cleanup: string[] = [];
   constructor(
     private readonly store: LibraryStore,
     /** Server time of this request (tombstone / bookkeeping timestamps; never used for LWW). */
@@ -83,21 +97,45 @@ class OpCtx {
   get changed(): boolean {
     return this.seqValue !== null;
   }
+  /** Seq for one more stamped row; rolls over to a fresh seq once the current group is full. */
+  private rowSeq(): number {
+    if (this.seqValue !== null && this.rowsInSeq >= MAX_SEQ_GROUP) {
+      this.seqValue = this.store.nextSeq();
+      this.rowsInSeq = 0;
+    }
+    const s = this.seq();
+    this.rowsInSeq++;
+    return s;
+  }
   touchItem(id: string): void {
-    this.store.exec("UPDATE items SET seq = ? WHERE id = ?", this.seq(), id);
+    if (this.dirtyItems.has(id)) {
+      this.store.exec("UPDATE items SET seq = ? WHERE id = ?", this.seq(), id);
+      return;
+    }
+    this.store.exec("UPDATE items SET seq = ? WHERE id = ?", this.rowSeq(), id);
     this.dirtyItems.add(id);
   }
   touchTag(id: string): void {
-    this.store.exec("UPDATE tags SET seq = ? WHERE id = ?", this.seq(), id);
+    this.store.exec("UPDATE tags SET seq = ? WHERE id = ?", this.rowSeq(), id);
   }
 }
 
 export class LibraryStore {
+  /** R2 keys/prefixes of committed ops awaiting deletion; drained by the LibraryDO (takeCleanup). */
+  private pendingCleanup: string[] = [];
+
   constructor(
     private readonly storage: DurableObjectStorage,
     /** Resolves the owning user id (for ParseJob.userId). */
     private readonly userId: () => string,
   ) {}
+
+  /** Returns and clears the R2 keys (prefixes end in "/") freed by committed ops. */
+  takeCleanup(): string[] {
+    const out = this.pendingCleanup;
+    this.pendingCleanup = [];
+    return out;
+  }
 
   // ---------- low-level helpers ----------
 
@@ -125,6 +163,9 @@ export class LibraryStore {
     return r && typeof r.v === "string" ? r.v : null;
   }
   setMetaText(k: string, v: string): void {
+    this.setMeta(k, v);
+  }
+  setMetaNumber(k: string, v: number): void {
     this.setMeta(k, v);
   }
 
@@ -209,12 +250,15 @@ export class LibraryStore {
 
   /** Runs `fn` in one transaction with an OpCtx; refreshes FTS of touched items at the end. */
   private withCtx<T>(fn: (ctx: OpCtx) => T, now: number = Date.now()): { value: T; ctx: OpCtx } {
-    return this.txn(() => {
+    const res = this.txn(() => {
       const ctx = new OpCtx(this, now);
       const value = fn(ctx);
       for (const id of ctx.dirtyItems) this.refreshFts(id);
       return { value, ctx };
     });
+    // Only reached when the transaction committed.
+    this.pendingCleanup.push(...res.ctx.cleanup);
+    return res;
   }
 
   private liveItemForOp(itemId: string): ItemRow {
@@ -226,6 +270,8 @@ export class LibraryStore {
 
   private newParseJob(ctx: OpCtx, row: ItemRow, extra: { rawKey?: string; force?: boolean } = {}): ParseJob {
     const gen = row.parse_gen + 1;
+    // The captured HTML is no longer the parse source (e.g. refresh from the web): don't keep it around.
+    if (row.parse_raw_key && row.parse_raw_key !== extra.rawKey) ctx.cleanup.push(row.parse_raw_key);
     this.exec(
       `UPDATE items SET parse_gen = ?, parse_status = 'pending', parse_error = NULL, parse_requested_at = ?,
          parse_raw_key = ? WHERE id = ?`,
@@ -256,6 +302,7 @@ export class LibraryStore {
    * rejected, everything (including applied_ops rows) is rolled back and `applied` is empty.
    */
   applyOpsAtomic(deviceId: string, ops: Op[], addInfo: AddInfo[], now: number = Date.now()): ApplyResult {
+    const cleanupMark = this.pendingCleanup.length;
     try {
       return this.txn(() => {
         const res = this.applyLoop(deviceId, ops, addInfo, now);
@@ -263,6 +310,7 @@ export class LibraryStore {
         return res;
       });
     } catch (e) {
+      this.pendingCleanup.length = cleanupMark; // nothing of the rolled-back ops was committed
       if (!(e instanceof Rollback)) throw e;
       const r = e.result.response;
       return { response: { applied: [], rejected: r.rejected, aliases: {}, cursor: this.getMeta("seq") }, parseJobs: [] };
@@ -380,10 +428,17 @@ export class LibraryStore {
         if (row.deleted_at !== null) return null; // applied no-op
         this.exec("UPDATE items SET deleted_at = ?, tombstoned_at = ? WHERE id = ?", stamp.at, ctx.now, row.id);
         ctx.touchItem(row.id);
+        // Captured HTML and private extracted content belong to this item only: delete them with it.
+        if (row.parse_raw_key) ctx.cleanup.push(row.parse_raw_key);
+        if (row.content_private === 1 && row.content_id) ctx.cleanup.push(r2Keys.contentDir(row.content_id, this.userId()));
         return null;
       }
       case "item.refresh": {
         const row = this.liveItemForOp(op.itemId);
+        // Coalesce refresh spam: a parse requested moments ago is still on its way (applied no-op).
+        if (row.parse_status === "pending" && row.parse_requested_at !== null && row.parse_requested_at > ctx.now - REFRESH_COALESCE_MS) {
+          return null;
+        }
         ctx.jobs.push(this.newParseJob(ctx, row, { force: true }));
         return null;
       }
@@ -571,6 +626,8 @@ export class LibraryStore {
     const toKey = tagKey(toName);
     const from = this.liveTagByKey(fromKey);
     if (!from) throw new Reject("unknown_tag");
+    // A stale (offline) op must not act on a tag created after it: applied no-op (api.md §8.4).
+    if (from.created_at > stamp.at) return;
     const other = fromKey === toKey ? null : this.liveTagByKey(toKey);
     let targetId = from.id;
     if (other) {
@@ -608,8 +665,18 @@ export class LibraryStore {
   private opTagDelete(ctx: OpCtx, op: OpOf<"tag.delete">, stamp: Stamp): void {
     const tag = this.liveTagByKey(tagKey(op.tag));
     if (!tag) throw new Reject("unknown_tag");
+    // A stale (offline) delete must not destroy a tag created after it: applied no-op (api.md §8.4).
+    if (tag.created_at > stamp.at) return;
     for (const id of this.liveCarriers(tag.id)) ctx.touchItem(id);
-    this.exec("UPDATE item_tags SET present = 0, at = ?, dev = ? WHERE tag_id = ? AND present = 1", stamp.at, stamp.dev, tag.id);
+    // Only pairs the delete wins take its stamp; newer pair stamps are kept (LWW).
+    this.exec(
+      "UPDATE item_tags SET present = 0, at = ?1, dev = ?2 WHERE tag_id = ?3 AND present = 1 AND (at < ?1 OR (at = ?1 AND dev <= ?2))",
+      stamp.at,
+      stamp.dev,
+      tag.id,
+    );
+    // Pairs stamped after the delete keep their own stamp (the tag is gone either way).
+    this.exec("UPDATE item_tags SET present = 0 WHERE tag_id = ? AND present = 1", tag.id);
     this.exec("UPDATE tags SET deleted_at = ?, tombstoned_at = ? WHERE id = ?", stamp.at, ctx.now, tag.id);
     ctx.touchTag(tag.id);
   }
@@ -624,9 +691,10 @@ export class LibraryStore {
   }
 
   /**
-   * Alarm sweep: re-issues parse jobs for live items stuck in `pending` since before `olderThan` (e.g. the
-   * queue send after a committed push failed, and the idempotent retry returned no jobs). Reuses the stored
-   * raw HTML key. Bumps parse_gen, so a late result of the original job is ignored as stale.
+   * Alarm sweep: re-sends parse jobs of live items stuck in `pending` since before `olderThan` (e.g. the
+   * queue send after a committed push failed, or the job was deferred by the parse budget). Reuses the stored
+   * raw HTML key and keeps parse_gen: a still-queued original job stays valid, and whichever copy finishes
+   * first wins (markParsed accepts one result per gen; the parser skips jobs that are no longer pending).
    */
   requeueStalePending(olderThan: number, limit: number, now: number = Date.now()): ParseJob[] {
     const rows = this.all<ItemRow>(
@@ -636,18 +704,47 @@ export class LibraryStore {
       limit,
     );
     if (rows.length === 0) return [];
-    return this.withCtx((ctx) => {
-      return rows.map((row) => {
-        const job = this.newParseJob(ctx, row, row.parse_raw_key ? { rawKey: row.parse_raw_key } : {});
+    const uid = this.userId();
+    return this.txn(() =>
+      rows.map((row) => {
+        this.exec("UPDATE items SET parse_requested_at = ? WHERE id = ?", now, row.id);
+        const job: ParseJob = { userId: uid, itemId: row.id, url: row.url, parseGen: row.parse_gen };
+        if (row.parse_raw_key) job.rawKey = row.parse_raw_key;
         return job;
-      });
-    }, now).value;
+      }),
+    );
   }
 
+  /** Marks jobs that were not sent (parse budget exhausted) so the next sweep picks them up first. */
+  deferParse(itemIds: readonly string[]): void {
+    if (itemIds.length === 0) return;
+    this.exec(
+      "UPDATE items SET parse_requested_at = 0 WHERE parse_status = 'pending' AND id IN (SELECT value FROM json_each(?))",
+      JSON.stringify(itemIds),
+    );
+  }
+
+  /** True while the item is live and still waiting for the result of parse generation `gen`. */
+  parseWanted(itemId: string, gen: number): boolean {
+    const row = this.first<{ g: number; s: string; d: number | null }>(
+      "SELECT parse_gen AS g, parse_status AS s, deleted_at AS d FROM items WHERE id = ?",
+      itemId,
+    );
+    return !!row && row.d === null && row.g === gen && row.s === "pending";
+  }
+
+  /**
+   * Parser result. Accepted once per parse generation, only while the item is pending for it: a duplicate
+   * delivery, or a DLQ `failed` after a committed success, is ignored (`ok:false`).
+   */
   markParsed(itemId: string, result: ParseResult): { ok: boolean } {
     const row = this.itemRow(itemId);
-    if (!row || row.deleted_at !== null || row.parse_gen !== result.parseGen) return { ok: false };
+    if (!row || row.deleted_at !== null || row.parse_gen !== result.parseGen || row.parse_status !== "pending") return { ok: false };
     this.withCtx((ctx) => {
+      // The previous private content of this item is superseded (a new private dir, or now public content).
+      if (row.content_private === 1 && row.content_id && row.content_id !== result.contentId) {
+        ctx.cleanup.push(r2Keys.contentDir(row.content_id, this.userId()));
+      }
       if (result.status === "failed") {
         this.exec("UPDATE items SET parse_status = 'failed', parse_error = ? WHERE id = ?", result.error ?? null, row.id);
       } else {

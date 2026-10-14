@@ -3,6 +3,8 @@ import type { ParseResult } from "@sroka/shared";
 /** The slice of LibraryDO's RPC surface the parser uses (the class lives in workers/api). */
 export interface LibraryParserRpc {
   markParsed(itemId: string, result: ParseResult): Promise<{ ok: boolean }>;
+  /** False when the job is superseded / already done / the item or library is gone. */
+  parseWanted(itemId: string, parseGen: number): Promise<boolean>;
 }
 
 /** `env.LIBRARY` as the parser sees it: only getByName() is used. */

@@ -101,8 +101,11 @@ describe("review fixes", () => {
       expect(s.requeueStalePending(Date.now() - 60_000, 100)).toEqual([]); // fresh → untouched
       const jobs: ParseJob[] = s.requeueStalePending(Date.now() + 1, 100);
       expect(jobs.map((j) => j.itemId).sort()).toEqual([a, b].sort());
-      expect(jobs.find((j) => j.itemId === b)).toMatchObject({ rawKey: `raw/${userId}/${b}.html.gz`, parseGen: 3 });
-      expect(jobs.find((j) => j.itemId === a)).toMatchObject({ parseGen: 2 });
+      // Same gen (no bump): a still-queued original job stays valid instead of being invalidated.
+      expect(jobs.find((j) => j.itemId === b)).toMatchObject({ rawKey: `raw/${userId}/${b}.html.gz`, parseGen: 2 });
+      expect(jobs.find((j) => j.itemId === a)).toMatchObject({ parseGen: 1 });
+      // Re-sent → fresh again.
+      expect(s.requeueStalePending(Date.now() - 60_000, 100)).toEqual([]);
       expect(jobs.find((j) => j.itemId === a)!.rawKey).toBeUndefined();
     });
   });

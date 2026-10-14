@@ -2,6 +2,7 @@ import { env as rawEnv } from "cloudflare:workers";
 import { PARSER_VERSION, r2Keys, urlHash, normalizeUrl, ParseResultSchema, type ParseJob, type ParseResult } from "@sroka/shared";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index.ts";
+import { sweepOrphanedUserData } from "../src/gc.ts";
 import type { ParserEnv } from "../src/env.ts";
 
 const base = rawEnv as unknown as ParserEnv;
@@ -15,6 +16,8 @@ const job = (over: Partial<ParseJob> = {}): ParseJob => ({ userId: "u1", itemId:
 
 let marked: Array<{ userId: string; itemId: string; result: ParseResult }>;
 let markFails = 0;
+let wanted: boolean[] = [];
+let markOk = true;
 let imagesFail = false;
 const fakeImages = {
   input: () => ({
@@ -40,8 +43,9 @@ function mkEnv(): ParserEnv {
             throw new Error("rpc down");
           }
           marked.push({ userId, itemId, result });
-          return { ok: true };
+          return { ok: markOk };
         },
+        parseWanted: async () => wanted.shift() ?? true,
       }),
     },
   };
@@ -74,6 +78,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   marked = [];
   markFails = 0;
+  wanted = [];
+  markOk = true;
   imagesFail = false;
   fetched = [];
   await base.DB.exec("DELETE FROM content");
@@ -247,5 +253,69 @@ describe("parser queue consumer", () => {
       status: "failed", parseGen: 7, contentPrivate: false, title: null, excerpt: null, siteName: null, author: null, lang: null,
       wordCount: null, readingMinutes: null, error: "parse_failed", parserVersion: PARSER_VERSION,
     });
+  });
+
+  it("skips superseded / already-done jobs before fetching, and before writing R2", async () => {
+    stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    wanted = [false];
+    const m = msg(job());
+    await run([m]);
+    expect(m.ack).toHaveBeenCalled();
+    expect(fetched).toEqual([]);
+    expect(marked).toEqual([]);
+    // Superseded while extracting: nothing is written.
+    wanted = [true, false];
+    const m2 = msg(job());
+    await run([m2]);
+    expect(m2.ack).toHaveBeenCalled();
+    expect(marked).toEqual([]);
+    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 0 });
+  });
+
+  it("deletes the private content it wrote when markParsed rejects the result (e.g. account wiped)", async () => {
+    const rawKey = r2Keys.raw("u9", ITEM);
+    const gz = await new Response(new Blob([PAGE]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    await base.CONTENT.put(rawKey, gz);
+    stubWeb({ "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    markOk = false;
+    await run([msg(job({ userId: "u9", rawKey }))]);
+    const cid = marked[0]!.result.contentId!;
+    expect((await base.CONTENT.list({ prefix: r2Keys.contentDir(cid, "u9") })).objects).toEqual([]);
+  });
+
+  it("never fills or reads the shared cache from a non-canonical fetch (tracking params echoed into the page)", async () => {
+    const evil = "https://example.com/post?utm_campaign=Your+account+is+locked";
+    stubWeb({ [evil]: () => html(), "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    await run([msg(job({ url: evil }))]);
+    expect(fetched[0]).toBe(evil);
+    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 0 });
+    // A canonical save fetches its own copy (and may be cached); the evil variant then doesn't read it.
+    await run([msg(job({ itemId: "0192f3c4-1111-7000-8000-0000000000cc", parseGen: 1 }))]);
+    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 1 });
+    fetched.length = 0;
+    await run([msg(job({ url: evil, parseGen: 4 }))]);
+    expect(fetched[0]).toBe(evil);
+  });
+
+  it("does not share 'partial' parses (bot walls, consent pages) through the cache", async () => {
+    const thin = `<!doctype html><html><head><title>Access denied</title></head><body><article><p>${"Access denied. ".repeat(12)}</p></article></body></html>`;
+    stubWeb({ "https://example.com/post": () => html(thin) });
+    await run([msg(job())]);
+    expect(marked[0]!.result.status).toBe("partial");
+    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 0 });
+  });
+
+  it("weekly GC deletes R2 data of user ids that no longer exist", async () => {
+    await base.DB.exec("CREATE TABLE IF NOT EXISTS user (id TEXT PRIMARY KEY);");
+    await base.DB.prepare("INSERT OR IGNORE INTO user (id) VALUES ('alive')").run();
+    for (const k of ["private/alive/c1/a.html", "raw/alive/i.html.gz", "private/ghost/c1/a.html", "raw/ghost/i.html.gz", "uploads/ghost/x.csv"]) {
+      await base.CONTENT.put(k, "x");
+    }
+    const r = await sweepOrphanedUserData(base);
+    expect(r.deleted).toEqual(expect.arrayContaining(["private/ghost/", "raw/ghost/", "uploads/ghost/"]));
+    expect(r.deleted.filter((p) => p.includes("/alive/"))).toEqual([]);
+    expect(await base.CONTENT.head("private/alive/c1/a.html")).not.toBeNull();
+    expect(await base.CONTENT.head("raw/alive/i.html.gz")).not.toBeNull();
+    expect(await base.CONTENT.head("raw/ghost/i.html.gz")).toBeNull();
   });
 });

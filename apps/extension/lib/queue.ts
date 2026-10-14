@@ -1,6 +1,6 @@
 import { ext } from "./chrome.ts";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
-import { getSettings } from "./settings.ts";
+import { getSettings, type Settings } from "./settings.ts";
 
 export const QUEUE_KEY = "queue";
 export const ALARM = "sroka-retry";
@@ -17,6 +17,20 @@ export interface QueueEntry {
   attempts: number;
   nextAt: number;
   addedAt: number;
+  /**
+   * Who queued it: the account (email, null if signed out at the time) and server. Entries are only sent with
+   * a matching session, so one person's captured pages never go to another account or another server.
+   */
+  owner?: { email: string | null; serverUrl: string };
+}
+
+const normEmail = (e: string | null | undefined) => (e ? e.trim().toLowerCase() : null);
+
+/** True if `e` may be sent with the current session. Legacy entries (no owner) predate this check. */
+export function ownedBy(e: QueueEntry, s: Pick<Settings, "email" | "serverUrl">): boolean {
+  if (!e.owner) return true;
+  if (e.owner.serverUrl !== s.serverUrl) return false;
+  return e.owner.email === null || normEmail(e.owner.email) === normEmail(s.email);
 }
 
 export function backoffMs(attempts: number, retryAfterSec?: number): number {
@@ -77,8 +91,10 @@ async function writeQueue(q: QueueEntry[]): Promise<QueueEntry[]> {
   }
 }
 
-async function scheduleAlarm(q: QueueEntry[]) {
-  if (!q.length || (await getSettings()).signedOut) {
+async function scheduleAlarm(all: QueueEntry[]) {
+  const s = await getSettings();
+  const q = all.filter((e) => ownedBy(e, s));
+  if (!q.length || s.signedOut) {
     await ext().alarms.clear(ALARM);
     return;
   }
@@ -95,7 +111,9 @@ export function enqueue(body: SaveBody, now = Date.now()): Promise<QueueEntry> {
       const used = q.reduce((n, e) => n + (e.body.html ? byteLen(e.body.html) : 0), 0);
       if (size > MAX_QUEUED_HTML || used + size > MAX_QUEUED_HTML_TOTAL) delete b.html;
     }
-    const entry: QueueEntry = { id: crypto.randomUUID(), body: b, attempts: 0, nextAt: now, addedAt: now };
+    const s = await getSettings();
+    const owner = { email: s.signedOut ? null : normEmail(s.email), serverUrl: s.serverUrl };
+    const entry: QueueEntry = { id: crypto.randomUUID(), body: b, attempts: 0, nextAt: now, addedAt: now, owner };
     q.push(entry);
     const written = await writeQueue(q);
     await scheduleAlarm(written);
@@ -107,13 +125,15 @@ export function enqueue(body: SaveBody, now = Date.now()): Promise<QueueEntry> {
 export function processQueue(now = Date.now()): Promise<{ sent: number; remaining: number }> {
   return locked(async () => {
     let q = await readQueue();
-    if ((await getSettings()).signedOut) {
+    const s = await getSettings();
+    if (s.signedOut) {
       await ext().alarms.clear(ALARM);
       return { sent: 0, remaining: q.length };
     }
     let sent = 0;
     for (const e of [...q]) {
       if (e.nextAt > now) continue;
+      if (!ownedBy(e, s)) continue; // another account's / server's saves wait for their own session
       try {
         await saveItem(e.body);
         q = q.filter((x) => x.id !== e.id);

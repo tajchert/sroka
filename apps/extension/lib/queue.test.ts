@@ -171,3 +171,22 @@ describe("review fixes", () => {
     expect((await readQueue()).map((e) => e.body.url)).toEqual(["https://b.com/"]);
   });
 });
+
+describe("queue ownership", () => {
+  it("never sends one account's queued captures with another account's session or to another server", async () => {
+    await setSettings({ token: "ta", email: "A@example.com", signedOut: false, serverUrl: "https://api.sroka.app" });
+    await enqueue({ url: "https://intranet.example/", html: "<p>secret</p>" });
+    // A signs out; B signs in on the same browser.
+    await setSettings({ token: "tb", email: "b@example.com", signedOut: false });
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async () => ok());
+    expect(await processQueue()).toEqual({ sent: 0, remaining: 1 });
+    expect(f).not.toHaveBeenCalled();
+    // Same account, different server: still not sent.
+    await setSettings({ token: "ta2", email: "a@example.com", serverUrl: "https://evil.example" });
+    expect(await processQueue()).toEqual({ sent: 0, remaining: 1 });
+    expect(f).not.toHaveBeenCalled();
+    // Back on A's server as A: sent.
+    await setSettings({ serverUrl: "https://api.sroka.app" });
+    expect(await processQueue()).toEqual({ sent: 1, remaining: 0 });
+  });
+});

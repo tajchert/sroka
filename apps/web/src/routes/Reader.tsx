@@ -34,11 +34,15 @@ export default function Reader() {
     queryKey: ["content", id, contentId],
     queryFn: () => api.getContent(id),
     enabled: !!contentId,
-    staleTime: 6 * 3600_000,
+    // Re-signing (new exp) must not rebuild an open article: that reloads the iframe and loses the position.
+    staleTime: Infinity,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     retry: false,
   });
+  // Keyed by contentId, not by the (re-signed) URL.
   const articleQ = useQuery({
-    queryKey: ["article", contentQ.data?.articleUrl],
+    queryKey: ["article", contentId],
     queryFn: () => api.fetchArticle(contentQ.data!.articleUrl),
     enabled: !!contentQ.data,
     staleTime: Infinity,
@@ -55,7 +59,8 @@ export default function Reader() {
       articleQ.data && contentQ.data
         ? buildSrcdoc({ html: articleQ.data, baseUrl: contentQ.data.baseUrl, settings: settingsRef.current, prefersDark: prefersDark() })
         : null,
-    [articleQ.data, contentQ.data],
+    // Rebuilt per article, not per URL signature (contentQ.data is read from the render that built it).
+    [articleQ.data, contentId],
   );
 
   const pushSettings = useCallback((s: ReaderSettings) => {
@@ -122,6 +127,7 @@ export default function Reader() {
         }
       } else if (d.type === "sroka:metrics" && typeof d.progress === "number") {
         const anchor = typeof d.anchor === "number" ? d.anchor : null;
+        if (anchor !== null) startAnchor.current = anchor; // a rebuilt frame resumes here, not at the first position
         pendingProgress.current = { progress: Math.min(1, Math.max(0, d.progress)), anchor };
         flushTimer.current ??= setTimeout(flush, 3000);
       }

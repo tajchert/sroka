@@ -16,6 +16,7 @@ import {
 import type { Env } from "./env.ts";
 import { patchToOps } from "./do/rest.ts";
 import { migrate } from "./do/schema.ts";
+import { deletePrefix } from "./r2.ts";
 import { withLeadImageUrls } from "./do/sign.ts";
 import { type AddInfo, type ApplyResult, LibraryStore, type TagWithCount } from "./do/store.ts";
 
@@ -34,6 +35,21 @@ const STALE_PENDING_MS = 30 * 60 * 1000;
 /** Delay of the extra alarm scheduled when a route failed to enqueue parse jobs. */
 const SWEEP_DELAY_MS = STALE_PENDING_MS + 60 * 1000;
 const SWEEP_BATCH = 100;
+/**
+ * Per-user parse budget (token bucket): at most PARSE_BURST jobs at once, refilled at PARSE_BURST per hour.
+ * Jobs over budget stay `pending` and are sent by the sweep later (DEFERRED_SWEEP_MS cadence).
+ */
+export const PARSE_BURST = 1000;
+const PARSE_REFILL_PER_MS = PARSE_BURST / (60 * 60 * 1000);
+const DEFERRED_SWEEP_MS = 10 * 60 * 1000;
+/** Marker table created by destroy(): the library of a deleted account must never be recreated. */
+const DESTROYED_TABLE = "_destroyed";
+
+export class LibraryDestroyedError extends Error {
+  constructor() {
+    super("library_destroyed");
+  }
+}
 
 /**
  * Per-user library (SQLite DO, decisions D5). Addressed with `env.LIBRARY.getByName(userId)`.
@@ -43,19 +59,75 @@ export class LibraryDO extends DurableObject<Env> {
   private store: LibraryStore;
   private ready = false;
   private alarmChecked = false;
+  private destroyed: boolean | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.store = new LibraryStore(ctx.storage, () => this.userId());
     void ctx.blockConcurrencyWhile(async () => {
-      this.ensureSchema();
+      if (!this.isDestroyed()) this.ensureSchema();
     });
   }
 
+  private isDestroyed(): boolean {
+    if (this.destroyed === null) {
+      this.destroyed =
+        this.ctx.storage.sql.exec("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = ?", DESTROYED_TABLE).toArray().length > 0;
+    }
+    return this.destroyed;
+  }
+
+  /** Migrates on first use. Throws LibraryDestroyedError for a wiped (deleted-account) library. */
   private ensureSchema(): void {
     if (this.ready) return;
+    if (this.isDestroyed()) throw new LibraryDestroyedError();
     migrate(this.ctx.storage);
     this.ready = true;
+  }
+
+  /** Deletes R2 objects freed by committed ops (raw captures, private content). Best effort. */
+  private async flushCleanup(): Promise<void> {
+    const keys = this.store.takeCleanup();
+    if (keys.length === 0) return;
+    const exact = keys.filter((k) => !k.endsWith("/"));
+    const prefixes = keys.filter((k) => k.endsWith("/"));
+    try {
+      await Promise.all([
+        exact.length ? this.env.CONTENT.delete(exact) : Promise.resolve(),
+        ...prefixes.map((p) => deletePrefix(this.env.CONTENT, p)),
+      ]);
+    } catch (e) {
+      console.error("LibraryDO: R2 cleanup failed", keys, e);
+    }
+  }
+
+  /** Takes up to `n` tokens of the parse budget; returns how many were granted. */
+  private takeParseTokens(n: number, now = Date.now()): number {
+    if (n <= 0) return 0;
+    const last = this.store.getMeta("parse_budget_at");
+    const stored = last === 0 ? PARSE_BURST : this.store.getMeta("parse_budget");
+    const tokens = Math.min(PARSE_BURST, stored + Math.max(0, now - last) * PARSE_REFILL_PER_MS);
+    const granted = Math.min(n, Math.floor(tokens));
+    this.store.setMetaNumber("parse_budget", tokens - granted);
+    this.store.setMetaNumber("parse_budget_at", now);
+    return granted;
+  }
+
+  /** Applies the parse budget: returns the jobs to send now; the rest are deferred to the sweep. */
+  private async budgetJobs(jobs: ParseJob[]): Promise<ParseJob[]> {
+    if (jobs.length === 0) return jobs;
+    const granted = this.takeParseTokens(jobs.length);
+    if (granted === jobs.length) return jobs;
+    this.store.deferParse(jobs.slice(granted).map((j) => j.itemId));
+    await this.scheduleSweepIn(DEFERRED_SWEEP_MS);
+    return jobs.slice(0, granted);
+  }
+
+  private async scheduleSweepIn(ms: number): Promise<void> {
+    const at = Date.now() + ms;
+    const cur = await this.ctx.storage.getAlarm();
+    if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
+    this.alarmChecked = true;
   }
 
   private userId(): string {
@@ -115,6 +187,8 @@ export class LibraryDO extends DurableObject<Env> {
     const res = atomic ? this.store.applyOpsAtomic(deviceId, ops, info) : this.store.applyOps(deviceId, ops, info);
     res.response.rejected.unshift(...invalid);
     if (ops.length > 0) await this.ensureAlarm();
+    res.parseJobs = await this.budgetJobs(res.parseJobs);
+    await this.flushCleanup();
     return res;
   }
 
@@ -131,17 +205,32 @@ export class LibraryDO extends DurableObject<Env> {
   }
 
   /** Bumps parse_gen and returns the job to enqueue (html save path), or null if the item is unknown/deleted. */
-  requestParse(itemId: string, opts: { rawKey?: string; force?: boolean } = {}): ParseJob | null {
+  async requestParse(itemId: string, opts: { rawKey?: string; force?: boolean } = {}): Promise<ParseJob | null> {
     this.ensureSchema();
-    return this.store.requestParse(itemId, opts);
+    const job = this.store.requestParse(itemId, opts);
+    await this.flushCleanup();
+    return job ? ((await this.budgetJobs([job]))[0] ?? null) : null;
   }
 
-  /** Parser result. `{ok:false}` for unknown/deleted items and stale parseGen. */
-  markParsed(itemId: string, result: ParseResult): { ok: boolean } {
+  /**
+   * Parser result. `{ok:false}` for unknown/deleted items, stale parseGen, a result already applied for this
+   * gen, or a destroyed library (the parser then deletes private content it wrote).
+   */
+  async markParsed(itemId: string, result: ParseResult): Promise<{ ok: boolean }> {
+    if (this.isDestroyed()) return { ok: false };
     this.ensureSchema();
     const p = ParseResultSchema.safeParse(result);
     if (!p.success) return { ok: false };
-    return this.store.markParsed(itemId, p.data);
+    const r = this.store.markParsed(itemId, p.data);
+    await this.flushCleanup();
+    return r;
+  }
+
+  /** Parser pre-check: false when the job is superseded / already done / the item or library is gone. */
+  parseWanted(itemId: string, parseGen: number): boolean {
+    if (this.isDestroyed()) return false;
+    this.ensureSchema();
+    return this.store.parseWanted(itemId, parseGen);
   }
 
   async pull(cursor: number, limit: number): Promise<PullResult> {
@@ -155,8 +244,13 @@ export class LibraryDO extends DurableObject<Env> {
   async destroy(): Promise<void> {
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+    // Tombstone: later RPCs (in-flight pushes, import steps, parser results, a retried alarm) must not
+    // migrate a fresh schema and recreate the deleted user's library.
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS ${DESTROYED_TABLE} (at INTEGER)`);
+    this.ctx.storage.sql.exec(`INSERT INTO ${DESTROYED_TABLE} (at) VALUES (?)`, Date.now());
+    this.destroyed = true;
     this.ready = false;
-    this.alarmChecked = false;
+    this.alarmChecked = true;
   }
 
   // ---------- internal helpers for workers/api routes ----------
@@ -186,8 +280,7 @@ export class LibraryDO extends DurableObject<Env> {
   }
 
   async requestParseAndGet(itemId: string, opts: { rawKey?: string; force?: boolean }): Promise<{ job: ParseJob | null; item: Item | null }> {
-    this.ensureSchema();
-    const job = this.store.requestParse(itemId, opts);
+    const job = await this.requestParse(itemId, opts);
     return { job, item: await this.signOne(this.store.getItem(itemId)) };
   }
 
@@ -257,28 +350,39 @@ export class LibraryDO extends DurableObject<Env> {
    */
   async scheduleParseSweep(): Promise<void> {
     this.ensureSchema();
-    const at = Date.now() + SWEEP_DELAY_MS;
-    const cur = await this.ctx.storage.getAlarm();
-    if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
-    this.alarmChecked = true;
+    await this.scheduleSweepIn(SWEEP_DELAY_MS);
   }
 
-  /** Re-enqueues parse jobs of items stuck in `pending` (lost queue sends). Returns the number re-enqueued. */
+  /**
+   * Re-sends parse jobs of items stuck in `pending` (lost queue sends, budget-deferred jobs), within the parse
+   * budget. Returns the number re-sent; schedules another sweep when the budget ran out first.
+   */
   async sweepStalePending(now: number = Date.now()): Promise<number> {
     this.ensureSchema();
     let total = 0;
     for (;;) {
-      const jobs = this.store.requeueStalePending(now - STALE_PENDING_MS, SWEEP_BATCH, now);
+      const budget = this.takeParseTokens(SWEEP_BATCH, now);
+      const jobs = budget > 0 ? this.store.requeueStalePending(now - STALE_PENDING_MS, budget, now) : [];
+      // Return unused tokens.
+      if (budget > jobs.length) this.store.setMetaNumber("parse_budget", this.store.getMeta("parse_budget") + budget - jobs.length);
+      if (budget === 0) {
+        await this.scheduleSweepIn(DEFERRED_SWEEP_MS);
+        break;
+      }
       if (jobs.length === 0) break;
       if (jobs.length === 1) await this.env.PARSE_QUEUE.send(jobs[0]!);
       else await this.env.PARSE_QUEUE.sendBatch(jobs.map((body) => ({ body })));
       total += jobs.length;
-      if (jobs.length < SWEEP_BATCH) break;
+      if (jobs.length < budget) break;
     }
     return total;
   }
 
   override async alarm(): Promise<void> {
+    if (this.isDestroyed()) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
     this.ensureSchema();
     this.store.prune();
     // Reschedule before the sweep: a failing queue send makes the alarm retry, but the daily cadence stays.

@@ -401,12 +401,26 @@ describe("parse pipeline", () => {
 });
 
 describe("account wipe", () => {
-  it("destroy() deletes everything; the library is usable afterwards", async () => {
+  it("destroy() deletes everything and leaves a tombstone: later writes can't recreate the library", async () => {
     const { lib } = freshLibrary();
-    await lib.applyOps("d", [add(uuidv7(), "https://w.example/", T0)]);
+    const id = uuidv7();
+    await lib.applyOps("d", [add(id, "https://w.example/", T0)]);
     await lib.destroy();
-    const r = await lib.pull(0, 10);
-    expect(r).toEqual({ ok: true, data: { cursor: 0, hasMore: false, items: [], tags: [], deleted: { items: [], tags: [] } } });
-    expect(await lib.stats()).toEqual({ unread: 0, archived: 0, favorites: 0, tags: 0 });
+    await runInDurableObject(lib, async (inst: LibraryDO) => {
+      await expect(inst.applyOps("d", [add(uuidv7(), "https://late.example/", T0)])).rejects.toThrow(/library_destroyed/);
+      await expect(inst.pull(0, 10)).rejects.toThrow(/library_destroyed/);
+    });
+    // A late parser result / pre-check is refused instead of migrating a fresh schema.
+    expect(await lib.parseWanted(id, 1)).toBe(false);
+    expect(
+      await lib.markParsed(id, { status: "failed", parseGen: 1, contentPrivate: false, title: null, excerpt: null, siteName: null, author: null, lang: null, wordCount: null, readingMinutes: null, error: "x", parserVersion: 1 }),
+    ).toEqual({ ok: false });
+    await runInDurableObject(lib, async (inst: LibraryDO, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+      await inst.alarm(); // a retried alarm must not resurrect the schema or reschedule itself
+      expect(await state.storage.getAlarm()).toBeNull();
+      const tables = state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'items'").toArray();
+      expect(tables).toEqual([]);
+    });
   });
 });

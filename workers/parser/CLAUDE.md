@@ -9,7 +9,8 @@ Runs `@sroka/extractor`, writes R2 (`CONTENT`), D1 `content` cache rows (`DB`), 
 
 ## Key files
 - `wrangler.jsonc` — consumers, LIBRARY (script_name sroka-api), DB (migrations in ../api/migrations), CONTENT, CONFIG, IMAGES, vars.
-- `src/env.ts` — `ParserEnv`; `LIBRARY` is typed by a local minimal RPC interface (`markParsed`).
+- `src/env.ts` — `ParserEnv`; `LIBRARY` is typed by a local minimal RPC interface (`markParsed`, `parseWanted`).
+- `src/gc.ts` — weekly `scheduled()` cron (wrangler `triggers.crons`): deletes `private/`, `raw/`, `uploads/` of user ids no longer in D1, expired `auth_throttle` rows.
 - `src/index.ts` — `queue()` handler: retry/backoff (30s*2^n, last attempt marks failed), DLQ branch. `src/process.ts` — `processJob` (cache lookup, raw/fetch, buildContent, R2 writes, D1 `content` insert). Cache needs `meta.json` in the content dir (written last).
 - Tests stub `globalThis.fetch` and override `IMAGES`/`LIBRARY` in env; `vitest.config.ts` pre-bundles sanitize-html/postcss (CJS) for workerd.
 

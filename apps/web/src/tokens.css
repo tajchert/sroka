@@ -1,0 +1,27 @@
+/* Sroka brand tokens. Black and white, with the sheen of a magpie wing (teal through blue to violet). */
+:root {
+  --paper: #fafaf8;
+  --paper-2: #f0f0ec;
+  --ink: #0b0c0d;
+  --ink-2: #5a5d60;
+  --rule: #e0e0db;
+  --wing: #0b7f7c;
+  --wing-ink: #ffffff;
+  --sheen: linear-gradient(112deg, #0a7a76 0%, #1496a6 34%, #2b6bd6 68%, #6a4fc8 100%);
+  --font-ui: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-read: "Literata", "Iowan Old Style", Charter, Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b0c0d;
+    --paper-2: #151719;
+    --ink: #f1f1ee;
+    --ink-2: #9a9ea2;
+    --rule: #25282b;
+    --wing: #45d2c4;
+    --wing-ink: #04201e;
+    --sheen: linear-gradient(112deg, #2fd0bd 0%, #3bb4d6 34%, #5b8cf0 68%, #9a82f2 100%);
+    color-scheme: dark;
+  }
+}

@@ -4,4 +4,120 @@
     <string name="feature_library_archive">Archive</string>
     <string name="feature_library_favorites">Favorites</string>
     <string name="feature_library_tags">Tags</string>
+
+    <!-- Top bar -->
+    <string name="feature_library_search">Search</string>
+    <string name="feature_library_search_hint">Search saved articles</string>
+    <string name="feature_library_close_search">Close search</string>
+    <string name="feature_library_clear_search">Clear</string>
+    <string name="feature_library_back">Back</string>
+    <string name="feature_library_sort">Sort</string>
+    <string name="feature_library_settings">Settings</string>
+    <string name="feature_library_fetch">Fetch new articles</string>
+    <string name="feature_library_sort_newest">Newest first</string>
+    <string name="feature_library_sort_oldest">Oldest first</string>
+    <string name="feature_library_sort_shortest">Shortest first</string>
+    <string name="feature_library_sort_longest">Longest first</string>
+
+    <!-- Progress strip -->
+    <string name="feature_library_status_syncing">Syncing…</string>
+    <string name="feature_library_status_downloading">Downloading %1$d of %2$d</string>
+    <string name="feature_library_status_downloading_title">Downloading %1$d of %2$d · %3$s</string>
+    <string name="feature_library_status_offline">Offline · showing saved articles</string>
+    <string name="feature_library_status_network_error">Couldn\'t reach the server. Showing saved articles.</string>
+    <string name="feature_library_status_server_error">Server problem. Try again later.</string>
+    <string name="feature_library_status_sign_in">Sign in again to sync</string>
+    <string name="feature_library_sign_in">Sign in</string>
+
+    <!-- Fetch results -->
+    <string name="feature_library_fetch_up_to_date">Library is up to date</string>
+    <plurals name="feature_library_fetch_done">
+        <item quantity="one">%d article ready offline</item>
+        <item quantity="other">%d articles ready offline</item>
+    </plurals>
+    <string name="feature_library_fetch_failed_network">Couldn\'t fetch: no connection</string>
+    <string name="feature_library_fetch_failed_server">Couldn\'t fetch: server problem</string>
+    <string name="feature_library_fetch_failed_auth">Couldn\'t fetch: sign in again</string>
+
+    <!-- Empty states -->
+    <string name="feature_library_empty_my_list_title">Nothing saved yet</string>
+    <string name="feature_library_empty_my_list_body">Share any link to Sroka to save it</string>
+    <string name="feature_library_empty_archive_title">Archive is empty</string>
+    <string name="feature_library_empty_archive_body">Articles you finish or archive show up here</string>
+    <string name="feature_library_empty_favorites_title">No favorites</string>
+    <string name="feature_library_empty_favorites_body">Swipe an article right or use its menu to favorite it</string>
+    <string name="feature_library_empty_tag_title">No articles with this tag</string>
+    <string name="feature_library_empty_search_title">No results</string>
+    <string name="feature_library_empty_search_body">Try different words</string>
+    <string name="feature_library_empty_tags_title">No tags yet</string>
+    <string name="feature_library_empty_tags_body">Add tags from an article\'s menu to organize your library</string>
+
+    <!-- Rows -->
+    <string name="feature_library_row_meta_minutes">%1$s · %2$d min</string>
+    <string name="feature_library_row_processing">Processing…</string>
+    <string name="feature_library_row_parse_failed">Couldn\'t read this page</string>
+    <string name="feature_library_row_available_offline">Available offline</string>
+    <string name="feature_library_row_favorite">Favorite</string>
+    <string name="feature_library_swipe_archive">Archive</string>
+    <string name="feature_library_swipe_unarchive">Move to My List</string>
+    <string name="feature_library_swipe_favorite">Favorite</string>
+    <string name="feature_library_swipe_unfavorite">Remove favorite</string>
+
+    <!-- Snackbars -->
+    <string name="feature_library_undo">Undo</string>
+    <string name="feature_library_snack_archived">Archived</string>
+    <string name="feature_library_snack_unarchived">Moved to My List</string>
+    <string name="feature_library_snack_favorited">Added to favorites</string>
+    <string name="feature_library_snack_unfavorited">Removed from favorites</string>
+    <string name="feature_library_snack_deleted">Article deleted</string>
+    <string name="feature_library_snack_saved">Saved</string>
+    <string name="feature_library_snack_already_saved">Already saved. Moved to My List.</string>
+    <string name="feature_library_snack_refresh">Refreshing article</string>
+
+    <!-- Add dialog -->
+    <string name="feature_library_add">Add</string>
+    <string name="feature_library_add_title">Add link</string>
+    <string name="feature_library_add_label">Link</string>
+    <string name="feature_library_add_invalid">Enter a valid web address</string>
+    <string name="feature_library_cancel">Cancel</string>
+    <string name="feature_library_save">Save</string>
+
+    <!-- Item actions -->
+    <string name="feature_library_action_favorite">Add to favorites</string>
+    <string name="feature_library_action_unfavorite">Remove from favorites</string>
+    <string name="feature_library_action_archive">Archive</string>
+    <string name="feature_library_action_unarchive">Move to My List</string>
+    <string name="feature_library_action_edit_tags">Edit tags</string>
+    <string name="feature_library_action_share">Share link</string>
+    <string name="feature_library_action_open_original">Open original</string>
+    <string name="feature_library_action_refresh">Refresh article</string>
+    <string name="feature_library_action_delete">Delete</string>
+    <string name="feature_library_delete_title">Delete article?</string>
+    <string name="feature_library_delete_body">It will be removed from this device and your account.</string>
+
+    <!-- Tags -->
+    <string name="feature_library_tags_edit_title">Edit tags</string>
+    <string name="feature_library_tags_input_label">New tag</string>
+    <string name="feature_library_tags_add">Add tag</string>
+    <string name="feature_library_tags_remove">Remove tag %1$s</string>
+    <string name="feature_library_tags_suggestions">Recent tags</string>
+    <string name="feature_library_tags_more">Tag options</string>
+    <string name="feature_library_tags_rename">Rename</string>
+    <string name="feature_library_tags_delete">Delete</string>
+    <string name="feature_library_tags_rename_title">Rename tag</string>
+    <string name="feature_library_tags_rename_invalid">Tag name can\'t be empty or longer than 64 characters</string>
+    <string name="feature_library_tags_delete_title">Delete tag \"%1$s\"?</string>
+    <string name="feature_library_tags_delete_body">It is removed from all articles. The articles stay in your library.</string>
+    <plurals name="feature_library_tag_count">
+        <item quantity="one">%d article</item>
+        <item quantity="other">%d articles</item>
+    </plurals>
+
+    <!-- Share sheet -->
+    <string name="feature_library_share_saved">Saved to Sroka</string>
+    <string name="feature_library_share_already">Already in Sroka. Moved to My List.</string>
+    <string name="feature_library_share_no_url">No link found in what you shared</string>
+    <string name="feature_library_share_sign_in_needed">Sign in to Sroka to save articles</string>
+    <string name="feature_library_share_add_tags">Add tags</string>
+    <string name="feature_library_share_done">Done</string>
 </resources>

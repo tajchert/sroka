@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { patchItem } from "../lib/cache.ts";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { hostOf, isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
@@ -23,8 +24,9 @@ export default function Reader() {
   const [settings, setSettings] = useState<ReaderSettings>(() => loadReaderSettings());
   const [panel, setPanel] = useState<"" | "settings" | "tags">("");
 
-  const itemQ = useQuery({ queryKey: ["item", id], queryFn: () => api.getItem(id), retry: false });
+  const itemQ = useQuery({ queryKey: ["item", id], queryFn: () => api.getItem(id), retry: false, refetchOnMount: "always" });
   const item = itemQ.data;
+  const qc = useQueryClient();
   const { gaveUp } = useParsePolling(item);
 
   const contentId = item?.contentId;
@@ -47,7 +49,7 @@ export default function Reader() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const startAnchor = useRef<number | null>(null);
-  if (item && startAnchor.current === null && item.progressAnchor !== null) startAnchor.current = item.progressAnchor;
+  if (item && !itemQ.isFetching && startAnchor.current === null && item.progressAnchor !== null) startAnchor.current = item.progressAnchor;
   const srcdoc = useMemo(
     () =>
       articleQ.data && contentQ.data
@@ -77,7 +79,35 @@ export default function Reader() {
     pendingProgress.current = null;
     if (!p || Math.abs(p.progress - lastSent.current) < 0.005) return;
     lastSent.current = p.progress;
-    void api.updateItem(id, { progress: p.progress, progressAnchor: p.anchor }).catch(() => undefined);
+    void api.updateItem(id, { progress: p.progress, progressAnchor: p.anchor }).then((it) => patchItem(qc, it), () => undefined);
+  }, [id, qc]);
+
+  // flush on leave: keepalive fetch survives page close (sendBeacon cannot PATCH)
+  useEffect(() => {
+    const leave = () => {
+      const p = pendingProgress.current;
+      if (!p) return;
+      pendingProgress.current = null;
+      lastSent.current = p.progress;
+      try {
+        void fetch(`/v1/items/${id}`, {
+          method: "PATCH",
+          keepalive: true,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-Sroka-Device": "web" },
+          body: JSON.stringify({ progress: p.progress, progressAnchor: p.anchor }),
+        }).catch(() => undefined);
+      } catch {
+        /* ignore */
+      }
+    };
+    const onVis = () => { if (document.visibilityState === "hidden") leave(); };
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [id]);
 
   useEffect(() => {

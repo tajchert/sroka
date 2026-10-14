@@ -1,3 +1,4 @@
+import { cancelPendingDeletes } from "../lib/hooks.ts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -45,7 +46,11 @@ export default function Shell() {
   const tags = useQuery({ queryKey: ["tags"], queryFn: api.listTags, enabled: !!me.data, staleTime: 30_000 });
 
   useEffect(() => {
-    setUnauthorizedHandler(() => qc.setQueryData(["me"], null));
+    setUnauthorizedHandler(() => {
+      cancelPendingDeletes();
+      qc.clear();
+      qc.setQueryData(["me"], null);
+    });
     return () => setUnauthorizedHandler(null);
   }, [qc]);
   useEffect(() => setOpen(false), [loc.pathname, loc.search]);

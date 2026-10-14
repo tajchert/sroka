@@ -46,6 +46,7 @@ export default function SignIn() {
     setError(null);
     try {
       await api.verifyOtp(email.trim(), value);
+      qc.clear();
       await qc.invalidateQueries({ queryKey: ["me"] });
     } catch (e) {
       fail(e);

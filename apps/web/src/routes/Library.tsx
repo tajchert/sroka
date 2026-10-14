@@ -24,7 +24,7 @@ const SORTS: { value: ItemSort; label: string }[] = [
 
 export default function Library({ state: baseState }: { state: ItemState }) {
   const { name } = useParams();
-  const tag = name ? decodeURIComponent(name) : undefined;
+  const tag = name || undefined;
   const state: ItemState = tag ? "all" : baseState;
   const [sp, setSp] = useSearchParams();
   const navigate = useNavigate();
@@ -97,7 +97,7 @@ export default function Library({ state: baseState }: { state: ItemState }) {
         case "j": move(sel + 1); break;
         case "k": move(sel - 1); break;
         case "/": e.preventDefault(); searchRef.current?.focus(); break;
-        case "Enter": if (cur && !cur.id.startsWith("tmp-")) navigate(`/item/${cur.id}`); break;
+        case "Enter": if (cur && !(e.target as HTMLElement | null)?.closest?.("button,a") && !cur.id.startsWith("tmp-")) navigate(`/item/${cur.id}`); break;
         case "a": if (cur) void actions.setArchived(cur, cur.status !== "archived"); break;
         case "f": if (cur) void actions.toggleFavorite(cur); break;
         default: return;

@@ -1,3 +1,4 @@
+import { cancelPendingDeletes, flushPendingDeletes } from "../lib/hooks.ts";
 import type { ImportFormat, Job } from "@sroka/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -18,6 +19,7 @@ export default function Settings() {
 
   const signOut = async () => {
     try {
+      await flushPendingDeletes().catch(() => undefined);
       await api.signOut();
     } finally {
       qc.clear();
@@ -35,6 +37,7 @@ export default function Settings() {
     queryFn: () => api.getImport(jobId!),
     enabled: !!jobId,
     refetchInterval: (q) => {
+      if (q.state.status === "error") return false;
       const s = q.state.data?.status;
       return s === "done" || s === "failed" ? false : 1500;
     },
@@ -73,6 +76,7 @@ export default function Settings() {
     setDeleting(true);
     try {
       await api.deleteAccount();
+      cancelPendingDeletes();
       await api.signOut().catch(() => undefined);
       qc.clear();
       qc.setQueryData(["me"], null);
@@ -106,6 +110,7 @@ export default function Settings() {
             {uploading ? "Uploading" : "Import"}
           </button>
           {j && <ImportProgress job={j} />}
+          {job.isError && !j && <p className="text-[#c2362f]">Could not load the import status. Try again later.</p>}
         </div>
       </Section>
 

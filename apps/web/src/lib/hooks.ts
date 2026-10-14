@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { Item, UpdateItemRequest } from "@sroka/shared";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
 import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
@@ -24,6 +24,24 @@ function errMessage(e: unknown): string {
 }
 
 /** Mutations on items with cache patching, error toasts and a 6 s undo window for deletes. */
+interface PendingDelete {
+  run: () => Promise<void>;
+  cancel: () => void;
+}
+const pendingDeletes = new Set<PendingDelete>();
+/** Sign-out: run deletes the user already confirmed (while the session is still valid). */
+export async function flushPendingDeletes(): Promise<void> {
+  const all = [...pendingDeletes];
+  pendingDeletes.clear();
+  await Promise.all(all.map((p) => p.run()));
+}
+/** Session lost (401): drop queued deletes so they cannot hit the next session. */
+export function cancelPendingDeletes(): void {
+  const all = [...pendingDeletes];
+  pendingDeletes.clear();
+  for (const p of all) p.cancel();
+}
+
 export function useItemActions() {
   const qc = useQueryClient();
   const toasts = useToasts();
@@ -67,9 +85,13 @@ export function useItemActions() {
   const remove = useCallback(
     (item: Item, onDone?: () => void) => {
       hideItem(item.id);
-      let undone = false;
-      const timer = setTimeout(async () => {
-        if (undone) return;
+      let done = false;
+      const entry: PendingDelete = {
+        run: async () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          pendingDeletes.delete(entry);
         try {
           await api.deleteItem(item.id);
           removeItem(qc, item.id);
@@ -80,15 +102,22 @@ export function useItemActions() {
         } finally {
           unhideItem(item.id);
         }
-      }, 6000);
+        },
+        cancel: () => {
+          done = true;
+          clearTimeout(timer);
+          unhideItem(item.id);
+        },
+      };
+      const timer = setTimeout(() => void entry.run(), 6000);
+      pendingDeletes.add(entry);
       toasts.push(
         {
           message: "Deleted",
           actionLabel: "Undo",
           onAction: () => {
-            undone = true;
-            clearTimeout(timer);
-            unhideItem(item.id);
+            pendingDeletes.delete(entry);
+            entry.cancel();
           },
         },
         6000,
@@ -144,10 +173,10 @@ export function useParsePolling(item: Item | undefined): { gaveUp: boolean } {
   const qc = useQueryClient();
   const pending = !!item && item.parseStatus === "pending" && !item.id.startsWith("tmp-");
   const id = item?.id;
-  const gaveUp = useRef(false);
+  const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
     if (!pending || !id) return;
-    gaveUp.current = false;
+    setGaveUp(false);
     const started = Date.now();
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -155,7 +184,7 @@ export function useParsePolling(item: Item | undefined): { gaveUp: boolean } {
     const tick = async () => {
       if (cancelled) return;
       if (Date.now() - started > POLL_GIVE_UP_MS) {
-        gaveUp.current = true;
+        setGaveUp(true);
         return;
       }
       try {
@@ -174,7 +203,7 @@ export function useParsePolling(item: Item | undefined): { gaveUp: boolean } {
       clearTimeout(timer);
     };
   }, [pending, id, qc]);
-  return { gaveUp: gaveUp.current };
+  return { gaveUp };
 }
 
 /** True when the keyboard event target is a text field (shortcuts must not fire). */

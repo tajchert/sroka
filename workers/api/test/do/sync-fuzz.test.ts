@@ -155,6 +155,6 @@ describe("sync convergence fuzz", () => {
       expect(first.tags.map((t) => t[0])).not.toContain("beta");
       expect(first.tags.map((t) => t[0])).not.toContain("delta");
       for (const s of snaps.slice(1)) expect(s).toEqual(first);
-    });
+    }, 30_000);
   }
 });

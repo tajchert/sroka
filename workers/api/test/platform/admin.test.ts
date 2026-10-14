@@ -38,19 +38,12 @@ const rows: Row[] = [
 
 beforeAll(async () => {
   await migrate();
-  // Table is created by a migration on the parser branch; create it here when the migration is absent.
-  await testEnv.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS parse_attempts (id TEXT PRIMARY KEY NOT NULL, created_at INTEGER NOT NULL, user_hash TEXT, item_id TEXT,
-      domain TEXT NOT NULL, url TEXT, status TEXT NOT NULL, error_code TEXT, error_detail TEXT, method TEXT NOT NULL,
-      fallback_outcome TEXT NOT NULL, http_status INTEGER, text_chars INTEGER, word_count INTEGER, images INTEGER,
-      duration_ms INTEGER, render_ms INTEGER, attempt INTEGER, parser_version TEXT, rule_applied INTEGER NOT NULL DEFAULT 0)`,
-  ).run();
   await testEnv.DB.prepare("DELETE FROM parse_attempts").run();
   for (const r of rows) {
     await testEnv.DB.prepare(
-      `INSERT INTO parse_attempts (id, created_at, domain, url, status, error_code, method, fallback_outcome) VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO parse_attempts (id, created_at, user_hash, item_id, domain, url, status, error_code, method, fallback_outcome, attempt, parser_version) VALUES (?,?,'u0000000000000000',?,?,?,?,?,?,?,1,1)`,
     )
-      .bind(r.id, r.at, r.domain, r.url === undefined ? `https://${r.domain}/${r.id}` : r.url, r.status, r.err ?? null, r.method ?? "fetch", r.fb ?? "none")
+      .bind(r.id, r.at, `item-${r.id}`, r.domain, r.url === undefined ? `https://${r.domain}/${r.id}` : r.url, r.status, r.err ?? null, r.method ?? "fetch", r.fb ?? "none")
       .run();
   }
   admin = await signIn(ADMIN);

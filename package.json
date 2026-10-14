@@ -13,7 +13,9 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "dev:setup": "node scripts/dev-setup.mjs && npm run db:migrate:local -w @sroka/api && npm run build -w @sroka/web",
+    "e2e:local": "bash scripts/e2e-local.sh"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

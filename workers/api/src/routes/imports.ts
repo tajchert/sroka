@@ -1,4 +1,4 @@
-import { ImportFormat, LIMITS, uuidv7 } from "@sroka/shared";
+import { ImportFormat, LIMITS, log, uuidv7 } from "@sroka/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
 import { getJob, reserveImportJob, updateJob } from "../import/jobs.ts";
@@ -52,7 +52,7 @@ importsRoutes.post("/", async (c) => {
     uploadKey = `uploads/${userId}/${id}.${ext(format.data, bytes)}`;
     await c.env.CONTENT.put(uploadKey, bytes);
   } catch (e) {
-    console.error("[sroka] import upload failed", e);
+    log.exception("import upload failed", e, { event: "import_upload_failed", importId: id });
     // Release the reservation (workflow_unavailable rows don't count toward the daily limit).
     await updateJob(c.env.DB, id, { status: "failed", error: "workflow_unavailable" });
     return c.json({ error: "unavailable", message: "could not store the upload" }, 503);
@@ -62,7 +62,7 @@ importsRoutes.post("/", async (c) => {
   try {
     await c.env.IMPORT_WORKFLOW.create({ id, params });
   } catch (e) {
-    console.error("[sroka] import workflow create failed", e);
+    log.exception("import workflow create failed", e, { event: "import_workflow_create_failed", importId: id });
     await updateJob(c.env.DB, id, { status: "failed", error: "workflow_unavailable" });
     await c.env.CONTENT.delete(uploadKey);
     return c.json({ error: "unavailable", message: "could not start the import" }, 503);

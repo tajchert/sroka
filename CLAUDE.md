@@ -2,7 +2,7 @@
 
 Monorepo (npm workspaces). Product/design: `docs/sroka-system-design.md` (long — read only the section you need).
 **Binding rulings: `docs/decisions.md`** (overrides the design doc). HTTP/sync contract: `docs/api.md`. Verified API snippets: `docs/research/*.md`.
-Progress ledger: `docs/ledger.md`.
+Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.md` (use `log` from `@sroka/shared`, never bare `console.*`; never log secrets, emails, article content).
 
 ## Layout
 - `packages/shared` — zod schemas, sync op types, URL normalizer, UUIDv7, content-URL signing (TS source, no build)

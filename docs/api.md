@@ -358,6 +358,8 @@ Direct download (no job in this build). All live items, newest first, streamed o
 - `GET /v1/config` (**no auth**) → `200 ConfigResponse` = KV `CONFIG` key `"config"` (JSON) merged over defaults, plus `appOrigin` = `env.APP_ORIGIN` (never from KV; the extension opens `${appOrigin}/app/` for "Open library"):
   `{"appOrigin":"https://sroka.app","minVersions":{"android":null,"ios":null,"extension":null},"features":{"imports":true,"exports":true,"browserRender":false,"highlights":false,"realtime":false},"limits":{"maxOpsPerPush":500,"maxHtmlBytes":5242880,"maxImportBytes":20971520}}`. `Cache-Control: public, max-age=300`.
 - `GET /v1/health` (no auth) → `200 {"ok":true}`.
+- `POST /v1/client-errors` (**no auth**, web client error reporting) body `ClientErrorRequest` `{"message","stack"?,"url"?,"userAgent"?,"release"?}` (`message` required; strings are truncated: message 1000, stack 4096, url/userAgent 300, release 64; body ≤ 16 KiB else `413`) → `204`. Logged server-side at error level with `event:"client_error"`; nothing is stored. Best-effort rate limit 10/min per IP per isolate → `429 {"error":"rate_limited"}` + `Retry-After`. Invalid body → `400`.
+- Every `/v1` response carries `x-request-id` (the `cf-ray`); an unhandled server error answers `500 {"error":"internal","requestId":"<cf-ray>"}` — quote the id when reporting a problem (see `docs/observability.md`).
 
 ## 13. URL normalization (`normalizeUrl`)
 

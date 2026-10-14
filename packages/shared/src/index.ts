@@ -8,3 +8,5 @@ export * from "./parse.ts";
 export * from "./content-sign.ts";
 export * from "./lww.ts";
 export * from "./hlc.ts";
+export * from "./log.ts";
+export * from "./metrics.ts";

@@ -10,12 +10,16 @@ import { itemsRoutes } from "./routes/items.ts";
 import { tagsRoutes } from "./routes/tags.ts";
 import { syncRoutes } from "./routes/sync.ts";
 import { importsRoutes } from "./routes/imports.ts";
+import { clientErrorRoutes } from "./routes/client-errors.ts";
 import { exportsRoutes } from "./routes/exports.ts";
+import { onError, requestLogger } from "./middleware/logging.ts";
 
 export { LibraryDO } from "./library-do.ts";
 export { ImportWorkflow } from "./import/workflow.ts";
 
 const app = new Hono<AppEnv>();
+
+app.use("*", requestLogger);
 
 // Host branching (api.md §2): the content host serves signed content only.
 app.use("*", async (c, next) => {
@@ -32,6 +36,7 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env, c.executionCtx).
 // Public /v1 endpoints (registered before the auth middleware).
 app.get("/v1/health", (c) => c.json({ ok: true }));
 app.route("/v1", configRoutes);
+app.route("/v1", clientErrorRoutes);
 
 // Authenticated /v1.
 app.use("/v1/*", requireAuth);
@@ -42,10 +47,7 @@ app.route("/v1/sync", syncRoutes);
 app.route("/v1/imports", importsRoutes);
 app.route("/v1/exports", exportsRoutes);
 
-app.onError((err, c) => {
-  console.error("[sroka] unhandled", err);
-  return c.json({ error: "internal" }, 500);
-});
+app.onError(onError);
 
 // Everything else: /v1 and /api unknown → JSON 404; otherwise static assets (landing, /app/* with SPA fallback).
 app.notFound((c) => {

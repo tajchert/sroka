@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { DeleteAccountRequest, toApiError, type MeResponse } from "@sroka/shared";
+import { DeleteAccountRequest, hashId, log, toApiError, type MeResponse } from "@sroka/shared";
 import type { AppEnv, Env } from "../env.ts";
 import * as authSchema from "../db/auth-schema.ts";
 import { jobs } from "../db/schema.ts";
@@ -25,7 +25,7 @@ accountRoutes.get("/me", async (c) => {
     const stub = c.env.LIBRARY.getByName(userId) as unknown as LibraryStub;
     stats = await stub.stats!();
   } catch (e) {
-    if (!isMissingRpc(e)) console.error("[sroka] stats failed", e);
+    if (!isMissingRpc(e)) log.exception("stats failed", e, { event: "stats_failed" });
   }
   const body: MeResponse = {
     user: {
@@ -51,6 +51,8 @@ export async function deleteAccountData(
   email: string,
   afterLibraryWipe?: () => void,
 ): Promise<void> {
+  const userHash = await hashId(userId);
+  log.info("account deletion started", { event: "account_delete", step: "start", userHash });
   const db = drizzle(env.DB, { schema: authSchema });
   // Stop running imports first so they can't recreate library data after the wipe (workflow id = job id).
   const running = await env.DB.prepare("SELECT id FROM jobs WHERE user_id = ? AND kind = 'import' AND status IN ('queued','running')")
@@ -72,6 +74,7 @@ export async function deleteAccountData(
   } catch (e) {
     if (!isMissingRpc(e)) throw e;
   }
+  log.info("account deletion: library wiped", { event: "account_delete", step: "library_destroyed", userHash });
   afterLibraryWipe?.(); // start the R2 wipe independently of the D1 step
   // One atomic batch; session last so a failure leaves the user signed in and able to retry.
   await db.batch([
@@ -86,6 +89,7 @@ export async function deleteAccountData(
     db.delete(authSchema.user).where(eq(authSchema.user.id, userId)),
     db.delete(authSchema.session).where(eq(authSchema.session.userId, userId)),
   ]);
+  log.info("account deletion: D1 rows deleted", { event: "account_delete", step: "d1_deleted", userHash });
 }
 
 accountRoutes.delete("/account", async (c) => {
@@ -99,7 +103,7 @@ accountRoutes.delete("/account", async (c) => {
     c.executionCtx.waitUntil(
       Promise.all(
         [`private/${userId}/`, `raw/${userId}/`, `uploads/${userId}/`].map((p) => deletePrefix(c.env.CONTENT, p)),
-      ).catch((e) => console.error("[sroka] R2 wipe failed", e)),
+      ).catch((e) => log.exception("account R2 wipe failed", e, { event: "account_r2_wipe_failed" })),
     ),
   );
   return c.json({ deleted: true as const });

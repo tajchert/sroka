@@ -1,12 +1,12 @@
 /** Shared helpers for the library routes (routes/items.ts, tags.ts, sync.ts). */
-import { DEVICE_HEADER, DeviceId, type ParseJob, REST_DEVICE_ID, isUuid, toApiError } from "@sroka/shared";
+import { DEVICE_HEADER, DeviceId, log, type ParseJob, REST_DEVICE_ID, isUuid, toApiError } from "@sroka/shared";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 import type { Env } from "../env.ts";
 
 /** Hono env of the /v1 library sub-apps: an auth middleware (api-platform) has set `userId`. */
-export type LibraryAppEnv = { Bindings: Env; Variables: { userId: string } };
+export type LibraryAppEnv = { Bindings: Env; Variables: { userId: string; requestId: string } };
 export type LibraryContext = Context<LibraryAppEnv>;
 
 export function apiError(c: Context, status: ContentfulStatusCode, error: string, message?: string): Response {
@@ -62,13 +62,13 @@ export async function enqueueParseJobs(env: Env, jobs: readonly ParseJob[], user
       }
     }
     if (lastErr !== undefined) {
-      console.error("enqueueParseJobs: queue send failed, deferring to the LibraryDO sweep", lastErr);
+      log.exception("parse queue send failed, deferring to the LibraryDO sweep", lastErr, { event: "queue_send_failed", jobs: chunk.length });
       const uid = userId ?? chunk[0]!.userId;
       try {
         await env.LIBRARY.getByName(uid).scheduleParseSweep();
       } catch (e) {
         // The daily alarm sweep still picks the items up.
-        console.error("enqueueParseJobs: scheduleParseSweep failed", e);
+        log.exception("scheduleParseSweep failed", e, { event: "sweep_schedule_failed" });
       }
     }
   }

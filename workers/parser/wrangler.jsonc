@@ -5,7 +5,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  },
+  // Metrics: write via src/metrics.ts; query with the Analytics Engine SQL API (docs/observability.md).
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "sroka_events" }],
   "workers_dev": false,
   "limits": { "cpu_ms": 300000 },
   // Weekly GC (src/gc.ts): R2 data of deleted accounts, expired auth_throttle rows.

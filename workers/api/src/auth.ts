@@ -80,7 +80,7 @@ export function createAuth(env: Env, ctx?: WaitUntil) {
             }
           : {}),
         async sendVerificationOTP({ email, otp, type }) {
-          const p = sendOtpEmail(env, email, otp, type).catch((e) => console.error("[sroka] OTP email failed", e));
+          const p = sendOtpEmail(env, email, otp, type).catch(() => undefined /* already logged by sendOtpEmail */);
           if (ctx) ctx.waitUntil(p);
           else await p;
         },

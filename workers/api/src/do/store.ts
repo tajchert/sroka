@@ -1,3 +1,4 @@
+import { log } from "@sroka/shared";
 /**
  * LibraryStore — synchronous SQLite logic of the per-user LibraryDO (docs/api.md §7–§9, §15; decisions D5).
  * Everything here is sync (DO SQL API); async work (url hashing, URL signing) happens in library-do.ts.
@@ -356,7 +357,7 @@ export class LibraryStore {
         else {
           // Safety net: an unexpected (SQL) error on one op is rolled back (own transaction) and reported as
           // rejected, so a single bad op can never fail — and permanently wedge — a device's whole push.
-          console.error("LibraryDO applyOps: op failed", op.type, op.opId, e);
+          log.exception("LibraryDO applyOps: op failed", e, { event: "do_op_failed", opType: op.type, opId: op.opId });
           rejected.push({ opId: op.opId, reason: "invalid_op" });
         }
       }

@@ -18,6 +18,7 @@ export interface ParserEnv {
   DB: D1Database;
   CONTENT: R2Bucket;
   CONFIG: KVNamespace;
+  METRICS?: AnalyticsEngineDataset;
   IMAGES: ImagesBinding;
   ENVIRONMENT: "development" | "production";
   APP_ORIGIN: string;

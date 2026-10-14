@@ -6,7 +6,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  },
+  // Metrics: write via src/metrics.ts; query with the Analytics Engine SQL API (docs/observability.md).
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "sroka_events" }],
   "routes": [
     { "pattern": "sroka.app", "custom_domain": true },
     { "pattern": "api.sroka.app", "custom_domain": true },

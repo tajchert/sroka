@@ -10,6 +10,7 @@ import {
   r2Keys,
   tryNormalizeUrl,
   uuidv7,
+  writeMetric,
 } from "@sroka/shared";
 import { Hono } from "hono";
 import {
@@ -63,6 +64,7 @@ itemsRoutes.post("/", async (c) => {
 
   const res = await stub.applyRest(restDeviceId(c), [op], { itemId });
   const rej = res.response.rejected[0];
+  writeMetric(c.env.METRICS, { event: "save", blobs: [req.source ?? "api", rej ? rej.reason : "ok"] });
   if (rej) {
     if (rej.reason === "invalid_url") return apiError(c, 400, "invalid_url");
     return apiError(c, 400, "invalid_request", rej.reason);

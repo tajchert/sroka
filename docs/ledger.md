@@ -15,6 +15,8 @@
 | Review + fixes | todo | |
 | Security hardening (adversarial review) | done | "fix: security hardening" — DO tombstone on destroy, parse budget + refresh coalescing, parseWanted pre-checks, one result per gen, sweep keeps gen, R2 cleanup on delete/re-parse, bounded seq groups, stale tag ops, shared-cache key/partial rules, image memory budget, per-email OTP throttle (`auth_throttle`, migration 0001), session cookie refresh, atomic import reservation, owner-scoped extension queue, Reader re-sign reload, mailto links, weekly parser GC of deleted users' R2 data |
 
+| Observability | done (branch feat/observability) | structured logger (`@sroka/shared` log.ts/metrics.ts), request logging + onError requestId, parser per-job `parse` log, Analytics Engine `METRICS`/`sroka_events`, `/v1/client-errors` + web reporting, `docs/observability.md`. Deploy: enable Analytics Engine in dashboard once; set up alerts per doc |
+
 ## Open items
 - Shared public content GC: `content.ref_count` is never decremented (item delete, re-parse, account delete) and no cron collects `content/{id}/` dirs or superseded rows. Needs DO-reported content changes (or a DO scan) before a ref_count==0 rule is safe.
 - Account deletion R2 wipe runs once in `waitUntil`; the weekly parser cron (`src/gc.ts`) is the retry. A Workflow/queue-based wipe would be faster.

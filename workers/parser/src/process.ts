@@ -6,7 +6,7 @@ import {
   type SafeFetchOptions,
   safeFetch,
 } from "@sroka/extractor";
-import { normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
+import { log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
 
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -29,6 +29,14 @@ export const defaultDeps: Deps = {
   now: () => Date.now(),
   newId: () => uuidv7(),
 };
+
+/** Out-param of processJob for the per-job log / metric (all optional). */
+export interface JobStats {
+  cacheHit?: boolean;
+  /** Package bytes (0 on cache hit / failure). */
+  bytes?: number;
+  images?: number;
+}
 
 export function failedResult(job: ParseJob, error: string): ParseResult {
   return {
@@ -126,7 +134,7 @@ async function cacheLookup(env: ParserEnv, hash: string, now: number): Promise<{
     if (!obj) return null;
     return { id: row.id, meta: (await obj.json()) as CachedMeta };
   } catch (e) {
-    console.warn("cache lookup failed", e);
+    log.warnException("cache lookup failed", e, { event: "cache_lookup_failed" });
     return null;
   }
 }
@@ -180,6 +188,7 @@ export async function processJob(
   job: ParseJob,
   deps: Deps = defaultDeps,
   stillWanted?: () => Promise<boolean>,
+  stats?: JobStats,
 ): Promise<ParseResult | null> {
   const isPrivate = !!job.rawKey;
   let canonical: string;
@@ -194,7 +203,10 @@ export async function processJob(
 
   if (sharedCache && !job.force) {
     const hit = await cacheLookup(env, hash, now);
-    if (hit) return resultFrom(job, hit.id, false, hit.meta);
+    if (hit) {
+      if (stats) stats.cacheHit = true;
+      return resultFrom(job, hit.id, false, hit.meta);
+    }
   }
 
   const fetchOptions: SafeFetchOptions = { fetch: deps.fetch, ownHosts: ownHosts(env) };
@@ -246,7 +258,7 @@ export async function processJob(
     });
   } catch (e) {
     // deterministic parser crash (linkedom/Readability/fflate): retrying won't help
-    console.warn(`buildContent threw for ${job.itemId}: ${e instanceof Error ? e.message : e}`);
+    log.warnException("buildContent threw", e, { event: "build_content_failed", itemId: job.itemId });
     return failedResult(job, "extract_failed");
   }
   if (!built) {
@@ -254,6 +266,11 @@ export async function processJob(
     return failedResult(job, "extract_failed");
   }
 
+  if (stats) {
+    stats.cacheHit = false;
+    stats.bytes = built.packageBytes;
+    stats.images = built.files.filter((f) => f.path.startsWith("img/")).length;
+  }
   if (stillWanted && !(await stillWanted())) return null;
 
   // 3. write R2 (fresh contentId => write-once keys); meta.json last = cache-validity marker
@@ -286,7 +303,7 @@ export async function processJob(
         .bind(contentId, hash, canonical, PARSER_VERSION, built.status, built.meta.title, built.meta.wordCount, built.meta.lang, built.packageBytes, now)
         .run();
     } catch (e) {
-      console.warn("content row insert failed", e);
+      log.warnException("content row insert failed", e, { event: "content_row_insert_failed" });
     }
   }
 
@@ -303,6 +320,6 @@ export async function incrementRefCount(env: ParserEnv, result: ParseResult): Pr
   try {
     await env.DB.prepare("UPDATE content SET ref_count = ref_count + 1 WHERE id = ?1").bind(result.contentId).run();
   } catch (e) {
-    console.warn("ref_count increment failed", e);
+    log.warnException("ref_count increment failed", e, { event: "ref_count_failed" });
   }
 }

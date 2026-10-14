@@ -1,3 +1,4 @@
+import { log } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
 
 /** Delete all R2 objects under a prefix (paged). */
@@ -43,7 +44,7 @@ export async function sweepOrphanedUserData(env: Pick<ParserEnv, "DB" | "CONTENT
   try {
     await env.DB.prepare("DELETE FROM auth_throttle WHERE expires_at < ?1").bind(now).run();
   } catch (e) {
-    console.warn("auth_throttle cleanup failed", e);
+    log.warnException("auth_throttle cleanup failed", e, { event: "gc_throttle_cleanup_failed" });
   }
   return { deleted };
 }

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { LIMITS, type ConfigResponse } from "@sroka/shared";
+import { LIMITS, log, type ConfigResponse } from "@sroka/shared";
 import type { AppEnv } from "../env.ts";
 
 export const configRoutes = new Hono<AppEnv>();
@@ -32,7 +32,7 @@ configRoutes.get("/config", async (c) => {
   try {
     kv = await c.env.CONFIG.get("config", "json");
   } catch (e) {
-    console.error("[sroka] CONFIG read failed", e);
+    log.exception("CONFIG read failed", e, { event: "config_read_failed" });
   }
   const cfg = merge(defaultConfig(c.env.APP_ORIGIN), kv);
   cfg.appOrigin = c.env.APP_ORIGIN;

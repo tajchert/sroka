@@ -158,6 +158,23 @@ export const RenameTagRequest = z.object({ name: TagName });
 export const TagResponse = z.object({ tag: Tag.required({ count: true }) });
 export type TagResponse = z.infer<typeof TagResponse>;
 
+// ---------- client error reporting ----------
+
+const clip = (max: number) => z.string().transform((s) => s.slice(0, max));
+
+/** POST /v1/client-errors (no auth): web client runtime errors. Over-long fields are truncated, not rejected. */
+export const ClientErrorRequest = z.object({
+  message: clip(1000).pipe(z.string().min(1)),
+  /** Truncated to 4 KB. */
+  stack: clip(4096).optional(),
+  /** Location pathname only (no query/hash). */
+  url: clip(300).optional(),
+  userAgent: clip(300).optional(),
+  /** Build/release identifier of the web app. */
+  release: clip(64).optional(),
+});
+export type ClientErrorRequest = z.infer<typeof ClientErrorRequest>;
+
 // ---------- config / me / account ----------
 
 /** GET /v1/config (KV key "config", defaults merged). Public: auth NOT required. */

@@ -3,6 +3,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router";
 import "./index.css";
+import ErrorBoundary from "./components/ErrorBoundary.tsx";
+import { installGlobalErrorHandlers } from "./lib/error-reporting.ts";
 import Shell from "./components/Shell.tsx";
 import { ToastProvider } from "./lib/store.tsx";
 import Library from "./routes/Library.tsx";
@@ -34,15 +36,19 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: false, retry: 1 } },
 });
 
+installGlobalErrorHandlers();
+
 const el = document.getElementById("root");
 if (el) {
   createRoot(el).render(
     <StrictMode>
+      <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <RouterProvider router={router} />
         </ToastProvider>
       </QueryClientProvider>
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

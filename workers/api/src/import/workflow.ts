@@ -1,5 +1,5 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
-import { IMPORT_DEVICE_ID, type ImportFormat, uuidv7 } from "@sroka/shared";
+import { IMPORT_DEVICE_ID, log, type ImportFormat, uuidv7 } from "@sroka/shared";
 import type { Env } from "../env.ts";
 import { enqueueParseJobs } from "../do/route-helpers.ts";
 import { jobExists, updateJob } from "./jobs.ts";
@@ -124,7 +124,7 @@ export async function runImport(
     return { status: "done", total: parsed.total, skipped };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[sroka] import failed", p.importId, e);
+    log.exception("import failed", e, { event: "import_failed", importId: p.importId });
     await step.do("fail-unexpected", async () => {
       await updateJob(env.DB, p.importId, { status: "failed", error: msg.slice(0, 300) });
       await cleanup(env, p);

@@ -1,3 +1,4 @@
+import { log } from "@sroka/shared";
 import { DurableObject } from "cloudflare:workers";
 import {
   type Item,
@@ -97,7 +98,7 @@ export class LibraryDO extends DurableObject<Env> {
         ...prefixes.map((p) => deletePrefix(this.env.CONTENT, p)),
       ]);
     } catch (e) {
-      console.error("LibraryDO: R2 cleanup failed", keys, e);
+      log.exception("LibraryDO R2 cleanup failed", e, { event: "do_r2_cleanup_failed", keyCount: keys.length });
     }
   }
 
@@ -387,6 +388,8 @@ export class LibraryDO extends DurableObject<Env> {
     this.store.prune();
     // Reschedule before the sweep: a failing queue send makes the alarm retry, but the daily cadence stays.
     await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
-    await this.sweepStalePending();
+    const t0 = Date.now();
+    const resent = await this.sweepStalePending();
+    log.info("LibraryDO alarm sweep", { event: "do_alarm_sweep", resent, durationMs: Date.now() - t0 });
   }
 }

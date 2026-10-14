@@ -11,6 +11,7 @@ export interface Env {
   PARSE_QUEUE: Queue<ParseJob>;
   IMPORT_WORKFLOW: Workflow<ImportParams>;
   EMAIL: SendEmail;
+  METRICS?: AnalyticsEngineDataset;
   IMAGES: ImagesBinding;
   ASSETS: Fetcher;
   ENVIRONMENT: "development" | "production";
@@ -33,4 +34,4 @@ export interface Env {
 }
 
 /** Hono app typing shared by route modules. `userId` is set by the /v1 auth middleware. */
-export type AppEnv = { Bindings: Env; Variables: { userId: string } };
+export type AppEnv = { Bindings: Env; Variables: { userId: string; requestId: string } };

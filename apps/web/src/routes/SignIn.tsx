@@ -41,7 +41,12 @@ export default function SignIn() {
     }
   };
 
+  // Guards against double submission (auto-submit on the 6th digit + Enter/paste): the OTP is
+  // single-use, so a second request for the same code fails with INVALID_OTP after the first succeeded.
+  const verifying = useRef(false);
   const verify = async (value: string) => {
+    if (verifying.current) return;
+    verifying.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -52,6 +57,7 @@ export default function SignIn() {
       fail(e);
       setCode("");
     } finally {
+      verifying.current = false;
       setBusy(false);
     }
   };

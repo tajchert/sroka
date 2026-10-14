@@ -1,0 +1,34 @@
+{
+  "name": "@sroka/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev -c wrangler.jsonc -c ../parser/wrangler.jsonc",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "auth:schema": "npx @better-auth/cli generate --config auth.cli.ts --output src/db/auth-schema.ts -y",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply sroka --local",
+    "db:migrate:remote": "wrangler d1 migrations apply sroka --remote"
+  },
+  "dependencies": {
+    "@sroka/shared": "*",
+    "better-auth": "^1.7.8",
+    "drizzle-orm": "^0.45.4",
+    "fflate": "^0.8.3",
+    "hono": "^4.13.13",
+    "linkedom": "^0.18.13",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
+    "@cloudflare/vitest-plugin": "^1.4.2",
+    "@cloudflare/workers-types": "^5.20261014.1",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.4",
+    "wrangler": "^4.151.0"
+  }
+}

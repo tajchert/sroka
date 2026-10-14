@@ -1,0 +1,40 @@
+// sroka-api — Hono API + Better Auth + LibraryDO + signed content route + static web assets.
+// See docs/decisions.md D3/D5/D6/D7. Replace placeholder ids (LOCAL / PLACEHOLDER) before deploy.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "sroka-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "sroka.app", "custom_domain": true },
+    { "pattern": "api.sroka.app", "custom_domain": true },
+    { "pattern": "c.sroka.app", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "run_worker_first": ["/api/*", "/v1/*", "/app/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "sroka", "database_id": "LOCAL", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [{ "binding": "CONTENT", "bucket_name": "sroka-content" }],
+  "kv_namespaces": [{ "binding": "CONFIG", "id": "PLACEHOLDER_CONFIG_KV_ID" }],
+  "durable_objects": { "bindings": [{ "name": "LIBRARY", "class_name": "LibraryDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LibraryDO"] }],
+  "queues": { "producers": [{ "queue": "sroka-parse", "binding": "PARSE_QUEUE" }] },
+  "send_email": [{ "name": "EMAIL" }],
+  "images": { "binding": "IMAGES" },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "APP_ORIGIN": "https://sroka.app",
+    "API_ORIGIN": "https://api.sroka.app",
+    "CONTENT_ORIGIN": "https://c.sroka.app",
+    "BROWSER_RENDER_ENABLED": "false"
+  }
+  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY, optional REVIEW_EMAIL, REVIEW_OTP.
+  // Local dev overrides vars via .dev.vars (see .dev.vars.example).
+}

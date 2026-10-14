@@ -1,0 +1,10 @@
+# Copy to .dev.vars (gitignored). wrangler dev reads it and overrides [vars].
+ENVIRONMENT=development
+APP_ORIGIN=http://localhost:8787
+API_ORIGIN=http://localhost:8787
+CONTENT_ORIGIN=http://127.0.0.1:8787
+BETTER_AUTH_SECRET=change-me-to-32-plus-random-characters-xxxxxxxx
+CONTENT_URL_SIGNING_KEY=change-me-to-32-plus-random-characters-yyyyyyyy
+# Optional fixed-code review account (D4):
+# REVIEW_EMAIL=review@sroka.app
+# REVIEW_OTP=123456

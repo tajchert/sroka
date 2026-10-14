@@ -1,0 +1,40 @@
+// sroka-parser — queue consumer of sroka-parse. See docs/decisions.md D6.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "sroka-parser",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "workers_dev": false,
+  "queues": {
+    "consumers": [
+      {
+        "queue": "sroka-parse",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "sroka-parse-dlq",
+        "max_concurrency": 4
+      },
+      // DLQ consumer: marks items failed via LibraryDO.markParsed(..., {status:"failed"}).
+      { "queue": "sroka-parse-dlq", "max_batch_size": 10, "max_retries": 3 }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "LIBRARY", "class_name": "LibraryDO", "script_name": "sroka-api" }]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "sroka", "database_id": "LOCAL", "migrations_dir": "../api/migrations" }
+  ],
+  "r2_buckets": [{ "binding": "CONTENT", "bucket_name": "sroka-content" }],
+  "kv_namespaces": [{ "binding": "CONFIG", "id": "PLACEHOLDER_CONFIG_KV_ID" }],
+  "images": { "binding": "IMAGES" },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "APP_ORIGIN": "https://sroka.app",
+    "API_ORIGIN": "https://api.sroka.app",
+    "CONTENT_ORIGIN": "https://c.sroka.app",
+    "BROWSER_RENDER_ENABLED": "false"
+  }
+}

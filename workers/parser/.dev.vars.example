@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored).
+ENVIRONMENT=development
+APP_ORIGIN=http://localhost:8787
+API_ORIGIN=http://localhost:8787
+CONTENT_ORIGIN=http://127.0.0.1:8787

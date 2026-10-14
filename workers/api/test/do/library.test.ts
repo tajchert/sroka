@@ -29,7 +29,7 @@ describe("LibraryDO schema", () => {
   it("migrates to the latest schema version with FTS table", async () => {
     const { lib } = freshLibrary();
     await runInDurableObject(lib, (_inst: LibraryDO, state) => {
-      expect(state.storage.sql.exec("SELECT version FROM _schema").one().version).toBe(2);
+      expect(state.storage.sql.exec("SELECT version FROM _schema").one().version).toBe(3);
       const names = state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table'").toArray().map((r) => r.name);
       expect(names).toEqual(expect.arrayContaining(["items", "tags", "item_tags", "applied_ops", "item_aliases", "tag_renames", "items_fts", "meta"]));
     });

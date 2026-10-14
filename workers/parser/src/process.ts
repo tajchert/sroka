@@ -120,14 +120,20 @@ interface CachedMeta {
   leadImageKey?: string;
 }
 
-/** Shared-cache lookup (public content only). Degrades to a miss on any D1/R2 error. */
+/**
+ * Shared-cache lookup (public content only). Degrades to a miss on any D1/R2 error. The lookup and the
+ * `last_used_at` touch are one statement, so the GC (which marks a row only while `last_used_at` is older than
+ * its grace period, and never a touched one) can't collect content that a cache hit is about to attach.
+ */
 async function cacheLookup(env: ParserEnv, hash: string, now: number): Promise<{ id: string; meta: CachedMeta } | null> {
   try {
     const row = await env.DB.prepare(
-      // Only full ('ok') parses are shared: a 'partial' row is typically a bot wall / consent / paywall page.
-      "SELECT id FROM content WHERE url_hash = ?1 AND parser_version = ?2 AND status = 'ok' AND parsed_at > ?3 ORDER BY parsed_at DESC LIMIT 1",
+      // Only full ('ok') canonical parses are shared: a 'partial' row is typically a bot wall / consent / paywall page.
+      `UPDATE content SET last_used_at = MAX(last_used_at, ?4) WHERE id = (
+         SELECT id FROM content WHERE url_hash = ?1 AND parser_version = ?2 AND status = 'ok' AND cacheable = 1
+           AND gc_at IS NULL AND parsed_at > ?3 ORDER BY parsed_at DESC LIMIT 1) RETURNING id`,
     )
-      .bind(hash, PARSER_VERSION, now - CACHE_TTL_MS)
+      .bind(hash, PARSER_VERSION, now - CACHE_TTL_MS, now)
       .first<{ id: string }>();
     if (!row) return null;
     const obj = await env.CONTENT.get(`${r2Keys.contentDir(row.id)}meta.json`);
@@ -286,6 +292,33 @@ export async function processJob(
     readingMinutes: built.meta.readingMinutes,
     ...(built.leadImageKey ? { leadImageKey: built.leadImageKey } : {}),
   };
+  // Every public dir gets a D1 `content` row BEFORE its R2 writes, so the GC can always find (and eventually
+  // collect) it — even when the R2 writes or markParsed fail, or the result is rejected as stale. Only canonical
+  // full parses are `cacheable` (shared cache, api.md §9); the cache also requires meta.json (written last).
+  if (!isPrivate) {
+    try {
+      await env.DB.prepare(
+        `INSERT INTO content (id, url_hash, canonical_url, parser_version, status, title, word_count, lang, bytes, ref_count,
+           parsed_at, cacheable, last_used_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?11, ?10)`,
+      )
+        .bind(
+          contentId,
+          hash,
+          canonical,
+          PARSER_VERSION,
+          built.status,
+          built.meta.title,
+          built.meta.wordCount,
+          built.meta.lang,
+          built.packageBytes,
+          now,
+          sharedCache && built.status === "ok" ? 1 : 0,
+        )
+        .run();
+    } catch (e) {
+      throw new TransientError(`content row insert: ${e}`);
+    }
+  }
   try {
     // One at a time: concurrent puts would keep every request body buffered at once.
     for (const f of built.files) await env.CONTENT.put(dir + f.path, f.bytes, { httpMetadata: { contentType: f.contentType } });
@@ -294,32 +327,5 @@ export async function processJob(
     throw new TransientError(`r2 put: ${e}`);
   }
 
-  // 4. shared cache row (public, canonical fetch, full parse only). Failure here is non-fatal.
-  if (sharedCache && built.status === "ok") {
-    try {
-      await env.DB.prepare(
-        "INSERT INTO content (id, url_hash, canonical_url, parser_version, status, title, word_count, lang, bytes, ref_count, parsed_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)",
-      )
-        .bind(contentId, hash, canonical, PARSER_VERSION, built.status, built.meta.title, built.meta.wordCount, built.meta.lang, built.packageBytes, now)
-        .run();
-    } catch (e) {
-      log.warnException("content row insert failed", e, { event: "content_row_insert_failed" });
-    }
-  }
-
   return resultFrom(job, contentId, isPrivate, cached);
-}
-
-/**
- * api.md section 9: the parser ref-counts shared content. Called after markParsed returned ok (first accept
- * for that parse gen) for a public ok/partial result (fresh parse or cache hit). Errors are swallowed.
- * NOTE: nothing decrements ref_count yet and there is no shared-content GC (see docs/ledger.md).
- */
-export async function incrementRefCount(env: ParserEnv, result: ParseResult): Promise<void> {
-  if (result.status === "failed" || result.contentPrivate || !result.contentId) return;
-  try {
-    await env.DB.prepare("UPDATE content SET ref_count = ref_count + 1 WHERE id = ?1").bind(result.contentId).run();
-  } catch (e) {
-    log.warnException("ref_count increment failed", e, { event: "ref_count_failed" });
-  }
 }

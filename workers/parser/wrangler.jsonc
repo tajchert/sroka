@@ -15,7 +15,7 @@
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "sroka_events" }],
   "workers_dev": false,
   "limits": { "cpu_ms": 300000 },
-  // Weekly GC (src/gc.ts): R2 data of deleted accounts, expired auth_throttle rows.
+  // Weekly GC (src/gc.ts): R2 data of deleted accounts, expired auth_throttle rows, content-ref backfill, shared content.
   "triggers": { "crons": ["23 4 * * SUN"] },
   "queues": {
     "consumers": [

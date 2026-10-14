@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import worker from "../src/index.ts";
 import { sweepOrphanedUserData } from "../src/gc.ts";
 import type { ParserEnv } from "../src/env.ts";
+import { addUser, migrateD1 } from "./d1.ts";
 
 const base = rawEnv as unknown as ParserEnv;
 const para = "The quick brown fox jumps over the lazy dog while reading a long and interesting article. ";
@@ -46,6 +47,7 @@ function mkEnv(): ParserEnv {
           return { ok: markOk };
         },
         parseWanted: async () => wanted.shift() ?? true,
+        reemitContentRefs: async () => ({ refs: 0, pending: 0 }),
       }),
     },
   };
@@ -71,10 +73,9 @@ const html = (b = PAGE) => new Response(b, { headers: { "content-type": "text/ht
 const png = () => new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } });
 
 beforeAll(async () => {
-  await base.DB.exec(
-    "CREATE TABLE IF NOT EXISTS content (id TEXT PRIMARY KEY, url_hash TEXT NOT NULL, canonical_url TEXT NOT NULL, parser_version INTEGER NOT NULL, status TEXT NOT NULL, title TEXT, word_count INTEGER, lang TEXT, bytes INTEGER, ref_count INTEGER DEFAULT 0, parsed_at INTEGER NOT NULL);",
-  );
+  await migrateD1(base.DB);
 });
+const cacheableRows = async () => (await base.DB.prepare("SELECT COUNT(*) AS n FROM content WHERE cacheable = 1").first<{ n: number }>())!.n;
 beforeEach(async () => {
   marked = [];
   markFails = 0;
@@ -83,6 +84,8 @@ beforeEach(async () => {
   imagesFail = false;
   fetched = [];
   await base.DB.exec("DELETE FROM content");
+  await base.DB.exec("DELETE FROM content_refs");
+  await base.DB.exec("DELETE FROM gc_state");
   fetchMock = vi.spyOn(globalThis, "fetch");
 });
 afterEach(() => vi.restoreAllMocks());
@@ -169,15 +172,22 @@ describe("parser queue consumer", () => {
     expect(marked[0]!.result).toMatchObject({ status: "failed", error: "raw_corrupt" });
   });
 
-  it("increments ref_count after markParsed ok, on fresh parse and cache hit; not for private", async () => {
+  it("a shared-cache hit touches last_used_at (GC grace); the parser no longer counts refs itself", async () => {
     stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
     await run([msg(job())]);
     const id = marked[0]!.result.contentId!;
-    const rc = async () => (await base.DB.prepare("SELECT ref_count AS n FROM content WHERE id = ?1").bind(id).first<{ n: number }>())!.n;
-    expect(await rc()).toBe(1);
+    const row = async () => (await base.DB.prepare("SELECT ref_count AS rc, last_used_at AS lu, parsed_at AS pa FROM content WHERE id = ?1").bind(id).first<{ rc: number; lu: number; pa: number }>())!;
+    expect((await row()).lu).toBe((await row()).pa);
+    await base.DB.prepare("UPDATE content SET last_used_at = 5 WHERE id = ?1").bind(id).run();
+    const before = Date.now();
     await run([msg(job())]);
     expect(marked[1]!.result.contentId).toBe(id);
-    expect(await rc()).toBe(2);
+    expect((await row()).lu).toBeGreaterThanOrEqual(before);
+    expect((await row()).rc).toBe(0);
+    // A row being garbage-collected is never served from the cache.
+    await base.DB.prepare("UPDATE content SET gc_at = 1 WHERE id = ?1").bind(id).run();
+    await run([msg(job())]);
+    expect(marked[2]!.result.contentId).not.toBe(id);
   });
 
   it("fails permanently when the raw object is missing", async () => {
@@ -288,10 +298,12 @@ describe("parser queue consumer", () => {
     stubWeb({ [evil]: () => html(), "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
     await run([msg(job({ url: evil }))]);
     expect(fetched[0]).toBe(evil);
-    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 0 });
+    // Its public dir gets a (non-cacheable) row so the GC can collect it.
+    expect(await cacheableRows()).toBe(0);
+    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content WHERE cacheable = 0").first<{ n: number }>()).toEqual({ n: 1 });
     // A canonical save fetches its own copy (and may be cached); the evil variant then doesn't read it.
     await run([msg(job({ itemId: "0192f3c4-1111-7000-8000-0000000000cc", parseGen: 1 }))]);
-    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 1 });
+    expect(await cacheableRows()).toBe(1);
     fetched.length = 0;
     await run([msg(job({ url: evil, parseGen: 4 }))]);
     expect(fetched[0]).toBe(evil);
@@ -302,12 +314,13 @@ describe("parser queue consumer", () => {
     stubWeb({ "https://example.com/post": () => html(thin) });
     await run([msg(job())]);
     expect(marked[0]!.result.status).toBe("partial");
-    expect(await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>()).toEqual({ n: 0 });
+    expect(await cacheableRows()).toBe(0);
+    const row = await base.DB.prepare("SELECT id, status, cacheable FROM content").first();
+    expect(row).toEqual({ id: marked[0]!.result.contentId, status: "partial", cacheable: 0 });
   });
 
   it("weekly GC deletes R2 data of user ids that no longer exist", async () => {
-    await base.DB.exec("CREATE TABLE IF NOT EXISTS user (id TEXT PRIMARY KEY);");
-    await base.DB.prepare("INSERT OR IGNORE INTO user (id) VALUES ('alive')").run();
+    await addUser(base.DB, "alive");
     for (const k of ["private/alive/c1/a.html", "raw/alive/i.html.gz", "private/ghost/c1/a.html", "raw/ghost/i.html.gz", "uploads/ghost/x.csv"]) {
       await base.CONTENT.put(k, "x");
     }

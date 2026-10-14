@@ -432,6 +432,8 @@ export class LibraryStore {
         // Captured HTML and private extracted content belong to this item only: delete them with it.
         if (row.parse_raw_key) ctx.cleanup.push(row.parse_raw_key);
         if (row.content_private === 1 && row.content_id) ctx.cleanup.push(r2Keys.contentDir(row.content_id, this.userId()));
+        // Shared content: items can't be undeleted, so the tombstone no longer references it (api.md §9).
+        if (row.content_private === 0 && row.content_id) this.markRefDirty(row.content_id);
         return null;
       }
       case "item.refresh": {
@@ -749,6 +751,9 @@ export class LibraryStore {
       if (result.status === "failed") {
         this.exec("UPDATE items SET parse_status = 'failed', parse_error = ? WHERE id = ?", result.error ?? null, row.id);
       } else {
+        // Shared-content references: the previous public content (if replaced) and the new one (api.md §9).
+        if (row.content_private === 0 && row.content_id) this.markRefDirty(row.content_id);
+        if (!result.contentPrivate && result.contentId) this.markRefDirty(result.contentId);
         this.exec(
           `UPDATE items SET content_id = ?, content_private = ?, lead_image_key = ?, title = COALESCE(?, title),
              excerpt = ?, site_name = ?, author = ?, lang = ?, word_count = ?, reading_minutes = ?,
@@ -771,6 +776,52 @@ export class LibraryStore {
       ctx.touchItem(row.id);
     });
     return { ok: true };
+  }
+
+  // ---------- shared-content references (outbox → D1 content_refs, api.md §9) ----------
+
+  /** Marks a public content id for a D1 ref flush (call inside the transaction that changed the reference). */
+  markRefDirty(contentId: string): void {
+    this.exec(
+      "INSERT INTO content_ref_outbox (content_id, gen) VALUES (?, 1) ON CONFLICT(content_id) DO UPDATE SET gen = gen + 1",
+      contentId,
+    );
+  }
+
+  /** Backfill: marks every public content id referenced by a live item. Returns the outbox size. */
+  markAllRefsDirty(): number {
+    this.txn(() => {
+      for (const r of this.all<{ c: string }>(
+        "SELECT DISTINCT content_id AS c FROM items WHERE content_id IS NOT NULL AND content_private = 0 AND deleted_at IS NULL",
+      )) {
+        this.markRefDirty(r.c);
+      }
+    });
+    return this.pendingRefCount();
+  }
+
+  pendingRefCount(): number {
+    return Number(this.first<{ n: number }>("SELECT COUNT(*) AS n FROM content_ref_outbox")!.n);
+  }
+
+  /**
+   * Up to `limit` outbox entries with the desired D1 state computed now from `items`: `live` = some live item
+   * of this library references the content publicly (a failed re-parse keeps the earlier content readable).
+   */
+  refBatch(limit: number): { contentId: string; gen: number; live: boolean }[] {
+    return this.all<{ c: string; g: number; live: number }>(
+      `SELECT o.content_id AS c, o.gen AS g, EXISTS (SELECT 1 FROM items i WHERE i.content_id = o.content_id
+         AND i.content_private = 0 AND i.deleted_at IS NULL) AS live
+       FROM content_ref_outbox o ORDER BY o.content_id LIMIT ?`,
+      limit,
+    ).map((r) => ({ contentId: r.c, gen: Number(r.g), live: Number(r.live) === 1 }));
+  }
+
+  /** Clears flushed entries unless they were re-marked while the D1 write was in flight. */
+  clearRefs(done: readonly { contentId: string; gen: number }[]): void {
+    this.txn(() => {
+      for (const d of done) this.exec("DELETE FROM content_ref_outbox WHERE content_id = ? AND gen = ?", d.contentId, d.gen);
+    });
   }
 
   // ---------- sync pull ----------

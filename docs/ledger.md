@@ -16,9 +16,11 @@
 | Security hardening (adversarial review) | done | "fix: security hardening" — DO tombstone on destroy, parse budget + refresh coalescing, parseWanted pre-checks, one result per gen, sweep keeps gen, R2 cleanup on delete/re-parse, bounded seq groups, stale tag ops, shared-cache key/partial rules, image memory budget, per-email OTP throttle (`auth_throttle`, migration 0001), session cookie refresh, atomic import reservation, owner-scoped extension queue, Reader re-sign reload, mailto links, weekly parser GC of deleted users' R2 data |
 
 | Observability | done (branch feat/observability) | structured logger (`@sroka/shared` log.ts/metrics.ts), request logging + onError requestId, parser per-job `parse` log, Analytics Engine `METRICS`/`sroka_events`, `/v1/client-errors` + web reporting, `docs/observability.md`. Deploy: enable Analytics Engine in dashboard once; set up alerts per doc |
+| Shared-content GC | done (not deployed) | feat/content-gc — LibraryDO content-ref outbox (DO schema v3) → D1 `content_refs` (migration 0002), content row for every public dir, cache-hit touch, weekly cron backfill (operator-started) + GC of unreferenced content after 30 days. Production rollout steps: workers/parser/CLAUDE.md "Shared-content GC" |
 
 ## Open items
-- Shared public content GC: `content.ref_count` is never decremented (item delete, re-parse, account delete) and no cron collects `content/{id}/` dirs or superseded rows. Needs DO-reported content changes (or a DO scan) before a ref_count==0 rule is safe.
+- Shared-content GC rollout in production: apply migration 0002, deploy sroka-api then sroka-parser, then start the backfill (workers/parser/CLAUDE.md). GC stays a no-op until the backfill finishes.
+- Legacy public `content/{id}/` dirs written before migration 0002 without a D1 row (partial parses, non-canonical URLs, failed row inserts) are not collected (no R2-listing sweep).
 - Account deletion R2 wipe runs once in `waitUntil`; the weekly parser cron (`src/gc.ts`) is the retry. A Workflow/queue-based wipe would be faster.
 - FTS rewrite of a huge tag rename still runs in one transaction.
 
@@ -27,4 +29,4 @@
 - sroka-api deployed with custom domains sroka.app, api.sroka.app, c.sroka.app; sroka-parser deployed (consumers sroka-parse + DLQ, cron `23 4 * * SUN`).
 - Apex A records (parking) deleted by owner. Production smoke: landing, /app, SPA deep link, /v1/health, /v1/config, CORS preflight OK.
 - OPEN: api.sroka.app / c.sroka.app return NXDOMAIN at the authoritative NS although the Worker custom domains are attached (edge serves them fine via --resolve). Need proxied DNS records (AAAA 100::) or a dashboard re-attach.
-- OPEN: real email OTP sign-in in production not yet exercised; shared-content GC (ref_count decrement) not built.
+- OPEN: real email OTP sign-in in production not yet exercised; shared-content GC built on feat/content-gc, not deployed yet.

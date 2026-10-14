@@ -80,6 +80,22 @@ export const MIGRATIONS: readonly string[][] = [
     // Regular (not contentless) FTS5 table, maintained manually (api.md §8.5, D5).
     `CREATE VIRTUAL TABLE items_fts USING fts5(title, excerpt, site_name, tags)`,
   ],
+  // v2: server-time bookkeeping. `deleted_at` / `tag_renames.at` hold the (clamped) client `at` and stay the
+  // LWW / stale-op reference; purging (prune) uses the server-time columns so a skewed or long-offline
+  // client can't get a fresh tombstone purged immediately. parse_requested_at / parse_raw_key let the alarm
+  // re-enqueue parse jobs whose queue send was lost.
+  [
+    `ALTER TABLE items ADD COLUMN tombstoned_at INTEGER`,
+    `UPDATE items SET tombstoned_at = deleted_at WHERE deleted_at IS NOT NULL`,
+    `ALTER TABLE tags ADD COLUMN tombstoned_at INTEGER`,
+    `UPDATE tags SET tombstoned_at = deleted_at WHERE deleted_at IS NOT NULL`,
+    `ALTER TABLE tag_renames ADD COLUMN recorded_at INTEGER`,
+    `UPDATE tag_renames SET recorded_at = at`,
+    `ALTER TABLE items ADD COLUMN parse_requested_at INTEGER`,
+    `ALTER TABLE items ADD COLUMN parse_raw_key TEXT`,
+    `CREATE INDEX items_tombstoned ON items(tombstoned_at) WHERE tombstoned_at IS NOT NULL`,
+    `CREATE INDEX items_pending ON items(parse_requested_at) WHERE parse_status = 'pending' AND deleted_at IS NULL`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

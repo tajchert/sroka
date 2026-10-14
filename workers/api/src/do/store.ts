@@ -40,6 +40,13 @@ export class Reject extends Error {
   }
 }
 
+/** Internal: aborts the outer transaction of applyOpsAtomic. */
+class Rollback extends Error {
+  constructor(readonly result: ApplyResult) {
+    super("rollback");
+  }
+}
+
 export interface ApplyResult {
   response: PushResponse;
   parseJobs: ParseJob[];
@@ -64,7 +71,11 @@ class OpCtx {
   private seqValue: number | null = null;
   readonly dirtyItems = new Set<string>();
   readonly jobs: ParseJob[] = [];
-  constructor(private readonly store: LibraryStore) {}
+  constructor(
+    private readonly store: LibraryStore,
+    /** Server time of this request (tombstone / bookkeeping timestamps; never used for LWW). */
+    readonly now: number,
+  ) {}
   seq(): number {
     if (this.seqValue === null) this.seqValue = this.store.nextSeq();
     return this.seqValue;
@@ -197,9 +208,9 @@ export class LibraryStore {
   }
 
   /** Runs `fn` in one transaction with an OpCtx; refreshes FTS of touched items at the end. */
-  private withCtx<T>(fn: (ctx: OpCtx) => T): { value: T; ctx: OpCtx } {
+  private withCtx<T>(fn: (ctx: OpCtx) => T, now: number = Date.now()): { value: T; ctx: OpCtx } {
     return this.txn(() => {
-      const ctx = new OpCtx(this);
+      const ctx = new OpCtx(this, now);
       const value = fn(ctx);
       for (const id of ctx.dirtyItems) this.refreshFts(id);
       return { value, ctx };
@@ -215,7 +226,14 @@ export class LibraryStore {
 
   private newParseJob(ctx: OpCtx, row: ItemRow, extra: { rawKey?: string; force?: boolean } = {}): ParseJob {
     const gen = row.parse_gen + 1;
-    this.exec("UPDATE items SET parse_gen = ?, parse_status = 'pending', parse_error = NULL WHERE id = ?", gen, row.id);
+    this.exec(
+      `UPDATE items SET parse_gen = ?, parse_status = 'pending', parse_error = NULL, parse_requested_at = ?,
+         parse_raw_key = ? WHERE id = ?`,
+      gen,
+      ctx.now,
+      extra.rawKey ?? null,
+      row.id,
+    );
     ctx.touchItem(row.id);
     const job: ParseJob = { userId: this.userId(), itemId: row.id, url: row.url, parseGen: gen };
     if (extra.rawKey !== undefined) job.rawKey = extra.rawKey;
@@ -230,6 +248,28 @@ export class LibraryStore {
    * every item.add op at index i. Idempotent per (deviceId, opId).
    */
   applyOps(deviceId: string, ops: Op[], addInfo: AddInfo[], now: number = Date.now()): ApplyResult {
+    return this.applyLoop(deviceId, ops, addInfo, now);
+  }
+
+  /**
+   * All-or-nothing variant for REST requests that synthesize several ops (PATCH /v1/items/:id): if any op is
+   * rejected, everything (including applied_ops rows) is rolled back and `applied` is empty.
+   */
+  applyOpsAtomic(deviceId: string, ops: Op[], addInfo: AddInfo[], now: number = Date.now()): ApplyResult {
+    try {
+      return this.txn(() => {
+        const res = this.applyLoop(deviceId, ops, addInfo, now);
+        if (res.response.rejected.length > 0) throw new Rollback(res);
+        return res;
+      });
+    } catch (e) {
+      if (!(e instanceof Rollback)) throw e;
+      const r = e.result.response;
+      return { response: { applied: [], rejected: r.rejected, aliases: {}, cursor: this.getMeta("seq") }, parseJobs: [] };
+    }
+  }
+
+  private applyLoop(deviceId: string, ops: Op[], addInfo: AddInfo[], now: number): ApplyResult {
     const applied: string[] = [];
     const rejected: PushResponse["rejected"] = [];
     const aliases: Record<string, string> = {};
@@ -258,13 +298,19 @@ export class LibraryStore {
             alias,
           );
           return alias;
-        });
+        }, now);
         applied.push(op.opId);
         if (alias && op.type === "item.add") aliases[op.itemId] = alias;
         parseJobs.push(...ctx.jobs);
       } catch (e) {
         if (e instanceof Reject) rejected.push({ opId: op.opId, reason: e.reason });
-        else throw e;
+        else if (e instanceof Rollback) throw e;
+        else {
+          // Safety net: an unexpected (SQL) error on one op is rolled back (own transaction) and reported as
+          // rejected, so a single bad op can never fail — and permanently wedge — a device's whole push.
+          console.error("LibraryDO applyOps: op failed", op.type, op.opId, e);
+          rejected.push({ opId: op.opId, reason: "invalid_op" });
+        }
       }
     });
 
@@ -332,7 +378,7 @@ export class LibraryStore {
         const row = this.itemRow(this.resolveItemId(op.itemId));
         if (!row) throw new Reject("unknown_item");
         if (row.deleted_at !== null) return null; // applied no-op
-        this.exec("UPDATE items SET deleted_at = ? WHERE id = ?", stamp.at, row.id);
+        this.exec("UPDATE items SET deleted_at = ?, tombstoned_at = ? WHERE id = ?", stamp.at, ctx.now, row.id);
         ctx.touchItem(row.id);
         return null;
       }
@@ -352,8 +398,14 @@ export class LibraryStore {
 
   private opAdd(ctx: OpCtx, op: OpOf<"item.add">, stamp: Stamp, info: AddInfo): string | null {
     if (!info) throw new Reject("invalid_url");
-    const resolved = this.resolveItemId(op.itemId);
+    let resolved = this.resolveItemId(op.itemId);
     let target = this.itemRow(resolved);
+    if (!target && resolved !== op.itemId) {
+      // Stale alias (its target's tombstone was purged): drop it so the new row is reachable by its own id.
+      this.exec("DELETE FROM item_aliases WHERE client_id = ?", op.itemId);
+      resolved = op.itemId;
+      target = this.itemRow(resolved);
+    }
     let alias: string | null = resolved !== op.itemId ? resolved : null;
     if (target) {
       if (target.deleted_at !== null) throw new Reject("item_deleted");
@@ -443,7 +495,10 @@ export class LibraryStore {
           id = next.to_tag_id;
           continue;
         }
-        return t.deleted_at >= at ? { noop: true } : { missing: true };
+        if (t.deleted_at >= at) return { noop: true };
+        // The chain ends at a tombstone older than the op: the rename doesn't apply any more, resolve by the
+        // op's own name below (a live tag of that name may exist again).
+        break;
       }
     }
     const live = this.liveTagByKey(key);
@@ -460,8 +515,11 @@ export class LibraryStore {
     let tag: TagRow;
     if ("missing" in res) {
       if (!present) return;
-      if (this.presentTagCount(itemId) >= LIMITS.maxTagsPerItem) throw new Reject("too_many_tags");
       const norm = normalizeTagName(name);
+      // Re-check: a live tag of this name may exist even when the op's rename chain was a dead end.
+      const live = this.liveTagByKey(tagKey(norm));
+      if (live) return this.setPairOn(ctx, itemId, live, present, stamp);
+      if (this.presentTagCount(itemId) >= LIMITS.maxTagsPerItem) throw new Reject("too_many_tags");
       tag = { id: uuidv7(), name: norm, name_key: tagKey(norm), created_at: stamp.at, deleted_at: null, seq: 0 };
       this.exec(
         "INSERT INTO tags (id, name, name_key, created_at, deleted_at, seq) VALUES (?, ?, ?, ?, NULL, ?)",
@@ -474,6 +532,10 @@ export class LibraryStore {
     } else {
       tag = res.tag;
     }
+    this.setPairOn(ctx, itemId, tag, present, stamp);
+  }
+
+  private setPairOn(ctx: OpCtx, itemId: string, tag: TagRow, present: boolean, stamp: Stamp): void {
     const pair = this.first<PairRow>("SELECT present, at, dev FROM item_tags WHERE item_id = ? AND tag_id = ?", itemId, tag.id);
     if (pair && !pairWins(stamp, { at: pair.at, dev: pair.dev })) return;
     const was = pair?.present === 1;
@@ -526,7 +588,7 @@ export class LibraryStore {
         this.exec("UPDATE item_tags SET present = 0 WHERE item_id = ? AND tag_id = ?", p.item_id, from.id);
         if (changed && live && live.d === null) ctx.touchItem(p.item_id);
       }
-      this.exec("UPDATE tags SET deleted_at = ? WHERE id = ?", stamp.at, from.id);
+      this.exec("UPDATE tags SET deleted_at = ?, tombstoned_at = ? WHERE id = ?", stamp.at, ctx.now, from.id);
       ctx.touchTag(from.id);
     } else if (from.name !== toName) {
       this.exec("UPDATE tags SET name = ?, name_key = ? WHERE id = ?", toName, toKey, from.id);
@@ -534,11 +596,12 @@ export class LibraryStore {
       for (const id of this.liveCarriers(from.id)) ctx.touchItem(id);
     }
     this.exec(
-      `INSERT INTO tag_renames (from_key, to_tag_id, at) VALUES (?, ?, ?)
-       ON CONFLICT(from_key) DO UPDATE SET to_tag_id = excluded.to_tag_id, at = excluded.at`,
+      `INSERT INTO tag_renames (from_key, to_tag_id, at, recorded_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(from_key) DO UPDATE SET to_tag_id = excluded.to_tag_id, at = excluded.at, recorded_at = excluded.recorded_at`,
       fromKey,
       targetId,
       stamp.at,
+      ctx.now,
     );
   }
 
@@ -547,17 +610,38 @@ export class LibraryStore {
     if (!tag) throw new Reject("unknown_tag");
     for (const id of this.liveCarriers(tag.id)) ctx.touchItem(id);
     this.exec("UPDATE item_tags SET present = 0, at = ?, dev = ? WHERE tag_id = ? AND present = 1", stamp.at, stamp.dev, tag.id);
-    this.exec("UPDATE tags SET deleted_at = ? WHERE id = ?", stamp.at, tag.id);
+    this.exec("UPDATE tags SET deleted_at = ?, tombstoned_at = ? WHERE id = ?", stamp.at, ctx.now, tag.id);
     ctx.touchTag(tag.id);
   }
 
   // ---------- parse pipeline ----------
 
   /** api.md §9: bumps parse_gen, sets pending, returns the job (null if unknown/deleted). */
-  requestParse(itemId: string, opts: { rawKey?: string; force?: boolean } = {}): ParseJob | null {
+  requestParse(itemId: string, opts: { rawKey?: string; force?: boolean } = {}, now: number = Date.now()): ParseJob | null {
     const row = this.itemRow(this.resolveItemId(itemId));
     if (!row || row.deleted_at !== null) return null;
-    return this.withCtx((ctx) => this.newParseJob(ctx, row, opts)).value;
+    return this.withCtx((ctx) => this.newParseJob(ctx, row, opts), now).value;
+  }
+
+  /**
+   * Alarm sweep: re-issues parse jobs for live items stuck in `pending` since before `olderThan` (e.g. the
+   * queue send after a committed push failed, and the idempotent retry returned no jobs). Reuses the stored
+   * raw HTML key. Bumps parse_gen, so a late result of the original job is ignored as stale.
+   */
+  requeueStalePending(olderThan: number, limit: number, now: number = Date.now()): ParseJob[] {
+    const rows = this.all<ItemRow>(
+      `SELECT * FROM items WHERE parse_status = 'pending' AND deleted_at IS NULL
+         AND (parse_requested_at IS NULL OR parse_requested_at < ?) ORDER BY parse_requested_at LIMIT ?`,
+      olderThan,
+      limit,
+    );
+    if (rows.length === 0) return [];
+    return this.withCtx((ctx) => {
+      return rows.map((row) => {
+        const job = this.newParseJob(ctx, row, row.parse_raw_key ? { rawKey: row.parse_raw_key } : {});
+        return job;
+      });
+    }, now).value;
   }
 
   markParsed(itemId: string, result: ParseResult): { ok: boolean } {
@@ -777,24 +861,23 @@ export class LibraryStore {
     return this.toItems(this.all<ItemRow>("SELECT * FROM items WHERE deleted_at IS NULL ORDER BY saved_at, id"));
   }
 
-  /** Alarm: purge old tombstones / tag_renames / applied_ops (api.md §7.3, §14). */
+  /**
+   * Alarm: purge old tombstones / tag_renames / applied_ops (api.md §7.3, §14). Uses the server-time columns
+   * (tombstoned_at, recorded_at), never the client `at`, so a skewed/offline device can't trigger an early purge.
+   */
   prune(now: number = Date.now()): void {
     const tombCut = now - LIMITS.tombstoneTtlMs;
     this.txn(() => {
-      const maxItem = this.first<{ s: number | null }>("SELECT MAX(seq) AS s FROM items WHERE deleted_at IS NOT NULL AND deleted_at < ?", tombCut)!.s;
-      const maxTag = this.first<{ s: number | null }>("SELECT MAX(seq) AS s FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < ?", tombCut)!.s;
+      const maxItem = this.first<{ s: number | null }>("SELECT MAX(seq) AS s FROM items WHERE tombstoned_at < ?", tombCut)!.s;
+      const maxTag = this.first<{ s: number | null }>("SELECT MAX(seq) AS s FROM tags WHERE tombstoned_at < ?", tombCut)!.s;
       const horizon = Math.max(this.getMeta("tombstone_horizon"), maxItem ?? 0, maxTag ?? 0);
-      this.exec(
-        "DELETE FROM item_tags WHERE item_id IN (SELECT id FROM items WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
-        tombCut,
-      );
-      this.exec("DELETE FROM items WHERE deleted_at IS NOT NULL AND deleted_at < ?", tombCut);
-      this.exec(
-        "DELETE FROM item_tags WHERE tag_id IN (SELECT id FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
-        tombCut,
-      );
-      this.exec("DELETE FROM tags WHERE deleted_at IS NOT NULL AND deleted_at < ?", tombCut);
-      this.exec("DELETE FROM tag_renames WHERE at < ?", tombCut);
+      this.exec("DELETE FROM item_tags WHERE item_id IN (SELECT id FROM items WHERE tombstoned_at < ?)", tombCut);
+      this.exec("DELETE FROM items WHERE tombstoned_at < ?", tombCut);
+      this.exec("DELETE FROM item_tags WHERE tag_id IN (SELECT id FROM tags WHERE tombstoned_at < ?)", tombCut);
+      this.exec("DELETE FROM tags WHERE tombstoned_at < ?", tombCut);
+      // Aliases whose target is gone would hide a later re-save under the same client id.
+      this.exec("DELETE FROM item_aliases WHERE target_id NOT IN (SELECT id FROM items)");
+      this.exec("DELETE FROM tag_renames WHERE recorded_at < ?", tombCut);
       this.exec("DELETE FROM applied_ops WHERE applied_at < ?", now - LIMITS.appliedOpsTtlMs);
       this.setMeta("tombstone_horizon", horizon);
     });

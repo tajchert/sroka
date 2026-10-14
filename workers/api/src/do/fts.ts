@@ -24,7 +24,16 @@ export function normalizeDomainFilter(d: string): string {
       /* keep as is */
     }
   }
-  return s.replace(/\.+$/, "").replace(/^www\./, "");
+  s = s.replace(/\.+$/, "").replace(/^www\./, "");
+  // Stored domains come from the canonical URL (WHATWG host: punycode for IDNs) → convert the filter the same way.
+  if (s !== "" && /[^\x00-\x7f]/.test(s)) {
+    try {
+      s = new URL("http://" + s).hostname;
+    } catch {
+      /* keep as is */
+    }
+  }
+  return s;
 }
 
 /** Escapes LIKE wildcards (ESCAPE '\'). */

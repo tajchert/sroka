@@ -33,6 +33,11 @@ export type ItemRow = {
   clock: string;
   seq: number;
   fts_rowid: number | null;
+  /** v2: server time of the delete (purge reference); deleted_at is the client stamp. */
+  tombstoned_at: number | null;
+  /** v2: server time of the last parse request (stuck-pending sweep). */
+  parse_requested_at: number | null;
+  parse_raw_key: string | null;
 };
 
 export type TagRow = {

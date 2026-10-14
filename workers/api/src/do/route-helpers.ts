@@ -40,12 +40,37 @@ export function validItemId(id: string): boolean {
   return isUuid(id);
 }
 
-/** Enqueues parse jobs (≤100 per sendBatch). */
-export async function enqueueParseJobs(env: Env, jobs: readonly ParseJob[]): Promise<void> {
+const ENQUEUE_ATTEMPTS = 3;
+
+/**
+ * Enqueues parse jobs (≤100 per sendBatch), retrying each chunk. Never throws: the ops behind the jobs are
+ * already committed (a 500 would make the client retry an idempotent push that returns no jobs). If a send
+ * still fails, the LibraryDO is asked to run its stuck-pending sweep soon, which re-enqueues those items.
+ */
+export async function enqueueParseJobs(env: Env, jobs: readonly ParseJob[], userId?: string): Promise<void> {
   for (let i = 0; i < jobs.length; i += 100) {
     const chunk = jobs.slice(i, i + 100);
-    if (chunk.length === 1) await env.PARSE_QUEUE.send(chunk[0]!);
-    else await env.PARSE_QUEUE.sendBatch(chunk.map((body) => ({ body })));
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < ENQUEUE_ATTEMPTS; attempt++) {
+      try {
+        if (chunk.length === 1) await env.PARSE_QUEUE.send(chunk[0]!);
+        else await env.PARSE_QUEUE.sendBatch(chunk.map((body) => ({ body })));
+        lastErr = undefined;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (lastErr !== undefined) {
+      console.error("enqueueParseJobs: queue send failed, deferring to the LibraryDO sweep", lastErr);
+      const uid = userId ?? chunk[0]!.userId;
+      try {
+        await env.LIBRARY.getByName(uid).scheduleParseSweep();
+      } catch (e) {
+        // The daily alarm sweep still picks the items up.
+        console.error("enqueueParseJobs: scheduleParseSweep failed", e);
+      }
+    }
   }
 }
 

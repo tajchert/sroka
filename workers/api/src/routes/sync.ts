@@ -10,7 +10,7 @@ syncRoutes.post("/push", async (c) => {
   if (!parsed.success) return validationError(c, parsed.error);
   // Ops are validated one by one inside applyOps (invalid → rejected "invalid_op").
   const { response, parseJobs } = await library(c).applyOps(parsed.data.deviceId, parsed.data.ops);
-  await enqueueParseJobs(c.env, parseJobs);
+  await enqueueParseJobs(c.env, parseJobs, c.var.userId);
   return c.json(response);
 });
 

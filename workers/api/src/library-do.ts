@@ -29,6 +29,11 @@ export interface RestResult extends ApplyResult {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Items `pending` longer than this are re-enqueued by the alarm sweep. */
+const STALE_PENDING_MS = 30 * 60 * 1000;
+/** Delay of the extra alarm scheduled when a route failed to enqueue parse jobs. */
+const SWEEP_DELAY_MS = STALE_PENDING_MS + 60 * 1000;
+const SWEEP_BATCH = 100;
 
 /**
  * Per-user library (SQLite DO, decisions D5). Addressed with `env.LIBRARY.getByName(userId)`.
@@ -79,7 +84,7 @@ export class LibraryDO extends DurableObject<Env> {
   }
 
   /** Validates ops (invalid → rejected invalid_op) and precomputes canonical URLs/hashes, then applies. */
-  private async apply(deviceId: string, raw: readonly unknown[]): Promise<ApplyResult> {
+  private async apply(deviceId: string, raw: readonly unknown[], atomic = false): Promise<ApplyResult> {
     this.ensureSchema();
     const ops: Op[] = [];
     const invalid: { opId: string; reason: "invalid_op" }[] = [];
@@ -107,7 +112,7 @@ export class LibraryDO extends DurableObject<Env> {
       info.push({ canonical, hash: await urlHash(canonical) });
     }
     // Everything below is synchronous (no interleaving with other requests).
-    const res = this.store.applyOps(deviceId, ops, info);
+    const res = atomic ? this.store.applyOpsAtomic(deviceId, ops, info) : this.store.applyOps(deviceId, ops, info);
     res.response.rejected.unshift(...invalid);
     if (ops.length > 0) await this.ensureAlarm();
     return res;
@@ -175,7 +180,8 @@ export class LibraryDO extends DurableObject<Env> {
     this.ensureSchema();
     const current = this.store.getItem(itemId);
     if (!current) return { response: { applied: [], rejected: [], aliases: {}, cursor: this.store.getMeta("seq") }, parseJobs: [], item: null };
-    const res = await this.apply(deviceId, patchToOps(patch, current, at));
+    // All-or-nothing: a PATCH is one request, it must not be half-applied and reported as failed.
+    const res = await this.apply(deviceId, patchToOps(patch, current, at), true);
     return { ...res, item: await this.signOne(this.store.getItem(current.id)) };
   }
 
@@ -239,9 +245,38 @@ export class LibraryDO extends DurableObject<Env> {
     return this.sign(this.store.exportItems());
   }
 
+  /**
+   * Called by a route whose queue send failed after the ops were committed: schedules an earlier alarm so the
+   * stuck-pending sweep re-enqueues those items soon (the client's idempotent retry returns no jobs).
+   */
+  async scheduleParseSweep(): Promise<void> {
+    this.ensureSchema();
+    const at = Date.now() + SWEEP_DELAY_MS;
+    const cur = await this.ctx.storage.getAlarm();
+    if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
+    this.alarmChecked = true;
+  }
+
+  /** Re-enqueues parse jobs of items stuck in `pending` (lost queue sends). Returns the number re-enqueued. */
+  async sweepStalePending(now: number = Date.now()): Promise<number> {
+    this.ensureSchema();
+    let total = 0;
+    for (;;) {
+      const jobs = this.store.requeueStalePending(now - STALE_PENDING_MS, SWEEP_BATCH, now);
+      if (jobs.length === 0) break;
+      if (jobs.length === 1) await this.env.PARSE_QUEUE.send(jobs[0]!);
+      else await this.env.PARSE_QUEUE.sendBatch(jobs.map((body) => ({ body })));
+      total += jobs.length;
+      if (jobs.length < SWEEP_BATCH) break;
+    }
+    return total;
+  }
+
   override async alarm(): Promise<void> {
     this.ensureSchema();
     this.store.prune();
+    // Reschedule before the sweep: a failing queue send makes the alarm retry, but the daily cadence stays.
     await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+    await this.sweepStalePending();
   }
 }

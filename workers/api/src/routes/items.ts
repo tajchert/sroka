@@ -77,10 +77,10 @@ itemsRoutes.post("/", async (c) => {
       httpMetadata: { contentType: "text/html; charset=utf-8", contentEncoding: "gzip" },
     });
     const { job, item: after } = await stub.requestParseAndGet(item.id, { rawKey, force: true });
-    if (job) await enqueueParseJobs(c.env, [job]);
+    if (job) await enqueueParseJobs(c.env, [job], c.var.userId);
     if (after) item = after;
   } else {
-    await enqueueParseJobs(c.env, res.parseJobs);
+    await enqueueParseJobs(c.env, res.parseJobs, c.var.userId);
   }
   return c.json({ item, created }, 202);
 });
@@ -150,7 +150,7 @@ itemsRoutes.post("/:id/refresh", async (c) => {
     requireLive: true,
   });
   if (!res.item || res.response.applied.length === 0) return apiError(c, 404, "not_found");
-  await enqueueParseJobs(c.env, res.parseJobs);
+  await enqueueParseJobs(c.env, res.parseJobs, c.var.userId);
   return c.json({ item: res.item }, 202);
 });
 

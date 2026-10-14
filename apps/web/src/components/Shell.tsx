@@ -113,6 +113,11 @@ export default function Shell() {
         <NavLink to="/settings" className={linkCls}>
           Settings
         </NavLink>
+        {me.data.isAdmin && (
+          <NavLink to="/admin" className={linkCls}>
+            Admin
+          </NavLink>
+        )}
         <p className="truncate px-3 pt-1 text-xs text-ink2">{me.data.user.email}</p>
       </div>
     </nav>

@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import { installGlobalErrorHandlers } from "./lib/error-reporting.ts";
 import Shell from "./components/Shell.tsx";
 import { ToastProvider } from "./lib/store.tsx";
+import Admin from "./routes/Admin.tsx";
 import Library from "./routes/Library.tsx";
 import Reader from "./routes/Reader.tsx";
 import Settings from "./routes/Settings.tsx";
@@ -25,6 +26,7 @@ const router = createBrowserRouter(
         { path: "/tags", element: <Tags /> },
         { path: "/item/:id", element: <Reader /> },
         { path: "/settings", element: <Settings /> },
+        { path: "/admin", element: <Admin /> },
         { path: "*", element: <Library state="unread" /> },
       ],
     },

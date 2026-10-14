@@ -21,6 +21,8 @@ export interface Env {
   /** Dev only: comma-separated extra web origins (vite :5173) for trustedOrigins + content CORS. */
   DEV_ORIGINS?: string;
   BROWSER_RENDER_ENABLED: string;
+  /** Comma-separated admin emails (case-insensitive); gates /v1/admin/* and `isAdmin` on /v1/me (D10). */
+  ADMIN_EMAILS?: string;
   BETTER_AUTH_SECRET: string;
   CONTENT_URL_SIGNING_KEY: string;
   /** Published extension id (adds chrome-extension://<id> to trustedOrigins). */

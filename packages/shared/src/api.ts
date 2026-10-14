@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { LIMITS } from "./limits.ts";
+import { SiteRuleSchema } from "./site-rules.ts";
 import {
   ExportFormat,
   ImportFormat,
@@ -201,6 +202,8 @@ export type ConfigResponse = z.infer<typeof ConfigResponse>;
 export const MeResponse = z.object({
   user: User,
   stats: z.object({ unread: z.number().int(), archived: z.number().int(), favorites: z.number().int(), tags: z.number().int() }),
+  /** True when the user's email is in env `ADMIN_EMAILS` (D10). Optional so older servers still parse. */
+  isAdmin: z.boolean().optional(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 
@@ -269,3 +272,80 @@ export function decodeListCursor(s: string): ListCursor | null {
     return null;
   }
 }
+
+// ---------- admin (D10): /v1/admin/* ----------
+
+export const AdminParseStatus = z.enum(["ok", "partial", "failed"]);
+export const AdminParseMethod = z.enum(["fetch", "render", "capture", "cache"]);
+export const AdminFallbackOutcome = z.enum(["none", "ok", "partial", "failed", "budget", "disabled"]);
+
+export const AdminSummaryQuery = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) });
+
+const AdminCounts = z.object({
+  total: z.number().int(),
+  ok: z.number().int(),
+  partial: z.number().int(),
+  failed: z.number().int(),
+  /** Attempts where the browser-render fallback was tried (fallback_outcome not none/budget/disabled). */
+  renderTried: z.number().int(),
+  renderOk: z.number().int(),
+  /** Attempts where the fallback was blocked by the budget. */
+  renderBudgetBlocked: z.number().int(),
+});
+
+export const AdminDomainSummary = AdminCounts.extend({
+  domain: z.string(),
+  lastAttemptAt: z.number().int(),
+  topErrors: z.array(z.object({ code: z.string(), count: z.number().int() })).max(3),
+});
+export type AdminDomainSummary = z.infer<typeof AdminDomainSummary>;
+
+export const AdminSummaryResponse = z.object({
+  days: z.number().int(),
+  since: z.number().int(),
+  totals: AdminCounts,
+  daily: z.array(z.object({ day: z.string(), total: z.number().int(), ok: z.number().int(), partial: z.number().int(), failed: z.number().int() })),
+  domains: z.array(AdminDomainSummary),
+});
+export type AdminSummaryResponse = z.infer<typeof AdminSummaryResponse>;
+
+export const AdminAttemptsQuery = z.object({
+  domain: z.string().min(1).max(253).optional(),
+  status: AdminParseStatus.optional(),
+  method: AdminParseMethod.optional(),
+  fallback: AdminFallbackOutcome.optional(),
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const AdminAttempt = z.object({
+  id: z.string(),
+  createdAt: z.number().int(),
+  domain: z.string(),
+  url: z.string().nullable(),
+  itemId: z.string().nullable(),
+  status: z.string(),
+  errorCode: z.string().nullable(),
+  errorDetail: z.string().nullable(),
+  method: z.string(),
+  fallbackOutcome: z.string(),
+  httpStatus: z.number().int().nullable(),
+  textChars: z.number().int().nullable(),
+  wordCount: z.number().int().nullable(),
+  images: z.number().int().nullable(),
+  durationMs: z.number().int().nullable(),
+  renderMs: z.number().int().nullable(),
+  attempt: z.number().int().nullable(),
+  parserVersion: z.string().nullable(),
+  ruleApplied: z.boolean(),
+});
+export type AdminAttempt = z.infer<typeof AdminAttempt>;
+
+export const AdminAttemptsResponse = z.object({ attempts: z.array(AdminAttempt), nextCursor: z.string().nullable() });
+export type AdminAttemptsResponse = z.infer<typeof AdminAttemptsResponse>;
+
+export const AdminSiteRuleEntry = z.object({ host: z.string(), rule: SiteRuleSchema });
+export type AdminSiteRuleEntry = z.infer<typeof AdminSiteRuleEntry>;
+export const AdminSiteRulesResponse = z.object({ rules: z.array(AdminSiteRuleEntry) });
+export type AdminSiteRulesResponse = z.infer<typeof AdminSiteRulesResponse>;
+export const AdminSiteRuleResponse = AdminSiteRuleEntry;

@@ -1,5 +1,9 @@
 /** Typed same-origin API client for /v1 and /api/auth (docs/api.md). */
 import {
+  AdminAttemptsResponse,
+  AdminSiteRuleResponse,
+  AdminSiteRulesResponse,
+  AdminSummaryResponse,
   ConfigResponse,
   ContentUrlsResponse,
   CreateItemResponse,
@@ -14,6 +18,7 @@ import {
   type Item,
   type ItemSort,
   type ItemState,
+  type SiteRule,
   type UpdateItemRequest,
 } from "@sroka/shared";
 
@@ -104,6 +109,15 @@ export interface ItemsQuery {
   limit?: number;
 }
 
+export interface AdminAttemptsQueryParams {
+  domain?: string;
+  status?: string;
+  method?: string;
+  fallback?: string;
+  cursor?: string;
+  limit?: number;
+}
+
 export const api = {
   // --- auth (Better Auth) ---
   sendOtp: (email: string, turnstileToken?: string | null) =>
@@ -151,6 +165,15 @@ export const api = {
   renameTag: async (id: string, name: string) =>
     (await request(`/v1/tags/${id}`, { method: "PATCH", body: { name }, schema: TagResponse })).tag,
   deleteTag: (id: string) => request(`/v1/tags/${id}`, { method: "DELETE" }),
+
+  // --- admin (D10; 404 for non-admins) ---
+  adminSummary: (days: number) => request("/v1/admin/parse/summary", { query: { days }, schema: AdminSummaryResponse }),
+  adminAttempts: (query: AdminAttemptsQueryParams) =>
+    request("/v1/admin/parse/attempts", { query: { ...query }, schema: AdminAttemptsResponse }),
+  adminRules: async () => (await request("/v1/admin/site-rules", { schema: AdminSiteRulesResponse })).rules,
+  adminPutRule: (host: string, rule: SiteRule) =>
+    request(`/v1/admin/site-rules/${encodeURIComponent(host)}`, { method: "PUT", body: rule, schema: AdminSiteRuleResponse }),
+  adminDeleteRule: (host: string) => request(`/v1/admin/site-rules/${encodeURIComponent(host)}`, { method: "DELETE" }),
 
   // --- import / export ---
   async createImport(file: File, format: ImportFormat) {

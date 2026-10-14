@@ -18,7 +18,9 @@ for (const w of ["api", "parser"]) {
   }
   const text = readFileSync(join(dir, ".dev.vars.example"), "utf8")
     .replace(/^BETTER_AUTH_SECRET=.*$/m, `BETTER_AUTH_SECRET=${secret()}`)
-    .replace(/^CONTENT_URL_SIGNING_KEY=.*$/m, `CONTENT_URL_SIGNING_KEY=${secret()}`);
+    .replace(/^CONTENT_URL_SIGNING_KEY=.*$/m, `CONTENT_URL_SIGNING_KEY=${secret()}`)
+    // ADMIN_EMAILS stays configurable: `ADMIN_EMAILS=you@example.com npm run dev:setup` pre-fills it (api only).
+    .replace(/^ADMIN_EMAILS=.*$/m, `ADMIN_EMAILS=${process.env.ADMIN_EMAILS ?? ""}`);
   writeFileSync(target, text);
   console.log(`create workers/${w}/.dev.vars`);
 }

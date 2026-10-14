@@ -65,9 +65,16 @@ export interface ExtractOptions {
   minTextChars?: number;
 }
 
-function safeQueryAll(doc: Doc, sel: string): Element[] {
+/** The linkedom element surface we use (works under both DOM lib and workers-types). */
+interface El {
+  textContent: string | null;
+  innerHTML: string;
+  remove(): void;
+}
+
+function safeQueryAll(doc: Doc, sel: string): El[] {
   try {
-    return [...(doc.querySelectorAll(sel) as unknown as Iterable<Element>)];
+    return [...(doc.querySelectorAll(sel) as unknown as Iterable<El>)];
   } catch {
     return [];
   }

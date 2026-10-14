@@ -1,13 +1,23 @@
 import {
+  BOT_WALL_STATUSES,
+  BROWSER_UA,
   buildContent,
   decodeHtml,
+  detectBotWall,
+  extractArticle,
   FetchError,
+  PARTIAL_BELOW_CHARS,
+  type BotWall,
+  type Extracted,
+  type ExtractOptions,
   type ImageTransform,
   type SafeFetchOptions,
   safeFetch,
 } from "@sroka/extractor";
-import { log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
+import { displayDomain, hashId, log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
+import { renderEnabled, renderPage, takeRenderBudget } from "./render.ts";
+import { loadSiteRule, stripParams } from "./site-rules.ts";
 
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_RAW_BYTES = 12 * 1024 * 1024;
@@ -30,12 +40,45 @@ export const defaultDeps: Deps = {
   newId: () => uuidv7(),
 };
 
-/** Out-param of processJob for the per-job log / metric (all optional). */
+export type ParseMethod = "fetch" | "render" | "capture" | "cache";
+export type FallbackOutcome = "none" | "ok" | "partial" | "failed" | "budget" | "disabled";
+
+/** Out-param of processJob for the per-job log / metric / parse_attempts row (all optional). */
 export interface JobStats {
   cacheHit?: boolean;
   /** Package bytes (0 on cache hit / failure). */
   bytes?: number;
   images?: number;
+  /** Where the HTML that was used came from. */
+  method?: ParseMethod;
+  /** Browser Run fallback: none = not needed, disabled = needed but off (env or rule), budget = over budget. */
+  fallbackOutcome?: FallbackOutcome;
+  /** A KV site rule matched the host. */
+  ruleApplied?: boolean;
+  renderMs?: number;
+  textChars?: number;
+  /** Origin HTTP status of the plain fetch (or of the rendered page when its HTML was used). */
+  httpStatus?: number;
+  /** Extra failure detail (render error, render_budget). */
+  errorDetail?: string;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+/** extractArticle that never throws (linkedom/Readability crash = nothing extractable). */
+function safeExtract(html: string, url: string, opts: ExtractOptions, itemId: string): Extracted | null {
+  try {
+    return extractArticle(html, url, opts);
+  } catch (e) {
+    log.warnException("extractArticle threw", e, { event: "build_content_failed", itemId });
+    return null;
+  }
 }
 
 export function failedResult(job: ParseJob, error: string): ParseResult {
@@ -194,9 +237,11 @@ export async function processJob(
   job: ParseJob,
   deps: Deps = defaultDeps,
   stillWanted?: () => Promise<boolean>,
-  stats?: JobStats,
+  stats: JobStats = {},
 ): Promise<ParseResult | null> {
   const isPrivate = !!job.rawKey;
+  stats.method = isPrivate ? "capture" : "fetch";
+  stats.fallbackOutcome = "none";
   let canonical: string;
   try {
     canonical = normalizeUrl(job.url);
@@ -207,19 +252,34 @@ export async function processJob(
   const now = deps.now();
   const sharedCache = !isPrivate && sharesCacheKey(job.url, canonical);
 
+  // Site rule (KV CONFIG, 60 s isolate cache). Applies to captures too, except the render settings.
+  const site = await loadSiteRule(env.CONFIG, hostOf(job.url), now);
+  const rule = site?.rule;
+  stats.ruleApplied = !!rule;
+  if (rule?.disabled) return failedResult(job, "site_disabled");
+  const extractOptions: ExtractOptions = {
+    ...(rule?.removeSelectors ? { removeSelectors: rule.removeSelectors } : {}),
+    ...(rule?.contentSelector ? { contentSelector: rule.contentSelector } : {}),
+    ...(rule?.minTextChars !== undefined ? { minTextChars: rule.minTextChars } : {}),
+  };
+  const minChars = rule?.minTextChars ?? PARTIAL_BELOW_CHARS;
+
   if (sharedCache && !job.force) {
     const hit = await cacheLookup(env, hash, now);
     if (hit) {
-      if (stats) stats.cacheHit = true;
+      stats.cacheHit = true;
+      stats.method = "cache";
       return resultFrom(job, hit.id, false, hit.meta);
     }
   }
 
   const fetchOptions: SafeFetchOptions = { fetch: deps.fetch, ownHosts: ownHosts(env) };
+  const pageUrl = isPrivate ? job.url : stripParams(job.url, rule?.stripParams);
 
-  // 1. obtain HTML
-  let html: string;
+  // 1. obtain HTML (captured raw HTML, or a plain fetch). Bot-wall statuses are kept for the render fallback.
+  let html: string | null = null;
   let baseUrl = job.url;
+  let fetchErr: FetchError | null = null;
   try {
     if (job.rawKey) {
       let obj: R2ObjectBody | null;
@@ -239,24 +299,89 @@ export async function processJob(
       // Captured HTML is stored as UTF-8 (JSON string); ignore the page's original <meta charset>.
       html = decodeHtml(raw, "text/html; charset=utf-8");
     } else {
-      const res = await safeFetch(job.url, fetchOptions);
+      const res = await safeFetch(pageUrl, { ...fetchOptions, ...(rule?.userAgent === "browser" ? { userAgent: BROWSER_UA } : {}) });
+      stats.httpStatus = res.status;
       html = decodeHtml(res.bytes, res.contentType);
       baseUrl = res.url;
     }
   } catch (e) {
-    if (e instanceof FetchError) {
+    if (!(e instanceof FetchError)) throw e;
+    const status = /^http_(\d{3})$/.exec(e.code)?.[1];
+    if (status) stats.httpStatus = Number(status);
+    if (isPrivate || !status || !BOT_WALL_STATUSES.includes(Number(status))) {
       if (e.transient) throw e;
       return failedResult(job, e.code);
     }
-    throw e;
+    fetchErr = e;
   }
 
-  // 2. extract + sanitize + images + package
+  // 2a. extract (cheap) and decide whether the Browser Run fallback is needed (never for captured HTML)
+  let wall: BotWall | null = null;
+  let chosen: Extracted | null = null;
+  if (html !== null) {
+    wall = isPrivate ? null : detectBotWall(html);
+    if (wall !== "challenge") chosen = safeExtract(html, baseUrl, extractOptions, job.itemId);
+  }
+  let trigger: string | null = null;
+  if (!isPrivate) {
+    if (fetchErr) trigger = fetchErr.code;
+    else if (wall === "challenge") trigger = "challenge";
+    else if (!chosen) trigger = wall ?? "extract_failed";
+    else if (chosen.text.length < minChars) trigger = wall ?? "short";
+    else if (rule?.render === "always") trigger = "rule_always";
+  }
+  if (trigger) {
+    if (rule?.render === "never" || !renderEnabled(env)) {
+      stats.fallbackOutcome = "disabled";
+    } else if (!(await takeRenderBudget(env, await hashId(job.userId, 16), now))) {
+      stats.fallbackOutcome = "budget";
+      stats.errorDetail = "render_budget";
+    } else {
+      const r = await renderPage(env, pageUrl, {
+        ...(rule?.waitForSelector ? { waitForSelector: rule.waitForSelector } : {}),
+        browserUa: rule?.userAgent === "browser",
+        ownHosts: fetchOptions.ownHosts ?? [],
+      });
+      stats.renderMs = r.ms;
+      log.info("browser render", { event: "render", domain: displayDomain(job.url), trigger, ok: r.ok, ms: r.ms, itemId: job.itemId });
+      if (!r.ok) {
+        stats.fallbackOutcome = "failed";
+        stats.errorDetail = r.error;
+      } else {
+        const rWall = detectBotWall(r.html);
+        const rex = rWall === "challenge" ? null : safeExtract(r.html, r.finalUrl, extractOptions, job.itemId);
+        if (!rex) {
+          stats.fallbackOutcome = "failed";
+          stats.errorDetail = rWall === "challenge" ? "render_bot_wall" : "render_extract_failed";
+        } else {
+          const better = !chosen || rex.text.length >= minChars || rex.text.length > chosen.text.length;
+          stats.fallbackOutcome = rex.text.length >= minChars ? "ok" : "partial";
+          if (better) {
+            chosen = rex;
+            baseUrl = r.finalUrl;
+            stats.method = "render";
+            if (r.httpStatus !== null) stats.httpStatus = r.httpStatus;
+          }
+        }
+      }
+    }
+  }
+  if (!chosen) {
+    if (fetchErr) {
+      if (fetchErr.transient) throw fetchErr;
+      return failedResult(job, fetchErr.code);
+    }
+    return failedResult(job, wall === "challenge" ? "bot_wall" : "extract_failed");
+  }
+
+  // 2b. sanitize + images + package
   const contentId = deps.newId();
   let built;
   try {
     built = await buildContent({
-      html,
+      html: "",
+      extracted: chosen,
+      extractOptions,
       url: baseUrl,
       contentId,
       transform: deps.transform ?? imagesTransform(env),
@@ -267,16 +392,12 @@ export async function processJob(
     log.warnException("buildContent threw", e, { event: "build_content_failed", itemId: job.itemId });
     return failedResult(job, "extract_failed");
   }
-  if (!built) {
-    // TODO(BROWSER_RENDER_ENABLED): when env.BROWSER_RENDER_ENABLED === "true", enqueue a Browser Run render and re-extract here.
-    return failedResult(job, "extract_failed");
-  }
+  if (!built) return failedResult(job, "extract_failed");
 
-  if (stats) {
-    stats.cacheHit = false;
-    stats.bytes = built.packageBytes;
-    stats.images = built.files.filter((f) => f.path.startsWith("img/")).length;
-  }
+  stats.cacheHit = false;
+  stats.bytes = built.packageBytes;
+  stats.images = built.files.filter((f) => f.path.startsWith("img/")).length;
+  stats.textChars = built.textChars;
   if (stillWanted && !(await stillWanted())) return null;
 
   // 3. write R2 (fresh contentId => write-once keys); meta.json last = cache-validity marker

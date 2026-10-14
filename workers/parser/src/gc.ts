@@ -1,4 +1,5 @@
 import { log, r2Keys } from "@sroka/shared";
+import { ATTEMPTS_RETENTION_MS } from "./attempts.ts";
 import type { ParserEnv } from "./env.ts";
 
 /** Delete all R2 objects under a prefix (paged). Returns the number of objects deleted. */
@@ -179,6 +180,13 @@ export async function sweepSharedContent(
   return out;
 }
 
+/** Parse analytics retention (decisions D10): parse_attempts older than 30 days, expired render_budget rows. */
+export async function purgeParseAnalytics(db: D1Database, now = Date.now()): Promise<{ attempts: number; budget: number }> {
+  const a = await db.prepare("DELETE FROM parse_attempts WHERE created_at < ?1").bind(now - ATTEMPTS_RETENTION_MS).run();
+  const b = await db.prepare("DELETE FROM render_budget WHERE expires_at < ?1").bind(now).run();
+  return { attempts: a.meta.changes ?? 0, budget: b.meta.changes ?? 0 };
+}
+
 /** The weekly cron: each step isolated so one failure doesn't block the others; logs one summary line. */
 export async function runWeeklyGc(env: ParserEnv, now = Date.now()): Promise<void> {
   const summary: Record<string, unknown> = {};
@@ -193,5 +201,6 @@ export async function runWeeklyGc(env: ParserEnv, now = Date.now()): Promise<voi
   await step("userData", async () => (await sweepOrphanedUserData(env, now)).deleted.length);
   await step("backfill", () => backfillContentRefs(env));
   await step("sharedContent", () => sweepSharedContent(env, now));
+  await step("parseAnalytics", () => purgeParseAnalytics(env.DB, now));
   log.info("gc sweep finished", { event: "gc_sweep", ...summary });
 }

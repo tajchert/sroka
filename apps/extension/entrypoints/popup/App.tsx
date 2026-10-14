@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { deleteItem, describeError, getConfig, patchItem, sendOtp, signIn, tagSuggestions } from "../../lib/api.ts";
 import { invalidate, setCached } from "../../lib/badge-cache.ts";
 import type { Msg } from "../../lib/messages.ts";
-import { releaseQueue } from "../../lib/queue.ts";
 import type { SaveResult } from "../../lib/save.ts";
 import { getSettings } from "../../lib/settings.ts";
 
@@ -57,8 +56,8 @@ export function App() {
 
   const onSignedIn = async () => {
     setEmail((await getSettings()).email);
-    await releaseQueue();
-    void send({ type: "process-queue" });
+    // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
+    await send({ type: "release-queue", skipUrl: tab.url });
     await save(tab);
   };
 

@@ -1,3 +1,4 @@
+import { clearCache } from "./badge-cache.ts";
 import { ext } from "./chrome.ts";
 
 export const DEFAULT_SERVER = "https://api.sroka.app";
@@ -38,6 +39,7 @@ export async function setSettings(patch: Partial<Settings>): Promise<void> {
 export async function clearSession(): Promise<void> {
   await ext().storage.local.remove(["token", "email"]);
   await ext().storage.local.set({ signedOut: true });
+  await clearCache();
 }
 
 /** Per-install device id for the X-Sroka-Device LWW tie-breaker. */

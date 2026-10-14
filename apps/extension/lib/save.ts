@@ -1,4 +1,4 @@
-import type { Item } from "@sroka/shared";
+import { LIMITS, type Item } from "@sroka/shared";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
 import { setCached } from "./badge-cache.ts";
 import { ext } from "./chrome.ts";
@@ -40,8 +40,13 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
   } catch (e) {
     if (e instanceof ApiFailure) {
       if (e.status === 413 && body.html) return saveWithFallback({ ...body, html: undefined });
+      if (e.status === 400 && e.code !== "invalid_url" && body.title) return saveWithFallback({ ...body, title: undefined });
       if (e.unauthorized || e.retryable) {
-        await enqueue(body);
+        try {
+          await enqueue(body);
+        } catch (qe) {
+          return { ok: false, queued: false, reason: "error", message: `Could not queue save: ${qe instanceof Error ? qe.message : String(qe)}` };
+        }
         return { ok: false, queued: true, reason: e.unauthorized ? "signed_out" : "offline", message: e.message };
       }
       return {
@@ -59,7 +64,7 @@ export async function saveTab(tab: { id?: number; url?: string; title?: string }
   if (!isSavableUrl(tab.url)) return { ok: false, queued: false, reason: "unsupported", message: "This page can't be saved." };
   const s = await getSettings();
   const html = s.captureHtml && tab.id != null ? await captureHtml(tab.id) : null;
-  return saveWithFallback({ url: tab.url, title: tab.title || undefined, source: "extension", ...(html ? { html } : {}) });
+  return saveWithFallback({ url: tab.url, title: tab.title?.trim().slice(0, LIMITS.maxTitleLength) || undefined, source: "extension", ...(html ? { html } : {}) });
 }
 
 export const saveLink = (url: string, title?: string): Promise<SaveResult> =>

@@ -1,6 +1,6 @@
 import { refreshBadge, paintBadge } from "../lib/badge.ts";
 import type { Msg } from "../lib/messages.ts";
-import { ALARM, processQueue } from "../lib/queue.ts";
+import { ALARM, processQueue, releaseQueue, removeQueuedUrl } from "../lib/queue.ts";
 import { saveLink, saveTab, type SaveResult } from "../lib/save.ts";
 
 async function flash(tabId: number | undefined, r: SaveResult) {
@@ -48,7 +48,7 @@ export default defineBackground(() => {
     }
   });
   chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
-    if (change.status === "loading" || change.url) void refreshBadge(tabId, change.url ?? tab.url);
+    if (change.status === "loading" || change.status === "complete" || change.url) void refreshBadge(tabId, change.url ?? tab.url);
   });
 
   chrome.alarms.onAlarm.addListener((a) => {
@@ -57,19 +57,29 @@ export default defineBackground(() => {
   chrome.runtime.onStartup.addListener(() => void processQueue());
 
   chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
+    const fail = (e: unknown) => sendResponse({ ok: false, queued: false, reason: "error", message: String(e) });
     if (msg.type === "save-tab") {
-      saveTab(msg.tab).then(async (r) => {
-        await flash(msg.tab.id, r);
-        sendResponse(r);
-      });
+      saveTab(msg.tab)
+        .then(async (r) => {
+          await flash(msg.tab.id, r).catch(() => undefined);
+          sendResponse(r);
+        })
+        .catch(fail);
       return true;
     }
     if (msg.type === "refresh-badge") {
-      refreshBadge(msg.tabId, msg.url, { force: false }).then(() => sendResponse(true));
+      refreshBadge(msg.tabId, msg.url, { force: false }).then(() => sendResponse(true), () => sendResponse(false));
       return true;
     }
     if (msg.type === "process-queue") {
-      processQueue().then(sendResponse);
+      processQueue().then(sendResponse, () => sendResponse({ sent: 0, remaining: -1 }));
+      return true;
+    }
+    if (msg.type === "release-queue") {
+      (msg.skipUrl ? removeQueuedUrl(msg.skipUrl) : Promise.resolve())
+        .then(() => releaseQueue())
+        .then(() => processQueue())
+        .then(sendResponse, () => sendResponse({ sent: 0, remaining: -1 }));
       return true;
     }
     return false;

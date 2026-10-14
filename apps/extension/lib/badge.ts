@@ -25,6 +25,13 @@ export async function refreshBadge(tabId: number, url: string | undefined, opts:
       await setCached(url, { saved: !!item, id: item?.id });
       entry = { saved: !!item, id: item?.id, at: Date.now() };
     }
+    // A slow lookup may finish after navigation; only paint if the tab still shows this URL.
+    try {
+      const cur = await ext().tabs?.get(tabId);
+      if (cur && cur.url !== url) return;
+    } catch {
+      return; // tab gone
+    }
     await paintBadge(tabId, entry.saved);
   } catch {
     /* offline or 401: leave as is */

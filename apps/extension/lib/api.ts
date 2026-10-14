@@ -6,6 +6,7 @@ import type {
   ListItemsResponse,
   TagSuggestionsResponse,
 } from "@sroka/shared";
+import { clearCache } from "./badge-cache.ts";
 import { clearSession, getDeviceId, getSettings, setSettings } from "./settings.ts";
 
 /** status 0 = network failure. */
@@ -54,6 +55,7 @@ export async function rawFetch(path: string, opts: FetchOpts = {}): Promise<Resp
   if (opts.auth !== false) {
     if (!s.token) {
       await setSettings({ signedOut: true });
+      await clearCache();
       throw new ApiFailure(401, "unauthorized");
     }
     headers.authorization = `Bearer ${s.token}`;
@@ -72,6 +74,7 @@ export async function rawFetch(path: string, opts: FetchOpts = {}): Promise<Resp
   if (res.status === 401 && opts.auth !== false) {
     // Mark signed-out; queue and email are kept.
     await setSettings({ signedOut: true });
+    await clearCache();
   }
   if (!res.ok) throw await errorFrom(res);
   return res;
@@ -118,6 +121,7 @@ export async function signIn(email: string, otp: string): Promise<void> {
   const token = res.headers.get("set-auth-token");
   if (!token) throw new ApiFailure(500, "no_token", "Server did not return a session token");
   await setSettings({ token, email, signedOut: false });
+  await clearCache();
 }
 
 export async function signOut(): Promise<void> {

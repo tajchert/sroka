@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ALARM, backoffMs, enqueue, MAX_QUEUED_HTML, processQueue, readQueue, releaseQueue } from "./queue.ts";
+import { ALARM, backoffMs, enqueue, MAX_QUEUED_HTML, processQueue, readFailed, readQueue, releaseQueue, removeQueuedUrl } from "./queue.ts";
 import { saveWithFallback } from "./save.ts";
 import { setSettings } from "./settings.ts";
 import { installChrome, jsonRes } from "./test-chrome.ts";
@@ -106,5 +106,68 @@ describe("saveWithFallback", () => {
     const r = await saveWithFallback({ url: "https://a.com/", html: "<p/>" });
     expect(r.ok).toBe(true);
     expect(JSON.parse((f.mock.calls[1]![1] as RequestInit).body as string).html).toBeUndefined();
+  });
+});
+
+describe("review fixes", () => {
+  it("quota failure on enqueue retries without html", async () => {
+    const real = c.storage.local.set.getMockImplementation()!;
+    c.storage.local.set.mockImplementationOnce(async () => {
+      throw new Error("QUOTA_BYTES quota exceeded");
+    });
+    c.storage.local.set.mockImplementation(real);
+    await enqueue({ url: "https://a.com/", html: "<p>hi</p>" });
+    const q = await readQueue();
+    expect(q).toHaveLength(1);
+    expect(q[0]!.body.html).toBeUndefined();
+  });
+
+  it("caps total queued html in bytes", async () => {
+    const big = "é".repeat(400_000); // 800 KB
+    for (let i = 0; i < 7; i++) await enqueue({ url: `https://a.com/${i}`, html: big });
+    const withHtml = (await readQueue()).filter((e) => e.body.html).length;
+    expect(withHtml).toBe(5);
+  });
+
+  it("never drops network failures; records permanent failures", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+    let t = now;
+    for (let i = 0; i < 60; i++) {
+      await processQueue(t);
+      t += 3_600_000;
+    }
+    expect(await readQueue()).toHaveLength(1);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => jsonRes(400, { error: "invalid_url" }));
+    await processQueue(t);
+    expect(await readQueue()).toHaveLength(0);
+    expect((await readFailed())[0]!.url).toBe("https://a.com/");
+  });
+
+  it("400 retries without title", async () => {
+    const f = vi.spyOn(globalThis, "fetch");
+    f.mockImplementationOnce(async () => jsonRes(400, { error: "invalid_request" }));
+    f.mockImplementation(async () => ok());
+    const r = await saveWithFallback({ url: "https://a.com/", title: "t" });
+    expect(r.ok).toBe(true);
+    expect(JSON.parse(f.mock.calls[1]![1]!.body as string).title).toBeUndefined();
+  });
+
+  it("signed-out processQueue is a no-op and clears the alarm", async () => {
+    await enqueue({ url: "https://a.com/" });
+    await setSettings({ signedOut: true });
+    const f = vi.spyOn(globalThis, "fetch");
+    f.mockClear();
+    expect(await processQueue()).toEqual({ sent: 0, remaining: 1 });
+    expect(f).not.toHaveBeenCalled();
+    expect(c.alarms.clear).toHaveBeenCalledWith(ALARM);
+  });
+
+  it("removeQueuedUrl drops only that url", async () => {
+    await enqueue({ url: "https://a.com/" });
+    await enqueue({ url: "https://b.com/" });
+    await removeQueuedUrl("https://a.com/");
+    expect((await readQueue()).map((e) => e.body.url)).toEqual(["https://b.com/"]);
   });
 });

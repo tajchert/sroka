@@ -7,3 +7,4 @@ export * from "./sanitize.ts";
 export * from "./images.ts";
 export * from "./package.ts";
 export * from "./pipeline.ts";
+export * from "./bot-wall.ts";

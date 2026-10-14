@@ -1,5 +1,5 @@
 import { PARSER_VERSION, readingMinutes } from "@sroka/shared";
-import { countWords, extractArticle } from "./extract.ts";
+import { countWords, extractArticle, type ExtractOptions, type Extracted } from "./extract.ts";
 import { processImages, type ImageTransform } from "./images.ts";
 import { buildArticleHtml, buildPackage } from "./package.ts";
 import type { SafeFetchOptions } from "./safe-fetch.ts";
@@ -32,6 +32,8 @@ export interface BuildContentResult {
   leadImageKey?: string;
   /** total bytes of package.zip */
   packageBytes: number;
+  /** Characters of extracted text (text.txt). */
+  textChars: number;
 }
 
 export interface BuildContentOptions {
@@ -42,14 +44,18 @@ export interface BuildContentOptions {
   transform: ImageTransform;
   fetchOptions: SafeFetchOptions;
   parserVersion?: number;
+  /** Site-rule options (removeSelectors / contentSelector before extraction, minTextChars for `partial`). */
+  extractOptions?: ExtractOptions;
+  /** Already extracted article (skips extractArticle; `extractOptions` then only sets minTextChars). */
+  extracted?: Extracted;
 }
 
 const enc = new TextEncoder();
-const PARTIAL_BELOW_CHARS = 500;
+export const PARTIAL_BELOW_CHARS = 500;
 
 /** HTML -> Readability -> sanitize -> images -> article.html/text.txt/package.zip. Returns null if nothing extractable. */
 export async function buildContent(o: BuildContentOptions): Promise<BuildContentResult | null> {
-  const ex = extractArticle(o.html, o.url);
+  const ex = o.extracted ?? extractArticle(o.html, o.url, o.extractOptions);
   if (!ex) return null;
   const san = sanitizeArticle(ex.contentHtml, o.url);
   const leadCandidates = [ex.leadImage, san.images[0]].filter((x): x is string => !!x);
@@ -83,7 +89,7 @@ export async function buildContent(o: BuildContentOptions): Promise<BuildContent
   if (imgs.thumb) files.push({ path: "thumb.webp", bytes: imgs.thumb, contentType: "image/webp" });
 
   return {
-    status: text.length < PARTIAL_BELOW_CHARS ? "partial" : "ok",
+    status: text.length < (o.extractOptions?.minTextChars ?? PARTIAL_BELOW_CHARS) ? "partial" : "ok",
     meta: {
       title: ex.title,
       excerpt: ex.excerpt,
@@ -97,5 +103,6 @@ export async function buildContent(o: BuildContentOptions): Promise<BuildContent
     files,
     leadImageKey: imgs.thumb ? "thumb.webp" : undefined,
     packageBytes: pkg.zip.byteLength,
+    textChars: text.length,
   };
 }

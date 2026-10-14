@@ -1,8 +1,8 @@
 import { FetchError } from "@sroka/extractor";
 import { ParseJobSchema, r2Keys, type ParseJob } from "@sroka/shared";
-import { deletePrefix, sweepOrphanedUserData } from "./gc.ts";
+import { deletePrefix, runWeeklyGc } from "./gc.ts";
 import type { ParserEnv } from "./env.ts";
-import { defaultDeps, failedResult, incrementRefCount, processJob, type Deps } from "./process.ts";
+import { defaultDeps, failedResult, processJob, type Deps } from "./process.ts";
 
 export { processJob } from "./process.ts";
 
@@ -53,9 +53,9 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
       }
       result = failedResult(job, code);
     }
+    // Shared-content references are reported to D1 by the LibraryDO itself (content_refs, api.md §9).
     const ack = await lib.markParsed(job.itemId, result);
-    if (ack?.ok) await incrementRefCount(env, result);
-    else if (result.contentPrivate && result.contentId) {
+    if (!ack?.ok && result.contentPrivate && result.contentId) {
       // Rejected (stale, duplicate, item deleted, account wiped): this private dir is referenced by nothing.
       await deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId)).catch((e) =>
         console.warn("private content cleanup failed", e),
@@ -63,9 +63,9 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     }
     msg.ack();
   } catch (e) {
-    // markParsed RPC failure etc. NOTE: the retry re-parses with a new contentId; orphaned R2 objects /
-    // content row (ref_count 0) from this attempt are not collected yet (private ones of deleted accounts
-    // are swept by the weekly cron, see gc.ts).
+    // markParsed RPC failure etc. NOTE: the retry re-parses with a new contentId; a public dir from this
+    // attempt has a content row without refs and is collected by the shared-content GC (gc.ts); private ones
+    // are only swept once the account is deleted.
     console.error(`markParsed failed for ${job.itemId}`, e);
     msg.retry({ delaySeconds: backoff(msg.attempts) });
   }
@@ -94,8 +94,8 @@ export default {
     // sequential: one parse at a time keeps memory/CPU within the isolate limits
     for (const m of batch.messages) await handleMessage(m, env, defaultDeps);
   },
-  /** Weekly cron (wrangler.jsonc triggers): R2 data of deleted accounts, expired auth throttle rows. */
+  /** Weekly cron (wrangler.jsonc triggers): deleted accounts' R2 data, auth throttle rows, shared content (gc.ts). */
   async scheduled(_ctrl: ScheduledController, env: ParserEnv): Promise<void> {
-    await sweepOrphanedUserData(env);
+    await runWeeklyGc(env);
   },
 } satisfies ExportedHandler<ParserEnv, ParseJob>;

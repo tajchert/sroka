@@ -5,6 +5,8 @@ export interface LibraryParserRpc {
   markParsed(itemId: string, result: ParseResult): Promise<{ ok: boolean }>;
   /** False when the job is superseded / already done / the item or library is gone. */
   parseWanted(itemId: string, parseGen: number): Promise<boolean>;
+  /** GC backfill: re-emits the library's public content refs to D1 `content_refs`; pending > 0 = flush failed. */
+  reemitContentRefs(): Promise<{ refs: number; pending: number }>;
 }
 
 /** `env.LIBRARY` as the parser sees it: only getByName() is used. */

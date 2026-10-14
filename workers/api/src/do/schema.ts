@@ -96,6 +96,14 @@ export const MIGRATIONS: readonly string[][] = [
     `CREATE INDEX items_tombstoned ON items(tombstoned_at) WHERE tombstoned_at IS NOT NULL`,
     `CREATE INDEX items_pending ON items(parse_requested_at) WHERE parse_status = 'pending' AND deleted_at IS NULL`,
   ],
+  // v3: shared-content references (api.md §9 "Content references"). `content_ref_outbox` = public content ids
+  // whose D1 `content_refs` row may be out of date; `gen` is bumped on every re-mark so a flush only clears an
+  // entry that did not change while its D1 write was in flight. The desired state is recomputed from `items`
+  // at flush time (never stored), so the outbox is order-independent and idempotent.
+  [
+    `CREATE TABLE content_ref_outbox (content_id TEXT PRIMARY KEY, gen INTEGER NOT NULL)`,
+    `CREATE INDEX items_content ON items(content_id) WHERE content_id IS NOT NULL`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

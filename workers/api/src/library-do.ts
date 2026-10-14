@@ -44,6 +44,9 @@ const PARSE_REFILL_PER_MS = PARSE_BURST / (60 * 60 * 1000);
 const DEFERRED_SWEEP_MS = 10 * 60 * 1000;
 /** Marker table created by destroy(): the library of a deleted account must never be recreated. */
 const DESTROYED_TABLE = "_destroyed";
+/** Content-ref outbox entries per D1 batch, and the alarm delay after a failed flush. */
+const REF_BATCH = 50;
+const REF_RETRY_MS = 10 * 60 * 1000;
 
 export class LibraryDestroyedError extends Error {
   constructor() {
@@ -60,6 +63,8 @@ export class LibraryDO extends DurableObject<Env> {
   private ready = false;
   private alarmChecked = false;
   private destroyed: boolean | null = null;
+  /** Serializes content-ref flushes (flushContentRefs). */
+  private refChain: Promise<unknown> = Promise.resolve();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -99,6 +104,57 @@ export class LibraryDO extends DurableObject<Env> {
     } catch (e) {
       console.error("LibraryDO: R2 cleanup failed", keys, e);
     }
+  }
+
+  /**
+   * Flushes the content-ref outbox to D1 `content_refs` (api.md §9 "Content references"). Serialized per
+   * instance: the desired state is computed right before each D1 batch, and an entry re-marked while its
+   * batch was in flight keeps its row (gen mismatch) and is flushed again — so concurrent flushes can never
+   * write an older state over a newer one. On failure the alarm retries (REF_RETRY_MS). Returns the number of
+   * entries still pending.
+   */
+  private flushContentRefs(): Promise<number> {
+    const run = this.refChain.then(() => this.flushRefsNow());
+    this.refChain = run.catch(() => undefined);
+    return run;
+  }
+
+  private async flushRefsNow(): Promise<number> {
+    if (this.isDestroyed()) return 0;
+    const db = this.env.DB;
+    const userId = this.userId();
+    for (;;) {
+      const batch = this.store.refBatch(REF_BATCH);
+      if (batch.length === 0) return 0;
+      const now = Date.now();
+      const stmts: D1PreparedStatement[] = [];
+      for (const r of batch) {
+        stmts.push(
+          r.live
+            ? db.prepare("INSERT INTO content_refs (content_id, user_id, at) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING").bind(r.contentId, userId, now)
+            : db.prepare("DELETE FROM content_refs WHERE content_id = ?1 AND user_id = ?2").bind(r.contentId, userId),
+          // Attach/detach restarts the GC grace period; ref_count is only a cache of COUNT(content_refs).
+          db
+            .prepare(
+              "UPDATE content SET last_used_at = MAX(last_used_at, ?2), ref_count = (SELECT COUNT(*) FROM content_refs WHERE content_id = ?1) WHERE id = ?1",
+            )
+            .bind(r.contentId, now),
+        );
+      }
+      try {
+        await db.batch(stmts);
+      } catch (e) {
+        console.error("LibraryDO: content_refs flush failed", e);
+        await this.scheduleSweepIn(REF_RETRY_MS).catch(() => undefined);
+        return this.store.pendingRefCount();
+      }
+      this.store.clearRefs(batch);
+    }
+  }
+
+  /** Flushes the outbox if it has entries (cheap check on the hot paths). */
+  private async flushRefsIfPending(): Promise<void> {
+    if (this.store.pendingRefCount() > 0) await this.flushContentRefs();
   }
 
   /** Takes up to `n` tokens of the parse budget; returns how many were granted. */
@@ -189,6 +245,7 @@ export class LibraryDO extends DurableObject<Env> {
     if (ops.length > 0) await this.ensureAlarm();
     res.parseJobs = await this.budgetJobs(res.parseJobs);
     await this.flushCleanup();
+    await this.flushRefsIfPending();
     return res;
   }
 
@@ -223,7 +280,20 @@ export class LibraryDO extends DurableObject<Env> {
     if (!p.success) return { ok: false };
     const r = this.store.markParsed(itemId, p.data);
     await this.flushCleanup();
+    await this.flushRefsIfPending();
     return r;
+  }
+
+  /**
+   * One-time backfill (parser GC, api.md §9): re-emits every public content reference of this library to D1
+   * `content_refs` and flushes. `pending` > 0 means the flush failed (retry later). A destroyed library has none.
+   */
+  async reemitContentRefs(): Promise<{ refs: number; pending: number }> {
+    if (this.isDestroyed()) return { refs: 0, pending: 0 };
+    this.ensureSchema();
+    const refs = this.store.markAllRefsDirty();
+    const pending = await this.flushContentRefs();
+    return { refs, pending };
   }
 
   /** Parser pre-check: false when the job is superseded / already done / the item or library is gone. */
@@ -251,6 +321,13 @@ export class LibraryDO extends DurableObject<Env> {
     this.destroyed = true;
     this.ready = false;
     this.alarmChecked = true;
+    // Detach all shared content of this user. Best effort: the parser GC also ignores (and purges) refs of
+    // user ids no longer in D1, which covers a failure here and a flush that was in flight during the wipe.
+    try {
+      await this.env.DB.prepare("DELETE FROM content_refs WHERE user_id = ?1").bind(this.ctx.id.name ?? "").run();
+    } catch (e) {
+      console.warn("LibraryDO: content_refs cleanup on destroy failed", e);
+    }
   }
 
   // ---------- internal helpers for workers/api routes ----------
@@ -387,6 +464,7 @@ export class LibraryDO extends DurableObject<Env> {
     this.store.prune();
     // Reschedule before the sweep: a failing queue send makes the alarm retry, but the daily cadence stays.
     await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+    await this.flushRefsIfPending(); // retries failed content-ref flushes (errors are swallowed)
     await this.sweepStalePending();
   }
 }

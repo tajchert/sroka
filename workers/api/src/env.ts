@@ -20,6 +20,11 @@ export interface Env {
   BROWSER_RENDER_ENABLED: string;
   BETTER_AUTH_SECRET: string;
   CONTENT_URL_SIGNING_KEY: string;
+  /** Published extension id (adds chrome-extension://<id> to trustedOrigins). */
+  EXT_ID?: string;
   REVIEW_EMAIL?: string;
   REVIEW_OTP?: string;
 }
+
+/** Hono app typing shared by route modules. `userId` is set by the /v1 auth middleware. */
+export type AppEnv = { Bindings: Env; Variables: { userId: string } };

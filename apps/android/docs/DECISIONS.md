@@ -29,10 +29,11 @@ core/ui                   ItemRow, ItemThumbnail, OfflineBadge, TagChips, EmptyS
 core/database             Room DB `SrokaDatabase` (A4)
 core/datastore            prefs (A6), SessionStore (token, Keystore-encrypted), deviceId
 core/network              SrokaApi (A5)
-core/data                 repositories + SyncEngine + ContentStore + workers (A7–A9); interfaces in `app.sroka.core.data.*`
-core/testing              fakes of every core/data interface, test data builders, MainDispatcherRule
+core/domain               INTERFACES consumed by features (`app.sroka.core.domain`): LibraryRepository, TagRepository, SyncController, SyncStatusRepository, ContentStore (reader-facing part), AuthRepository, SettingsRepository, AccountRepository
+core/data                 implementations of core:domain interfaces + SyncEngine + workers (A7–A9), Hilt @Binds
+core/testing              fakes of every core:domain interface, test data builders, MainDispatcherRule
 ```
-Features depend on `core:data` interfaces + `core:ui` + `core:designsystem` + `core:model` only; never on database/network directly.
+Features depend on `core:domain` + `core:ui` + `core:designsystem` + `core:model` (+ `core:common`) only; never on core:data/database/network/datastore — so features compile while core:data is being built. Only `app` depends on `core:data`. Each feature impl exposes `fun EntryProviderScope<NavKey>.<feature>Entries(navigator…)` (template pattern) wired in `app`.
 
 ## A3 Models (`core:model`, package `app.sroka.core.model`)
 - `Item(id, url, canonicalUrl, title: String?, excerpt, siteName, author, lang, leadImageKey, wordCount: Int?, readingMinutes: Int?, contentId: String?, contentPrivate, parseStatus: ParseStatus, parseError: String?, status: ItemStatus, isFavorite, progress: Float, progressAnchor: Int?, savedAt: Long, archivedAt: Long?, lastReadAt: Long?, source: String?, tags: List<String>, offline: OfflineState, thumbnailPath: String?)`

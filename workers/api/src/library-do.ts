@@ -115,6 +115,11 @@ export class LibraryDO extends DurableObject<Env> {
 
   // ---------- public RPC surface (api.md §15) ----------
 
+  /** Liveness probe (used by the parser test harness). */
+  ping(): string {
+    return "pong";
+  }
+
   /** Sync push / single mutation path. Returns the PushResponse and parse jobs for the caller to enqueue. */
   async applyOps(deviceId: string, ops: readonly unknown[]): Promise<ApplyResult> {
     return this.apply(deviceId, ops);

@@ -370,16 +370,21 @@ export class LibraryStore {
     if (target) {
       // Duplicate (api.md §8.2 step 4).
       if (op.onDuplicate !== "merge") {
+        // savedAt = max(savedAt, at) even when the status stamp loses: a max is order-independent, so
+        // devices converge regardless of which duplicate add created the row.
+        const savedAt = Math.max(target.saved_at, stamp.at);
+        if (savedAt !== target.saved_at) {
+          this.exec("UPDATE items SET saved_at = ? WHERE id = ?", savedAt, target.id);
+          ctx.touchItem(target.id);
+        }
         const clock = parseClock(target.clock);
         if (applyLww(clock, "status", stamp)) {
-          const savedAt = Math.max(target.saved_at, stamp.at);
           this.exec(
-            "UPDATE items SET status = 'unread', archived_at = NULL, saved_at = ?, clock = ? WHERE id = ?",
-            savedAt,
+            "UPDATE items SET status = 'unread', archived_at = NULL, clock = ? WHERE id = ?",
             JSON.stringify(clock),
             target.id,
           );
-          if (target.status !== "unread" || target.archived_at !== null || target.saved_at !== savedAt) ctx.touchItem(target.id);
+          if (target.status !== "unread" || target.archived_at !== null) ctx.touchItem(target.id);
         }
         if (provisionalTitle && target.title === null) {
           this.exec("UPDATE items SET title = ? WHERE id = ?", provisionalTitle, target.id);

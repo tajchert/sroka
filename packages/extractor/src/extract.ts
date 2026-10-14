@@ -21,7 +21,9 @@ const clean = (s: string | null | undefined): string | null => {
   return t ? t : null;
 };
 
-function meta(doc: Document, ...names: string[]): string | null {
+type Doc = ReturnType<typeof parseHTML>["document"];
+
+function meta(doc: Doc, ...names: string[]): string | null {
   for (const n of names) {
     const el = doc.querySelector(`meta[property="${n}"], meta[name="${n}"]`);
     const v = clean(el?.getAttribute("content"));
@@ -55,7 +57,7 @@ export function countWords(text: string): number {
 
 /** Run Readability over `html`. Returns null if no article content could be extracted. */
 export function extractArticle(html: string, url: string): Extracted | null {
-  const { document } = parseHTML(html) as unknown as { document: Document };
+  const { document } = parseHTML(html);
   try {
     Object.defineProperty(document, "baseURI", { value: url, configurable: true });
   } catch {

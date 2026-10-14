@@ -23,5 +23,7 @@ export default defineConfig({
   test: {
     // vitest 5 fs module cache breaks @cloudflare/vitest-plugin 1.4.x ("no such file … .vitest-cache").
     fsModuleCache: false,
+    // sanitize-html -> postcss are CJS; pre-bundle them so workerd can load them under vitest.
+    deps: { optimizer: { ssr: { enabled: true, include: ["sanitize-html", "postcss"] } } },
     include: ["test/**/*.test.ts", "src/**/*.test.ts"] },
 });

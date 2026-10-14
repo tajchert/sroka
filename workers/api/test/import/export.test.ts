@@ -57,3 +57,32 @@ describe("GET /v1/exports", () => {
     expect(await (await t.raw("/v1/exports?format=csv")).text()).toBe("title,url,time_added,tags,status,favorite\r\n");
   });
 });
+
+describe("export hardening", () => {
+  it("guards formula cells and round-trips them", async () => {
+    const t = makeApp();
+    const stub = t.env.LIBRARY.getByName(t.user);
+    await stub.applyOps("dev1", [
+      { type: "item.add", opId: "f1", at: Date.now(), itemId: crypto.randomUUID(), source: "web", url: "https://example.com/f", title: '=HYPERLINK("http://evil/","x")', tags: ["a,b"] },
+    ] as any);
+    const text = await (await t.raw("/v1/exports?format=csv")).text();
+    expect(text).toContain(`"'=HYPERLINK(""http://evil/"",""x"")"`);
+    const p = parseImport("pocket_csv", new TextEncoder().encode(text));
+    expect(p.rows[0]).toMatchObject({ title: '=HYPERLINK("http://evil/","x")', tags: ["a,b"] });
+  });
+
+  it("pages through more than one DO page", async () => {
+    const t = makeApp();
+    const stub = t.env.LIBRARY.getByName(t.user);
+    const at = Date.now();
+    const ops = Array.from({ length: 450 }, (_, i) => ({ type: "item.add", opId: `p${i}`, at, itemId: crypto.randomUUID(), source: "web", url: `https://example.com/p${i}`, savedAt: 1_700_000_000_000 + (i % 7) * 1000 }));
+    for (let i = 0; i < ops.length; i += 200) await stub.applyOps("dev1", ops.slice(i, i + 200) as any);
+    const page = await stub.exportPage(null, 500);
+    expect(page.length).toBe(450);
+    const j = (await (await t.raw("/v1/exports?format=json")).json()) as any;
+    expect(j.items).toHaveLength(450);
+    expect(new Set(j.items.map((i: any) => i.url)).size).toBe(450);
+    const next = await stub.exportPage({ savedAt: page[199]!.savedAt, id: page[199]!.id }, 1000);
+    expect(next.length).toBe(250);
+  });
+});

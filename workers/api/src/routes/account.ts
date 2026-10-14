@@ -59,6 +59,19 @@ export async function deleteAccountData(
   afterLibraryWipe?: () => void,
 ): Promise<void> {
   const db = drizzle(env.DB, { schema: authSchema });
+  // Stop running imports first so they can't recreate library data after the wipe (workflow id = job id).
+  const running = await env.DB.prepare("SELECT id FROM jobs WHERE user_id = ? AND kind = 'import' AND status IN ('queued','running')")
+    .bind(userId)
+    .all<{ id: string }>();
+  await Promise.all(
+    (running.results ?? []).map(async (r) => {
+      try {
+        await env.IMPORT_WORKFLOW?.get(r.id).then((w) => w.terminate());
+      } catch {
+        /* already finished / not found */
+      }
+    }),
+  );
   // Library first (may fail → user can retry while still signed in).
   const stub = env.LIBRARY.getByName(userId) as unknown as LibraryStub;
   try {

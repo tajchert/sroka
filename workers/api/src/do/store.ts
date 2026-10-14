@@ -861,6 +861,17 @@ export class LibraryStore {
     return this.toItems(this.all<ItemRow>("SELECT * FROM items WHERE deleted_at IS NULL ORDER BY saved_at, id"));
   }
 
+  /** One export page, newest first (saved_at DESC, id), unsigned. `after` is the last row of the previous page. */
+  exportPage(after: { savedAt: number; id: string } | null, limit: number): ItemData[] {
+    const rows = after
+      ? this.all<ItemRow>(
+          "SELECT * FROM items WHERE deleted_at IS NULL AND (saved_at < ? OR (saved_at = ? AND id > ?)) ORDER BY saved_at DESC, id LIMIT ?",
+          after.savedAt, after.savedAt, after.id, limit,
+        )
+      : this.all<ItemRow>("SELECT * FROM items WHERE deleted_at IS NULL ORDER BY saved_at DESC, id LIMIT ?", limit);
+    return this.toItems(rows);
+  }
+
   /**
    * Alarm: purge old tombstones / tag_renames / applied_ops (api.md §7.3, §14). Uses the server-time columns
    * (tombstoned_at, recorded_at), never the client `at`, so a skewed/offline device can't trigger an early purge.

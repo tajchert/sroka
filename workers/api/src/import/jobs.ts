@@ -44,7 +44,7 @@ export async function getJob(db: D1Database, userId: string, id: string): Promis
 
 export async function countRecentImports(db: D1Database, userId: string, since: number): Promise<number> {
   const r = await db
-    .prepare("SELECT COUNT(*) AS n FROM jobs WHERE user_id = ? AND kind = 'import' AND created_at >= ?")
+    .prepare("SELECT COUNT(*) AS n FROM jobs WHERE user_id = ? AND kind = 'import' AND created_at >= ? AND COALESCE(error, '') != 'workflow_unavailable'")
     .bind(userId, since)
     .first<{ n: number }>();
   return r?.n ?? 0;
@@ -75,4 +75,8 @@ export async function updateJob(db: D1Database, id: string, p: JobPatch): Promis
     }
   }
   await db.prepare(`UPDATE jobs SET ${sets.join(", ")} WHERE id = ?`).bind(...args, id).run();
+}
+
+export async function jobExists(db: D1Database, id: string): Promise<boolean> {
+  return (await db.prepare("SELECT 1 AS x FROM jobs WHERE id = ?").bind(id).first()) !== null;
 }

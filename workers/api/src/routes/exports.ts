@@ -8,13 +8,26 @@ export const exportsRoutes = new Hono<AppEnv>();
 
 const enc = new TextEncoder();
 
-export function csvRow(i: Item): string {
+type ExportItem = Omit<Item, "leadImageUrl">;
+
+/** Neutralises spreadsheet formula injection: a leading = + - @ TAB CR gets a `'` prefix (the importer strips it). */
+export function csvSafe(v: string): string {
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+}
+
+function tagsCell(tags: string[]): string {
+  // Tags are joined with `|`. A lone tag containing a comma gets a trailing `|` so the importer doesn't split it on commas.
+  const cell = tags.map((t) => t.replace(/\|/g, "/")).join("|");
+  return tags.length === 1 && cell.includes(",") ? cell + "|" : cell;
+}
+
+export function csvRow(i: ExportItem): string {
   return (
     [
-      i.title ?? "",
+      csvSafe(i.title ?? ""),
       i.url,
       String(Math.floor(i.savedAt / 1000)),
-      i.tags.join("|"),
+      csvSafe(tagsCell(i.tags)),
       i.status === "archived" ? "archive" : "unread",
       i.isFavorite ? "1" : "0",
     ]
@@ -23,7 +36,7 @@ export function csvRow(i: Item): string {
   );
 }
 
-export function exportJsonItem(i: Item): ExportJson["items"][number] {
+export function exportJsonItem(i: ExportItem): ExportJson["items"][number] {
   return {
     url: i.url,
     title: i.title,
@@ -44,8 +57,7 @@ exportsRoutes.get("/", async (c) => {
   if (!q.success) return c.json({ error: "invalid_format", message: "format must be csv or json" }, 400);
   const format = q.data.format;
   const now = Date.now();
-  // Exports are newest first; the DO returns savedAt ascending.
-  const items = (await c.env.LIBRARY.getByName(c.var.userId).exportItems()).reverse();
+  const stub = c.env.LIBRARY.getByName(c.var.userId);
 
   const date = new Date(now).toISOString().slice(0, 10);
   const headers = {
@@ -54,31 +66,28 @@ exportsRoutes.get("/", async (c) => {
     "X-Content-Type-Options": "nosniff",
   };
 
-  // Stream in slices so large libraries don't build one giant string.
-  let idx = 0;
-  const SLICE = 500;
+  // Stream one DO page per pull (newest first); nothing but the current page is held in memory.
+  const PAGE = 500;
+  let after: { savedAt: number; id: string } | null = null;
   let first = true;
   const body = new ReadableStream<Uint8Array>({
-    pull(ctrl) {
+    async pull(ctrl) {
+      const page: ExportItem[] = await stub.exportPage(after, PAGE);
       let out = "";
       if (format === "csv") {
         if (first) out += EXPORT_CSV_COLUMNS.join(",") + "\r\n";
-        for (const i of items.slice(idx, idx + SLICE)) out += csvRow(i);
-        idx += SLICE;
-        first = false;
-        ctrl.enqueue(enc.encode(out));
-        if (idx >= items.length) ctrl.close();
+        for (const i of page) out += csvRow(i);
       } else {
         if (first) out += `{"format":"sroka-export","version":1,"exportedAt":${now},"items":[`;
-        const slice = items.slice(idx, idx + SLICE);
-        out += slice.map((i) => JSON.stringify(exportJsonItem(i))).join(",");
-        if (idx > 0 && slice.length > 0) out = "," + out;
-        idx += SLICE;
-        first = false;
-        if (idx >= items.length) out += "]}";
-        ctrl.enqueue(enc.encode(out));
-        if (idx >= items.length) ctrl.close();
+        out += page.map((i) => JSON.stringify(exportJsonItem(i))).join(",");
+        if (!first && page.length > 0) out = "," + out;
       }
+      const done = page.length < PAGE;
+      if (format === "json" && done) out += "]}";
+      first = false;
+      if (page.length > 0) after = { savedAt: page[page.length - 1]!.savedAt, id: page[page.length - 1]!.id };
+      if (out) ctrl.enqueue(enc.encode(out));
+      if (done) ctrl.close();
     },
   });
   return new Response(body, {

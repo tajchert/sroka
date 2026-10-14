@@ -101,3 +101,18 @@ describe("netscape_html", () => {
     expect(p.rows[2]).toMatchObject({ title: "Netscape one", tags: ["x", "y z"], status: "unread", savedAt: 1700000500_000 });
   });
 });
+
+describe("hardening", () => {
+  it("scans pathological unclosed anchors in linear time", () => {
+    const html = "<a href=x>".repeat(20000);
+    const t0 = Date.now();
+    parseImport("netscape_html", new TextEncoder().encode(html));
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+  it("rejects zip bombs", async () => {
+    const { zipSync } = await import("fflate");
+    const big = new Uint8Array(45 * 1024 * 1024);
+    const z = zipSync({ "a.csv": big });
+    expect(() => parseImport("pocket_csv", z)).toThrow(/too large/);
+  });
+});

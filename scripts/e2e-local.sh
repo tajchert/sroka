@@ -50,11 +50,15 @@ check() { # check 'jq-bool-expr' description
 header() { grep -i "^$1:" "$TMP/headers" | head -1 | cut -d' ' -f2- | tr -d '\r'; }
 urlenc() { node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$1"; }
 
-read_otp() { # read_otp email → newest OTP from the dev log
+OTP_MARK=0
+otp_count() { grep -cF "[sroka] OTP for $1: " "$DEV_LOG" 2>/dev/null || true; }
+read_otp() { # read_otp email → newest OTP logged AFTER the last send_otp for that email
   local email=$1 code="" i
-  for i in $(seq 1 20); do
-    code=$(grep -F "[sroka] OTP for $email: " "$DEV_LOG" 2>/dev/null | tail -1 | sed -E 's/.*: ([0-9]{6}).*/\1/' || true)
-    [ -n "$code" ] && { echo "$code"; return 0; }
+  for i in $(seq 1 40); do
+    if [ "$(otp_count "$email")" -gt "$OTP_MARK" ]; then
+      code=$(grep -F "[sroka] OTP for $email: " "$DEV_LOG" | tail -1 | sed -E 's/.*: ([0-9]{6}).*/\1/' || true)
+      [ -n "$code" ] && { echo "$code"; return 0; }
+    fi
     sleep 0.5
   done
   return 1
@@ -69,7 +73,7 @@ auth_post() { # auth_post URL ORIGIN JSON [curl args…] → STATUS (waits out B
     wait=$(header x-retry-after); echo "  (rate limited, waiting ${wait:-30}s)"; sleep "${wait:-30}"
   done
 }
-send_otp() { auth_post "$1/api/auth/email-otp/send-verification-otp" "$3" "{\"email\":\"$2\",\"type\":\"sign-in\"}"; }
+send_otp() { OTP_MARK=$(otp_count "$2"); auth_post "$1/api/auth/email-otp/send-verification-otp" "$3" "{\"email\":\"$2\",\"type\":\"sign-in\"}"; }
 sign_in() { # sign_in base email otp origin jar
   auth_post "$1/api/auth/sign-in/email-otp" "$4" "{\"email\":\"$2\",\"otp\":\"$3\"}" -c "$5"
 }
@@ -142,7 +146,8 @@ req GET "$BASE/app/"; expect 200 "GET /app/"
 grep -q '/assets/app-' "$TMP/body" || fail "/app/ is not the SPA shell"
 req GET "$BASE/app/item/x"; expect 200 "GET /app/item/x (SPA deep link)"
 grep -q '/assets/app-' "$TMP/body" || fail "deep link is not the SPA shell"
-asset=$(grep -oE '/assets/app-[^"]+\.js' "$TMP/body" | head -1)
+asset=$(grep -oE '/assets/app-[^"]+\.js' "$TMP/body" | head -1) || true
+[ -n "$asset" ] || fail "no /assets/app-*.js referenced by the SPA shell"
 req GET "$BASE$asset"; expect 200 "GET $asset"
 req GET "$BASE/v1/health"; expect 200 "GET /v1/health"; check '.ok==true' "health ok"
 req GET "$BASE/v1/config"; expect 200 "GET /v1/config"; check '.appOrigin and .limits.maxOpsPerPush==500' "config shape"
@@ -312,15 +317,83 @@ api GET "/v1/sync/pull?cursor=$C1"; check ".deleted.items|index(\"$SYNC_ID\")!=n
 api GET "/v1/sync/pull?cursor=abc"; expect 400 "pull bad cursor → 400"
 
 # ---------------------------------------------------------------------------------------------
+section "import (Pocket CSV + Netscape HTML via ImportWorkflow)"
+now_s=$(date +%s)
+cat > "$TMP/pocket.csv" <<CSV
+title,url,time_added,tags,status
+"Imported One",https://example.com/imp-one,$((now_s - 300)),alpha|beta gamma,unread
+"=HYPERLINK(""http://evil.example/"",""x"")",https://example.com/imp-two,$((now_s - 200)),"x,y",archive
+"No url row",,$((now_s - 100)),,unread
+"Imported Three",https://example.com/imp-three,$((now_s - 50)),,unread
+CSV
+cat > "$TMP/bookmarks.html" <<HTML
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+<DT><H3>Reading Folder</H3>
+<DL><p>
+<DT><A HREF="https://example.com/imp-html-one" ADD_DATE="$((now_s - 400))" TAGS="htmltag,second">HTML One</A>
+<DT><A HREF="https://example.com/imp-html-two" ADD_DATE="$((now_s - 350))">HTML Two</A>
+</DL><p>
+</DL><p>
+HTML
+
+poll_job() { # poll_job id → waits for done/failed; body = job response
+  local id=$1 deadline=$((SECONDS + 120))
+  while :; do
+    api GET "/v1/imports/$id"
+    case "$(jqb .job.status)" in done) return 0 ;; failed) fail "import job failed: $(jqb .job.error)" ;; esac
+    [ $SECONDS -lt $deadline ] || fail "import job $id did not finish"
+    sleep 1
+  done
+}
+upload() { # upload FORMAT FILE → STATUS/body of POST /v1/imports
+  req POST "$BASE/v1/imports" -H "Authorization: Bearer $TOKEN" -F "format=$1" -F "file=@$2"
+}
+
+upload pocket_csv "$TMP/pocket.csv"; expect 202 "POST /v1/imports (pocket_csv)"
+check '.job.status=="queued" or .job.status=="running"' "job accepted"
+JOB1=$(jqb .job.id)
+poll_job "$JOB1"
+check '.job.done==4 and .job.skipped==1 and .job.total==4' "csv job done: 4 rows processed, 1 skipped"
+api GET "/v1/items?state=all&limit=100"
+check '[.items[].canonicalUrl]|(index("https://example.com/imp-one")!=null and index("https://example.com/imp-three")!=null)' "csv items present"
+check '(.items[]|select(.canonicalUrl=="https://example.com/imp-one")|.tags|sort)==["alpha","beta gamma"]' "csv tags split on |"
+check '(.items[]|select(.canonicalUrl=="https://example.com/imp-two")|.status)=="archived"' "csv archive status"
+check '(.items[]|select(.canonicalUrl=="https://example.com/imp-two")|.title|startswith("=HYPERLINK"))' "formula-looking title imported verbatim"
+check '(.items[]|select(.canonicalUrl=="https://example.com/imp-two")|.tags|sort)==["x","y"]' "csv tags split on comma without |"
+
+upload netscape_html "$TMP/bookmarks.html"; expect 202 "POST /v1/imports (netscape_html)"
+JOB2=$(jqb .job.id)
+poll_job "$JOB2"
+check '.job.done==2' "html job done: 2 rows"
+api GET "/v1/items?state=all&limit=100&tag=htmltag"
+check '[.items[].canonicalUrl]==["https://example.com/imp-html-one"]' "html item present with tag filter"
+upload pocket_csv "$TMP/pocket.csv"; expect 202 "re-import same csv"
+poll_job "$(jqb .job.id)"
+api GET "/v1/items?state=all&limit=100"
+check '[.items[]|select(.canonicalUrl=="https://example.com/imp-one")]|length==1' "re-import merges duplicates"
+printf 'nope' > "$TMP/bad.txt"
+req POST "$BASE/v1/imports" -H "Authorization: Bearer $TOKEN" -F "format=bogus" -F "file=@$TMP/bad.txt"; expect 400 "bad import format → 400"
+req POST "$BASE/v1/imports" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data '{}'; expect 415 "non-multipart import → 415"
+api GET "/v1/imports/nonexistent"; expect 404 "unknown job → 404"
+
+# ---------------------------------------------------------------------------------------------
 section "exports"
-api GET "/v1/exports?format=json"
-if [ "$STATUS" = 404 ] && [ "$(jqb .error)" = not_found ]; then
-  echo "  (exports route not implemented yet — skipped)"
-else
-  expect 200 "export json"; check '.format=="sroka-export" and (.items|length)>=1' "export json body"
-  api GET "/v1/exports?format=csv"; expect 200 "export csv"
-  head -1 "$TMP/body" | grep -q '^title,url,time_added,tags,status,favorite' || fail "csv header"; ok "csv header"
-fi
+api GET "/v1/exports?format=json"; expect 200 "export json"
+header content-disposition | grep -q 'attachment; filename="sroka-export-.*\.json"' || fail "json content-disposition"; ok "json attachment header"
+check '.format=="sroka-export" and (.items|length)>=5' "export json body"
+check '(.items[]|select(.url|endswith("/imp-one"))|(.tags|sort)==["alpha","beta gamma"] and .status=="unread")' "json export has imported item with tags"
+check '(.items[]|select(.url|endswith("/imp-two"))|.status=="archived")' "json export keeps archived status"
+api GET "/v1/exports?format=csv"; expect 200 "export csv"
+head -1 "$TMP/body" | grep -q '^title,url,time_added,tags,status,favorite' || fail "csv header"; ok "csv header"
+grep -q 'example.com/imp-one,[0-9]*,alpha|beta gamma,unread,0' "$TMP/body" || fail "csv row for imp-one"; ok "csv row with tags"
+grep -q "'=HYPERLINK" "$TMP/body" || fail "csv formula guard missing"; ok "csv formula injection guarded with leading '"
+if grep -qE '^"?=HYPERLINK' "$TMP/body"; then fail "csv has an unguarded formula"; fi; ok "no unguarded formula cell"
+cp "$TMP/body" "$TMP/export.csv"
+upload pocket_csv "$TMP/export.csv"; expect 202 "re-import our own csv export"
+poll_job "$(jqb .job.id)"
+api GET "/v1/items?state=all&limit=100"
+check '(.items[]|select(.canonicalUrl=="https://example.com/imp-two")|.title|startswith("=HYPERLINK"))' "round trip strips the guard quote"
 
 # ---------------------------------------------------------------------------------------------
 section "vite dev proxy ($VITE_BASE)"

@@ -27,6 +27,10 @@ export class ImportParseError extends Error {
 
 const decoder = new TextDecoder("utf-8");
 
+const MAX_ZIP_ENTRY = 40 * 1024 * 1024;
+const MAX_ZIP_TOTAL = 50 * 1024 * 1024;
+const MAX_ZIP_ENTRIES = 20;
+
 /** unix seconds (or ms, if clearly ms) to epoch ms; undefined for empty/invalid/non-positive. */
 export function parseTimestamp(v: string | undefined): number | undefined {
   if (!v) return undefined;
@@ -62,6 +66,11 @@ function validUrl(u: string | undefined): string | null {
   return tryNormalizeUrl(t) === null ? null : t;
 }
 
+/** Undo the export's formula-injection guard: `'=...` / `'+...` etc. */
+function unguard(v: string | undefined): string | undefined {
+  return v !== undefined && /^'[=+\-@\t\r]/.test(v) ? v.slice(1) : v;
+}
+
 function title(t: string | undefined): string | undefined {
   const v = (t ?? "").trim();
   return v ? v.slice(0, LIMITS.maxTitleLength) : undefined;
@@ -93,9 +102,9 @@ function parsePocketCsvText(text: string): ParsedImport {
     const status = (col(r, "status") ?? "").trim().toLowerCase();
     rows.push({
       url,
-      title: title(col(r, "title")),
+      title: title(unguard(col(r, "title"))),
       savedAt: parseTimestamp(col(r, "time_added")),
-      tags: splitTags(col(r, "tags")),
+      tags: splitTags(unguard(col(r, "tags"))),
       status: status === "archive" || status === "archived" || status === "read" ? "archived" : "unread",
       isFavorite: ["1", "true", "yes"].includes((col(r, "favorite") ?? "").trim().toLowerCase()),
     });
@@ -111,8 +120,20 @@ export function parsePocketCsv(bytes: Uint8Array): ParsedImport {
   if (!isZip(bytes)) return parsePocketCsvText(decoder.decode(bytes));
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(bytes, { filter: (f) => /\.csv$/i.test(f.name) && !f.name.includes("__MACOSX") });
-  } catch {
+    let total = 0;
+    let count = 0;
+    files = unzipSync(bytes, {
+      filter: (f) => {
+        if (!/\.csv$/i.test(f.name) || f.name.includes("__MACOSX")) return false;
+        total += f.originalSize;
+        if (f.originalSize > MAX_ZIP_ENTRY || total > MAX_ZIP_TOTAL || ++count > MAX_ZIP_ENTRIES) {
+          throw new ImportParseError("zip_too_large", "The zip is too large when uncompressed");
+        }
+        return true;
+      },
+    });
+  } catch (e) {
+    if (e instanceof ImportParseError) throw e;
     throw new ImportParseError("bad_zip", "Could not read the zip archive");
   }
   const names = Object.keys(files).sort();

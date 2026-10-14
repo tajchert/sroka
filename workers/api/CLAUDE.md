@@ -17,7 +17,7 @@ signed content route on the `CONTENT_ORIGIN` host, static web assets (`../../app
    OTP codes are logged: `[sroka] OTP for <email>: <code>`.
 3. Optional: `npm run dev -w @sroka/web` — vite :5173 proxying `/api` + `/v1` (needs `DEV_ORIGINS=http://localhost:5173`, in the example).
 4. `DEV_LOG=/tmp/sroka-dev.log npm run e2e:local` — `scripts/e2e-local.sh`: curl walk-through of auth, saves + parse, signed content
-   (CSP/CORS/tamper), tags, filters, PATCH, sync push/pull, vite proxy (if running), account deletion. Exits non-zero on failure.
+   (CSP/CORS/tamper), tags, filters, PATCH, sync push/pull, imports (Workflow, local) + exports, vite proxy (if running), account deletion. Exits non-zero on failure.
    Needs internet (saves Wikipedia + a blog post; `SKIP_PUBLIC=1` to skip). Better Auth rate limits (OTP send 3/min, sign-in 3/10 s per IP) make it wait on reruns.
 - Local Images binding = sharp (miniflare); if sharp is unavailable it returns 503 and the parser falls back to the original image bytes (`img/{sha}.{jpg|png|…}`, no thumbnail).
 - Reset local state: stop dev, `rm -rf workers/api/.wrangler/state`, re-run `npm run db:migrate:local -w @sroka/api`.

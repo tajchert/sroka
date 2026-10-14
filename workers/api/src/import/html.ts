@@ -33,13 +33,47 @@ export type HtmlEvent =
   | { kind: "heading"; level: number; text: string }
   | { kind: "link"; attrs: Record<string, string>; text: string };
 
-/** Headings (h1-h6) and anchors in document order. */
+/**
+ * Headings (h1-h6) and anchors in document order. Linear: openers are found left to right, each closer search is
+ * cached (a missing closer is remembered), and an element never extends past the next opener (unclosed tags are tolerated).
+ */
 export function scanBookmarks(html: string): HtmlEvent[] {
   const events: HtmlEvent[] = [];
-  const re = /<(h[1-6])\b[^>]*>([\s\S]*?)<\/\1\s*>|<a\b([^>]*)>([\s\S]*?)<\/a\s*>/gi;
-  for (let m = re.exec(html); m; m = re.exec(html)) {
-    if (m[1]) events.push({ kind: "heading", level: Number(m[1][1]), text: textOf(m[2]!) });
-    else events.push({ kind: "link", attrs: parseAttrs(m[3]!), text: textOf(m[4]!) });
+  const lower = html.toLowerCase();
+  const opener = /<(h[1-6]|a)(?=[\s>\/])/gi;
+  const closeCache = new Map<string, number>();
+  const findClose = (tag: string, from: number): number => {
+    const cached = closeCache.get(tag);
+    if (cached !== undefined && (cached === -1 || cached >= from)) return cached;
+    const idx = lower.indexOf(`</${tag}`, from);
+    closeCache.set(tag, idx);
+    return idx;
+  };
+  let pos = 0;
+  while (pos < html.length) {
+    opener.lastIndex = pos;
+    const m = opener.exec(html);
+    if (!m) break;
+    const tag = m[1]!.toLowerCase();
+    const gt = html.indexOf(">", m.index);
+    if (gt === -1) break;
+    const attrs = html.slice(m.index + m[0].length, gt);
+    opener.lastIndex = gt + 1;
+    const nextM = opener.exec(html);
+    const nextOpen = nextM ? nextM.index : html.length;
+    let close = findClose(tag, gt + 1);
+    let end: number;
+    if (close !== -1 && close < nextOpen) {
+      const cgt = html.indexOf(">", close);
+      end = cgt === -1 ? html.length : cgt + 1;
+    } else {
+      close = nextOpen;
+      end = nextOpen;
+    }
+    const inner = html.slice(gt + 1, close);
+    if (tag === "a") events.push({ kind: "link", attrs: parseAttrs(attrs), text: textOf(inner) });
+    else events.push({ kind: "heading", level: Number(tag[1]), text: textOf(inner) });
+    pos = Math.max(end, gt + 1);
   }
   return events;
 }

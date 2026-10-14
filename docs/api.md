@@ -331,7 +331,12 @@ Route (content host only): `GET`/`HEAD` only (else `405`). Malformed → `403 fo
 ### 11.1 `POST /v1/imports` (multipart/form-data)
 Fields: `file` (File, ≤20 MiB → else 413), `format` = `pocket_csv | pocket_html | instapaper_csv | netscape_html`. Not multipart → 415.
 Response **`202 {"job": Job}`**; poll `GET /v1/imports/:id` → `200 {"job": Job}` (404 if not the caller's job) until `done`/`failed`.
-Server: store file at `uploads/{userId}/{jobId}`, create D1 `jobs` row (`kind:"import"`), process in `ctx.waitUntil` (parse file → rows → `item.add` ops with deviceId `"import"`, `source:"import"`, `onDuplicate:"merge"`, `savedAt` from file, `status`, `isFavorite`, `tags`; applied in DO batches of ≤200 via applyOps; update `jobs.done` after each batch; then enqueue ParseJobs for newly created items, newest first, ≤100 per `sendBatch`). Invalid URLs are counted in `skipped`. Max 50 000 rows.
+Limits: 10 imports per day per user (429 `rate_limited`, jobs that failed with `workflow_unavailable` don't count); empty file → 400; bad `format` → 400.
+Server: stores the upload at `uploads/{userId}/{jobId}.{csv|html|zip}`, inserts the D1 `jobs` row (`kind:"import"`, `queued`), then starts a **Cloudflare Workflow** (`IMPORT_WORKFLOW`, `ImportWorkflow`, instance id = job id). If the workflow cannot start the job is marked `failed` (`error:"workflow_unavailable"`), the upload deleted and the route returns 503. Workflow steps:
+1. `parse` — job → `running`; parse the upload (own tolerant scanners; zip: ≤20 entries, ≤40 MiB per entry / 50 MiB total, else `zip_too_large`; >50 000 rows → `too_many_rows`), sort newest first, pre-assign `itemId`s and write batches of 200 rows to R2 (`uploads/{userId}/{jobId}/rows-{n}.json`; step output is limited to 1 MiB). Sets `total` (valid + invalid rows) and `skipped`/`done` = invalid rows (no usable http(s) URL).
+2. `apply-N` (per batch, retried) — `applyOps` with deviceId `"import"`, `item.add` ops (`opId = "{jobId}:{row}"` so retries replay idempotently; `source:"import"`, `onDuplicate:"merge"`, `savedAt`, `status`, `isFavorite`, `tags`), then enqueue the returned ParseJobs (newest first). If the job row no longer exists (account deleted) the step does nothing and the workflow ends. `progress-N` writes absolute `done`/`skipped`; `step.sleep("3 seconds")` throttles between batches (≈12 min for 50 000 rows).
+3. `finish` — job → `done`; delete the upload and row chunks. On any failure (`missing_url_column`, `no_csv_in_zip`, `bad_zip`, `zip_too_large`, `too_many_rows`, `upload_missing`, unexpected error) the job becomes `failed` with `error` set and the upload/chunks are deleted too.
+Account deletion terminates the user's queued/running import workflows before wiping data.
 Formats:
 - `pocket_csv`: header `title,url,time_added,tags,status` (`time_added` unix s, `tags` `|`-separated, `status` `unread`|`archive`). A `.zip` containing one or more such CSVs (Pocket's 2025 export) is also accepted for this format (detect by `PK\x03\x04` magic; unzip with fflate).
 - `pocket_html`: `ril_export.html` — `<h1>Unread</h1><ul><li><a href="URL" time_added="SECS" tags="a,b">Title</a>` … `<h1>Read Archive</h1>` → archived.
@@ -339,8 +344,8 @@ Formats:
 - `netscape_html`: `<DT><A HREF="URL" ADD_DATE="SECS" TAGS="a,b">Title</A>` → unread; folder (`<H3>`) names are ignored.
 
 ### 11.2 `GET /v1/exports?format=csv|json`
-Direct download (no job in this build). All live items, newest first. `Content-Disposition: attachment; filename="sroka-export-YYYY-MM-DD.{csv|json}"`.
-- `csv` (`text/csv; charset=utf-8`): header `title,url,time_added,tags,status,favorite` (Pocket-compatible + favorite): `time_added` unix seconds, `tags` joined with `|`, `status` `unread|archive`, `favorite` `0|1`. RFC 4180 quoting.
+Direct download (no job in this build). All live items, newest first, streamed one LibraryDO page (`exportPage`, 500 rows, unsigned) per pull. `Content-Disposition: attachment; filename="sroka-export-YYYY-MM-DD.{csv|json}"`.
+- `csv` (`text/csv; charset=utf-8`): header `title,url,time_added,tags,status,favorite` (Pocket-compatible + favorite): `time_added` unix seconds, `tags` joined with `|` (a lone tag containing a comma gets a trailing `|`; `|` inside a tag name becomes `/`), `status` `unread|archive`, `favorite` `0|1`. RFC 4180 quoting. Anti formula-injection: `title` and `tags` cells starting with `= + - @ TAB CR` are prefixed with `'` (the `pocket_csv` importer strips that `'`).
 - `json` (`application/json`): `ExportJson` `{"format":"sroka-export","version":1,"exportedAt":…, "items":[ExportItem…]}`.
 
 ## 12. Account, me, config

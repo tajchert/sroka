@@ -2,7 +2,7 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { IMPORT_DEVICE_ID, type ImportFormat, uuidv7 } from "@sroka/shared";
 import type { Env } from "../env.ts";
 import { enqueueParseJobs } from "../do/route-helpers.ts";
-import { updateJob } from "./jobs.ts";
+import { jobExists, updateJob } from "./jobs.ts";
 import { type ImportRow, ImportParseError, parseImport } from "./parsers.ts";
 
 export interface ImportParams {
@@ -24,6 +24,19 @@ type StepLike = Pick<WorkflowStep, "do" | "sleep">;
 const chunkKey = (p: ImportParams, i: number) => `uploads/${p.userId}/${p.importId}/rows-${i}.json`;
 
 const RETRY = { retries: { limit: 3, delay: "5 seconds", backoff: "exponential" }, timeout: "5 minutes" } as const;
+
+/** Deletes the upload and all row chunks of an import (also on failure: they hold the user's whole export). */
+async function cleanup(env: Env, p: ImportParams): Promise<void> {
+  const prefix = `uploads/${p.userId}/${p.importId}/`;
+  const keys = [p.uploadKey];
+  let cursor: string | undefined;
+  do {
+    const l = await env.CONTENT.list({ prefix, cursor });
+    keys.push(...l.objects.map((o) => o.key));
+    cursor = l.truncated ? l.cursor : undefined;
+  } while (cursor);
+  for (let i = 0; i < keys.length; i += 1000) await env.CONTENT.delete(keys.slice(i, i + 1000));
+}
 
 /** Workflow body, separated from the class so tests can drive it with a fake step. */
 export async function runImport(
@@ -57,7 +70,10 @@ export async function runImport(
     });
 
     if (!parsed.ok) {
-      await step.do("fail", async () => updateJob(env.DB, p.importId, { status: "failed", error: parsed.error }));
+      await step.do("fail", async () => {
+        await updateJob(env.DB, p.importId, { status: "failed", error: parsed.error });
+        await cleanup(env, p);
+      });
       return { status: "failed", total: 0, skipped: 0 };
     }
 
@@ -66,6 +82,8 @@ export async function runImport(
     let skipped = parsed.invalid;
     for (let i = 0; i < parsed.batches; i++) {
       const res = await step.do(`apply-${i}`, RETRY, async () => {
+        // The account was deleted while we ran: do nothing (and don't recreate the user's library).
+        if (!(await jobExists(env.DB, p.importId))) return { count: 0, rejected: 0, gone: true };
         const obj = await env.CONTENT.get(chunkKey(p, i));
         if (!obj) throw new Error(`rows chunk ${i} missing`);
         const rows = (await obj.json()) as RowWithId[];
@@ -86,8 +104,12 @@ export async function runImport(
         }));
         const { response, parseJobs } = await env.LIBRARY.getByName(p.userId).applyOps(IMPORT_DEVICE_ID, ops);
         await enqueueParseJobs(env, parseJobs, p.userId);
-        return { count: rows.length, rejected: response.rejected.length };
+        return { count: rows.length, rejected: response.rejected.length, gone: false };
       });
+      if (res.gone) {
+        await cleanup(env, p);
+        return { status: "failed", total: parsed.total, skipped };
+      }
       done += res.count;
       skipped += res.rejected;
       await step.do(`progress-${i}`, async () => updateJob(env.DB, p.importId, { done, skipped }));
@@ -97,16 +119,16 @@ export async function runImport(
     // 3. Finish + cleanup.
     await step.do("finish", async () => {
       await updateJob(env.DB, p.importId, { status: "done", done, skipped });
-      const keys = [p.uploadKey, ...Array.from({ length: parsed.batches }, (_, i) => chunkKey(p, i))];
-      await env.CONTENT.delete(keys);
+      await cleanup(env, p);
     });
     return { status: "done", total: parsed.total, skipped };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[sroka] import failed", p.importId, e);
-    await step.do("fail-unexpected", async () =>
-      updateJob(env.DB, p.importId, { status: "failed", error: msg.slice(0, 300) }),
-    );
+    await step.do("fail-unexpected", async () => {
+      await updateJob(env.DB, p.importId, { status: "failed", error: msg.slice(0, 300) });
+      await cleanup(env, p);
+    });
     return { status: "failed", total: 0, skipped: 0 };
   }
 }

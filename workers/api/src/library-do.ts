@@ -245,6 +245,12 @@ export class LibraryDO extends DurableObject<Env> {
     return this.sign(this.store.exportItems());
   }
 
+  /** Export page, newest first, unsigned (no image URLs). Pass the last item of the previous page as `after`. */
+  exportPage(after: { savedAt: number; id: string } | null, limit: number): Omit<Item, "leadImageUrl">[] {
+    this.ensureSchema();
+    return this.store.exportPage(after, Math.min(Math.max(1, limit), 1000));
+  }
+
   /**
    * Called by a route whose queue send failed after the ops were committed: schedules an earlier alarm so the
    * stuck-pending sweep re-enqueues those items soon (the client's idempotent retry returns no jobs).

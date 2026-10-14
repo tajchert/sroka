@@ -1,7 +1,7 @@
 import { FetchError } from "@sroka/extractor";
 import { ParseJobSchema, type ParseJob } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
-import { defaultDeps, failedResult, processJob, type Deps } from "./process.ts";
+import { defaultDeps, failedResult, incrementRefCount, processJob, type Deps } from "./process.ts";
 
 export { processJob } from "./process.ts";
 
@@ -34,10 +34,12 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
       }
       result = failedResult(job, code);
     }
-    await lib.markParsed(job.itemId, result);
+    const ack = await lib.markParsed(job.itemId, result);
+    if (ack?.ok) await incrementRefCount(env, result);
     msg.ack();
   } catch (e) {
-    // markParsed RPC failure etc.
+    // markParsed RPC failure etc. NOTE: the retry re-parses with a new contentId; orphaned R2 objects /
+    // content row (ref_count 0) from this attempt are left to the weekly GC.
     console.error(`markParsed failed for ${job.itemId}`, e);
     msg.retry({ delaySeconds: backoff(msg.attempts) });
   }
@@ -63,6 +65,7 @@ async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise
 export default {
   async queue(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise<void> {
     if (batch.queue === DLQ) return handleDlq(batch, env);
-    await Promise.all(batch.messages.map((m) => handleMessage(m, env, defaultDeps)));
+    // sequential: one parse at a time keeps memory/CPU within the isolate limits
+    for (const m of batch.messages) await handleMessage(m, env, defaultDeps);
   },
 } satisfies ExportedHandler<ParserEnv, ParseJob>;

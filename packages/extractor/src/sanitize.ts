@@ -144,7 +144,7 @@ export function sanitizeArticle(contentHtml: string, baseUrl: string): SanitizeR
         } catch {
           /* keep */
         }
-        return { tagName: "a", attribs: { href: src, class: "embed-card" }, text: `Embedded content (${host})` };
+        return { tagName: "a", attribs: { href: src, class: "embed-card", rel: "noopener noreferrer nofollow", target: "_blank" }, text: `Embedded content (${host})` };
       },
     },
     exclusiveFilter: (frame) => {

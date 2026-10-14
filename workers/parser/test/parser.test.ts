@@ -142,6 +142,38 @@ describe("parser queue consumer", () => {
     expect((await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>())!.n).toBe(0);
   });
 
+  it("decodes captured raw HTML as UTF-8 even if the page declares a legacy charset", async () => {
+    const page = PAGE.replace("<title>", '<meta charset="iso-8859-2"><title>').replace("Test Post</h1>", "zolc \u017c\u00f3\u0142\u0107</h1>").replace(para.repeat(10), para.repeat(10) + " \u017c\u00f3\u0142\u0107 ");
+    const rawKey = r2Keys.raw("u1", ITEM);
+    const gz = await new Response(new Blob([page]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    await base.CONTENT.put(rawKey, gz);
+    stubWeb({ "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    await run([msg(job({ rawKey }))]);
+    const { result } = marked[0]!;
+    const txt = await (await base.CONTENT.get(r2Keys.contentDir(result.contentId!, "u1") + "text.txt"))!.text();
+    expect(txt).toContain("\u017c\u00f3\u0142\u0107");
+  });
+
+  it("marks a corrupt raw gzip as permanent raw_corrupt (no retry)", async () => {
+    const rawKey = r2Keys.raw("u1", ITEM);
+    await base.CONTENT.put(rawKey, new Uint8Array([1, 2, 3, 4, 5]));
+    const m = msg(job({ rawKey }));
+    await run([m]);
+    expect(m.retry).not.toHaveBeenCalled();
+    expect(marked[0]!.result).toMatchObject({ status: "failed", error: "raw_corrupt" });
+  });
+
+  it("increments ref_count after markParsed ok, on fresh parse and cache hit; not for private", async () => {
+    stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    await run([msg(job())]);
+    const id = marked[0]!.result.contentId!;
+    const rc = async () => (await base.DB.prepare("SELECT ref_count AS n FROM content WHERE id = ?1").bind(id).first<{ n: number }>())!.n;
+    expect(await rc()).toBe(1);
+    await run([msg(job())]);
+    expect(marked[1]!.result.contentId).toBe(id);
+    expect(await rc()).toBe(2);
+  });
+
   it("fails permanently when the raw object is missing", async () => {
     await run([msg(job({ rawKey: "raw/u1/missing.html.gz" }))]);
     expect(marked[0]!.result).toMatchObject({ status: "failed", error: "raw_missing" });

@@ -9,6 +9,7 @@ import {
   extractArticle,
   FetchError,
   isBlockedHost,
+  processImages,
   rewriteImages,
   safeFetch,
   sanitizeArticle,
@@ -212,6 +213,11 @@ describe("sanitizeArticle", () => {
     expect(r.html).not.toContain("<iframe");
     expect(r.html).not.toContain("javascript:");
   });
+  it("embed link cards carry rel and target", () => {
+    const r = S(`<iframe src="https://www.youtube.com/embed/abc"></iframe>`);
+    expect(r.html).toContain('rel="noopener noreferrer nofollow"');
+    expect(r.html).toContain('target="_blank"');
+  });
   it("adds rel/target to external links", () => {
     expect(S(`<a href="https://a.com/">x</a>`).html).toContain('rel="noopener noreferrer nofollow"');
   });
@@ -302,6 +308,24 @@ describe("buildContent", () => {
       url: "https://example.com/p", contentId: "0192f3c4-1111-7000-8000-000000000001", transform, fetchOptions: { fetch: f },
     }))!;
     expect(r.files.filter((x) => x.path.startsWith("img/")).length).toBe(50);
+  });
+
+  it("stops storing images once the byte budget is reached", async () => {
+    const f = (async () => new Response(new Uint8Array(100).fill(7), { headers: { "content-type": "image/png" } })) as never;
+    let n = 0;
+    const tr = async () => ({ bytes: new Uint8Array(100).fill(++n), contentType: "image/webp" });
+    const r = await processImages({ urls: ["https://a.com/1.png", "https://a.com/2.png", "https://a.com/3.png"], leadCandidates: [], transform: tr, fetchOptions: { fetch: f }, maxTotalBytes: 250, concurrency: 1 });
+    expect(r.files.length).toBe(2);
+  });
+
+  it("lower-priority lead candidate finishing last does not overwrite the thumbnail", async () => {
+    const f = (async (u: string) => new Response(new Uint8Array([u.includes("og") ? 1 : 2]), { headers: { "content-type": "image/png" } })) as never;
+    const tr = async (b: Uint8Array) => {
+      if (b[0] === 2) await new Promise((r) => setTimeout(r, 30)); // lower-priority candidate finishes last
+      return { bytes: new Uint8Array([b[0]!]), contentType: "image/webp" };
+    };
+    const r = await processImages({ urls: ["https://a.com/b.png"], leadCandidates: ["https://a.com/og.png", "https://a.com/b.png"], transform: tr, fetchOptions: { fetch: f }, concurrency: 2 });
+    expect(Array.from(r.thumb!)).toEqual([1]);
   });
 
   it("returns null when nothing is extractable", async () => {

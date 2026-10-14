@@ -2,6 +2,8 @@ import { FetchError, safeFetch, type SafeFetchOptions } from "./safe-fetch.ts";
 
 export const MAX_IMAGES = 50;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** Total bytes of stored images per article (memory budget for the 128 MB isolate). */
+export const MAX_TOTAL_IMAGE_BYTES = 40 * 1024 * 1024;
 
 /** Injected by the worker (Cloudflare Images binding). Throw to signal failure (fallback to original is applied). */
 export type ImageTransform = (bytes: Uint8Array, contentType: string, opts: { width: number }) => Promise<{ bytes: Uint8Array; contentType: string }>;
@@ -37,6 +39,7 @@ export interface ProcessImagesOptions {
   transform: ImageTransform;
   fetchOptions: SafeFetchOptions;
   maxImages?: number;
+  maxTotalBytes?: number;
   concurrency?: number;
 }
 
@@ -51,6 +54,8 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
   const files = new Map<string, StoredImage>();
   let thumb: Uint8Array | null = null;
   let thumbFrom: string | null = null;
+  let totalBytes = 0;
+  const budget = o.maxTotalBytes ?? MAX_TOTAL_IMAGE_BYTES;
   const leadSet = new Set(o.leadCandidates);
 
   const work = [...urls];
@@ -81,8 +86,12 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
       if (rank < curRank) {
         try {
           const t = await o.transform(res.bytes, ctype, { width: 400 });
-          thumb = t.bytes;
-          thumbFrom = url;
+          // re-check after the await: a higher-priority candidate may have finished meanwhile
+          const cur = thumbFrom === null ? Infinity : o.leadCandidates.indexOf(thumbFrom);
+          if (rank < cur) {
+            thumb = t.bytes;
+            thumbFrom = url;
+          }
         } catch {
           /* no thumb from this one */
         }
@@ -99,9 +108,11 @@ export async function processImages(o: ProcessImagesOptions): Promise<ProcessedI
       if (ext && res.bytes.byteLength <= MAX_IMAGE_BYTES) stored = { bytes: res.bytes, contentType: ctype, ext };
     }
     if (!stored) return;
+    if (totalBytes + stored.bytes.byteLength > budget) return; // over the per-article byte budget: skip
     const sha256 = await sha256Hex(stored.bytes);
     const path = `img/${sha256}.${stored.ext}`;
     const img: StoredImage = { path, bytes: stored.bytes, contentType: stored.contentType, sha256 };
+    if (!files.has(path)) totalBytes += stored.bytes.byteLength;
     files.set(path, img);
     byUrl.set(url, img);
   };

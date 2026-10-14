@@ -176,7 +176,15 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
         throw new TransientError(`r2 get: ${e}`);
       }
       if (!obj) return failedResult(job, "raw_missing");
-      html = decodeHtml(await gunzip(obj.body));
+      let raw: Uint8Array;
+      try {
+        raw = await gunzip(obj.body);
+      } catch (e) {
+        if (e instanceof FetchError) throw e;
+        return failedResult(job, "raw_corrupt");
+      }
+      // Captured HTML is stored as UTF-8 (JSON string); ignore the page's original <meta charset>.
+      html = decodeHtml(raw, "text/html; charset=utf-8");
     } else {
       const res = await safeFetch(job.url, fetchOptions);
       html = decodeHtml(res.bytes, res.contentType);
@@ -192,13 +200,20 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
 
   // 2. extract + sanitize + images + package
   const contentId = deps.newId();
-  const built = await buildContent({
-    html,
-    url: baseUrl,
-    contentId,
-    transform: deps.transform ?? imagesTransform(env),
-    fetchOptions,
-  });
+  let built;
+  try {
+    built = await buildContent({
+      html,
+      url: baseUrl,
+      contentId,
+      transform: deps.transform ?? imagesTransform(env),
+      fetchOptions,
+    });
+  } catch (e) {
+    // deterministic parser crash (linkedom/Readability/fflate): retrying won't help
+    console.warn(`buildContent threw for ${job.itemId}: ${e instanceof Error ? e.message : e}`);
+    return failedResult(job, "extract_failed");
+  }
   if (!built) {
     // TODO(BROWSER_RENDER_ENABLED): when env.BROWSER_RENDER_ENABLED === "true", enqueue a Browser Run render and re-extract here.
     return failedResult(job, "extract_failed");
@@ -238,4 +253,17 @@ export async function processJob(env: ParserEnv, job: ParseJob, deps: Deps = def
   }
 
   return resultFrom(job, contentId, isPrivate, cached);
+}
+
+/**
+ * api.md section 9: the parser ref-counts shared content. Called after markParsed returned ok for a
+ * public ok/partial result (fresh parse or cache hit). Errors are swallowed; the cron reconciles drift.
+ */
+export async function incrementRefCount(env: ParserEnv, result: ParseResult): Promise<void> {
+  if (result.status === "failed" || result.contentPrivate || !result.contentId) return;
+  try {
+    await env.DB.prepare("UPDATE content SET ref_count = ref_count + 1 WHERE id = ?1").bind(result.contentId).run();
+  } catch (e) {
+    console.warn("ref_count increment failed", e);
+  }
 }

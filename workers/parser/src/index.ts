@@ -1,5 +1,6 @@
 import { FetchError } from "@sroka/extractor";
-import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, writeMetric, type ParseJob, type ParseResult } from "@sroka/shared";
+import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJob } from "@sroka/shared";
+import { reportParse } from "./attempts.ts";
 import { deletePrefix, runWeeklyGc } from "./gc.ts";
 import type { ParserEnv } from "./env.ts";
 import { defaultDeps, failedResult, processJob, type Deps, type JobStats } from "./process.ts";
@@ -12,33 +13,6 @@ const MAX_RETRIES = 3;
 
 function backoff(attempts: number): number {
   return Math.min(30 * 2 ** (attempts - 1), 900);
-}
-
-/** One `parse` log line + Analytics Engine point per finished job (domain only, never the URL path). */
-function reportParse(env: ParserEnv, job: ParseJob, result: ParseResult, stats: JobStats, durationMs: number, attempts: number): void {
-  const domain = displayDomain(job.url) || "unknown";
-  const source = job.rawKey ? "capture" : job.force ? "refresh" : "fetch";
-  const level = result.status === "failed" ? "warn" : "info";
-  log[level]("parse", {
-    event: "parse",
-    domain,
-    status: result.status,
-    error: result.error,
-    source,
-    durationMs,
-    bytes: stats.bytes ?? 0,
-    images: stats.images ?? 0,
-    cacheHit: stats.cacheHit ?? false,
-    parserVersion: result.parserVersion,
-    attempts,
-    itemId: job.itemId,
-  });
-  writeMetric(env.METRICS, {
-    event: "parse",
-    blobs: [domain, result.status, result.error ?? "", source, stats.cacheHit ? "hit" : "miss"],
-    doubles: [durationMs, stats.bytes ?? 0, stats.images ?? 0],
-    index: domain,
-  });
 }
 
 async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps): Promise<void> {
@@ -81,8 +55,9 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
         return;
       }
       result = failedResult(job, code);
+      stats.errorDetail ??= (e instanceof Error ? e.message : String(e)).slice(0, 300);
     }
-    reportParse(env, job, result, stats, Date.now() - t0, msg.attempts);
+    await reportParse(env, { job, result, stats, durationMs: Date.now() - t0, attempt: msg.attempts });
     const ack = await lib.markParsed(job.itemId, result);
     if (!ack?.ok && result.contentPrivate && result.contentId) {
       // Rejected (stale, duplicate, item deleted, account wiped): this private dir is referenced by nothing.
@@ -108,9 +83,10 @@ async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise
       continue;
     }
     log.warn("job reached the dead-letter queue", { event: "dlq", domain: displayDomain(parsed.data.url), itemId: parsed.data.itemId, attempts: msg.attempts, parserVersion: PARSER_VERSION });
-    writeMetric(env.METRICS, { event: "parse", blobs: [displayDomain(parsed.data.url) || "unknown", "failed", "dlq", "dlq", "miss"], doubles: [0, 0, 0], index: displayDomain(parsed.data.url) || "unknown" });
+    const result = failedResult(parsed.data, "parse_failed");
     try {
-      await env.LIBRARY.getByName(parsed.data.userId).markParsed(parsed.data.itemId, failedResult(parsed.data, "parse_failed"));
+      await env.LIBRARY.getByName(parsed.data.userId).markParsed(parsed.data.itemId, result);
+      await reportParse(env, { job: parsed.data, result, stats: { errorDetail: "dlq" }, durationMs: 0, attempt: msg.attempts, source: "dlq" });
       msg.ack();
     } catch (e) {
       log.exception("DLQ markParsed failed", e, { event: "dlq_mark_failed", itemId: parsed.data.itemId });

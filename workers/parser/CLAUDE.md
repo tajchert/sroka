@@ -11,8 +11,9 @@ Runs `@sroka/extractor`, writes R2 (`CONTENT`), D1 `content` cache rows (`DB`), 
 - `wrangler.jsonc` — consumers, LIBRARY (script_name sroka-api), DB (migrations in ../api/migrations), CONTENT, CONFIG, IMAGES, vars.
 - `src/env.ts` — `ParserEnv`; `LIBRARY` is typed by a local minimal RPC interface (`markParsed`, `parseWanted`, `reemitContentRefs`).
 - `src/gc.ts` — weekly `scheduled()` cron (wrangler `triggers.crons`) = `runWeeklyGc`: deletes `private/`, `raw/`, `uploads/` of user ids no longer in D1, expired `auth_throttle` rows; content-ref backfill; shared-content GC (below).
-- `src/index.ts` — `queue()` handler: retry/backoff (30s*2^n, last attempt marks failed), DLQ branch. `src/process.ts` — `processJob` (cache lookup, raw/fetch, buildContent, R2 writes, D1 `content` insert). Cache needs `meta.json` in the content dir (written last).
-- Tests stub `globalThis.fetch` and override `IMAGES`/`LIBRARY` in env; `vitest.config.ts` pre-bundles sanitize-html/postcss (CJS) for workerd.
+- `src/index.ts` — `queue()` handler: retry/backoff (30s*2^n, last attempt marks failed), DLQ branch. `src/process.ts` — `processJob` (site rule, cache lookup, raw/fetch, extract, Browser Run fallback, buildContent, R2 writes, D1 `content` insert; fills `JobStats`). Cache needs `meta.json` in the content dir (written last).
+- `src/site-rules.ts` (KV rules + 60 s isolate cache), `src/render.ts` (budgets + `BROWSER.quickAction("content")`), `src/attempts.ts` (`reportParse`: `parse` log + AE point + D1 `parse_attempts` row).
+- Tests stub `globalThis.fetch` and override `IMAGES`/`LIBRARY` (and `BROWSER`/`METRICS` mocks in `test/render-rules.test.ts`; KV rules use the real miniflare `CONFIG`) in env; `vitest.config.ts` sets `BROWSER_RENDER_ENABLED=false` by default; `vitest.config.ts` pre-bundles sanitize-html/postcss (CJS) for workerd.
   `test/d1.ts` applies the real `../api/migrations`; `test/content-gc.test.ts` runs refs + GC end to end against the real LibraryDO.
 
 ## Shared-content GC (api.md §9 "Content references / GC", decisions D6)
@@ -29,6 +30,22 @@ It is a **no-op until `gc_state.gc_backfill_done = '1'`**, which only the backfi
    in the same run. Check: `npx wrangler d1 execute sroka --remote --command "SELECT * FROM gc_state; SELECT COUNT(*) FROM content_refs"` and the `gc summary` log.
 Emergency stop: `DELETE FROM gc_state WHERE k = 'gc_backfill_done'` (GC becomes a no-op again; rerun the backfill by also deleting `gc_backfill_cursor`).
 
+## Browser Run + site rules (decisions D10, api.md §9)
+- Fallback render when the plain fetch hits a bot wall (403/429/503 or a challenge page), extracts nothing, or yields < 500 chars
+  (rule `minTextChars`), or the rule says `render: "always"`. Never for captures. Budgets per user/day 30 and global/day 500 (vars,
+  D1 `render_budget`). Off locally (`.dev.vars` `BROWSER_RENDER_ENABLED=false`; Browser Run doesn't run in `wrangler dev`).
+- **Site rules** live in KV `CONFIG` under `site-rules:v1:{host}` (host without `www.`; a rule for `example.com` also covers
+  `blog.example.com` unless that has its own). Fields (`SiteRuleSchema`, unknown keys rejected): `render` auto|always|never,
+  `contentSelector`, `removeSelectors[]`, `stripParams[]`, `userAgent` default|browser, `minTextChars`, `waitForSelector`,
+  `disabled`, `note`, `updatedAt`. Invalid rules are ignored (`site_rule_invalid` warn). Changes apply within 60 s (isolate cache);
+  already-cached shared content stays until refreshed (7-day cache). Add/edit a rule (run from `workers/parser`):
+  `npx wrangler kv key put --remote --binding CONFIG "site-rules:v1:example.com" '{"render":"always","removeSelectors":[".paywall-teaser"],"note":"JS-rendered","updatedAt":1760486400000}'`
+  Inspect / delete: `npx wrangler kv key get --remote --binding CONFIG "site-rules:v1:example.com"`, `npx wrangler kv key list --remote --binding CONFIG --prefix site-rules:v1:`, `npx wrangler kv key delete --remote --binding CONFIG "site-rules:v1:example.com"`.
+  To find candidates: D1 `parse_attempts` queries in docs/observability.md.
+- Production rollout: (1) `cd workers/api && npx wrangler d1 migrations apply sroka --remote` (0003: `parse_attempts`, `render_budget`)
+  **before** (2) `cd workers/parser && npx wrangler deploy`. Browser Run needs the Workers Paid plan for real volume (free: 10 min/day);
+  set `BROWSER_RENDER_ENABLED` to `"false"` in wrangler.jsonc and redeploy to switch it off.
+
 ## Decisions that apply
-D6 (pipeline, message `ParseJob`, images WebP 1600/thumb 400 + fallback, 7-day public cache by url_hash + PARSER_VERSION, private never shared), D5 (R2 layout), D7 (scope p vs u.{userId}).
+D10 (Browser Run fallback, site rules, parse analytics), D6 (pipeline, message `ParseJob`, images WebP 1600/thumb 400 + fallback, 7-day public cache by url_hash + PARSER_VERSION, private never shared), D5 (R2 layout), D7 (scope p vs u.{userId}).
 Messages are `ParseJob` from `@sroka/shared`; results are `ParseResult`. Don't add deps.

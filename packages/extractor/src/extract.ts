@@ -55,8 +55,33 @@ export function countWords(text: string): number {
   }
 }
 
+/** Per-site extraction options (site rules, decisions D10). */
+export interface ExtractOptions {
+  /** CSS selectors whose elements are removed before extraction (invalid selectors are ignored). */
+  removeSelectors?: readonly string[];
+  /** CSS selector of the article element: used instead of Readability when it matches with enough text. */
+  contentSelector?: string;
+  /** Below this many text characters the result is `partial` (buildContent; default 500). */
+  minTextChars?: number;
+}
+
+/** The linkedom element surface we use (works under both DOM lib and workers-types). */
+interface El {
+  textContent: string | null;
+  innerHTML: string;
+  remove(): void;
+}
+
+function safeQueryAll(doc: Doc, sel: string): El[] {
+  try {
+    return [...(doc.querySelectorAll(sel) as unknown as Iterable<El>)];
+  } catch {
+    return [];
+  }
+}
+
 /** Run Readability over `html`. Returns null if no article content could be extracted. */
-export function extractArticle(html: string, url: string): Extracted | null {
+export function extractArticle(html: string, url: string, opts: ExtractOptions = {}): Extracted | null {
   const { document } = parseHTML(html);
   try {
     Object.defineProperty(document, "baseURI", { value: url, configurable: true });
@@ -71,6 +96,35 @@ export function extractArticle(html: string, url: string): Extracted | null {
   const ogDesc = meta(document, "og:description", "description");
   const published = meta(document, "article:published_time", "og:article:published_time", "date", "pubdate");
 
+  for (const sel of opts.removeSelectors ?? []) for (const el of safeQueryAll(document, sel)) el.remove();
+
+  let host: string | null = null;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    /* ignore */
+  }
+
+  if (opts.contentSelector) {
+    const el = safeQueryAll(document, opts.contentSelector)[0];
+    const text = el ? normalizeText(el.textContent ?? "") : "";
+    if (el && text.length >= 40) {
+      const docTitle = clean(document.querySelector("title")?.textContent);
+      const h1 = clean(document.querySelector("h1")?.textContent);
+      return {
+        title: ogTitle ?? docTitle ?? h1,
+        byline: meta(document, "author", "article:author"),
+        siteName: ogSite ?? host,
+        lang: docLang,
+        publishedTime: published,
+        excerpt: ogDesc ?? clean(text.slice(0, 300)),
+        contentHtml: el.innerHTML,
+        text,
+        leadImage: ogImage,
+      };
+    }
+  }
+
   let article: ReturnType<Readability["parse"]>;
   try {
     article = new Readability(document as never, { charThreshold: 100 }).parse();
@@ -81,12 +135,6 @@ export function extractArticle(html: string, url: string): Extracted | null {
   const text = normalizeText(article.textContent ?? "");
   if (text.length < 40) return null;
 
-  let host: string | null = null;
-  try {
-    host = new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    /* ignore */
-  }
   return {
     title: clean(article.title) ?? ogTitle,
     byline: clean(article.byline),

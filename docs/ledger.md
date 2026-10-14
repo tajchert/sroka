@@ -17,6 +17,7 @@
 
 | Observability | done (branch feat/observability) | structured logger (`@sroka/shared` log.ts/metrics.ts), request logging + onError requestId, parser per-job `parse` log, Analytics Engine `METRICS`/`sroka_events`, `/v1/client-errors` + web reporting, `docs/observability.md`. Deploy: enable Analytics Engine in dashboard once; set up alerts per doc |
 | Shared-content GC | done (not deployed) | feat/content-gc — LibraryDO content-ref outbox (DO schema v3) → D1 `content_refs` (migration 0002), content row for every public dir, cache-hit touch, weekly cron backfill (operator-started) + GC of unreferenced content after 30 days. Production rollout steps: workers/parser/CLAUDE.md "Shared-content GC" |
+| Browser Run fallback + site rules + parse attempts (parser side of D10) | done (not deployed) | feat/render-rules — `BROWSER` binding + budgets (`render_budget`), bot-wall detection, KV site rules (60 s cache), `parse_attempts` rows + extended `parse` metric/log, weekly purge; migration 0003_parse_attempts. Rollout: workers/parser/CLAUDE.md "Browser Run + site rules". Admin API/UI: separate branch |
 
 ## Open items
 - Shared-content GC deployed 2026-10-15 (migration 0002 applied, backfill started via gc_state). The Sunday cron re-emits refs and sets gc_backfill_done; verify afterwards: `select * from gc_state; select count(*) from content_refs;`

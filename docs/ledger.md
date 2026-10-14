@@ -19,7 +19,7 @@
 | Shared-content GC | done (not deployed) | feat/content-gc — LibraryDO content-ref outbox (DO schema v3) → D1 `content_refs` (migration 0002), content row for every public dir, cache-hit touch, weekly cron backfill (operator-started) + GC of unreferenced content after 30 days. Production rollout steps: workers/parser/CLAUDE.md "Shared-content GC" |
 
 ## Open items
-- Shared-content GC rollout in production: apply migration 0002, deploy sroka-api then sroka-parser, then start the backfill (workers/parser/CLAUDE.md). GC stays a no-op until the backfill finishes.
+- Shared-content GC deployed 2026-10-15 (migration 0002 applied, backfill started via gc_state). The Sunday cron re-emits refs and sets gc_backfill_done; verify afterwards: `select * from gc_state; select count(*) from content_refs;`
 - Legacy public `content/{id}/` dirs written before migration 0002 without a D1 row (partial parses, non-canonical URLs, failed row inserts) are not collected (no R2-listing sweep).
 - Account deletion R2 wipe runs once in `waitUntil`; the weekly parser cron (`src/gc.ts`) is the retry. A Workflow/queue-based wipe would be faster.
 - FTS rewrite of a huge tag rename still runs in one transaction.

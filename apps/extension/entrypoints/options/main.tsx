@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import "../../assets/tailwind.css";
+import { Options } from "./Options.tsx";
 
 const el = document.getElementById("root");
-if (el) createRoot(el).render(<p className="p-3">Sroka options</p>);
+if (el) createRoot(el).render(<Options />);

@@ -28,6 +28,14 @@ export function normalizeTagName(name: string): string {
   return name.normalize("NFC").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Case-insensitive identity of a tag (stored as `tags.name_key`, unique among live tags).
+ * Full Unicode lower-casing (SQLite NOCASE folds ASCII only, so never rely on it for tags).
+ */
+export function tagKey(name: string): string {
+  return normalizeTagName(name).toLowerCase();
+}
+
 export const TagName = z
   .string()
   .transform(normalizeTagName)
@@ -47,8 +55,13 @@ export const Item = z.object({
   siteName: z.string().nullable(),
   author: z.string().nullable(),
   lang: z.string().nullable(),
-  /** Signed URL of the 400px thumbnail (content origin), or null. Expires like other content URLs (24 h). */
+  /**
+   * Signed URL of the 400px thumbnail (content origin), or null. Signed fresh in every response and
+   * expires like other content URLs (24 h) — a convenience for list views; long-lived clients use leadImageKey.
+   */
   leadImageUrl: z.string().nullable(),
+  /** Thumbnail path relative to the content dir (normally "thumb.webp"), or null. URL = content `baseUrl` + key. */
+  leadImageKey: z.string().nullable(),
   wordCount: z.number().int().nullable(),
   readingMinutes: z.number().int().nullable(),
   /** Parsed content package id (null until parsed). */

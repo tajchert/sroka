@@ -14,32 +14,53 @@ export const ParseJobSchema = z.object({
   rawKey: z.string().optional(),
   /** Skip the shared cache (item.refresh). */
   force: z.boolean().optional(),
+  /**
+   * items.parse_gen at enqueue time (the DO increments it on every enqueue and returns it with the job).
+   * Echoed in ParseResult; markParsed ignores results whose parseGen != the item's current parse_gen.
+   */
+  parseGen: z.number().int().nonnegative(),
 });
 export type ParseJob = z.infer<typeof ParseJobSchema>;
 
-/** Argument of the RPC `LibraryDO.markParsed(itemId, result)`. */
-export const ParseResultSchema = z.object({
-  status: ParseStatus.exclude(["pending"]),
-  /** Content package id (null/absent when failed). */
-  contentId: z.uuid().optional(),
-  /** true → R2 prefix private/{userId}/{contentId}/, false → content/{contentId}/. */
-  contentPrivate: z.boolean(),
-  title: z.string().nullable(),
-  excerpt: z.string().nullable(),
-  siteName: z.string().nullable(),
-  author: z.string().nullable(),
-  lang: z.string().nullable(),
-  wordCount: z.number().int().nonnegative().nullable(),
-  readingMinutes: z.number().int().nonnegative().nullable(),
-  /**
-   * Thumbnail file path RELATIVE to the content dir (normally "thumb.webp"), or absent.
-   * The API turns it into a signed `leadImageUrl`.
-   */
-  leadImageKey: z.string().optional(),
-  /** Short machine-ish reason for failed/partial, e.g. "http_404", "timeout", "not_html", "extract_failed". */
-  error: z.string().optional(),
-  parserVersion: z.number().int().positive(),
-});
+/**
+ * Argument of the RPC `LibraryDO.markParsed(itemId, result)`.
+ * Invariant: `contentId` required for ok/partial, absent for failed. A failed result only updates
+ * parse_status/parse_error (+seq); it never touches content_id, content_private or metadata.
+ */
+export const ParseResultSchema = z
+  .object({
+    status: ParseStatus.exclude(["pending"]),
+    /** ParseJob.parseGen echoed back (stale results are ignored). */
+    parseGen: z.number().int().nonnegative(),
+    /** Content package id: required for ok/partial, absent for failed. */
+    contentId: z.uuid().optional(),
+    /** true → R2 prefix private/{userId}/{contentId}/, false → content/{contentId}/. */
+    contentPrivate: z.boolean(),
+    title: z.string().nullable(),
+    excerpt: z.string().nullable(),
+    siteName: z.string().nullable(),
+    author: z.string().nullable(),
+    lang: z.string().nullable(),
+    wordCount: z.number().int().nonnegative().nullable(),
+    readingMinutes: z.number().int().nonnegative().nullable(),
+    /**
+     * Thumbnail file path RELATIVE to the content dir (normally "thumb.webp"), or absent.
+     * The API turns it into a signed `leadImageUrl`.
+     */
+    leadImageKey: z.string().optional(),
+    /** Short machine-ish reason for failed/partial, e.g. "http_404", "timeout", "not_html", "extract_failed". */
+    error: z.string().optional(),
+    parserVersion: z.number().int().positive(),
+  })
+  .superRefine((r, ctx) => {
+    if (r.status === "failed" ? r.contentId !== undefined : r.contentId === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["contentId"],
+        message: r.status === "failed" ? "contentId must be absent when failed" : "contentId required when ok/partial",
+      });
+    }
+  });
 export type ParseResult = z.infer<typeof ParseResultSchema>;
 
 /** Offline package manifest.json (design §7.3). */

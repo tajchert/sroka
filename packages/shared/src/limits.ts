@@ -34,3 +34,10 @@ export const LIMITS = {
 export function readingMinutes(wordCount: number): number {
   return wordCount <= 0 ? 0 : Math.max(1, Math.round(wordCount / 230));
 }
+
+/**
+ * `progressAnchor` = 0-based index of the first element matching this selector (document order,
+ * `querySelectorAll` on article.html's body) whose box is at or below the top of the viewport.
+ * Web reader and native apps MUST count with exactly this selector so anchors are portable.
+ */
+export const PROGRESS_ANCHOR_SELECTOR = "p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,figure";

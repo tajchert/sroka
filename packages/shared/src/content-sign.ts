@@ -119,6 +119,7 @@ export type VerifyResult =
 
 /**
  * Verifies a request pathname ("/s/{exp}/{sig}/{scope}/{contentId}/{file…}") and returns the R2 key.
+ * Pass `new URL(req.url).pathname` unmodified — never decodeURIComponent it first (`%2F` would become a separator).
  * Signature check uses WebCrypto `verify` (constant-time).
  */
 export async function verifyContentPath(
@@ -130,7 +131,9 @@ export async function verifyContentPath(
   // ["", "s", exp, sig, scope, contentId, ...file]
   if (parts.length < 7 || parts[0] !== "" || parts[1] !== "s") return { ok: false, reason: "malformed" };
   const [, , expStr, sig, scope, contentId, ...fileParts] = parts as [string, string, string, string, string, string, ...string[]];
-  if (!/^\d{1,12}$/.test(expStr)) return { ok: false, reason: "malformed" };
+  // Canonical forms only (no leading zeros, exactly 43 b64url chars) so one signature ↔ one URL.
+  if (!/^[1-9]\d{0,11}$/.test(expStr)) return { ok: false, reason: "malformed" };
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sig)) return { ok: false, reason: "bad_signature" };
   if (!CONTENT_ID_RE.test(contentId)) return { ok: false, reason: "malformed" };
   let userId: string | null = null;
   if (scope !== "p") {
@@ -141,7 +144,7 @@ export async function verifyContentPath(
   if (fileParts.length === 0 || fileParts.length > 4) return { ok: false, reason: "malformed" };
   for (const seg of fileParts) if (!FILE_SEGMENT_RE.test(seg) || seg.includes("..")) return { ok: false, reason: "malformed" };
   const sigBytes = b64urlDecode(sig);
-  if (!sigBytes || sigBytes.length !== 32) return { ok: false, reason: "bad_signature" };
+  if (!sigBytes || sigBytes.length !== 32 || b64url(sigBytes) !== sig) return { ok: false, reason: "bad_signature" };
   const exp = Number(expStr);
   const valid = await crypto.subtle.verify(
     "HMAC",

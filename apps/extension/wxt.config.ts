@@ -12,6 +12,8 @@ export default defineConfig({
       "https://api.sroka.app/*",
       ...(mode === "development" ? ["http://localhost:8787/*"] : []),
     ],
+    // Custom server URL (options page): requested at runtime via chrome.permissions.request.
+    optional_host_permissions: ["https://*/*", "http://localhost/*"],
     commands: {
       "save-page": {
         suggested_key: { default: "Alt+Shift+S", mac: "Alt+Shift+S" },

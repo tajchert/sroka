@@ -1,5 +1,5 @@
 // sroka-api — Hono API + Better Auth + LibraryDO + signed content route + static web assets.
-// See docs/decisions.md D3/D5/D6/D7. Replace placeholder ids (LOCAL / PLACEHOLDER) before deploy.
+// See docs/decisions.md D3/D5/D6/D7. Resource ids: docs/cloudflare-resources.md.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "sroka-api",
@@ -19,10 +19,10 @@
     "run_worker_first": ["/api/*", "/v1/*", "/app/*"]
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "sroka", "database_id": "LOCAL", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "sroka", "database_id": "4909f01f-3368-4169-9af8-e95144376aed", "migrations_dir": "migrations" }
   ],
   "r2_buckets": [{ "binding": "CONTENT", "bucket_name": "sroka-content" }],
-  "kv_namespaces": [{ "binding": "CONFIG", "id": "PLACEHOLDER_CONFIG_KV_ID" }],
+  "kv_namespaces": [{ "binding": "CONFIG", "id": "3fffa4e503274f16a3698f72f9a089c9" }],
   "durable_objects": { "bindings": [{ "name": "LIBRARY", "class_name": "LibraryDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LibraryDO"] }],
   "queues": { "producers": [{ "queue": "sroka-parse", "binding": "PARSE_QUEUE" }] },

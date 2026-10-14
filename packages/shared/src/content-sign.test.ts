@@ -51,4 +51,47 @@ describe("content signing", () => {
       expect((await verifyContentPath(KEY, p, 1_800_000_000)).ok, p).toBe(false);
     }
   });
+  it("signature is bound to the contentId", async () => {
+    const exp = 1_800_100_000;
+    const CID2 = "0192f3c4-1111-7222-8333-444455556667";
+    const sig = await signContentPath(KEY, exp, "u.alice", CID);
+    expect(await verifyContentPath(KEY, `/s/${exp}/${sig}/u.alice/${CID2}/article.html`, 1_800_000_000)).toEqual({ ok: false, reason: "bad_signature" });
+  });
+  it("rejects non-canonical exp and sig encodings", async () => {
+    const exp = 1_800_100_000;
+    const now = 1_800_000_000;
+    const sig = await signContentPath(KEY, exp, "p", CID);
+    expect((await verifyContentPath(KEY, `/s/${exp}/${sig}/p/${CID}/a.html`, now)).ok).toBe(true);
+    // leading zero on exp
+    expect(await verifyContentPath(KEY, `/s/0${exp}/${sig}/p/${CID}/a.html`, now)).toEqual({ ok: false, reason: "malformed" });
+    // same bytes, different spare bits in the last char
+    const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const last = ALPHA.indexOf(sig[42]!);
+    const alt = sig.slice(0, 42) + ALPHA[last ^ 1];
+    expect(await verifyContentPath(KEY, `/s/${exp}/${alt}/p/${CID}/a.html`, now)).toEqual({ ok: false, reason: "bad_signature" });
+    // padded / wrong length
+    expect((await verifyContentPath(KEY, `/s/${exp}/${sig}=/p/${CID}/a.html`, now)).ok).toBe(false);
+    expect((await verifyContentPath(KEY, `/s/${exp}/${sig.slice(0, 42)}/p/${CID}/a.html`, now)).ok).toBe(false);
+  });
+  it("file segment count and empty segments", async () => {
+    const exp = 1_900_000_000;
+    const now = 1_800_000_000;
+    const sig = await signContentPath(KEY, exp, "p", CID);
+    const base = `/s/${exp}/${sig}/p/${CID}/`;
+    expect((await verifyContentPath(KEY, base + "a/b/c/d.webp", now)).ok).toBe(true);
+    expect(await verifyContentPath(KEY, base + "a/b/c/d/e.webp", now)).toEqual({ ok: false, reason: "malformed" });
+    expect(await verifyContentPath(KEY, base + "img//a.webp", now)).toEqual({ ok: false, reason: "malformed" });
+    expect(await verifyContentPath(KEY, `/s/${exp}/${sig}//p/${CID}/a.html`, now)).toEqual({ ok: false, reason: "malformed" });
+  });
+  it("rejects percent-encoded traversal (pathname must not be decoded)", async () => {
+    const exp = 1_900_000_000;
+    const sig = await signContentPath(KEY, exp, "p", CID);
+    const base = `/s/${exp}/${sig}/p/${CID}/`;
+    for (const f of ["%2e%2e/x", "%2E%2E/x", "img/%2e%2e%2fx", "img%2Fa.webp", "img%2fa.webp", "%2e%2E%2F%2e%2e%2Fprivate"]) {
+      expect((await verifyContentPath(KEY, base + f, 1_800_000_000)).ok, f).toBe(false);
+    }
+    // what a Worker actually sees: new URL(...).pathname keeps %2F / %2e encoded
+    const p = new URL(`https://c.sroka.app${base}img%2F..%2Fx`).pathname;
+    expect((await verifyContentPath(KEY, p, 1_800_000_000)).ok).toBe(false);
+  });
 });

@@ -6,7 +6,7 @@ All of the code below was built and run in `/private/tmp/claude-501/sroka-resear
 | Package | Version |
 |---|---|
 | `better-auth` | 1.7.8 (includes `@better-auth/drizzle-adapter` 1.7.8) |
-| `@better-auth/cli` | 1.4.21 (works with 1.7.8 for schema generation) |
+| `auth` (Better Auth CLI, formerly `@better-auth/cli`) | 1.7.8 (matches `better-auth`; the old `@better-auth/cli` 1.4.x pulls its own better-auth 1.4 + prisma/better-sqlite3) |
 | `drizzle-orm` | 0.45.4 |
 | `drizzle-kit` | 0.31.11 |
 | `hono` | 4.13.13 |
@@ -14,7 +14,7 @@ All of the code below was built and run in `/private/tmp/claude-501/sroka-resear
 | `@cloudflare/workers-types` | 5.20261014.1 |
 | `typescript` | 5.9.3 (used in the test; 7.0.2 is latest and not tested) |
 
-Install: `npm i better-auth drizzle-orm hono && npm i -D drizzle-kit @better-auth/cli wrangler @cloudflare/workers-types`
+Install: `npm i better-auth drizzle-orm hono && npm i -D drizzle-kit auth@1.7.8 wrangler @cloudflare/workers-types`
 
 ## wrangler.jsonc
 ```jsonc
@@ -103,7 +103,7 @@ import { createAuth } from "./src/auth";
 export const auth = createAuth({ DB: {} as any, BETTER_AUTH_SECRET: "x".repeat(32), BETTER_AUTH_URL: "http://localhost:8787" });
 ```
 ```
-npx @better-auth/cli generate --config auth.cli.ts --output src/auth-schema.ts -y
+npx auth generate --config auth.cli.ts --output src/auth-schema.ts -y
 npx drizzle-kit generate          # drizzle.config.ts: dialect "sqlite", schema ./src/auth-schema.ts, out ./migrations
 npx wrangler d1 migrations apply sroka --local    # --remote for production
 ```

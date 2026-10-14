@@ -8,3 +8,5 @@ CONTENT_URL_SIGNING_KEY=change-me-to-32-plus-random-characters-yyyyyyyy
 # Optional fixed-code review account (D4):
 # REVIEW_EMAIL=review@sroka.app
 # REVIEW_OTP=123456
+# Dev only: extra web origins (vite dev server) for Better Auth trustedOrigins + content-route CORS (D3).
+DEV_ORIGINS=http://localhost:5173

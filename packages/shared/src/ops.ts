@@ -3,7 +3,10 @@ import { LIMITS } from "./limits.ts";
 import { EpochMs, Item, ItemSource, ItemStatus, Tag, TagName, TagNames } from "./model.ts";
 import { isHttpUrl } from "./url.ts";
 
-/** Client-generated op id (uuidv7 recommended); idempotency key stored in applied_ops. */
+/**
+ * Client-generated op id (uuidv7 recommended). Idempotency key is (deviceId, opId): applied_ops is keyed
+ * on both, so ids only need to be unique per device.
+ */
 export const OpId = z.string().min(1).max(64);
 /** Device id (client-generated, stable per install, e.g. "dev_<uuidv7>"). Used as LWW tie-breaker. */
 export const DeviceId = z.string().min(1).max(64).regex(/^[A-Za-z0-9_.:-]+$/);

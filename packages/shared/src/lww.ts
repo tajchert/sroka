@@ -46,6 +46,14 @@ export function applyLww(clock: ItemClock, field: LwwField, incoming: Stamp): bo
   return true;
 }
 
+/**
+ * item_tags pair LWW (D5): same rule as item fields — stamp `{at, dev}` stored in item_tags.at/.dev.
+ * `current` undefined = pair never written.
+ */
+export function pairWins(incoming: Stamp, current: Stamp | undefined): boolean {
+  return lwwWins(incoming, current);
+}
+
 export function parseClock(json: string | null | undefined): ItemClock {
   if (!json) return {};
   try {

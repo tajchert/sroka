@@ -4,7 +4,7 @@ Queue consumer of `sroka-parse` (batch 5, max_retries 3, DLQ `sroka-parse-dlq`, 
 Runs `@sroka/extractor`, writes R2 (`CONTENT`), D1 `content` cache rows (`DB`), transforms images (`IMAGES`), then calls `LIBRARY` DO RPC `markParsed(itemId, ParseResult)` (DO lives in `sroka-api`, `script_name`).
 
 ## Commands
-- `npm test -w @sroka/parser` (vitest + @cloudflare/vitest-plugin, `test/`; `fsModuleCache: false` required) · `npm run typecheck -w @sroka/parser`
+- `npm test -w @sroka/parser` (vitest + @cloudflare/vitest-plugin, `test/`; `fsModuleCache: false` required). Tests run with `main: ./test/entry.ts`, which re-exports the parser handler **and** `LibraryDO` from `../../api/src/library-do.ts`; `vitest.config.ts` maps `LIBRARY` to that local class (the real binding points at `script_name: "sroka-api"`, which doesn't exist in workerd tests) and overrides vars to dev values. · `npm run typecheck -w @sroka/parser`
 - Local: started together with the API by `npm run dev -w @sroka/api`.
 
 ## Key files

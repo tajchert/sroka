@@ -13,7 +13,7 @@ Contents: 1 Conventions · 2 Hosts, auth, CORS · 3 Errors · 4 Objects · 5 Ite
 - Times: **epoch milliseconds** (integers) everywhere, except the `exp` segment of signed content URLs (unix seconds) and CSV `time_added` (unix seconds, Pocket-compatible).
 - IDs: items, tags, jobs, content = **UUIDv7** strings (`uuidv7()` from `@sroka/shared`). User ids are Better Auth ids (opaque `[A-Za-z0-9_-]`, ≤64 chars).
 - All `/v1/*` endpoints require auth except `GET /v1/config` (and the unauthenticated `GET /v1/health`).
-- Validation: every request is validated with the zod schema named in each section (Hono `zValidator`-style, or `schema.safeParse`). Failures → `400 {error:"invalid_request", message, issues}`.
+- Validation: every request is validated with the zod schema named in each section (Hono `zValidator`-style, or `schema.safeParse`). Failures → `400 {error:"invalid_request", message, issues}`, **except** a failure whose only issue has `message:"invalid_url"` (from `HttpUrl`) → `400 {error:"invalid_url"}`. Build the body with `toApiError(zodError)` from `@sroka/shared` (api.ts).
 - Query-string numbers are coerced (`z.coerce`). Unknown query/body keys are ignored (zod strips).
 - Optional request header **`X-Sroka-Device: <deviceId>`** on REST mutation endpoints; used as the LWW tie-breaker. Default deviceId `"rest"` (`REST_DEVICE_ID`).
 
@@ -23,21 +23,26 @@ Contents: 1 Conventions · 2 Hosts, auth, CORS · 3 Errors · 4 Objects · 5 Ite
 |---|---|---|---|
 | `sroka.app` (dev `http://localhost:8787`) | `/` landing, `/app/*` SPA, **and** `/api/auth/*`, `/v1/*` (same-origin for the web app) | Better Auth **cookie** (host-only) | none needed (same origin) |
 | `api.sroka.app` (dev: same `localhost:8787`) | `/api/auth/*`, `/v1/*` | **`Authorization: Bearer <token>`** (cookies also accepted) | allow-list below |
-| `c.sroka.app` (dev `http://127.0.0.1:8787`) | `/s/…` signed content only | signature in path; cookieless | `Access-Control-Allow-Origin: {APP_ORIGIN}` |
+| `c.sroka.app` (dev `http://127.0.0.1:8787`) | `/s/…` signed content only | signature in path; cookieless | `Access-Control-Allow-Origin`: request origin if in `[APP_ORIGIN, ...DEV_ORIGINS]` |
 
 The API Worker picks the behaviour by `new URL(req.url).host`: equal to `new URL(CONTENT_ORIGIN).host` → content route only (everything else 404). Otherwise the normal app (`/api/auth/*`, `/v1/*`, `/app/*` SPA fallback, assets).
 In dev, `localhost:8787` acts as both `sroka.app` and `api.sroka.app`.
 
-**CORS for `/api/*` and `/v1/*`** (Hono `cors`): `origin` echoed only if it equals `APP_ORIGIN`, or starts with `chrome-extension://` or `moz-extension://`; otherwise no CORS headers. `allowMethods: GET,POST,PATCH,DELETE,OPTIONS`; `allowHeaders: Content-Type, Authorization, X-Sroka-Device`; `exposeHeaders: set-auth-token, Retry-After, Content-Disposition`; `credentials: false`; `maxAge: 600`. (The MV3 service worker with host_permissions bypasses CORS anyway.)
+Dev-only var `DEV_ORIGINS` (comma-separated; `.dev.vars`: `http://localhost:5173`, unset in production) lists extra web origins (vite dev server): they are added to Better Auth `trustedOrigins` and to the content-route CORS allow-list. (Through the vite proxy, `/api` and `/v1` requests are same-origin for the browser but keep `Origin: http://localhost:5173`.)
+
+**CORS for `/api/*` and `/v1/*`** (Hono `cors`): `origin` echoed only if it equals `APP_ORIGIN` (or is in `DEV_ORIGINS`), or starts with `chrome-extension://` or `moz-extension://`; otherwise no CORS headers. `allowMethods: GET,POST,PATCH,DELETE,OPTIONS`; `allowHeaders: Content-Type, Authorization, X-Sroka-Device`; `exposeHeaders: set-auth-token, Retry-After, X-Retry-After, Content-Disposition`; `credentials: false`; `maxAge: 600`. (The MV3 service worker with host_permissions bypasses CORS anyway.)
 
 ### 2.1 Auth endpoints (Better Auth, mounted at `/api/auth/*`)
 
 | Call | Body | Result |
 |---|---|---|
 | `POST /api/auth/email-otp/send-verification-otp` | `{"email":"a@b.c","type":"sign-in"}` | `200 {"success":true}` — same response whether or not the account exists. Dev (`ENVIRONMENT=development`): OTP logged as `[sroka] OTP for a@b.c: 123456`, email not sent. |
-| `POST /api/auth/sign-in/email-otp` | `{"email":"a@b.c","otp":"123456"}` | `200 {token, user}`, header **`set-auth-token: <token>`**, plus session cookie. Creates the user if new. Wrong code → `400`/`403` Better Auth error; >5 attempts → code invalidated. |
+| `POST /api/auth/sign-in/email-otp` | `{"email":"a@b.c","otp":"123456"}` | `200 {token, user}`, header **`set-auth-token: <token>`**, plus session cookie. Creates the user if new. Errors below. |
 | `GET /api/auth/get-session` | — | `{session, user}` or `null` |
 | `POST /api/auth/sign-out` | `{}` | `200` |
+
+Better Auth errors are **not** `ApiError`: body `{"code": "<CODE>", "message": "<text>"}`. Sign-in codes: `INVALID_OTP` (400, wrong/unknown code), `OTP_EXPIRED` (400), `TOO_MANY_ATTEMPTS` (403, code invalidated after 5 wrong tries → request a new one). Rate limiter on `/api/auth/*`: `429` with body `{"message":"Too many requests. Please try again later."}` (no `code`) and header **`X-Retry-After: <seconds>`** (not `Retry-After`).
+`trustedOrigins` (cookie/origin check): `[APP_ORIGIN, API_ORIGIN, "chrome-extension://<EXT_ID>", ...DEV_ORIGINS]`.
 
 OTP: 6 digits, expires in 300 s, 5 attempts, stored hashed. Sessions 90 days, rolling (refreshed at most daily).
 Extension/native: store the `set-auth-token` value verbatim (it contains `.` and may contain `=`; don't URL-encode) and send `Authorization: Bearer <value>`.
@@ -53,7 +58,7 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
 | Status | `error` | When |
 |---|---|---|
 | 400 | `invalid_request` | schema validation failed (`issues` present) or semantic problem (`message` e.g. `too_many_tags`, `empty_patch`, `bad_cursor`) |
-| 400 | `invalid_url` | URL not http(s) / not normalizable |
+| 400 | `invalid_url` | URL not http(s) / not normalizable (also: schema failure whose only issue is `invalid_url`, see §1) |
 | 401 | `unauthorized` | no/invalid session |
 | 403 | `forbidden` | content route: bad signature or expired (`message`: `bad_signature`/`expired`/`malformed`) |
 | 404 | `not_found` | unknown or deleted item/tag/job, unknown route |
@@ -62,7 +67,7 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
 | 410 | `resync_required` | sync pull cursor older than tombstone horizon |
 | 413 | `payload_too_large` | body/html/import file above limits |
 | 415 | `unsupported_media_type` | import not multipart / unknown file type |
-| 429 | `rate_limited` | with `Retry-After: <seconds>` |
+| 429 | `rate_limited` | `/v1`: with `Retry-After: <seconds>`. (`/api/auth/*` 429s come from Better Auth: `X-Retry-After`, §2.1) |
 | 500 | `internal` | unexpected; logged |
 
 ## 4. Objects
@@ -80,6 +85,7 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
   "author": "Jane Doe",
   "lang": "en",
   "leadImageUrl": "https://c.sroka.app/s/1760486400/AbC…xyz/p/0192f3c4-…/thumb.webp",
+  "leadImageKey": "thumb.webp",
   "wordCount": 2310,
   "readingMinutes": 10,
   "contentId": "0192f3c4-1111-7222-8333-444455556666",
@@ -100,9 +106,10 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
 ```
 
 - `title` on the wire = user title (set via `item.setTitle`/PATCH) if any, else parsed title, else the provisional title given at save time, else `null`. Clients fall back to `canonicalUrl`/domain for display.
-- `leadImageUrl`: signed URL (section 10) of `{contentDir}/{leadImageKey}`, freshly signed in every response (24 h TTL), `null` if no thumbnail.
-- `parseStatus`: `pending` (queued/working) → `ok` | `partial` (content usable but poor; offer "Open original") | `failed` (`parseError` = short reason like `http_404`, `timeout`, `not_html`, `extract_failed`, `too_large`, `blocked_url`). `contentId` non-null ⇔ content readable (`ok` or `partial`).
-- `progress` 0..1, `progressAnchor` paragraph index (0-based, counting block elements in article.html) or null.
+- `leadImageUrl`: signed URL (section 10) of `{contentDir}/{leadImageKey}`, freshly signed in every response (24 h TTL), `null` if no thumbnail. A convenience for list views; it goes stale in stored sync rows (rows are only re-sent when their seq changes).
+- `leadImageKey`: thumbnail path relative to the content dir (normally `"thumb.webp"`), or `null`. Long-lived clients (native) should download the thumbnail into their cache when they pull the row; if the URL has expired, build a fresh one as `baseUrl` from `GET /v1/items/:id/content` + `leadImageKey`.
+- `parseStatus`: `pending` (queued/working) → `ok` | `partial` (content usable but poor; offer "Open original") | `failed` (`parseError` = short reason like `http_404`, `timeout`, `not_html`, `extract_failed`, `too_large`, `blocked_url`). `contentId` non-null ⇒ content readable; `parseStatus` may still be `failed` after a failed refresh (the earlier content is kept), or `pending` during a refresh.
+- `progress` 0..1, `progressAnchor` = 0-based index into `article.html` body's `querySelectorAll(PROGRESS_ANCHOR_SELECTOR)` (`"p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,figure"`, from `@sroka/shared` limits.ts) of the first element at/below the top of the viewport, or null. Web and native count identically.
 - `status` `unread|archived`; `archivedAt` set when archived, null when unread.
 - `source`: `share|extension|web|import|email|api` or null.
 - `tags`: names, sorted case-insensitively.
@@ -111,7 +118,7 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
 ### 4.2 Tag
 
 `{"id":"0192…","name":"Machine learning","count":12,"seq":18399}` — `count` only in `GET /v1/tags`, `PATCH /v1/tags/:id` (and `TagResponse`), not in sync pull.
-Tag names: NFC, trimmed, whitespace collapsed (`normalizeTagName`), 1–64 chars, **case-insensitively unique** per user. The stored casing is the one from the creating op (or latest rename).
+Tag names: NFC, trimmed, whitespace collapsed (`normalizeTagName`), 1–64 chars, **case-insensitively unique** per user, where "case-insensitive" means equal `tagKey(name)` (= `normalizeTagName(name).toLowerCase()`, full Unicode: `Żółw` = `żółw`). The stored casing is the one from the creating op (or latest rename).
 
 ### 4.3 Job
 
@@ -133,17 +140,18 @@ Request `CreateItemRequest`:
 ```
 - `html` (optional): `document.documentElement.outerHTML` as a **plain JSON string** (not gzipped). Max `LIMITS.maxHtmlBytes` = 5 MiB of UTF-8; whole body max 6 MiB (check `Content-Length` first) → `413 payload_too_large`. Presence ⇒ captured/private content.
 - Server: new `itemId = uuidv7()`, op `item.add` (`onDuplicate:"readd"`, `source` default `"api"`). If the canonical URL already exists → the existing item is re-added (Pocket semantics, section 8.3) and returned with `created:false`.
-- If `html` given: gzip it (`CompressionStream("gzip")`), `CONTENT.put("raw/{userId}/{itemId}.html.gz")` (itemId = the resulting item's id, i.e. the existing one for duplicates), enqueue `ParseJob {userId,itemId,url,rawKey,force:true}`.
-- Without `html`: enqueue `ParseJob {userId,itemId,url}` only if the item is new, or it is a duplicate whose `parseStatus` is `failed`.
+- If `html` given: gzip it (`CompressionStream("gzip")`), `CONTENT.put("raw/{userId}/{itemId}.html.gz")` (itemId = the resulting item's id, i.e. the existing one for duplicates), enqueue `ParseJob {userId,itemId,url,rawKey,force:true,parseGen}` (store the raw HTML first, then DO `requestParse(itemId, {rawKey, force:true})` bumps `parse_gen`, sets `parse_status=pending` and returns the job; any plain job the `item.add` returned is not sent — §9).
+- Without `html`: enqueue `ParseJob {userId,itemId,url,parseGen}` only if the item is new, or it is a duplicate whose `parseStatus` is `failed`.
 - Response **`202 {"item": Item, "created": true|false}`** (`CreateItemResponse`). Item has `parseStatus:"pending"` when newly queued.
 - Errors: 400 `invalid_url`, 400 `invalid_request`, 413.
+- **Waiting for parse** (applies to 5.1, 5.6 and a `409 not_parsed` from 5.7): while `parseStatus === "pending"`, clients poll `GET /v1/items/:id` with backoff 2 s, 4 s, 8 s, … capped at 30 s, giving up after 5 min (show "still processing"). When `parseStatus` leaves `pending` and `contentId` is non-null → call `/content`. On `failed` → show `parseError` and offer Refresh / Open original. (Sync clients simply see the updated row in their next pull.)
 
 ### 5.2 `GET /v1/items` — list / search / lookup
 Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`), `tag`, `q`, `sort` (`newest`*default*|`oldest`|`shortest`|`longest`), `domain`, `url`, `cursor`, `limit` (1–100, default 30).
 
 - Never returns deleted items.
 - `state`: unread → `status='unread'`; archived → `status='archived'`; favorites → `isFavorite` (any status); all → everything.
-- `tag`: items where the tag (case-insensitive name) is present. Unknown tag → empty list.
+- `tag`: items where the tag (matched by `tagKey`) is present. Unknown tag → empty list.
 - `q`: FTS5 over title, excerpt, siteName, tags. Each whitespace-separated term is quoted and prefix-matched (`"term"*`), terms ANDed; FTS syntax characters in user input are neutralized (never 400/500 for odd input). Ordering still follows `sort`.
 - `domain`: matches the item host or any subdomain; leading `www.` ignored on both sides (`displayDomain`). E.g. `domain=nytimes.com` matches `www.nytimes.com`, `cooking.nytimes.com`.
 - `url`: **exact lookup** — server `normalizeUrl(url)` and matches `canonicalUrl` among live items, ignoring `state`/`tag`/`q`/`domain`. Returns 0 or 1 item, `nextCursor:null`. Invalid URL → `400 invalid_url`. (Extension badge.)
@@ -156,14 +164,14 @@ Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`)
 
 ### 5.4 `PATCH /v1/items/:id`
 Body `UpdateItemRequest` (≥1 field): `{"status":"archived"}`, `{"isFavorite":true}`, `{"title":"My title"}` (`""` = reset to parsed title), `{"progress":0.5,"progressAnchor":12}`, `{"tags":["a","b"]}` (**replaces** the tag set).
-Mapping: status → `item.setStatus`; isFavorite → `item.setFavorite`; title → `item.setTitle`; progress/progressAnchor → `item.setProgress` (if only `progressAnchor` given, progress keeps its current value); tags → diff against current tags: `item.tag present:false` for removed names, `present:true` for added names (case-insensitive compare).
+Mapping: status → `item.setStatus`; isFavorite → `item.setFavorite`; title → `item.setTitle`; progress/progressAnchor → `item.setProgress` (if only `progressAnchor` given, progress keeps its current value); tags → diff against current tags: `item.tag present:false` for removed names, `present:true` for added names (compare by `tagKey`).
 Response `200 {"item": Item}` (after applying). `404` unknown/deleted; `400 invalid_request` (`message:"too_many_tags"` if >100).
 
 ### 5.5 `DELETE /v1/items/:id`
 Op `item.delete`. `204` (no body). `404` if unknown or already deleted.
 
 ### 5.6 `POST /v1/items/:id/refresh`
-Op `item.refresh` (sets `parseStatus:"pending"`, enqueues `ParseJob{userId,itemId,url,force:true}`; the URL is refetched publicly — previously captured HTML is not reused). `202 {"item": Item}`. `404`.
+Op `item.refresh` (sets `parseStatus:"pending"`, bumps `parse_gen`, enqueues `ParseJob{userId,itemId,url,force:true,parseGen}`; the URL is refetched publicly — previously captured HTML is not reused). `202 {"item": Item}`. `404`.
 
 ### 5.7 `GET /v1/items/:id/content`
 `200 ContentUrlsResponse`:
@@ -174,7 +182,10 @@ Op `item.refresh` (sets `parseStatus:"pending"`, enqueues `ParseJob{userId,itemI
  "expiresAt":1760486400000}
 ```
 Scope `p` when `contentPrivate=false`, `u.{userId}` otherwise. `409 {"error":"not_parsed"}` when `contentId` is null (pending/failed). `404` unknown/deleted.
-Web reader: `fetch(articleUrl)` → text → `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc>` with injected `<base href="{baseUrl}" target="_blank">`, CSP meta, theme CSS (D7).
+Web reader (D7): `fetch(articleUrl)` → text → `<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" srcdoc>` (never `allow-same-origin`) with injected, in `<head>`:
+- `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {CONTENT_ORIGIN} data:; style-src 'unsafe-inline'; script-src 'nonce-{nonce}'">` — `{CONTENT_ORIGIN}` must be explicit: the srcdoc document has an opaque origin, so `'self'` would block every image.
+- `<base href="{baseUrl}" target="_blank">`, the theme `<style>`, and one `<script nonce="{nonce}">` reader script (fresh random nonce per render).
+The iframe is the scroll container. Reader script ⇄ parent via `postMessage`: iframe → parent `{type:"sroka:metrics", progress, anchor}` (debounced on scroll; parent verifies `event.source`), parent → iframe `{type:"sroka:scrollToAnchor", anchor}` (restore on open). `anchor` counts `PROGRESS_ANCHOR_SELECTOR` (§4.1). Parent sends `PATCH /v1/items/:id {progress, progressAnchor}` throttled and on leave.
 
 ## 6. Tags endpoints
 
@@ -188,7 +199,7 @@ Web reader: `fetch(articleUrl)` → text → `<iframe sandbox="allow-popups allo
 - `current`: tags of the live item whose canonical URL equals `normalizeUrl(url)`; `[]` if not saved / no url / invalid url (never 400).
 
 ### 6.3 `PATCH /v1/tags/:id` `{"name":"Machine learning"}`
-Op `tag.rename {from: <current name>, to: name}`. If another live tag already has that name (case-insensitively) the tags are **merged** into the existing one (section 8.6). `200 {"tag": Tag-with-count}` (the surviving tag). `404` unknown/deleted tag.
+Op `tag.rename {from: <current name>, to: name}`. If another live tag already has that name (same `tagKey`) the tags are **merged** into the existing one (section 8.4). `200 {"tag": Tag-with-count}` (the surviving tag). `404` unknown/deleted tag.
 
 ### 6.4 `DELETE /v1/tags/:id`
 Op `tag.delete {tag: <name>}`; removes the tag from all items. `204`. `404`.
@@ -196,7 +207,7 @@ Op `tag.delete {tag: <name>}`; removes the tag from all items. `204`. `404`.
 ## 7. Sync (native apps; any client may use it)
 
 ### 7.1 `POST /v1/sync/push`
-Request (`PushRequest`): `{"deviceId":"dev_0192…","ops":[Op, …]}` — `deviceId` `^[A-Za-z0-9_.:-]{1,64}$`, ≤500 ops (more → `400 invalid_request`). Op shapes (`Op` union in ops.ts), every op has `opId` (≤64 chars, uuidv7 recommended) and `at` (client epoch ms):
+Request (`PushRequest`): `{"deviceId":"dev_0192…","ops":[Op, …]}` — `deviceId` `^[A-Za-z0-9_.:-]{1,64}$`, ≤500 ops (more → `400 invalid_request`). Op shapes (`Op` union in ops.ts), every op has `opId` (≤64 chars, uuidv7 recommended; must be unique **per device** — idempotency is keyed on `(deviceId, opId)`) and `at` (client epoch ms):
 
 ```json
 {"opId":"…a1","type":"item.add","itemId":"<uuidv7>","at":1760400723120,"url":"https://example.com/post?utm_source=x",
@@ -221,10 +232,10 @@ Response `200 PushResponse`:
 Processing rules:
 1. The body is validated as `{deviceId, ops: unknown[] ≤500}`; then **each op individually** with `Op.safeParse`. An invalid op → `rejected {opId: op.opId ?? "", reason:"invalid_op"}`; the rest still apply.
 2. Ops are applied **in array order**, each in its own `transactionSync`.
-3. **Idempotency:** if `opId` is in `applied_ops`, the op is not re-applied and is reported in `applied` (and, for an aliased `item.add`, the alias is reported again — `applied_ops` stores the alias target).
-4. Applied ops (including LWW losers and no-ops) are recorded in `applied_ops(op_id, applied_at, alias)`. **Rejected ops are not recorded** (a retry re-evaluates them).
-5. Aliases: an `item.add` whose URL matches a different live item yields `aliases[clientId] = existingId`; later ops **in the same push** that reference `clientId` are rewritten to `existingId`. Clients must also rewrite pending local ops and merge the local row.
-6. Reject reasons (`RejectReason`): `invalid_op`, `unknown_item` (itemId never seen and not aliased), `item_deleted` (item is tombstoned — delete wins), `unknown_tag` (rename/delete of a missing tag name), `invalid_url`, `too_many_tags`. Clients drop rejected ops (after reconciling via pull).
+3. **Idempotency:** if `(deviceId, opId)` is in `applied_ops`, the op is not re-applied and is reported in `applied` (and, for an aliased `item.add`, the alias is reported again — `applied_ops` stores the alias target). REST-synthesized ops use server uuidv7 opIds under their own deviceId (`rest`/`import`), so they can't collide with client ids.
+4. Applied ops (including LWW losers and no-ops) are recorded in `applied_ops(device_id, op_id, applied_at, alias)`, primary key `(device_id, op_id)`. **Rejected ops are not recorded** (a retry re-evaluates them).
+5. Aliases: an `item.add` whose URL matches a different live item yields `aliases[clientId] = existingId` and stores `item_aliases(client_id → target_id)` durably. **Every** incoming `itemId` (in any later push, from any device) is first resolved through `item_aliases` (follow chains), so ops a client queued on its local id before learning the alias still apply. Clients should still rewrite pending local ops and merge the local row when they receive `aliases`.
+6. Reject reasons (`RejectReason`): `invalid_op`, `unknown_item` (itemId never seen and not in `item_aliases`), `item_deleted` (item is tombstoned — delete wins), `unknown_tag` (rename/delete of a missing tag name), `invalid_url`, `too_many_tags`. Clients drop rejected ops (after reconciling via pull).
 7. `cursor` = `meta.seq` after the push. Clients should still pull from their previous cursor to receive the canonical rows they changed.
 
 ### 7.2 `GET /v1/sync/pull?cursor=&limit=`
@@ -236,9 +247,11 @@ Response `200 PullResponse`:
  "deleted":{"items":["<itemId>"],"tags":["<tagId>"]}}
 ```
 - Returns all item and tag rows with `seq > cursor`, ordered by `seq` ascending, at most `limit` rows **in total** (items + tags + tombstones). Live rows go into `items`/`tags`; tombstoned rows go into `deleted.items`/`deleted.tags` (ids only).
+- **A page never splits a seq group** (one op stamps all rows it changes — tag rename/delete across N items, merges, `item.add` creating tags — with the same seq). After reaching `limit` rows, the server keeps adding rows until the seq changes, so a page may exceed `limit` (necessarily so when a single group is larger than `limit`). Implementation: select `seq > cursor ORDER BY seq LIMIT limit`, then also select all remaining rows with `seq = lastSeq`.
 - `cursor` in the response = seq of the last returned row if `hasMore`, else the current `meta.seq`. Repeat until `hasMore:false`. First sync: `cursor=0`.
+- Required DO test: rename a tag carried by more than `limit` items, pull with small `limit` from before the rename, and assert every item arrives exactly once.
 - `410 {"error":"resync_required"}` if `0 < cursor < meta.tombstone_horizon` (the highest seq of any purged tombstone). The client then merges pending ops, pushes them, and pulls from 0.
-- Item rows include signed `leadImageUrl` (24 h); clients needing content call `GET /v1/items/:id/content`.
+- Item rows include signed `leadImageUrl` (24 h) and the stable `leadImageKey` (§4.1); clients needing content call `GET /v1/items/:id/content`.
 
 ### 7.3 seq rules (for the DO implementer)
 - `meta.seq` starts at 0. **Each op that changes anything increments `meta.seq` exactly once** and stamps every row it changed (item, tag) with that value. LWW losers/no-ops don't increment.
@@ -253,14 +266,14 @@ Response `200 PullResponse`:
 
 ### 8.1 LWW
 Per-field clocks in `items.clock` JSON (`ItemClock`): `title`, `status`, `isFavorite`, `progress` (progress + anchor + lastReadAt together). Incoming stamp wins iff `at > cur.at`, or `at == cur.at && dev > cur.dev` (string compare), or equal stamp (later-applied wins) — `applyLww()`. Losing ops are **applied** (no change, no seq bump).
-`item_tags` pairs: LWW on `at` only (`present` + `at` columns): incoming wins iff `at >= pair.at`.
+`item_tags` pairs: same LWW rule with the stamp `{at, dev}` stored in `item_tags.at` / `item_tags.dev` — use `pairWins(incoming, {at, dev})` from `@sroka/shared` (lww.ts).
 
 ### 8.2 `item.add`
 1. `canonical = normalizeUrl(url)` (fail → reject `invalid_url`), `hash = urlHash(canonical)`.
 2. If `itemId` exists: tombstoned → reject `item_deleted`; live → treat as duplicate of itself (step 4 without alias).
 3. Else if a live item `Y` has `url_hash = hash` → duplicate of `Y`, alias `itemId → Y.id` (step 4).
 4. Duplicate handling: `onDuplicate:"readd"` (default): with stamp on `status`: if it wins → `status=unread`, `archivedAt=null`, `savedAt=max(savedAt, at)`; union `tags` (each as `item.tag present:true` with the op stamp); provisional `title` only if the item has no title. `onDuplicate:"merge"`: only union tags. (Re-queue parsing per 5.1.)
-5. Else insert a new live item: `id=itemId`, `url`, `canonical_url`, `url_hash`, `title` = provisional title or null, `status = op.status ?? "unread"`, `archivedAt = status==archived ? at : null`, `isFavorite = op.isFavorite ?? false`, `savedAt = op.savedAt ?? at`, `source = op.source ?? null`, `parse_status="pending"`, `clock` = `{status, isFavorite}` stamped (and `title` NOT stamped — the provisional title can be replaced by the parser), tags added, FTS row inserted. The caller (REST handler / push handler) enqueues a `ParseJob` for every newly created item (push: `ParseJob{userId,itemId,url}`; up to 100 per `sendBatch`).
+5. Else insert a new live item: `id=itemId`, `url`, `canonical_url`, `url_hash`, `title` = provisional title or null, `status = op.status ?? "unread"`, `archivedAt = status==archived ? at : null`, `isFavorite = op.isFavorite ?? false`, `savedAt = op.savedAt ?? at`, `source = op.source ?? null`, `parse_status="pending"`, `clock` = `{status, isFavorite}` stamped (and `title` NOT stamped — the provisional title can be replaced by the parser), tags added, FTS row inserted. The caller (REST handler / push handler) enqueues a `ParseJob` for every newly created item (push: `ParseJob{userId,itemId,url,parseGen}`; up to 100 per `sendBatch`). `applyOps` returns these jobs to the caller (internal RPC result `{response: PushResponse, parseJobs: ParseJob[]}`), with `parse_gen` already incremented.
 6. A URL whose only matching item is tombstoned creates a **new** item (re-save after delete).
 
 ### 8.3 Other item ops (target must be live; unknown → `unknown_item`, tombstoned → `item_deleted`)
@@ -268,25 +281,32 @@ Per-field clocks in `items.clock` JSON (`ItemClock`): `title`, `status`, `isFavo
 - `item.setFavorite`: LWW `isFavorite`.
 - `item.setProgress`: LWW `progress`; sets `progress`, `progressAnchor = anchor ?? null`, `lastReadAt = at`.
 - `item.setTitle`: LWW `title`; stores the **user title** (`""` → null = fall back to parsed/provisional). Parser never overwrites a user title.
-- `item.tag`: find live tag by name (NOCASE). Missing + `present:true` → create tag (`id=uuidv7()`, name as given). Missing + `present:false` → applied no-op. Pair LWW (8.1). Adding beyond 100 present tags → `too_many_tags`.
+- `item.tag`: resolve the tag per 8.4 (renames/tombstones), else find the live tag by `name_key = tagKey(tag)`. Missing + `present:true` → create tag (`id=uuidv7()`, name as given, `name_key`). Missing + `present:false` → applied no-op. Pair LWW (8.1). Adding beyond 100 present tags → `too_many_tags`.
 - `item.delete`: tombstone (`deleted_at = at`), delete FTS row; item_tags rows kept (not returned). Unknown → `unknown_item`; already deleted → applied no-op. **Delete wins**: all later ops on it are rejected `item_deleted`.
-- `item.refresh`: `parse_status=pending`, `parse_error=null`; caller enqueues `ParseJob{…, force:true}`.
+- `item.refresh`: `parse_status=pending`, `parse_error=null`, `parse_gen += 1`; caller enqueues `ParseJob{…, force:true, parseGen}` (returned in `parseJobs`).
 
 ### 8.4 Tag ops
-- `tag.rename {from,to}`: `from` missing → `unknown_tag`. Same tag (case-insensitive equal) → change casing. `to` names another live tag → **merge**: every present pair of `from` becomes present on `to` (stamp `at`), then `from` is tombstoned. Otherwise rename in place. No LWW on tag names (last applied wins).
-- `tag.delete {tag}`: missing → `unknown_tag`. Tombstone the tag, set all its pairs `present=0, at`. A later `item.tag` with that name creates a new tag (new id).
+All tag lookups use `name_key = tagKey(name)` (never SQLite `NOCASE`, which folds ASCII only).
+- `tag.rename {from,to}`: `from` missing → `unknown_tag`. Same tag (equal `tagKey`) → change casing. `to` names another live tag → **merge**: every present pair of `from` becomes present on `to` (stamp `at`), then `from` is tombstoned. Otherwise rename in place. No LWW on tag names (last applied wins).
+  Every rename (in place or merge) records `tag_renames(from_key, to_tag_id, at)` (upsert on `from_key`).
+- `tag.delete {tag}`: missing → `unknown_tag`. Tombstone the tag, set all its pairs `present=0` with the op stamp.
+- **Stale offline `item.tag` ops** (a device that hadn't seen the rename/delete):
+  1. Rename: if `tag_renames` has `from_key = tagKey(op.tag)` with `rename.at >= op.at`, the op targets `to_tag_id` instead (follow chains, max 10 hops; if the final target is tombstoned, apply rule 2 to it). An op with `at` later than the rename uses the name as given (may create a new tag with the old name).
+  2. Delete: if no live tag has that key but a tombstoned one does with `deleted_at >= op.at`, a `present:true` op is an **applied no-op** (doesn't resurrect the tag). Ops with `at > deleted_at` create a new tag (new id).
 
 ### 8.5 FTS
-`items_fts(title, excerpt, site_name, tags)` keyed by an integer rowid mapped to item id (e.g. an `items.rowid`/`fts_rowid` column). Updated manually on add, title/parse/tag changes, delete.
+`CREATE VIRTUAL TABLE items_fts USING fts5(title, excerpt, site_name, tags)` — a **regular** FTS5 table (it stores its own copy; overrides design §7.1 `content=''`, which can't be updated and needs original values to delete). Rowid = `items.fts_rowid` (INTEGER, unique). Maintained manually in the same `transactionSync`: add → `INSERT (rowid, …)`; title/parse/tag changes → `UPDATE items_fts SET … WHERE rowid=?` (or delete+insert); item delete → `DELETE FROM items_fts WHERE rowid=?`. `tags` column = present tag names joined with spaces; tag rename/delete updates every affected item's row.
 
 ## 9. Parse pipeline interface (api ↔ parser)
 
-- Queue `sroka-parse` message = `ParseJob` (parse.ts): `{userId, itemId, url, rawKey?, force?}`. Producer: `env.PARSE_QUEUE.send(job)` / `sendBatch`.
+- Queue `sroka-parse` message = `ParseJob` (parse.ts): `{userId, itemId, url, rawKey?, force?, parseGen}`. Producer: `env.PARSE_QUEUE.send(job)` / `sendBatch`.
+- **Generations:** the DO increments `items.parse_gen` on every enqueue (new `item.add`, failed-duplicate re-add, html save, `item.refresh`) and sets `parse_status=pending`; jobs come from the DO (`applyOps` → `parseJobs`, or DO RPC `requestParse(itemId, {rawKey?, force?}) → ParseJob | null` used by the html save path). `markParsed` returns `{ok:false}` and changes nothing when `result.parseGen !== items.parse_gen` (a newer job is in flight or finished).
 - `rawKey` = `raw/{userId}/{itemId}.html.gz` (gzip of the captured HTML). Present ⇒ parse that HTML (base URL = `url`), result is **private** (`contentPrivate:true`, R2 `private/{userId}/{contentId}/…`), never written to or read from the shared D1 cache.
 - No `rawKey` and no `force` ⇒ parser may reuse D1 `content` row with same `url_hash` + `PARSER_VERSION`, `status != failed`, `parsed_at` within 7 days.
-- Result → RPC on the user's DO: `env.LIBRARY.getByName(userId).markParsed(itemId, result: ParseResult) → Promise<{ok: boolean}>`. `ok:false` when the item is unknown or deleted (parser may then skip ref-counting). `ParseResult` fields: `status ok|partial|failed`, `contentId?`, `contentPrivate`, `title, excerpt, siteName, author, lang, wordCount, readingMinutes` (nullable), `leadImageKey?` (path relative to the content dir, normally `"thumb.webp"`), `error?`, `parserVersion`.
-- `markParsed` sets those columns (parsed `title` only replaces the stored non-user title when non-null), `parse_status`, `parse_error = error ?? null`, bumps seq, updates FTS. A `failed` result clears nothing else (keeps an earlier `contentId` if any).
-- DLQ consumer (`sroka-parse-dlq`) calls `markParsed(itemId, {status:"failed", contentPrivate:false, title:null, excerpt:null, siteName:null, author:null, lang:null, wordCount:null, readingMinutes:null, error:"parse_failed", parserVersion: PARSER_VERSION})`.
+- Result → RPC on the user's DO: `env.LIBRARY.getByName(userId).markParsed(itemId, result: ParseResult) → Promise<{ok: boolean}>`. `ok:false` when the item is unknown or deleted, or the result is stale (`parseGen` mismatch) — parser may then skip ref-counting. `ParseResult` fields: `status ok|partial|failed`, `parseGen` (echo of the job), `contentId` (required for ok/partial, absent for failed — enforced by the schema), `contentPrivate`, `title, excerpt, siteName, author, lang, wordCount, readingMinutes` (nullable), `leadImageKey?` (path relative to the content dir, normally `"thumb.webp"`), `error?`, `parserVersion`.
+- `markParsed` with `ok`/`partial` sets `content_id`, `content_private`, `lead_image_key`, metadata (parsed `title` only replaces the stored non-user title when non-null), `parse_status`, `parse_error = error ?? null`, bumps seq, updates FTS.
+- A `failed` result updates **only** `parse_status`, `parse_error` and seq — never `content_id`, `content_private`, `lead_image_key` or metadata (an earlier content stays readable; its `contentPrivate` is unchanged).
+- DLQ consumer (`sroka-parse-dlq`) calls `markParsed(itemId, {status:"failed", parseGen: job.parseGen, contentPrivate:false, title:null, excerpt:null, siteName:null, author:null, lang:null, wordCount:null, readingMinutes:null, error:"parse_failed", parserVersion: PARSER_VERSION})`.
 - R2 layout per content dir (`r2Keys.contentDir`): `article.html`, `text.txt`, `img/{sha256}.webp`, `thumb.webp`, `package.zip` (manifest.json + article.html + img/*; `PackageManifest`).
 
 ## 10. Content delivery (signed URLs, D7)
@@ -296,11 +316,12 @@ URL: `{CONTENT_ORIGIN}/s/{exp}/{sig}/{scope}/{contentId}/{file}`
 - `scope` = `p` (R2 `content/{contentId}/`) or `u.{userId}` (R2 `private/{userId}/{contentId}/`).
 - `sig` = base64url (no padding, 43 chars) of HMAC-SHA256(`CONTENT_URL_SIGNING_KEY`, `"{exp}/{scope}/{contentId}"`). Covers the directory, so relative `img/…` in article.html work.
 - `file`: 1–4 segments of `[A-Za-z0-9_-][A-Za-z0-9._-]*` (no `..`), e.g. `article.html`, `img/ab12….webp`, `package.zip`, `thumb.webp`.
-- Build with `buildContentUrls` / `buildContentUrl`; verify with `verifyContentPath(secret, pathname)` → `{ok, r2Key, isPrivate, …}`.
+- `exp` must be canonical (`^[1-9]\d{0,11}$`, no leading zeros) and `sig` exactly 43 canonical base64url chars, so each signature maps to one URL (stable CDN cache keys).
+- Build with `buildContentUrls` / `buildContentUrl`; verify with `verifyContentPath(secret, pathname)` → `{ok, r2Key, isPrivate, …}`. Pass `new URL(req.url).pathname` **unmodified**; never `decodeURIComponent` it first (`%2F` would become a separator and enable traversal — encoded forms are rejected as malformed).
 
 Route (content host only): `GET`/`HEAD` only (else `405`). Malformed → `403 forbidden message:malformed`; bad signature → `403 bad_signature`; expired → `403 expired`; R2 miss → `404`. Success headers:
 - `Content-Type` by extension: `.html` `text/html; charset=utf-8`, `.txt` `text/plain; charset=utf-8`, `.webp` `image/webp`, `.zip` `application/zip`, `.json` `application/json`, else R2 `httpMetadata.contentType` or `application/octet-stream`.
-- `Access-Control-Allow-Origin: {APP_ORIGIN}`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox`.
+- `Access-Control-Allow-Origin`: the request `Origin` if it equals `APP_ORIGIN` or is in `DEV_ORIGINS`, else omitted; always `Vary: Origin`. `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox`.
 - Public: `Cache-Control: public, max-age=86400, immutable`. Private: `Cache-Control: private, no-store`.
 - `ETag` from R2; honour `If-None-Match` (304) where cheap. `Content-Length` set.
 
@@ -325,8 +346,8 @@ Direct download (no job in this build). All live items, newest first. `Content-D
 
 - `GET /v1/me` → `200 MeResponse` `{"user":{"id","email","name","emailVerified","createdAt"},"stats":{"unread":12,"archived":340,"favorites":8,"tags":21}}`.
 - `DELETE /v1/account` body `{"confirm":"DELETE"}` (else 400) → `200 {"deleted":true}`. Server: DO `destroy()` (`ctx.storage.deleteAll()`), delete R2 prefixes `private/{userId}/`, `raw/{userId}/`, `uploads/{userId}/` (list+delete, may continue in `waitUntil`), D1 `jobs` rows, Better Auth user (sessions, accounts, verifications). Shared `content/` is left for GC. Client then signs out locally.
-- `GET /v1/config` (**no auth**) → `200 ConfigResponse` = KV `CONFIG` key `"config"` (JSON) merged over defaults:
-  `{"minVersions":{"android":null,"ios":null,"extension":null},"features":{"imports":true,"exports":true,"browserRender":false,"highlights":false,"realtime":false},"limits":{"maxOpsPerPush":500,"maxHtmlBytes":5242880,"maxImportBytes":20971520}}`. `Cache-Control: public, max-age=300`.
+- `GET /v1/config` (**no auth**) → `200 ConfigResponse` = KV `CONFIG` key `"config"` (JSON) merged over defaults, plus `appOrigin` = `env.APP_ORIGIN` (never from KV; the extension opens `${appOrigin}/app/` for "Open library"):
+  `{"appOrigin":"https://sroka.app","minVersions":{"android":null,"ios":null,"extension":null},"features":{"imports":true,"exports":true,"browserRender":false,"highlights":false,"realtime":false},"limits":{"maxOpsPerPush":500,"maxHtmlBytes":5242880,"maxImportBytes":20971520}}`. `Cache-Control: public, max-age=300`.
 - `GET /v1/health` (no auth) → `200 {"ok":true}`.
 
 ## 13. URL normalization (`normalizeUrl`)
@@ -359,10 +380,17 @@ Direct download (no job in this build). All live items, newest first. `Content-D
 | applied_ops retention | 30 days |
 | signed URL TTL | 24 h (rounded up to the hour) |
 
-Rate limits (clients must handle `429` + `Retry-After` with backoff): Better Auth global 100 req/min/IP (`storage:"database"`), email-OTP plugin 3/min per IP+path. `/v1` per-user soft limits (MAY be enforced via DO counters): `POST /v1/items` 120/min, `POST /v1/sync/push` 60/min, `POST /v1/imports` 10/day.
+Rate limits (clients must handle `429` with backoff: `Retry-After` on `/v1`, `X-Retry-After` on `/api/auth/*`): Better Auth global 100 req/min/IP (`storage:"database"`), email-OTP plugin 3/min per IP+path. `/v1` per-user soft limits (MAY be enforced via DO counters): `POST /v1/items` 120/min, `POST /v1/sync/push` 60/min, `POST /v1/imports` 10/day.
 
 ## 15. Storage notes for implementers
 
-- **LibraryDO** schema = design §7.1 plus: `items.user_title TEXT` (user override; wire `title = user_title ?? title`), `items.domain TEXT` (host without `www.`, for the `domain` filter), an integer key for FTS (`fts_rowid INTEGER` unique, or use the implicit `rowid`), `applied_ops.alias TEXT`, `meta` keys `seq`, `tombstone_horizon`. `item_tags` index on `(tag_id)`. Migrations via `PRAGMA user_version`.
+- **LibraryDO** schema = design §7.1 plus:
+  - `items.user_title TEXT` (user override; wire `title = user_title ?? title`), `items.domain TEXT` (host without `www.`, for the `domain` filter), `items.fts_rowid INTEGER UNIQUE` (FTS key, §8.5), `items.lead_image_key TEXT`, `items.parse_gen INTEGER NOT NULL DEFAULT 0` (§9).
+  - `tags.name_key TEXT NOT NULL` (= `tagKey(name)`), `CREATE UNIQUE INDEX … ON tags(name_key) WHERE deleted_at IS NULL`; no `COLLATE NOCASE` anywhere for tags.
+  - `item_tags.dev TEXT NOT NULL` (pair stamp = `{at, dev}`, §8.1); index on `(tag_id)`.
+  - `applied_ops(device_id TEXT, op_id TEXT, applied_at INTEGER, alias TEXT, PRIMARY KEY(device_id, op_id))`, pruned after 30 days.
+  - `item_aliases(client_id TEXT PRIMARY KEY, target_id TEXT NOT NULL)` — never pruned (one small row per duplicate add); deleted with the library.
+  - `tag_renames(from_key TEXT PRIMARY KEY, to_tag_id TEXT NOT NULL, at INTEGER NOT NULL)` — purged with tombstones (180 days).
+  - `items_fts` regular FTS5 (§8.5). `meta` keys `seq`, `tombstone_horizon`. Migrations via `PRAGMA user_version`.
 - **D1** `jobs` = design §7.2 plus `format TEXT`, `skipped INTEGER NOT NULL DEFAULT 0`. `content` as in design §7.2.
-- DO public RPC surface used by others: `applyOps(deviceId, ops: Op[]) → PushResponse`, `pull(cursor, limit) → PullResponse` (lead image URLs signed by the API layer or the DO with env secrets), `markParsed(itemId, ParseResult) → {ok}`, `destroy()`. List/get/tags/suggestions/stats/export helpers are internal to `workers/api`.
+- DO public RPC surface used by others: `applyOps(deviceId, ops: Op[]) → {response: PushResponse, parseJobs: ParseJob[]}`, `requestParse(itemId, {rawKey?, force?}) → ParseJob | null`, `pull(cursor, limit) → PullResponse` (lead image URLs signed by the API layer or the DO with env secrets), `markParsed(itemId, ParseResult) → {ok}`, `destroy()`. List/get/tags/suggestions/stats/export helpers are internal to `workers/api`.

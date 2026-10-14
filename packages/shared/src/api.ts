@@ -45,6 +45,19 @@ export const ApiError = z.object({
 });
 export type ApiError = z.infer<typeof ApiError>;
 
+/**
+ * Maps a zod validation failure to the 400 body (docs/api.md §3): if the only issue is `invalid_url`
+ * (from HttpUrl) → `{error:"invalid_url"}`, else `{error:"invalid_request", message, issues}`.
+ */
+export function toApiError(err: z.ZodError): ApiError {
+  const issues = err.issues.map((i) => ({
+    path: i.path.filter((p): p is string | number => typeof p !== "symbol"),
+    message: i.message,
+  }));
+  if (issues.length === 1 && issues[0]!.message === "invalid_url") return { error: "invalid_url" };
+  return { error: "invalid_request", message: issues[0]?.message ?? "invalid_request", issues };
+}
+
 // ---------- items ----------
 
 /** POST /v1/items */
@@ -149,6 +162,8 @@ export type TagResponse = z.infer<typeof TagResponse>;
 
 /** GET /v1/config (KV key "config", defaults merged). Public: auth NOT required. */
 export const ConfigResponse = z.object({
+  /** Web app origin (env APP_ORIGIN, not from KV), e.g. "https://sroka.app" — extension opens `${appOrigin}/app/`. */
+  appOrigin: z.string(),
   minVersions: z.object({
     android: z.string().nullable(),
     ios: z.string().nullable(),

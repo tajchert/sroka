@@ -25,10 +25,10 @@
     "bindings": [{ "name": "LIBRARY", "class_name": "LibraryDO", "script_name": "sroka-api" }]
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "sroka", "database_id": "LOCAL", "migrations_dir": "../api/migrations" }
+    { "binding": "DB", "database_name": "sroka", "database_id": "4909f01f-3368-4169-9af8-e95144376aed", "migrations_dir": "../api/migrations" }
   ],
   "r2_buckets": [{ "binding": "CONTENT", "bucket_name": "sroka-content" }],
-  "kv_namespaces": [{ "binding": "CONFIG", "id": "PLACEHOLDER_CONFIG_KV_ID" }],
+  "kv_namespaces": [{ "binding": "CONFIG", "id": "3fffa4e503274f16a3698f72f9a089c9" }],
   "images": { "binding": "IMAGES" },
   "vars": {
     "ENVIRONMENT": "production",

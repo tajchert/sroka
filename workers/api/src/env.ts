@@ -15,6 +15,8 @@ export interface Env {
   APP_ORIGIN: string;
   API_ORIGIN: string;
   CONTENT_ORIGIN: string;
+  /** Dev only: comma-separated extra web origins (vite :5173) for trustedOrigins + content CORS. */
+  DEV_ORIGINS?: string;
   BROWSER_RENDER_ENABLED: string;
   BETTER_AUTH_SECRET: string;
   CONTENT_URL_SIGNING_KEY: string;

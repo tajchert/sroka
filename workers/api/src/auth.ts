@@ -1,11 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, emailOTP } from "better-auth/plugins";
+import { createAuthMiddleware } from "better-auth/api";
 import { drizzle } from "drizzle-orm/d1";
 import type { Env } from "./env.ts";
 import * as schema from "./db/auth-schema.ts";
 import { sendOtpEmail } from "./email.ts";
 import { otpThrottleAfter, otpThrottleBefore } from "./auth-throttle.ts";
+import { turnstileBefore } from "./turnstile.ts";
 
 export type WaitUntil = { waitUntil(p: Promise<unknown>): void };
 
@@ -18,6 +20,12 @@ function randomOtp(len: number): string {
   const buf = new Uint32Array(len);
   crypto.getRandomValues(buf);
   return Array.from(buf, (n) => String(n % 10)).join("");
+}
+
+function chainBefore(...mws: Array<ReturnType<typeof createAuthMiddleware>>) {
+  return createAuthMiddleware(async (ctx) => {
+    for (const mw of mws) await mw(ctx as never);
+  });
 }
 
 /** Per-request Better Auth instance (decisions D4). Never cache module-global. */
@@ -52,7 +60,8 @@ export function createAuth(env: Env, ctx?: WaitUntil) {
       },
     },
     // Per-email OTP send limit + failed-code lockout (per-IP limits alone allow distributed abuse).
-    hooks: { before: otpThrottleBefore(env.DB), after: otpThrottleAfter(env.DB) },
+    // Turnstile first (web sign-in only), so rejected bot requests don't consume the per-email budget.
+    hooks: { before: chainBefore(turnstileBefore(env), otpThrottleBefore(env.DB)), after: otpThrottleAfter(env.DB) },
     advanced: {
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"] },
       defaultCookieAttributes: { sameSite: "lax", secure: !dev, httpOnly: true },

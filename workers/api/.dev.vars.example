@@ -10,3 +10,7 @@ CONTENT_URL_SIGNING_KEY=change-me-to-32-plus-random-characters-yyyyyyyy
 # REVIEW_OTP=123456
 # Dev only: extra web origins (vite dev server) for Better Auth trustedOrigins + content-route CORS (D3).
 DEV_ORIGINS=http://localhost:5173
+# Turnstile: Cloudflare's always-pass TEST keys (any token, e.g. XXXX.DUMMY.TOKEN.XXXX, is accepted).
+# Remove both lines to skip verification entirely.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

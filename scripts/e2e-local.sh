@@ -68,7 +68,7 @@ auth_post() { # auth_post URL ORIGIN JSON [curl args…] → STATUS (waits out B
   # send-verification-otp 3/min, sign-in/* 3/10s per IP)
   local url=$1 origin=$2 data=$3 i wait; shift 3
   for i in 1 2 3; do
-    req POST "$url" -H 'Content-Type: application/json' -H "Origin: $origin" --data "$data" "$@"
+    req POST "$url" -H "x-turnstile-token: XXXX.DUMMY.TOKEN.XXXX" -H 'Content-Type: application/json' -H "Origin: $origin" --data "$data" "$@"
     [ "$STATUS" = 429 ] || return 0
     wait=$(header x-retry-after); echo "  (rate limited, waiting ${wait:-30}s)"; sleep "${wait:-30}"
   done

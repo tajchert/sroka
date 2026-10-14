@@ -36,5 +36,7 @@ configRoutes.get("/config", async (c) => {
   }
   const cfg = merge(defaultConfig(c.env.APP_ORIGIN), kv);
   cfg.appOrigin = c.env.APP_ORIGIN;
+  if (c.env.TURNSTILE_SITE_KEY) cfg.turnstileSiteKey = c.env.TURNSTILE_SITE_KEY;
+  else delete cfg.turnstileSiteKey;
   return c.json(cfg, 200, { "Cache-Control": "public, max-age=300" });
 });

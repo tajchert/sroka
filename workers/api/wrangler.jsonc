@@ -34,8 +34,9 @@
     "APP_ORIGIN": "https://sroka.app",
     "API_ORIGIN": "https://api.sroka.app",
     "CONTENT_ORIGIN": "https://c.sroka.app",
-    "BROWSER_RENDER_ENABLED": "false"
+    "BROWSER_RENDER_ENABLED": "false",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFXEWydv4XHizEV8"
   }
-  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY, optional REVIEW_EMAIL, REVIEW_OTP.
+  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY, TURNSTILE_SECRET_KEY, optional REVIEW_EMAIL, REVIEW_OTP.
   // Local dev overrides vars via .dev.vars (see .dev.vars.example).
 }

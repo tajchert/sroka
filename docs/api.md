@@ -41,6 +41,8 @@ Dev-only var `DEV_ORIGINS` (comma-separated; `.dev.vars`: `http://localhost:5173
 | `GET /api/auth/get-session` | — | `{session, user}` or `null` |
 | `POST /api/auth/sign-out` | `{}` | `200` |
 
+**Turnstile (web only).** When `TURNSTILE_SECRET_KEY` is set, `send-verification-otp` requests from the web app (`Origin` = `APP_ORIGIN`/`DEV_ORIGINS`, or no `Origin` and host = the `APP_ORIGIN` host) must carry header **`X-Turnstile-Token: <widget token>`**; the server verifies it via Turnstile siteverify (success + hostname). Failure/missing → `400 {"code":"TURNSTILE_FAILED","message":"Verification failed. Please try again."}` (checked before the per-email throttle, so it consumes no budget). Tokens are single-use. **Exempt (tradeoff):** requests with any other `Origin` (extension `chrome-extension://…`) or without an `Origin` on `api.sroka.app` (native apps, curl) skip Turnstile, because those clients cannot run the widget; they are bounded only by the per-IP and per-email limits (§14). Unset secret (local dev/self-host) = no check. The site key comes from `GET /v1/config` (`turnstileSiteKey`, §12).
+
 Better Auth errors are **not** `ApiError`: body `{"code": "<CODE>", "message": "<text>"}`. Sign-in codes: `INVALID_OTP` (400, wrong/unknown code), `OTP_EXPIRED` (400), `TOO_MANY_ATTEMPTS` (403, code invalidated after 5 wrong tries → request a new one). Rate limiter on `/api/auth/*`: `429` with body `{"message":"Too many requests. Please try again later."}` (no `code`) and header **`X-Retry-After: <seconds>`** (not `Retry-After`).
 `trustedOrigins` (cookie/origin check): `[APP_ORIGIN, API_ORIGIN, "chrome-extension://<EXT_ID>", ...DEV_ORIGINS]`.
 
@@ -355,8 +357,8 @@ Direct download (no job in this build). All live items, newest first, streamed o
 
 - `GET /v1/me` → `200 MeResponse` `{"user":{"id","email","name","emailVerified","createdAt"},"stats":{"unread":12,"archived":340,"favorites":8,"tags":21}}`.
 - `DELETE /v1/account` body `{"confirm":"DELETE"}` (else 400) → `200 {"deleted":true}`. Server: DO `destroy()` (`ctx.storage.deleteAll()`), delete R2 prefixes `private/{userId}/`, `raw/{userId}/`, `uploads/{userId}/` (list+delete, may continue in `waitUntil`), D1 `jobs` rows, Better Auth user (sessions, accounts, verifications). Shared `content/` is left for GC. Client then signs out locally.
-- `GET /v1/config` (**no auth**) → `200 ConfigResponse` = KV `CONFIG` key `"config"` (JSON) merged over defaults, plus `appOrigin` = `env.APP_ORIGIN` (never from KV; the extension opens `${appOrigin}/app/` for "Open library"):
-  `{"appOrigin":"https://sroka.app","minVersions":{"android":null,"ios":null,"extension":null},"features":{"imports":true,"exports":true,"browserRender":false,"highlights":false,"realtime":false},"limits":{"maxOpsPerPush":500,"maxHtmlBytes":5242880,"maxImportBytes":20971520}}`. `Cache-Control: public, max-age=300`.
+- `GET /v1/config` (**no auth**) → `200 ConfigResponse` = KV `CONFIG` key `"config"` (JSON) merged over defaults, plus `appOrigin` = `env.APP_ORIGIN` (never from KV) and optional `turnstileSiteKey` = `env.TURNSTILE_SITE_KEY` (public; absent when unset, web then renders no widget) (the extension opens `${appOrigin}/app/` for "Open library"):
+  `{"appOrigin":"https://sroka.app","turnstileSiteKey":"0x4AAAAAAFXEWydv4XHizEV8","minVersions":{"android":null,"ios":null,"extension":null},"features":{"imports":true,"exports":true,"browserRender":false,"highlights":false,"realtime":false},"limits":{"maxOpsPerPush":500,"maxHtmlBytes":5242880,"maxImportBytes":20971520}}`. `Cache-Control: public, max-age=300`.
 - `GET /v1/health` (no auth) → `200 {"ok":true}`.
 
 ## 13. URL normalization (`normalizeUrl`)

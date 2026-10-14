@@ -164,6 +164,8 @@ export type TagResponse = z.infer<typeof TagResponse>;
 export const ConfigResponse = z.object({
   /** Web app origin (env APP_ORIGIN, not from KV), e.g. "https://sroka.app" — extension opens `${appOrigin}/app/`. */
   appOrigin: z.string(),
+  /** Turnstile site key (env TURNSTILE_SITE_KEY); absent = no widget (dev/self-host without Turnstile). */
+  turnstileSiteKey: z.string().optional(),
   minVersions: z.object({
     android: z.string().nullable(),
     ios: z.string().nullable(),

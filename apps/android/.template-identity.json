@@ -1,0 +1,9 @@
+{
+  "package": "app.sroka",
+  "app_name": "Sroka",
+  "host": "sroka.app",
+  "scheme": "sroka",
+  "symbol_prefix": "Sroka",
+  "project_name": "sroka",
+  "database": "sroka-database"
+}

@@ -12,6 +12,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import app.sroka.core.datastore.KeystoreTokenCipher
+import app.sroka.core.datastore.SessionDataStore
+import app.sroka.core.datastore.TokenCipher
 import javax.inject.Singleton
 
 /**
@@ -31,4 +34,19 @@ internal object DataStoreModule {
         corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
         produceFile = { context.preferencesDataStoreFile("user_preferences") },
     )
+
+    @Provides
+    @Singleton
+    @SessionDataStore
+    fun providesSessionDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        // A corrupt session file just means signed out.
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        produceFile = { context.preferencesDataStoreFile("session") },
+    )
+
+    @Provides
+    @Singleton
+    fun providesTokenCipher(): TokenCipher = KeystoreTokenCipher()
 }

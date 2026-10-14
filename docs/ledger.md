@@ -19,3 +19,10 @@
 - Shared public content GC: `content.ref_count` is never decremented (item delete, re-parse, account delete) and no cron collects `content/{id}/` dirs or superseded rows. Needs DO-reported content changes (or a DO scan) before a ref_count==0 rule is safe.
 - Account deletion R2 wipe runs once in `waitUntil`; the weekly parser cron (`src/gc.ts`) is the retry. A Workflow/queue-based wipe would be faster.
 - FTS rewrite of a huge tag rename still runs in one transaction.
+
+## Deploy (2026-10-15)
+- Remote D1 migrations 0000, 0001 applied; secrets BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY set on sroka-api.
+- sroka-api deployed with custom domains sroka.app, api.sroka.app, c.sroka.app; sroka-parser deployed (consumers sroka-parse + DLQ, cron `23 4 * * SUN`).
+- Apex A records (parking) deleted by owner. Production smoke: landing, /app, SPA deep link, /v1/health, /v1/config, CORS preflight OK.
+- OPEN: api.sroka.app / c.sroka.app return NXDOMAIN at the authoritative NS although the Worker custom domains are attached (edge serves them fine via --resolve). Need proxied DNS records (AAAA 100::) or a dashboard re-attach.
+- OPEN: real email OTP sign-in in production not yet exercised; shared-content GC (ref_count decrement) not built.

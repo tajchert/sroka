@@ -7,7 +7,7 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: "Sroka — Save for later",
     description: "Save pages to read later in Sroka",
-    permissions: ["activeTab", "contextMenus", "storage", "scripting"],
+    permissions: ["activeTab", "contextMenus", "storage", "scripting", "alarms", "tabs"],
     host_permissions: [
       "https://api.sroka.app/*",
       ...(mode === "development" ? ["http://localhost:8787/*"] : []),
@@ -15,9 +15,15 @@ export default defineConfig({
     // Custom server URL (options page): requested at runtime via chrome.permissions.request.
     optional_host_permissions: ["https://*/*", "http://localhost/*"],
     commands: {
-      "save-page": {
+      // Opens the popup, which saves immediately.
+      _execute_action: {
         suggested_key: { default: "Alt+Shift+S", mac: "Alt+Shift+S" },
-        description: "Save current page to Sroka",
+        description: "Save current page to Sroka (open popup)",
+      },
+      // Saves in the background without opening the popup.
+      "save-page": {
+        suggested_key: { default: "Alt+Shift+A", mac: "Alt+Shift+A" },
+        description: "Quick-save current page to Sroka",
       },
     },
   }),

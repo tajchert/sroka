@@ -59,6 +59,17 @@ describe("api client", () => {
     expect(init.credentials).toBe("same-origin");
   });
 
+  it("sends the Turnstile token header and maps TURNSTILE_FAILED", async () => {
+    const fn = mockFetch(200, { success: true });
+    await api.sendOtp("a@b.c", "tok123");
+    const [, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["X-Turnstile-Token"]).toBe("tok123");
+    mockFetch(400, { code: "TURNSTILE_FAILED", message: "Verification failed. Please try again." });
+    const err = await api.sendOtp("a@b.c", "bad").catch((e) => e);
+    expect(err.code).toBe("TURNSTILE_FAILED");
+    expect(describeAuthError(err)).toMatch(/verify/);
+  });
+
   it("parses Better Auth error codes", async () => {
     mockFetch(400, { code: "INVALID_OTP", message: "Invalid OTP" });
     const err = await api.verifyOtp("a@b.c", "000000").catch((e) => e);

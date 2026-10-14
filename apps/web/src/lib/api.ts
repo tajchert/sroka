@@ -1,5 +1,6 @@
 /** Typed same-origin API client for /v1 and /api/auth (docs/api.md). */
 import {
+  ConfigResponse,
   ContentUrlsResponse,
   CreateItemResponse,
   ItemResponse,
@@ -36,6 +37,7 @@ interface ReqOpts<T> {
   body?: unknown;
   form?: FormData;
   schema?: Schema<T>;
+  headers?: Record<string, string>;
 }
 
 let onUnauthorized: (() => void) | null = null;
@@ -62,7 +64,7 @@ function parseRetryAfter(res: Response): number | undefined {
 }
 
 async function request<T = void>(path: string, opts: ReqOpts<T> = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", "X-Sroka-Device": "web" };
+  const headers: Record<string, string> = { Accept: "application/json", "X-Sroka-Device": "web", ...opts.headers };
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
   else if (opts.body !== undefined) {
@@ -104,8 +106,13 @@ export interface ItemsQuery {
 
 export const api = {
   // --- auth (Better Auth) ---
-  sendOtp: (email: string) =>
-    request("/api/auth/email-otp/send-verification-otp", { method: "POST", body: { email, type: "sign-in" } }),
+  sendOtp: (email: string, turnstileToken?: string | null) =>
+    request("/api/auth/email-otp/send-verification-otp", {
+      method: "POST",
+      body: { email, type: "sign-in" },
+      headers: turnstileToken ? { "X-Turnstile-Token": turnstileToken } : undefined,
+    }),
+  config: () => request("/v1/config", { schema: ConfigResponse }),
   verifyOtp: (email: string, otp: string) =>
     request("/api/auth/sign-in/email-otp", { method: "POST", body: { email, otp } }),
   signOut: () => request("/api/auth/sign-out", { method: "POST", body: {} }),
@@ -178,6 +185,8 @@ export function describeAuthError(err: unknown): string {
         return "That code has expired. Request a new one.";
       case "TOO_MANY_ATTEMPTS":
         return "Too many wrong codes. Request a new code to continue.";
+      case "TURNSTILE_FAILED":
+        return "We could not verify that you are human. Please try again.";
       case "invalid_request":
       case "INVALID_EMAIL":
         return "Enter a valid email address.";

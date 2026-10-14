@@ -13,7 +13,7 @@ export const corsMiddleware = cors({
     return null;
   },
   allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization", "X-Sroka-Device"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Sroka-Device", "X-Turnstile-Token"],
   exposeHeaders: ["set-auth-token", "Retry-After", "X-Retry-After", "Content-Disposition"],
   credentials: false,
   maxAge: 600,

@@ -24,6 +24,10 @@ export interface Env {
   CONTENT_URL_SIGNING_KEY: string;
   /** Published extension id (adds chrome-extension://<id> to trustedOrigins). */
   EXT_ID?: string;
+  /** Turnstile site key (public var; served via GET /v1/config). */
+  TURNSTILE_SITE_KEY?: string;
+  /** Turnstile secret (wrangler secret). Unset = verification skipped (local dev / self-host). */
+  TURNSTILE_SECRET_KEY?: string;
   REVIEW_EMAIL?: string;
   REVIEW_OTP?: string;
 }

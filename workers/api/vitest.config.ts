@@ -9,6 +9,7 @@ export default defineConfig({
       miniflare: {
         bindings: {
           ENVIRONMENT: "development",
+          TURNSTILE_SITE_KEY: "1x00000000000000000000AA", // site key only; secret unset => verification skipped
           APP_ORIGIN: "http://localhost:8787",
           API_ORIGIN: "http://localhost:8787",
           CONTENT_ORIGIN: "http://127.0.0.1:8787",

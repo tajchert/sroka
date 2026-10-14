@@ -1,6 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { LogoMark } from "../components/Logo.tsx";
+import { Turnstile, type TurnstileHandle } from "../components/Turnstile.tsx";
 import { ApiRequestError, api, describeAuthError } from "../lib/api.ts";
 
 export default function SignIn() {
@@ -12,6 +13,12 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
+  const tsRef = useRef<TurnstileHandle>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const cfg = useQuery({ queryKey: ["config"], queryFn: api.config, staleTime: 5 * 60_000, retry: 1 });
+  const siteKey = cfg.data?.turnstileSiteKey;
+  // Without a site key (self-host/dev) the server does not require a token.
+  const needToken = !!siteKey && !token;
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -31,12 +38,13 @@ export default function SignIn() {
     setBusy(true);
     setError(null);
     try {
-      await api.sendOtp(email.trim());
+      await api.sendOtp(email.trim(), token);
       setStep("code");
       setCode("");
     } catch (e) {
       fail(e);
     } finally {
+      tsRef.current?.reset(); // tokens are single-use
       setBusy(false);
     }
   };
@@ -82,8 +90,8 @@ export default function SignIn() {
               Enter your email and we will send you a 6-digit code. No password needed.
             </label>
             <input id="email" className="input" type="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            <button className="btn btn-primary" disabled={busy || wait > 0 || !email}>
-              {busy ? "Sending" : wait > 0 ? `Wait ${wait}s` : "Email me a code"}
+            <button className="btn btn-primary" disabled={busy || wait > 0 || !email || needToken || cfg.isPending}>
+              {busy ? "Sending" : wait > 0 ? `Wait ${wait}s` : needToken ? "Verifying" : "Email me a code"}
             </button>
           </form>
         ) : (
@@ -120,12 +128,13 @@ export default function SignIn() {
               <button type="button" className="cursor-pointer text-ink2 hover:text-ink hover:underline" onClick={() => { setStep("email"); setError(null); }}>
                 Use a different email
               </button>
-              <button type="button" className="cursor-pointer text-ink2 hover:text-ink hover:underline disabled:opacity-50" disabled={busy || wait > 0} onClick={() => void sendCode()}>
+              <button type="button" className="cursor-pointer text-ink2 hover:text-ink hover:underline disabled:opacity-50" disabled={busy || wait > 0 || needToken} onClick={() => void sendCode()}>
                 {wait > 0 ? `Resend in ${wait}s` : "Send a new code"}
               </button>
             </div>
           </form>
         )}
+        {siteKey && <Turnstile ref={tsRef} siteKey={siteKey} onToken={setToken} />}
         {error && (
           <p role="alert" className="mt-4 text-sm text-[#c2362f]">
             {error}

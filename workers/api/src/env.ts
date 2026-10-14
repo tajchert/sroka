@@ -1,4 +1,5 @@
 import type { ParseJob } from "@sroka/shared";
+import type { ImportParams } from "./import/workflow.ts";
 import type { LibraryDO } from "./library-do.ts";
 
 /** Bindings of sroka-api (keep in sync with wrangler.jsonc). */
@@ -8,6 +9,7 @@ export interface Env {
   CONFIG: KVNamespace;
   LIBRARY: DurableObjectNamespace<LibraryDO>;
   PARSE_QUEUE: Queue<ParseJob>;
+  IMPORT_WORKFLOW: Workflow<ImportParams>;
   EMAIL: SendEmail;
   IMAGES: ImagesBinding;
   ASSETS: Fetcher;

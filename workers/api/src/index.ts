@@ -13,6 +13,7 @@ import { importsRoutes } from "./routes/imports.ts";
 import { exportsRoutes } from "./routes/exports.ts";
 
 export { LibraryDO } from "./library-do.ts";
+export { ImportWorkflow } from "./import/workflow.ts";
 
 const app = new Hono<AppEnv>();
 

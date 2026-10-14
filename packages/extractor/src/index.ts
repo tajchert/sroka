@@ -1,3 +1,9 @@
 // @sroka/extractor — pure extraction pipeline (fetch → Readability → sanitize → images → package).
-// Implemented in the "Extractor + parser worker" step. See packages/extractor/CLAUDE.md.
 export { PARSER_VERSION } from "@sroka/shared";
+export * from "./ssrf.ts";
+export * from "./safe-fetch.ts";
+export * from "./extract.ts";
+export * from "./sanitize.ts";
+export * from "./images.ts";
+export * from "./package.ts";
+export * from "./pipeline.ts";

@@ -39,7 +39,7 @@ import app.sroka.core.designsystem.theme.SrokaTheme
  * Scaffold(
  *     topBar = {
  *         SrokaTopAppBar(
- *             title = "Tasks",
+ *             title = "My List",
  *             onNavigationClick = { navController.popBackStack() },
  *         )
  *     }
@@ -97,7 +97,7 @@ fun SrokaTopAppBar(
 private fun SrokaTopAppBarPreview() {
     SrokaTheme {
         SrokaTopAppBar(
-            title = "Tasks",
+            title = "My List",
         )
     }
 }
@@ -107,7 +107,7 @@ private fun SrokaTopAppBarPreview() {
 private fun SrokaTopAppBarWithBackPreview() {
     SrokaTheme {
         SrokaTopAppBar(
-            title = "Task Details",
+            title = "Article",
             onNavigationClick = {},
         )
     }

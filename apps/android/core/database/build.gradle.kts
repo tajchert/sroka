@@ -1,19 +1,9 @@
 // =============================================================================
 // CORE:DATABASE MODULE
-// =============================================================================
-// Room database implementation for local data persistence.
 //
-// ## Why a Separate Database Module?
-//
-// 1. **Isolation**: Database schema changes are contained here
-// 2. **Testability**: Easy to test DAOs in isolation
-// 3. **Clear Boundaries**: Only this module knows about Room internals
-//
-// ## Key Patterns
-//
-// - **Entities**: Database table representations (NOT domain models)
-// - **DAOs**: Data Access Objects with Flow-based queries
-// - **Mappers**: Extension functions to convert entities to domain models
+// Room 3 database `SrokaDatabase` (DECISIONS A4): items, tags, FTS, pending ops,
+// sync state and downloaded-content bookkeeping. Schemas are exported to
+// `schemas/`; never use destructive migrations.
 // =============================================================================
 
 plugins {
@@ -38,32 +28,46 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric needs real resources; the JDK opens are required
+            // because Robolectric reaches into internals closed since Java 17.
+            isIncludeAndroidResources = true
+            all {
+                it.jvmArgs(
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                )
+            }
+        }
+    }
 }
 
-// Room schema location for migration testing
 room3 {
     schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
-    // Project modules
     implementation(projects.core.model)
+    implementation(projects.core.common)
 
-    // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // Room - using `api` so types are exposed for Hilt processing
     api(libs.bundles.room)
+    api(libs.androidx.paging.common)
     implementation(libs.sqlite.framework)
     ksp(libs.room.compiler)
 
-    // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Testing
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
+    // DAO tests run on the JVM against an in-memory database (Robolectric).
+    testImplementation(libs.bundles.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.room.testing)
+
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)

@@ -13,6 +13,11 @@ Built from the ai-android-template (adopted as `app.sroka`); template guides und
 ## Layout
 `app` (activities, nav, workers wiring) · `feature/{auth,library,reader,settings}/{api,impl}` · `core/{model,common,designsystem,ui,database,datastore,network,data,testing}` — see DECISIONS A2.
 
+## Contracts (foundation)
+- Interfaces: `core/domain/src/main/kotlin/app/sroka/core/domain/*.kt`; models: `core/model/.../core/model/*.kt`; fakes: `core/testing/.../core/testing/fake/Fake*.kt`, builder `testItem()`.
+- Nav keys: `feature/*/api/.../*Keys.kt`; entries `fun EntryProviderScope<NavKey>.<feature>Entries(callbacks…)` in `feature/*/impl/.../navigation/`; wired in `app/.../navigation/SrokaNavHost.kt`.
+- Until integration, `:app` does NOT depend on core:data; it binds `app/src/main/kotlin/app/sroka/di/TemporaryBindings.kt` (delete it when adding core:data).
+
 ## Conventions
 - Local-first: UI reads Room only; user actions write Room + `pending_ops` in one transaction (A7). Network only in SyncEngine/ContentStore.
 - Room: never destructive migrations; bump version + Migration + test; schemas exported to `core/database/schemas`.

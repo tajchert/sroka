@@ -44,7 +44,7 @@ Features depend on `core:domain` + `core:ui` + `core:designsystem` + `core:model
 - `ItemQuery(tab: LibraryTab, tag: String? = null, search: String? = null, sort: SortOrder = NEWEST)`; when `tag != null` the tab filter is ignored except ARCHIVE vs not? → No: tag view shows all live items with that tag (any status).
 - `TagCount(name, count)`.
 - `SyncStatus` (A9). `SessionState {SignedOut, SignedIn(email), Expired(email)}` (Expired = server returned 401; local data kept, banner asks to sign in again).
-- `newUuidV7(clock)`; `UrlNormalizer.normalize(url): String?` (null = invalid) and `extractFirstUrl(text): String?` (share text "Title https://…").
+- `newUuidV7(nowMillis = System.currentTimeMillis())` (callers pass `Clock.now()` from core:common); `UrlNormalizer.normalize(url): String?` (null = invalid) and `extractFirstUrl(text): String?` (share text "Title https://…").
 
 ## A4 Database (`core:database`, Room 3, file `sroka.db`, version 1, `exportSchema = true` → `core/database/schemas/`)
 Never destructive migrations. Every future change = new version + `Migration` + migration test. Tables:

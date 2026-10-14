@@ -73,8 +73,3 @@ internal val GrayVariant50 = Color(0xFF72777F)
 internal val GrayVariant60 = Color(0xFF8C9198)
 internal val GrayVariant80 = Color(0xFFC2C7CF)
 internal val GrayVariant90 = Color(0xFFDEE3EB)
-
-// Priority colors for tasks
-val PriorityHigh = Color(0xFFE53935)
-val PriorityMedium = Color(0xFFFFA726)
-val PriorityLow = Color(0xFF66BB6A)

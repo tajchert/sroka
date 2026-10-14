@@ -65,8 +65,7 @@ plugins {
 // =============================================================================
 
 dependencies {
-    // `:core:testing` holds fakes, and `:samples:tasks-app` is a development
-    // tool. Measuring either would report on test scaffolding.
+    // `:core:testing` holds fakes; measuring it would report on test scaffolding.
     kover(projects.app)
     kover(projects.core.common)
     kover(projects.core.data)
@@ -77,8 +76,14 @@ dependencies {
     kover(projects.core.model)
     kover(projects.core.network)
     kover(projects.core.ui)
-    kover(projects.feature.tasks.api)
-    kover(projects.feature.tasks.impl)
+    kover(projects.feature.auth.api)
+    kover(projects.feature.auth.impl)
+    kover(projects.feature.library.api)
+    kover(projects.feature.library.impl)
+    kover(projects.feature.reader.api)
+    kover(projects.feature.reader.impl)
+    kover(projects.feature.settings.api)
+    kover(projects.feature.settings.impl)
 }
 
 kover {
@@ -108,6 +113,14 @@ kover {
                 )
             }
         }
+    }
+}
+
+// Modules start empty while their owners build them out (see docs/LEDGER.md);
+// a test task without tests is not an error.
+subprojects {
+    tasks.withType<Test>().configureEach {
+        failOnNoDiscoveredTests.set(false)
     }
 }
 

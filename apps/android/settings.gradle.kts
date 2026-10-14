@@ -71,14 +71,21 @@ include(":core:testing")
 // Feature modules - user-facing features with API/impl split
 // -----------------------------------------------------------------------------
 
-// Tasks feature - public navigation routes
-include(":feature:tasks:api")
+// Sign-in (email + one-time code)
+include(":feature:auth:api")
+include(":feature:auth:impl")
 
-// Tasks feature - screens, ViewModels, implementation
-include(":feature:tasks:impl")
+// My List / Archive / Favorites / Tags
+include(":feature:library:api")
+include(":feature:library:impl")
 
-// Runnable feature host used for fast, isolated Tasks development
-include(":samples:tasks-app")
+// Offline article reader
+include(":feature:reader:api")
+include(":feature:reader:impl")
+
+// Downloads, storage, appearance, account
+include(":feature:settings:api")
+include(":feature:settings:impl")
 
 // =============================================================================
 // Type-safe project accessors (e.g., projects.core.model)

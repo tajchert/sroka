@@ -1,71 +1,51 @@
 package app.sroka.core.testing
 
-import app.sroka.core.model.Task
-import app.sroka.core.model.TaskPriority
-import kotlin.time.Clock
-import kotlin.time.Instant
-import java.util.UUID
+import app.sroka.core.model.Item
+import app.sroka.core.model.ItemStatus
+import app.sroka.core.model.OfflineState
+import app.sroka.core.model.ParseStatus
 
-/**
- * Test data builders for unit tests.
- *
- * ## Why Test Data Builders?
- *
- * Builders help create test data by:
- * 1. Providing sensible defaults
- * 2. Allowing customization of specific fields
- * 3. Reducing boilerplate in tests
- *
- * ## Usage
- *
- * ```kotlin
- * // Use defaults
- * val task = testTask()
- *
- * // Customize specific fields
- * val completedTask = testTask(isCompleted = true)
- * val highPriorityTask = testTask(priority = TaskPriority.HIGH)
- * ```
- */
-
-/**
- * Creates a test Task with sensible defaults.
- *
- * All parameters are optional - override only what you need.
- */
-fun testTask(
-    id: String = UUID.randomUUID().toString(),
-    title: String = "Test Task",
-    description: String = "Test task description",
-    isCompleted: Boolean = false,
-    createdAt: Instant = Clock.System.now(),
-    priority: TaskPriority = TaskPriority.MEDIUM,
-): Task = Task(
+/** Builds an [Item] with sensible defaults; override only what a test cares about. */
+fun testItem(
+    id: String = "0192f3c4-0000-7000-8000-000000000001",
+    url: String = "https://example.com/$id",
+    title: String? = "Article $id",
+    excerpt: String? = "Excerpt of $id",
+    status: ItemStatus = ItemStatus.UNREAD,
+    isFavorite: Boolean = false,
+    progress: Float = 0f,
+    tags: List<String> = emptyList(),
+    savedAt: Long = 1_760_400_000_000L,
+    wordCount: Int? = 1000,
+    readingMinutes: Int? = 5,
+    contentId: String? = "c-$id",
+    parseStatus: ParseStatus = ParseStatus.OK,
+    offline: OfflineState = OfflineState.DOWNLOADED,
+): Item = Item(
     id = id,
+    url = url,
+    canonicalUrl = url,
     title = title,
-    description = description,
-    isCompleted = isCompleted,
-    createdAt = createdAt,
-    priority = priority,
+    excerpt = excerpt,
+    siteName = "Example",
+    author = null,
+    lang = "en",
+    leadImageKey = null,
+    wordCount = wordCount,
+    readingMinutes = readingMinutes,
+    contentId = contentId,
+    contentPrivate = false,
+    parseStatus = parseStatus,
+    parseError = null,
+    status = status,
+    isFavorite = isFavorite,
+    progress = progress,
+    progressAnchor = null,
+    savedAt = savedAt,
+    archivedAt = if (status == ItemStatus.ARCHIVED) savedAt else null,
+    lastReadAt = null,
+    source = "share",
+    tags = tags,
+    offline = offline,
+    thumbnailPath = null,
 )
-
-/**
- * Creates a list of test tasks with varying properties.
- *
- * Useful when testing list displays or filtering.
- */
-fun testTaskList(
-    count: Int = 5,
-    completed: Int = 2,
-): List<Task> {
-    val priorities = TaskPriority.entries
-    return (0 until count).map { index ->
-        testTask(
-            id = "task-$index",
-            title = "Task ${index + 1}",
-            description = "Description for task ${index + 1}",
-            isCompleted = index < completed,
-            priority = priorities[index % priorities.size],
-        )
-    }
-}

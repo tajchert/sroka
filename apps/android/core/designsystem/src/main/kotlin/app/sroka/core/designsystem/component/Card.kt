@@ -27,10 +27,10 @@ import app.sroka.core.designsystem.theme.SrokaTheme
  *
  * ```kotlin
  * SrokaCard(
- *     onClick = { navigateToDetail(task.id) },
+ *     onClick = { navigateToDetail(item.id) },
  * ) {
- *     Text(task.title)
- *     Text(task.description)
+ *     Text(item.title)
+ *     Text(item.excerpt)
  * }
  * ```
  *

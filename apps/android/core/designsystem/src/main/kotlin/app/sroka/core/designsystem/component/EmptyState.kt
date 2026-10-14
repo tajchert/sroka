@@ -29,7 +29,7 @@ import app.sroka.core.designsystem.theme.SrokaTheme
  * ## When to Use
  *
  * Show this component when:
- * - A list is empty (no tasks, no search results)
+ * - A list is empty (no articles, no search results)
  * - Content hasn't been created yet
  * - A filter returns no results
  *
@@ -42,13 +42,13 @@ import app.sroka.core.designsystem.theme.SrokaTheme
  * ## Usage
  *
  * ```kotlin
- * if (tasks.isEmpty()) {
+ * if (items.isEmpty()) {
  *     SrokaEmptyState(
  *         icon = Icons.Outlined.CheckCircle,
- *         title = "No tasks yet",
- *         description = "Create your first task to get started",
- *         actionLabel = "Create Task",
- *         onAction = { navigateToCreateTask() },
+ *         title = "Nothing saved yet",
+ *         description = "Share any link to Sroka to save it",
+ *         actionLabel = "Add link",
+ *         onAction = { openAddDialog() },
  *     )
  * }
  * ```
@@ -171,9 +171,9 @@ private fun SrokaEmptyStatePreview() {
     SrokaTheme {
         SrokaEmptyState(
             icon = Icons.Outlined.Inbox,
-            title = "No tasks yet",
-            description = "Create your first task to get started",
-            actionLabel = "Create Task",
+            title = "Nothing saved yet",
+            description = "Share any link to Sroka to save it",
+            actionLabel = "Add link",
             onAction = {},
         )
     }
@@ -195,7 +195,7 @@ private fun SrokaEmptyStateMinimalPreview() {
 private fun SrokaErrorStatePreview() {
     SrokaTheme {
         SrokaErrorState(
-            message = "Unable to load tasks. Please check your connection.",
+            message = "Unable to load articles. Please check your connection.",
             onRetry = {},
         )
     }

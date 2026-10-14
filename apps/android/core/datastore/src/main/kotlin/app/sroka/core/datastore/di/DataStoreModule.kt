@@ -15,43 +15,20 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt module providing DataStore instances.
- *
- * ## Singleton Scope
- *
- * DataStore must be a singleton because:
- * 1. Multiple instances can corrupt the file
- * 2. DataStore handles concurrent access internally
- * 3. Creating DataStore is relatively expensive
- *
- * ## File Location
- *
- * The preferences file is stored at:
- * `/data/data/<package>/files/datastore/user_preferences.preferences_pb`
+ * Hilt module providing the user preferences DataStore
+ * (`files/datastore/user_preferences.preferences_pb`). DataStore must be a singleton per file.
+ * The encrypted session store (DECISIONS A6) uses a separate file and qualifier.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 internal object DataStoreModule {
 
-    /**
-     * Provides the user preferences DataStore.
-     *
-     * ## Why PreferenceDataStoreFactory?
-     *
-     * We use the factory directly instead of the `preferencesDataStore` delegate
-     * because Hilt modules can't use property delegates easily.
-     * This gives us the same functionality with more control.
-     */
     @Provides
     @Singleton
     fun providesUserPreferencesDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
-        corruptionHandler = ReplaceFileCorruptionHandler {
-            // Recover from malformed preference bytes instead of blocking app
-            // startup forever. User-configurable defaults are safe here.
-            emptyPreferences()
-        },
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
         produceFile = { context.preferencesDataStoreFile("user_preferences") },
     )
 }

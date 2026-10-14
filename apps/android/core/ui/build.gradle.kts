@@ -1,17 +1,8 @@
 // =============================================================================
 // CORE:UI MODULE
-// =============================================================================
-// Shared UI components that are specific to this app's domain.
 //
-// ## vs core:designsystem
-//
-// - **core:designsystem**: Generic Material 3 components (Button, Card, etc.)
-// - **core:ui**: App-specific components (TaskCard, PriorityBadge, etc.)
-//
-// Components in this module:
-// - Know about domain models (Task, TaskPriority)
-// - Are reused across multiple features
-// - Build on top of designsystem components
+// Shared Sroka UI pieces built on the design system: ItemRow, ItemThumbnail,
+// OfflineBadge, TagChips, EmptyState and common strings (DECISIONS A2).
 // =============================================================================
 
 plugins {
@@ -39,26 +30,24 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    // alpha16 removed the standalone threshold DSL; use exact image comparisons.
 }
 
 dependencies {
-    // Project modules
     implementation(projects.core.model)
-    implementation(projects.core.designsystem)
+    api(projects.core.designsystem)
 
-    // Compose BOM
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     implementation(libs.bundles.compose)
     implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
+    implementation(libs.coil.compose)
 
-    // Testing
     testImplementation(libs.junit)
-    androidTestImplementation(composeBom)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
     screenshotTestImplementation(libs.screenshot.validation.api)
     screenshotTestImplementation(libs.androidx.compose.ui.tooling)
 }

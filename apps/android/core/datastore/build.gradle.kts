@@ -1,20 +1,8 @@
 // =============================================================================
 // CORE:DATASTORE MODULE
-// =============================================================================
-// User preferences storage using Jetpack DataStore.
 //
-// ## DataStore vs SharedPreferences
-//
-// We use DataStore instead of SharedPreferences because:
-// 1. Async API - doesn't block the main thread
-// 2. Type safety - typed keys prevent runtime errors
-// 3. Flow-based - reactive updates to preference changes
-// 4. Consistent - no partial updates or race conditions
-//
-// ## Implementation Choice
-//
-// We use Preferences DataStore (key-value) for simplicity.
-// For more complex typed data, consider Proto DataStore.
+// Preferences DataStore for UserPreferences, the encrypted SessionStore and
+// the install's deviceId (DECISIONS A6).
 // =============================================================================
 
 plugins {
@@ -37,23 +25,34 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric needs real resources; the JDK opens are required
+            // because Robolectric reaches into internals closed since Java 17.
+            isIncludeAndroidResources = true
+            all {
+                it.jvmArgs(
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                )
+            }
+        }
+    }
 }
 
 dependencies {
-    // Project modules
     implementation(projects.core.model)
+    implementation(projects.core.common)
 
-    // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // DataStore - using `api` so types are exposed for Hilt processing
     api(libs.datastore.preferences)
-
-    // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Testing
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.bundles.testing)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
 }

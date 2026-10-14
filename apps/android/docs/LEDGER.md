@@ -3,7 +3,7 @@
 | Step | Status | Notes |
 |---|---|---|
 | Template copied + adopted (`app.sroka`), baseline build green | done | |
-| Foundation (strip Tasks, modules, deps, models, interfaces, fakes, nav skeleton) | todo | |
+| Foundation (strip Tasks, modules, deps, models, interfaces, fakes, nav skeleton) | done | COMMIT_HASH; app uses `app/.../di/TemporaryBindings.kt` until integration |
 | core:database | todo | |
 | core:network + core:datastore | todo | |
 | core:data (sync, content, workers) | todo | |

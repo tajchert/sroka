@@ -13,10 +13,10 @@
 // ## Dependency Approach
 //
 // This module depends on:
-// - All feature:*:impl modules (to access navigation graphs)
+// - All feature:*:impl modules (to access navigation entries)
 // - core:designsystem (for theme)
-// - core:data (for theme preferences)
-// - core:model (for preference models)
+// - core:data (implementations of core:domain interfaces, workers)
+// - core:model / core:domain (preferences, session state)
 //
 // Features are composed here via their navigation contributions.
 // =============================================================================
@@ -45,6 +45,8 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        // Server used until the user overrides it in Settings (DECISIONS A5).
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://api.sroka.app\"")
     }
 
     buildTypes {
@@ -68,6 +70,8 @@ android {
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            // Local wrangler dev server via `adb reverse tcp:8787 tcp:8787`.
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://localhost:8787\"")
         }
     }
 
@@ -113,16 +117,19 @@ dependencies {
     baselineProfile(projects.benchmark)
     implementation(libs.androidx.profileinstaller)
     // Project modules
-    implementation(projects.feature.tasks.api)
-    implementation(projects.feature.tasks.impl)
+    implementation(projects.feature.auth.impl)
+    implementation(projects.feature.library.impl)
+    implementation(projects.feature.reader.impl)
+    implementation(projects.feature.settings.impl)
     implementation(projects.core.designsystem)
-    implementation(projects.core.data)
     implementation(projects.core.model)
     implementation(projects.core.common)
-    implementation(projects.core.network)
-    implementation(projects.core.database)
-    implementation(projects.core.datastore)
     implementation(projects.core.domain)
+    // TODO(integration): add core:data (+ database/network/datastore come with it) and delete
+    // di/TemporaryBindings.kt. Kept out while core:data is built in parallel so its @Binds
+    // cannot clash with the temporary bindings.
+    // implementation(projects.core.data)
+    implementation(projects.core.ui)
 
     // Android Core
     implementation(libs.androidx.core.ktx)
@@ -133,6 +140,8 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     implementation(libs.bundles.compose)
+    implementation(libs.androidx.compose.material3.navigation.suite)
+    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
 
     // Lifecycle
@@ -149,11 +158,19 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
+    // Background sync/downloads (WorkManager with Hilt-injected workers)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.webkit)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(projects.core.testing)
 
     // Navigation and deep link tests drive the real Activity locally through
     // Robolectric, with Hilt supplying the real object graph.

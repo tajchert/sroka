@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_library_my_list">My List</string>
+    <string name="feature_library_archive">Archive</string>
+    <string name="feature_library_favorites">Favorites</string>
+    <string name="feature_library_tags">Tags</string>
+</resources>

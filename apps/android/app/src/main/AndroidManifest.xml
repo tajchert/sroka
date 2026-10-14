@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".SrokaApplication"
@@ -14,13 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Sroka">
-        <!--
-            launchMode="singleTop" keeps a single task instance, so a deep link
-            that arrives while the app is already running is delivered to
-            onNewIntent instead of stacking another copy of MainActivity.
-            MainActivity therefore validates incoming links in BOTH onCreate and
-            onNewIntent - a warm-start link is exactly as untrusted as a cold one.
-        -->
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -31,41 +27,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <!--
-                Verified Android App Link. autoVerify="true" makes Android check
-                https://sroka.app/.well-known/assetlinks.json for this app's
-                signing certificate; only then does the system open these links
-                directly instead of showing a chooser. Replace the host and
-                publish assetlinks.json before relying on this.
-            -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="sroka.app"
-                    android:pathPrefix="/tasks"
-                    android:scheme="https" />
-            </intent-filter>
-
-            <!--
-                Custom scheme, kept in a SEPARATE intent-filter on purpose.
-                Attributes inside one <data> set combine as a cross product, so
-                merging these two filters would also match sroka://sroka.app
-                and https://tasks - links this app never intended to claim.
-                A custom scheme cannot be verified and any other installed app may
-                register the same one, so treat it as the lower-trust path.
-            -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="tasks"
-                    android:scheme="sroka" />
-            </intent-filter>
         </activity>
+
+        <!--
+            WorkManager is initialised on demand through SrokaApplication
+            (Configuration.Provider + HiltWorkerFactory), so the default
+            startup initializer is removed. Other androidx.startup
+            initializers (e.g. ProcessLifecycleOwner) are kept.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>

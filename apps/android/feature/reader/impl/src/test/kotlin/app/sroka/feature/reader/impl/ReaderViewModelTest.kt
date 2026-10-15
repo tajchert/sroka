@@ -209,6 +209,17 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun inFlightDownloadElsewhereIsJoinedNotAwaitedForever() = runTest(dispatcher) {
+        seed(offline = OfflineState.DOWNLOADING)
+        content.offline.value = mapOf(id to OfflineState.DOWNLOADING)
+        content.nextDownloadResult = DownloadResult.Downloaded
+        content.downloadHook = { content.html.value = mapOf(id to "<p>x</p>") }
+        val vm = vm().also { it.collect(backgroundScope) }
+        assertEquals(1, content.downloadRequests.size)
+        assertTrue(vm.uiState.value is ReaderUiState.Ready)
+    }
+
+    @Test
     fun clearingTheViewModelFlushesLastPosition() = runTest(dispatcher) {
         seed()
         content.html.value = mapOf(id to "<p>x</p>")

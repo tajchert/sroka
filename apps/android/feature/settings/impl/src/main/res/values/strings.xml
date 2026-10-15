@@ -53,6 +53,8 @@
     <string name="feature_settings_server_label">Server URL</string>
     <string name="feature_settings_server_invalid">Enter a valid http:// or https:// address.</string>
     <string name="feature_settings_server_saved">Server saved</string>
+    <string name="feature_settings_server_switch_warning">Changing the server signs you out and removes all local data from this device. Unsynced changes are lost.</string>
+    <string name="feature_settings_server_switch">Sign out and switch</string>
 
     <string name="feature_settings_section_about">About</string>
     <string name="feature_settings_version">Version</string>

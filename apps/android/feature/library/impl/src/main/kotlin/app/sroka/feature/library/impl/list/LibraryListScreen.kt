@@ -150,6 +150,7 @@ fun LibraryListRoute(
                         SyncErrorKind.NETWORK -> R.string.feature_library_fetch_failed_network
                         SyncErrorKind.SERVER -> R.string.feature_library_fetch_failed_server
                         SyncErrorKind.AUTH -> R.string.feature_library_fetch_failed_auth
+                        SyncErrorKind.STORAGE -> R.string.feature_library_fetch_failed_storage
                     },
                 )
             }

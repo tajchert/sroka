@@ -142,8 +142,8 @@ class ReaderViewModel @AssistedInject constructor(
                     ReaderUiState.ParsePending
                 },
             )
-            // Already in flight; the offline flow moves us on when it finishes.
-            key.offline == OfflineState.DOWNLOADING -> emit(ReaderUiState.Downloading)
+            // Also when DOWNLOADING elsewhere: downloads of one item are serialized, so this waits
+            // for the in-flight one (then confirms it) and recovers if that one never finishes.
             else -> emitAll(download(key, attempt))
         }
     }

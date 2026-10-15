@@ -62,6 +62,16 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun changingServerWarnsAboutSignOut() {
+        show()
+        tap("Server")
+        compose.onNodeWithText("Changing the server signs you out", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Server URL").performTextInput("x")
+        compose.onNodeWithText("Changing the server signs you out", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Sign out and switch").assertIsDisplayed()
+    }
+
+    @Test
     fun deleteAccountRequiresTypedWord() {
         show()
         tap("Delete account")

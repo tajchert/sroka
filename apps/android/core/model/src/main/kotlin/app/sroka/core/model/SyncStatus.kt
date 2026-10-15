@@ -32,4 +32,7 @@ enum class SyncErrorKind {
     AUTH,
     NETWORK,
     SERVER,
+
+    /** Not enough free device storage for article packages. */
+    STORAGE,
 }

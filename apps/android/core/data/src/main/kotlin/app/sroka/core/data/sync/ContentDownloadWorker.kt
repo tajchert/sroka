@@ -110,7 +110,7 @@ class ContentDownloadWorker @AssistedInject constructor(
                 }
             }.awaitAll()
         }
-        return finish(downloaded, if (storageFull) SyncErrorKind.SERVER else failure)
+        return finish(downloaded, if (storageFull) SyncErrorKind.STORAGE else failure)
     }
 
     private fun finish(downloaded: Int, failure: SyncErrorKind?): Result {

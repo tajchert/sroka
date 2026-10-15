@@ -202,6 +202,22 @@ internal class ContentStoreTest : DataTestBase() {
         assertEquals(ContentState.DOWNLOADING, contentFileDao.get("a")!!.state)
     }
 
+    @Test fun missingFilesAreReconciledAtStartup() = runBlocking {
+        itemDao.upsertItem(entity("a"))
+        itemDao.upsertItem(entity("b"))
+        // a: DOWNLOADED but its package directory is gone
+        contentFileDao.upsert(ContentFileEntity("a", "c-a", ContentState.DOWNLOADED, thumbPath = paths.thumb("a").path))
+        // b: package present, thumbnail file gone
+        File(paths.articleDir("b"), "article.html").apply { parentFile!!.mkdirs(); writeText("<p>b</p>") }
+        contentFileDao.upsert(ContentFileEntity("b", "c-b", ContentState.DOWNLOADED, thumbPath = paths.thumb("b").path, thumbAttempts = 2))
+        contentStore.recoverInterrupted()
+        assertNull(contentFileDao.get("a"))
+        val b = contentFileDao.get("b")!!
+        assertEquals(ContentState.DOWNLOADED, b.state)
+        assertNull(b.thumbPath)
+        assertEquals(0, b.thumbAttempts)
+    }
+
     @Test fun diskFullIsStorageNotNetworkAndNotAnAttempt() = runBlocking {
         itemDao.upsertItem(entity("a"))
         val store = storeWith(StubApi(onDownload = { _, _ -> ApiResult.NetworkError(java.io.IOException("write failed: ENOSPC (No space left on device)")) }))

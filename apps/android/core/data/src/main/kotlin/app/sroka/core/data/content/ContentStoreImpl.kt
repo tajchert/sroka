@@ -1,5 +1,6 @@
 package app.sroka.core.data.content
 
+import android.util.Log
 import app.sroka.core.common.Clock
 import app.sroka.core.common.di.Dispatcher
 import app.sroka.core.common.di.SrokaDispatchers
@@ -131,17 +132,42 @@ class ContentStoreImpl @Inject internal constructor(
 
     /**
      * Once per process, before any download: rows left in DOWNLOADING by a process that died (or a
-     * worker that was killed) go back to QUEUED. Never run while a download of this process is in
-     * flight, so concurrent workers cannot reset each other's rows.
+     * worker that was killed) go back to QUEUED, and rows whose files vanished (restored backup,
+     * cleared storage) are reconciled. Never run while a download of this process is in flight, so
+     * concurrent workers cannot reset each other's rows.
      */
     internal suspend fun recoverInterrupted() {
         if (recovered) return
         recoverMutex.withLock {
             if (!recovered) {
                 contentFileDao.resetDownloading()
+                reconcileFiles()
                 recovered = true
             }
         }
+    }
+
+    /**
+     * A DOWNLOADED row without its article file is dropped (the item shows as remote and becomes
+     * eligible again); a thumb path to a missing file is cleared so the thumbnail is re-fetched.
+     */
+    private suspend fun reconcileFiles() {
+        val rows = contentFileDao.all().filter { it.state == ContentState.DOWNLOADED || it.thumbPath != null }
+        val (missing, staleThumbs) = withContext(io) {
+            val missing = rows.filter {
+                it.state == ContentState.DOWNLOADED &&
+                    (!ContentPaths.isSafeId(it.itemId) || !File(paths.articleDir(it.itemId), PackageInstaller.ARTICLE).isFile)
+            }
+            val missingIds = missing.mapTo(HashSet()) { it.itemId }
+            missing to rows.filter { it.itemId !in missingIds && it.thumbPath != null && it.thumbPath.let { path -> !File(path).isFile } }
+        }
+        if (missing.isEmpty() && staleThumbs.isEmpty()) return
+        Log.w(TAG, "reconcile: ${missing.size} packages and ${staleThumbs.size} thumbnails missing on disk")
+        db.tx {
+            contentFileDao.delete(missing.map { it.itemId })
+            staleThumbs.forEach { contentFileDao.upsert(it.copy(thumbPath = null, thumbAttempts = 0)) }
+        }
+        withContext(io) { missing.filter { ContentPaths.isSafeId(it.itemId) }.forEach { paths.deleteItemFiles(it.itemId) } }
     }
 
     /** Downloads (or confirms) the current package of [itemId]. Safe to call concurrently. */
@@ -426,5 +452,6 @@ class ContentStoreImpl @Inject internal constructor(
         private const val EVICT_BATCH = 500
         private const val MAX_THUMB_BYTES = 5L * 1024 * 1024
         const val THUMB_MAX_ATTEMPTS = 3
+        private const val TAG = "SrokaContent"
     }
 }

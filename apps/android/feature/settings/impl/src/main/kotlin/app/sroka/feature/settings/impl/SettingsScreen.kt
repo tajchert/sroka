@@ -361,6 +361,8 @@ private fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 private fun ServerDialog(initial: String, invalid: Boolean, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var value by rememberSaveable { mutableStateOf(initial) }
+    // Settings is only reachable signed in, and switching servers signs out and wipes local data.
+    val switching = value.isNotBlank() && value.trim().trimEnd('/') != initial.trimEnd('/')
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.feature_settings_server)) },
@@ -377,9 +379,23 @@ private fun ServerDialog(initial: String, invalid: Boolean, onSave: (String) -> 
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { onSave(value) }),
                 )
+                if (switching) {
+                    Text(
+                        stringResource(R.string.feature_settings_server_switch_warning),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(value) }) { Text(stringResource(R.string.feature_settings_save)) } },
+        confirmButton = {
+            TextButton(onClick = { onSave(value) }) {
+                Text(
+                    stringResource(
+                        if (switching) R.string.feature_settings_server_switch else R.string.feature_settings_save,
+                    ),
+                )
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.feature_settings_cancel)) } },
     )
 }

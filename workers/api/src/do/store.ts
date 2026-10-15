@@ -826,9 +826,9 @@ export class LibraryStore {
 
   // ---------- sync pull ----------
 
-  pull(cursor: number, limit: number): PullPage {
+  pull(cursor: number, limit: number, full = false): PullPage {
     const horizon = this.getMeta("tombstone_horizon");
-    if (cursor > 0 && cursor < horizon) return { error: "resync_required" };
+    if (!full && cursor > 0 && cursor < horizon) return { error: "resync_required" };
     type K = { kind: string; id: string; seq: number };
     let rows = this.all<K>(
       `SELECT kind, id, seq FROM (

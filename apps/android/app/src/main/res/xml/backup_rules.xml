@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower. DECISIONS A6: never back up the session token. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="datastore/session.preferences_pb" />
+    <exclude domain="file" path="articles/" />
+    <exclude domain="file" path="thumbs/" />
+</full-backup-content>

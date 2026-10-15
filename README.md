@@ -3,7 +3,7 @@
 Read-later app (a Pocket successor) on Cloudflare Workers: web app, Chrome extension, sync API for future mobile apps.
 
 - Design: `docs/sroka-system-design.md` · Binding decisions: `docs/decisions.md` · HTTP/sync contract: `docs/api.md`
-- Monorepo (npm workspaces): `packages/shared`, `packages/extractor`, `workers/api`, `workers/parser`, `apps/web`, `apps/extension`
+- Monorepo (npm workspaces): `packages/shared`, `packages/extractor`, `workers/api`, `workers/parser`, `apps/web`, `apps/extension`; plus `apps/android` (native Android app, own Gradle build — see [`apps/android/README.md`](apps/android/README.md))
 
 ```sh
 nvm use            # Node 26

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_reader_title">Reader</string>
+    <string name="feature_reader_back">Back</string>
+    <string name="feature_reader_favorite">Add to favorites</string>
+    <string name="feature_reader_unfavorite">Remove from favorites</string>
+    <string name="feature_reader_archive">Archive</string>
+    <string name="feature_reader_unarchive">Move to My List</string>
+    <string name="feature_reader_share">Share link</string>
+    <string name="feature_reader_more">More options</string>
+    <string name="feature_reader_open_original">Open original</string>
+    <string name="feature_reader_edit_tags">Edit tags</string>
+    <string name="feature_reader_refresh">Refresh article</string>
+    <string name="feature_reader_appearance">Text size and theme</string>
+    <string name="feature_reader_delete">Delete</string>
+    <string name="feature_reader_delete_title">Delete this article?</string>
+    <string name="feature_reader_delete_message">It is removed from your library and from this device.</string>
+    <string name="feature_reader_cancel">Cancel</string>
+    <string name="feature_reader_save">Save</string>
+    <string name="feature_reader_add_tag">Add tag</string>
+    <string name="feature_reader_remove_tag">Remove tag %1$s</string>
+    <string name="feature_reader_recent_tags">Recent tags</string>
+    <string name="feature_reader_theme">Theme</string>
+    <string name="feature_reader_theme_auto">Auto</string>
+    <string name="feature_reader_theme_light">Light</string>
+    <string name="feature_reader_theme_sepia">Sepia</string>
+    <string name="feature_reader_theme_dark">Dark</string>
+    <string name="feature_reader_text_size">Text size</string>
+    <string name="feature_reader_downloading">Downloading article…</string>
+    <string name="feature_reader_not_downloaded_offline_title">Not saved for offline reading</string>
+    <string name="feature_reader_not_downloaded_offline">Connect to the internet to download this article, or open the original.</string>
+    <string name="feature_reader_not_downloaded_signin">Sign in again to download this article.</string>
+    <string name="feature_reader_not_downloaded_error">The article could not be downloaded.</string>
+    <string name="feature_reader_renderer_gone">This article could not be displayed. Open the original instead.</string>
+    <string name="feature_reader_try_again">Try again</string>
+    <string name="feature_reader_pending_title">Still being prepared</string>
+    <string name="feature_reader_pending_message">The article is being processed. It will be available after your next fetch.</string>
+    <string name="feature_reader_failed_title">Could not read this page</string>
+    <string name="feature_reader_failed_message">The page could not be turned into a readable article.</string>
+    <string name="feature_reader_failed_reason">Reason: %1$s</string>
+</resources>

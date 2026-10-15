@@ -41,7 +41,7 @@ Dev-only var `DEV_ORIGINS` (comma-separated; `.dev.vars`: `http://localhost:5173
 | `GET /api/auth/get-session` | — | `{session, user}` or `null` |
 | `POST /api/auth/sign-out` | `{}` | `200` |
 
-**Turnstile (web only).** When `TURNSTILE_SECRET_KEY` is set, `send-verification-otp` requests from the web app (`Origin` = `APP_ORIGIN`/`DEV_ORIGINS`, or no `Origin` and host = the `APP_ORIGIN` host) must carry header **`X-Turnstile-Token: <widget token>`**; the server verifies it via Turnstile siteverify (success + hostname). Failure/missing → `400 {"code":"TURNSTILE_FAILED","message":"Verification failed. Please try again."}` (checked before the per-email throttle, so it consumes no budget). Tokens are single-use. **Exempt (tradeoff):** requests with any other `Origin` (extension `chrome-extension://…`) or without an `Origin` on `api.sroka.app` (native apps, curl) skip Turnstile, because those clients cannot run the widget; they are bounded only by the per-IP and per-email limits (§14). Unset secret (local dev/self-host) = no check. The site key comes from `GET /v1/config` (`turnstileSiteKey`, §12).
+**Turnstile (web only).** When `TURNSTILE_SECRET_KEY` is set, `send-verification-otp` requests from the web app (`Origin` = `APP_ORIGIN`/`DEV_ORIGINS`, or no `Origin` and host = the `APP_ORIGIN` host) must carry header **`X-Turnstile-Token: <widget token>`**; the server verifies it via Turnstile siteverify (success + hostname). Failure/missing → `400 {"code":"TURNSTILE_FAILED","message":"Verification failed. Please try again."}` (checked before the per-email throttle, so it consumes no budget). Tokens are single-use. **Exempt (tradeoff):** requests with any other `Origin` (extension `chrome-extension://…`) or without an `Origin` on `api.sroka.app` (native apps, curl) skip Turnstile, because those clients cannot run the widget; they are bounded only by the per-IP and per-email limits (§14). With `ENVIRONMENT=development` a request without `Origin` is always exempt (locally app and API share `localhost:8787`, so native debug clients would otherwise be blocked). Unset secret (local dev/self-host) = no check. The site key comes from `GET /v1/config` (`turnstileSiteKey`, §12).
 
 Better Auth errors are **not** `ApiError`: body `{"code": "<CODE>", "message": "<text>"}`. Sign-in codes: `INVALID_OTP` (400, wrong/unknown code), `OTP_EXPIRED` (400), `TOO_MANY_ATTEMPTS` (403, code invalidated after 5 wrong tries → request a new one). Rate limiter on `/api/auth/*`: `429` with body `{"message":"Too many requests. Please try again later."}` (no `code`) and header **`X-Retry-After: <seconds>`** (not `Retry-After`).
 `trustedOrigins` (cookie/origin check): `[APP_ORIGIN, API_ORIGIN, "chrome-extension://<EXT_ID>", ...DEV_ORIGINS]`.
@@ -242,7 +242,7 @@ Processing rules:
 7. `cursor` = `meta.seq` after the push. Clients should still pull from their previous cursor to receive the canonical rows they changed.
 
 ### 7.2 `GET /v1/sync/pull?cursor=&limit=`
-Query `PullQuery`: `cursor` (int ≥0, default 0), `limit` (1–1000, default 500).
+Query `PullQuery`: `cursor` (int ≥0, default 0), `limit` (1–1000, default 500), `full` (optional boolean, `1`/`true`).
 Response `200 PullResponse`:
 ```json
 {"cursor":18423,"hasMore":false,
@@ -254,6 +254,7 @@ Response `200 PullResponse`:
 - `cursor` in the response = seq of the last returned row if `hasMore`, else the current `meta.seq`. Repeat until `hasMore:false`. First sync: `cursor=0`.
 - Required DO test: rename a tag carried by more than `limit` items, pull with small `limit` from before the rename, and assert every item arrives exactly once.
 - `410 {"error":"resync_required"}` if `0 < cursor < meta.tombstone_horizon` (the highest seq of any purged tombstone). The client then merges pending ops, pushes them, and pulls from 0.
+- Clients doing a pass from 0 send `full=1` on every page of that pass; with `full` the horizon check is skipped. A pass from 0 is complete by construction because purged tombstones are only for rows the client never had or that a full pass doesn't need.
 - Item rows include signed `leadImageUrl` (24 h) and the stable `leadImageKey` (§4.1); clients needing content call `GET /v1/items/:id/content`.
 
 ### 7.3 seq rules (for the DO implementer)

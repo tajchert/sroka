@@ -304,9 +304,9 @@ export class LibraryDO extends DurableObject<Env> {
     return this.store.parseWanted(itemId, parseGen);
   }
 
-  async pull(cursor: number, limit: number): Promise<PullResult> {
+  async pull(cursor: number, limit: number, full = false): Promise<PullResult> {
     this.ensureSchema();
-    const page = this.store.pull(cursor, limit);
+    const page = this.store.pull(cursor, limit, full);
     if ("error" in page) return { ok: false, error: page.error };
     return { ok: true, data: { ...page.data, items: await this.sign(page.data.items) } };
   }

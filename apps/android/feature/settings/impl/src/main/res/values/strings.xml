@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_settings_title">Settings</string>
+    <string name="feature_settings_back">Back</string>
+    <string name="feature_settings_cancel">Cancel</string>
+    <string name="feature_settings_save">Save</string>
+    <string name="feature_settings_remove">Remove</string>
+
+    <string name="feature_settings_section_downloads">Downloads</string>
+    <string name="feature_settings_policy_wifi">Download on Wi-Fi only</string>
+    <string name="feature_settings_policy_any">Download on any network</string>
+    <string name="feature_settings_policy_manual">Manual only</string>
+    <string name="feature_settings_download_all">Download all now</string>
+    <string name="feature_settings_download_all_hint">Fetch new articles and save them for offline reading</string>
+    <string name="feature_settings_fetch_started">Fetching new articles</string>
+    <string name="feature_settings_storage_used">Storage used</string>
+    <string name="feature_settings_remove_downloads">Remove downloaded articles</string>
+    <string name="feature_settings_remove_downloads_body">Articles stay in your list but will need to be downloaded again to read offline.</string>
+    <string name="feature_settings_downloads_removed">Downloaded articles removed</string>
+
+    <string name="feature_settings_section_reading">Reading</string>
+    <string name="feature_settings_theme">Theme</string>
+    <string name="feature_settings_theme_system">System</string>
+    <string name="feature_settings_theme_light">Light</string>
+    <string name="feature_settings_theme_dark">Dark</string>
+    <string name="feature_settings_dynamic_color">Dynamic color</string>
+    <string name="feature_settings_dynamic_color_hint">Use colors from your wallpaper</string>
+    <string name="feature_settings_reader_theme">Reader theme</string>
+    <string name="feature_settings_reader_auto">Auto</string>
+    <string name="feature_settings_reader_light">Light</string>
+    <string name="feature_settings_reader_sepia">Sepia</string>
+    <string name="feature_settings_reader_dark">Dark</string>
+    <string name="feature_settings_text_size">Text size</string>
+
+    <string name="feature_settings_section_account">Account</string>
+    <string name="feature_settings_signed_in_as">Signed in as</string>
+    <string name="feature_settings_signed_out">Not signed in</string>
+    <string name="feature_settings_sign_out">Sign out</string>
+    <string name="feature_settings_sign_out_body">Signing out removes your saved articles and downloads from this device. They stay in your account and come back when you sign in again. Changes not yet synced will be lost.</string>
+    <string name="feature_settings_delete_account">Delete account</string>
+    <string name="feature_settings_delete_account_body">This permanently deletes your account and all saved articles, tags and highlights on the server, and removes everything from this device. This cannot be undone.</string>
+    <string name="feature_settings_delete_type">Type %1$s to confirm</string>
+    <string name="feature_settings_delete_forever">Delete forever</string>
+    <string name="feature_settings_delete_failed">Could not delete the account. Check your connection and try again.</string>
+
+    <string name="feature_settings_section_data">Import and export</string>
+    <string name="feature_settings_import_export">Import or export your library</string>
+    <string name="feature_settings_import_export_hint">Opens the Sroka web app in your browser</string>
+
+    <string name="feature_settings_section_advanced">Advanced</string>
+    <string name="feature_settings_server">Server</string>
+    <string name="feature_settings_server_body">Only change this if you run your own Sroka server. Leave empty to use the default.</string>
+    <string name="feature_settings_server_label">Server URL</string>
+    <string name="feature_settings_server_invalid">Enter a valid http:// or https:// address.</string>
+    <string name="feature_settings_server_saved">Server saved</string>
+    <string name="feature_settings_server_switch_warning">Changing the server signs you out and removes all local data from this device. Unsynced changes are lost.</string>
+    <string name="feature_settings_server_switch">Sign out and switch</string>
+
+    <string name="feature_settings_section_about">About</string>
+    <string name="feature_settings_version">Version</string>
+</resources>

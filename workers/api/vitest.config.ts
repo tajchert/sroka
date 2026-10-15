@@ -10,6 +10,8 @@ export default defineConfig({
         bindings: {
           ENVIRONMENT: "development",
           TURNSTILE_SITE_KEY: "1x00000000000000000000AA", // site key only; secret unset => verification skipped
+          // Explicitly empty: otherwise a local .dev.vars (npm run dev:setup) leaks its test secret in and every OTP send fails.
+          TURNSTILE_SECRET_KEY: "",
           APP_ORIGIN: "http://localhost:8787",
           API_ORIGIN: "http://localhost:8787",
           CONTENT_ORIGIN: "http://127.0.0.1:8787",

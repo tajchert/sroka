@@ -296,6 +296,32 @@ describe("sync pull", () => {
     const ok2 = await lib.pull(2, 10);
     expect(ok2.ok).toBe(true);
   });
+
+  it("full=1 pages a pass from 0 past a purged tombstone without 410", async () => {
+    const { lib } = freshLibrary();
+    const gone = uuidv7();
+    const ids = Array.from({ length: 6 }, () => uuidv7());
+    await lib.applyOps("d", [add(gone, "https://g.example/", T0), delItem(gone, T0 + 1)]);
+    await lib.applyOps("d", ids.map((id, i) => add(id, `https://live${i}.example/`, T0 + 10 + i)));
+    await runInDurableObject(lib, (inst: LibraryDO) => {
+      (inst as unknown as { store: { prune(now: number): void } }).store.prune(Date.now() + 181 * 86400_000);
+    });
+    const seen = new Set<string>();
+    let cursor = 0;
+    let pages = 0;
+    for (;;) {
+      const r = await lib.pull(cursor, 2, true);
+      if (!r.ok) throw new Error("410");
+      pages++;
+      for (const it of r.data.items) seen.add(it.id);
+      cursor = r.data.cursor;
+      if (!r.data.hasMore) break;
+    }
+    expect(pages).toBeGreaterThan(1);
+    expect(seen.size).toBe(6);
+    // Same mid-pass cursor without full still demands a resync.
+    expect(await lib.pull(1, 2)).toEqual({ ok: false, error: "resync_required" });
+  });
 });
 
 describe("list / search", () => {

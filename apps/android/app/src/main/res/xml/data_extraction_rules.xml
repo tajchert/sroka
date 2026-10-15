@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DECISIONS A6: the session token never leaves the device; library DB may be backed up. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="file" path="articles/" />
+        <exclude domain="file" path="thumbs/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/session.preferences_pb" />
+        <exclude domain="file" path="articles/" />
+        <exclude domain="file" path="thumbs/" />
+    </device-transfer>
+</data-extraction-rules>

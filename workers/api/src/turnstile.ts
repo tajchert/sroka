@@ -22,11 +22,16 @@ const hostOf = (u: string): string | null => {
   }
 };
 
-/** True when the request comes from the web app (Turnstile required). */
-export function isWebAppRequest(env: Pick<Env, "APP_ORIGIN" | "DEV_ORIGINS">, req: Request): boolean {
+/**
+ * True when the request comes from the web app (Turnstile required). A request without Origin counts as web only
+ * when it targets the APP_ORIGIN host outside development: locally the app and the API share one host
+ * (localhost:8787), and native debug clients (no Origin) must be able to sign in there.
+ */
+export function isWebAppRequest(env: Pick<Env, "APP_ORIGIN" | "DEV_ORIGINS" | "ENVIRONMENT">, req: Request): boolean {
   const webOrigins = [env.APP_ORIGIN, ...(env.DEV_ORIGINS ?? "").split(",").map((s) => s.trim())].filter(Boolean);
   const origin = req.headers.get("origin");
   if (origin) return webOrigins.includes(origin);
+  if (env.ENVIRONMENT === "development") return false;
   const appHost = hostOf(env.APP_ORIGIN);
   return !!appHost && hostOf(req.url) === appHost;
 }

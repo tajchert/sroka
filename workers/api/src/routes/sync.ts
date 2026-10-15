@@ -23,7 +23,7 @@ syncRoutes.post("/push", async (c) => {
 syncRoutes.get("/pull", async (c) => {
   const parsed = PullQuery.safeParse(c.req.query());
   if (!parsed.success) return validationError(c, parsed.error);
-  const r = await library(c).pull(parsed.data.cursor, parsed.data.limit);
+  const r = await library(c).pull(parsed.data.cursor, parsed.data.limit, parsed.data.full);
   if (!r.ok) return apiError(c, 410, r.error);
   return c.json(r.data);
 });

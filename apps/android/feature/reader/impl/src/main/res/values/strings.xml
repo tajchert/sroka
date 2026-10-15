@@ -31,11 +31,11 @@
     <string name="feature_reader_not_downloaded_offline">Connect to the internet to download this article, or open the original.</string>
     <string name="feature_reader_not_downloaded_signin">Sign in again to download this article.</string>
     <string name="feature_reader_not_downloaded_error">The article could not be downloaded.</string>
+    <string name="feature_reader_renderer_gone">This article could not be displayed. Open the original instead.</string>
     <string name="feature_reader_try_again">Try again</string>
     <string name="feature_reader_pending_title">Still being prepared</string>
     <string name="feature_reader_pending_message">The article is being processed. It will be available after your next fetch.</string>
     <string name="feature_reader_failed_title">Could not read this page</string>
     <string name="feature_reader_failed_message">The page could not be turned into a readable article.</string>
     <string name="feature_reader_failed_reason">Reason: %1$s</string>
-    <string name="feature_reader_no_browser">No app found to open this link.</string>
 </resources>

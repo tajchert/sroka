@@ -20,6 +20,9 @@ class FakeContentStore(
     var nextDownloadResult: DownloadResult = DownloadResult.Downloaded
     val downloadRequests = mutableListOf<String>()
 
+    /** Runs inside [downloadNow] before the result is returned (e.g. to flip [offline] states). */
+    var downloadHook: (suspend (String) -> Unit)? = null
+
     override fun observeOffline(itemId: String): Flow<OfflineState> =
         offline.map { it[itemId] ?: OfflineState.NONE }
 
@@ -29,6 +32,7 @@ class FakeContentStore(
 
     override suspend fun downloadNow(itemId: String): DownloadResult {
         downloadRequests += itemId
+        downloadHook?.invoke(itemId)
         val result = nextDownloadResult
         if (result == DownloadResult.Downloaded) {
             offline.update { it + (itemId to OfflineState.DOWNLOADED) }

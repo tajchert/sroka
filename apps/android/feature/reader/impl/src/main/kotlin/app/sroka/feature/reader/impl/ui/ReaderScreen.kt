@@ -1,10 +1,7 @@
 package app.sroka.feature.reader.impl.ui
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,12 +46,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.sroka.core.model.ItemStatus
+import app.sroka.core.ui.openExternalLink
 import app.sroka.feature.reader.impl.NotDownloadedReason
 import app.sroka.feature.reader.impl.R
 import app.sroka.feature.reader.impl.ReaderHtml
@@ -161,7 +158,7 @@ internal fun ReaderScreen(
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.feature_reader_open_original)) },
-                                    onClick = { menuOpen = false; openLink(context, current.url) },
+                                    onClick = { menuOpen = false; openExternalLink(context, current.url) },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.feature_reader_edit_tags)) },
@@ -208,14 +205,24 @@ internal fun ReaderScreen(
                             startProgress = restore.progress,
                         )
                     }
-                    ArticleWebView(
+                    var rendererGone by remember(s.html) { mutableStateOf(false) }
+                    if (rendererGone) {
+                        Centered {
+                            Text(
+                                stringResource(R.string.feature_reader_renderer_gone),
+                                textAlign = TextAlign.Center,
+                            )
+                            OriginalButton(originalUrl) { openExternalLink(context, it) }
+                        }
+                    } else ArticleWebView(
                         html = wrapped,
                         baseUrl = s.baseUrl,
                         articlesDir = articlesDir,
                         theme = theme,
                         textScale = prefs.readerTextScale,
                         onProgress = viewModel::onProgress,
-                        onLinkClick = { openLink(context, it) },
+                        onLinkClick = { openExternalLink(context, it) },
+                        onRendererGone = { rendererGone = true },
                         modifier = Modifier.fillMaxSize(),
                     )
                     LinearProgressIndicator(
@@ -248,7 +255,7 @@ internal fun ReaderScreen(
                         textAlign = TextAlign.Center,
                     )
                     Button(onClick = viewModel::retryDownload) { Text(stringResource(R.string.feature_reader_try_again)) }
-                    OriginalButton(originalUrl) { openLink(context, it) }
+                    OriginalButton(originalUrl) { openExternalLink(context, it) }
                 }
                 ReaderUiState.ParsePending -> Centered {
                     Text(
@@ -256,7 +263,7 @@ internal fun ReaderScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(stringResource(R.string.feature_reader_pending_message), textAlign = TextAlign.Center)
-                    OriginalButton(originalUrl) { openLink(context, it) }
+                    OriginalButton(originalUrl) { openExternalLink(context, it) }
                 }
                 is ReaderUiState.ParseFailed -> Centered {
                     Text(
@@ -266,7 +273,7 @@ internal fun ReaderScreen(
                     Text(stringResource(R.string.feature_reader_failed_message), textAlign = TextAlign.Center)
                     s.error?.let { Text(stringResource(R.string.feature_reader_failed_reason, it)) }
                     Button(onClick = viewModel::refresh) { Text(stringResource(R.string.feature_reader_try_again)) }
-                    OriginalButton(originalUrl) { openLink(context, it) }
+                    OriginalButton(originalUrl) { openExternalLink(context, it) }
                 }
             }
         }
@@ -320,15 +327,4 @@ private fun shareUrl(context: Context, url: String) {
         putExtra(Intent.EXTRA_TEXT, url)
     }
     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-}
-
-/** Opens http(s) links in a Custom Tab; other schemes are ignored. */
-private fun openLink(context: Context, url: String) {
-    val uri = url.toUri()
-    if (uri.scheme != "http" && uri.scheme != "https") return
-    try {
-        CustomTabsIntent.Builder().build().launchUrl(context, uri)
-    } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, R.string.feature_reader_no_browser, Toast.LENGTH_SHORT).show()
-    }
 }

@@ -11,6 +11,7 @@ import app.sroka.core.testing.fake.FakeSettingsRepository
 import app.sroka.core.testing.fake.FakeTagRepository
 import app.sroka.core.testing.testItem
 import app.sroka.core.testing.util.MainDispatcherRule
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -34,7 +35,7 @@ class ReaderViewModelTest {
     private var clock = 10_000L
 
     private fun vm(): ReaderViewModel {
-        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository())
+        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository(), CoroutineScope(dispatcher))
         vm.nowMillis = { clock }
         return vm
     }
@@ -188,5 +189,35 @@ class ReaderViewModelTest {
         assertEquals(false, archived)
         vm.setTags(listOf("b", "a"))
         assertEquals(listOf("a", "b"), library.items.value.single().tags)
+    }
+
+    @Test
+    fun failedDownloadDoesNotLoop() = runTest(dispatcher) {
+        seed(offline = OfflineState.AVAILABLE_REMOTE)
+        content.offline.value = mapOf(id to OfflineState.AVAILABLE_REMOTE)
+        content.nextDownloadResult = DownloadResult.Failed(RemoteFailure.SERVER)
+        content.downloadHook = {
+            content.offline.value = mapOf(id to OfflineState.DOWNLOADING)
+            content.offline.value = mapOf(id to OfflineState.FAILED)
+        }
+        val vm = vm().also { it.collect(backgroundScope) }
+        assertEquals(1, content.downloadRequests.size)
+        assertEquals(ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR), vm.uiState.value)
+        vm.retryDownload()
+        assertEquals(2, content.downloadRequests.size)
+        assertEquals(ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR), vm.uiState.value)
+    }
+
+    @Test
+    fun clearingTheViewModelFlushesLastPosition() = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>x</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        vm.onProgress(ProgressReport(0.1f, 1)) // saved
+        clock += 500
+        vm.onProgress(ProgressReport(0.7f, 7)) // throttled
+        assertEquals(0.1f, library.items.value.single().progress)
+        vm.onCleared()
+        assertEquals(0.7f, library.items.value.single().progress)
     }
 }

@@ -2,6 +2,7 @@ package app.sroka.feature.reader.impl
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.domain.ContentStore
 import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.LibraryRepository
@@ -18,7 +19,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,12 +28,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 sealed interface ReaderUiState {
     data object Loading : ReaderUiState
@@ -67,6 +69,7 @@ class ReaderViewModel @AssistedInject constructor(
     private val content: ContentStore,
     private val settings: SettingsRepository,
     tagRepository: TagRepository,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -85,6 +88,10 @@ class ReaderViewModel @AssistedInject constructor(
     )
 
     private val retry = MutableStateFlow(0)
+
+    /** Result of the VM-initiated download; lives outside the key-driven flow so it is never cancelled by it. */
+    private val vmDownload = MutableStateFlow<ReaderUiState?>(null)
+    private var autoDownloadedAttempt = -1
     private var latestItem: Item? = null
     private var reported: ProgressReport? = null
     private var lastSavedAt: Long? = null
@@ -117,16 +124,16 @@ class ReaderViewModel @AssistedInject constructor(
     }
         .distinctUntilChanged()
         .combine(retry) { key, attempt -> key to attempt }
-        .flatMapLatest { (key, _) -> resolve(key) }
+        .flatMapLatest { (key, attempt) -> resolve(key, attempt) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ReaderUiState.Loading)
 
-    private fun resolve(key: SourceKey): Flow<ReaderUiState> = flow {
+    private fun resolve(key: SourceKey, attempt: Int): Flow<ReaderUiState> = flow {
         ready = false
         when {
             key.missing -> emit(ReaderUiState.Missing)
             key.offline == OfflineState.DOWNLOADED -> {
                 val html = content.articleHtml(itemId)
-                if (html != null) emitReady(html) else emitAll(download(key))
+                if (html != null) emitReady(html) else emitAll(download(key, attempt))
             }
             !key.hasContent -> emit(
                 if (key.parse == ParseStatus.FAILED) {
@@ -135,7 +142,9 @@ class ReaderViewModel @AssistedInject constructor(
                     ReaderUiState.ParsePending
                 },
             )
-            else -> emitAll(download(key))
+            // Already in flight; the offline flow moves us on when it finishes.
+            key.offline == OfflineState.DOWNLOADING -> emit(ReaderUiState.Downloading)
+            else -> emitAll(download(key, attempt))
         }
     }
 
@@ -146,27 +155,42 @@ class ReaderViewModel @AssistedInject constructor(
         emit(ReaderUiState.Ready(html, content.articleBaseUrl(itemId)))
     }
 
-    private fun download(key: SourceKey): Flow<ReaderUiState> = flow {
-        emit(ReaderUiState.Downloading)
-        if (key.offline == OfflineState.DOWNLOADING) return@flow // already in flight; the offline flow will move us on
-        // Not cancellable: the download completes even if the key changes mid-call.
-        val result = withContext(NonCancellable) { content.downloadNow(itemId) }
-        when (result) {
-            DownloadResult.Downloaded -> {
-                val html = content.articleHtml(itemId)
-                if (html != null) emitReady(html) else emit(ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR))
-            }
-            DownloadResult.NotReady -> emit(ReaderUiState.ParsePending)
-            is DownloadResult.Failed -> emit(
+    /** Downloads at most once per retry [attempt]; later keys of the same attempt show the outcome. */
+    private fun download(key: SourceKey, attempt: Int): Flow<ReaderUiState> = flow {
+        if (attempt != autoDownloadedAttempt) {
+            autoDownloadedAttempt = attempt
+            vmDownload.value = ReaderUiState.Downloading
+            viewModelScope.launch { vmDownload.value = mapResult(content.downloadNow(itemId)) }
+        } else if (vmDownload.value == null) {
+            emit(
                 ReaderUiState.NotDownloaded(
-                    when (result.reason) {
-                        RemoteFailure.NETWORK -> NotDownloadedReason.OFFLINE
-                        RemoteFailure.UNAUTHORIZED -> NotDownloadedReason.SIGN_IN
-                        else -> NotDownloadedReason.ERROR
-                    },
+                    if (key.offline == OfflineState.FAILED) NotDownloadedReason.ERROR else NotDownloadedReason.OFFLINE,
                 ),
             )
+            return@flow
         }
+        emitAll(vmDownload.filterNotNull().onEach { if (it is ReaderUiState.Ready) ready = true })
+    }
+
+    private suspend fun mapResult(result: DownloadResult): ReaderUiState = when (result) {
+        DownloadResult.Downloaded -> {
+            val html = content.articleHtml(itemId)
+            if (html != null) {
+                ready = true
+                reported = null
+                ReaderUiState.Ready(html, content.articleBaseUrl(itemId))
+            } else {
+                ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR)
+            }
+        }
+        DownloadResult.NotReady -> ReaderUiState.ParsePending
+        is DownloadResult.Failed -> ReaderUiState.NotDownloaded(
+            when (result.reason) {
+                RemoteFailure.NETWORK -> NotDownloadedReason.OFFLINE
+                RemoteFailure.UNAUTHORIZED -> NotDownloadedReason.SIGN_IN
+                else -> NotDownloadedReason.ERROR
+            },
+        )
     }
 
     /** Try the download again (not-downloaded screen). */
@@ -200,9 +224,13 @@ class ReaderViewModel @AssistedInject constructor(
         if (reported != null && !unsaved) return
         unsaved = false
         lastSavedAt = nowMillis()
-        viewModelScope.launch {
-            withContext(NonCancellable) { library.setProgress(itemId, report.progress, report.anchor) }
-        }
+        // App scope: the write must survive this ViewModel being cleared (back, two-pane replacement).
+        appScope.launch { library.setProgress(itemId, report.progress, report.anchor) }
+    }
+
+    /** Public so tests can simulate the ViewModelStore clearing this entry. */
+    public override fun onCleared() {
+        flushProgress()
     }
 
     fun toggleFavorite() {

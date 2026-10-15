@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -53,12 +54,14 @@ internal fun ArticleWebView(
     textScale: Float,
     onProgress: (ProgressReport) -> Unit,
     onLinkClick: (String) -> Unit,
+    onRendererGone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOnLink by rememberUpdatedState(onLinkClick)
+    val currentOnRendererGone by rememberUpdatedState(onRendererGone)
     val state = remember { WebState() }
     val webViewRef = remember { arrayOfNulls<WebView>(1) }
     val assetLoader = remember(articlesDir) {
@@ -95,6 +98,14 @@ internal fun ArticleWebView(
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         handleNavigation(view, request.url, baseUrl) { currentOnLink(it) }
                         return true // never navigate the WebView itself
+                    }
+
+                    // Returning true keeps the app alive when the renderer crashes or is killed. The
+                    // caller drops this WebView from composition, whose onRelease destroys it.
+                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                        if (webViewRef[0] === view) webViewRef[0] = null
+                        currentOnRendererGone()
+                        return true
                     }
 
                     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) = Unit

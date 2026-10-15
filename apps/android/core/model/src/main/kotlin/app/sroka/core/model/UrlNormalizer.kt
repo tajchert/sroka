@@ -47,7 +47,9 @@ object UrlNormalizer {
     fun hostOf(url: String): String? = parse(url)?.host
 
     private val TRAILING_PUNCT = Regex("[.,;:!?'\"»”’…]+$")
-    private val URL_IN_TEXT = Regex("(?U)https?://[^\\s<>\"'`]+", RegexOption.IGNORE_CASE)
+    // Unicode separators (NBSP, U+2028…) end a URL via \p{Z}. No inline Unicode-class flag: Android's ICU regex rejects it
+    // (PatternSyntaxException at class init), while the JVM used by unit tests accepts it.
+    private val URL_IN_TEXT = Regex("https?://[^\\s\\p{Z}\\u0085<>\"'`]+", RegexOption.IGNORE_CASE)
     private val BRACKETS = listOf('(' to ')', '[' to ']', '{' to '}')
 
     /**

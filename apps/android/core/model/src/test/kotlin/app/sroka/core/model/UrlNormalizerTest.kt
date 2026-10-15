@@ -67,6 +67,21 @@ class UrlNormalizerTest {
     }
 
     @Test
+    fun extractFirstUrlStopsAtUnicodeSeparators() {
+        assertEquals("https://example.com/a", extractFirstUrl("Read https://example.com/a\u00A0now"))
+        assertEquals("https://example.com/b", extractFirstUrl("https://example.com/b\u2028next line"))
+        assertEquals("https://example.com/c", extractFirstUrl("https://example.com/c\u3000x"))
+    }
+
+    /** Android's ICU regex engine rejects inline flags the JVM accepts (e.g. `(?U)`), so JVM tests cannot catch them. */
+    @Test
+    fun mainSourcesUseNoAndroidIncompatibleRegexFlags() {
+        val offenders = java.io.File("src/main").walkTopDown().filter { it.extension == "kt" }
+            .filter { f -> f.readLines().any { "(?U)" in it || "UNICODE_CHARACTER_CLASS" in it } }.toList()
+        assertEquals(emptyList<java.io.File>(), offenders)
+    }
+
+    @Test
     fun extractFirstUrlReturnsNullWhenAbsent() {
         assertNull(extractFirstUrl("no links here"))
     }

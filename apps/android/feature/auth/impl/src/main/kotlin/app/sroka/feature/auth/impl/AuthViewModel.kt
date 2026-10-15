@@ -1,5 +1,6 @@
 package app.sroka.feature.auth.impl
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sroka.core.domain.AuthError
@@ -18,6 +19,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val KEY_STEP = "step"
+private const val KEY_EMAIL = "email"
 
 const val CODE_LENGTH = 6
 const val RESEND_COOLDOWN_SECONDS = 60
@@ -41,9 +45,17 @@ data class AuthUiState(
 class AuthViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val settings: SettingsRepository,
+    private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(AuthUiState(serverUrl = settings.defaultServerUrl))
+    private val _state = MutableStateFlow(
+        // Survives process death while the user reads the code in their mail app (the code itself is not kept).
+        AuthUiState(
+            step = savedState.get<AuthStep>(KEY_STEP) ?: AuthStep.EMAIL,
+            email = savedState.get<String>(KEY_EMAIL).orEmpty(),
+            serverUrl = settings.defaultServerUrl,
+        ),
+    )
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
     private var cooldownJob: Job? = null
@@ -59,7 +71,10 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun onEmailChange(value: String) = _state.update { it.copy(email = value, error = null) }
+    fun onEmailChange(value: String) {
+        savedState[KEY_EMAIL] = value
+        _state.update { it.copy(email = value, error = null) }
+    }
 
     fun onCodeChange(value: String) {
         val digits = value.filter { it.isDigit() }.take(CODE_LENGTH)
@@ -76,6 +91,7 @@ class AuthViewModel @Inject constructor(
             _state.update { it.copy(error = AuthError.InvalidEmail) }
             return
         }
+        savedState[KEY_EMAIL] = email
         _state.update { it.copy(loading = true, error = null, email = email) }
         viewModelScope.launch { handleSend(auth.sendCode(email), moveToCode = true) }
     }
@@ -90,6 +106,7 @@ class AuthViewModel @Inject constructor(
     private fun handleSend(result: AuthResult, moveToCode: Boolean) {
         when (result) {
             AuthResult.Success -> {
+                savedState[KEY_STEP] = AuthStep.CODE
                 _state.update { it.copy(loading = false, step = AuthStep.CODE, code = "") }
                 startCooldown(RESEND_COOLDOWN_SECONDS)
             }
@@ -124,6 +141,7 @@ class AuthViewModel @Inject constructor(
     /** Back from the code step to the email step. */
     fun changeEmail() {
         cooldownJob?.cancel()
+        savedState[KEY_STEP] = AuthStep.EMAIL
         _state.update { it.copy(step = AuthStep.EMAIL, code = "", error = null, resendSeconds = 0) }
     }
 

@@ -1,5 +1,6 @@
 package app.sroka.feature.auth.impl
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -27,7 +28,7 @@ class AuthScreenTest {
     private val auth = FakeAuthRepository()
     private val settings = FakeSettingsRepository()
 
-    private fun setContent(vm: AuthViewModel = AuthViewModel(auth, settings)): AuthViewModel {
+    private fun setContent(vm: AuthViewModel = AuthViewModel(auth, settings, SavedStateHandle())): AuthViewModel {
         compose.setContent { AuthRoute(vm) }
         return vm
     }
@@ -70,7 +71,7 @@ class AuthScreenTest {
     @Test
     fun expiredSessionPrefillsEmail() {
         val expired = FakeAuthRepository(SessionState.Expired("me@x.io"))
-        val vm = AuthViewModel(expired, settings)
+        val vm = AuthViewModel(expired, settings, SavedStateHandle())
         setContent(vm)
         assertEquals("me@x.io", vm.state.value.email)
     }
@@ -82,5 +83,14 @@ class AuthScreenTest {
         assertEquals(true, vm.state.value.serverUrlInvalid)
         vm.saveServerUrl("https://my.server")
         assertEquals("https://my.server", settings.preferencesFlow.value.serverUrl)
+    }
+
+    @Test
+    fun restoresCodeStepFromSavedState() {
+        val saved = SavedStateHandle(mapOf("step" to AuthStep.CODE, "email" to "a@b.co"))
+        val vm = AuthViewModel(auth, settings, saved)
+        assertEquals(AuthStep.CODE, vm.state.value.step)
+        assertEquals("a@b.co", vm.state.value.email)
+        assertEquals("", vm.state.value.code)
     }
 }

@@ -30,5 +30,6 @@
 - Remote D1 migrations 0000, 0001 applied; secrets BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY set on sroka-api.
 - sroka-api deployed with custom domains sroka.app, api.sroka.app, c.sroka.app; sroka-parser deployed (consumers sroka-parse + DLQ, cron `23 4 * * SUN`).
 - Apex A records (parking) deleted by owner. Production smoke: landing, /app, SPA deep link, /v1/health, /v1/config, CORS preflight OK.
-- OPEN: api.sroka.app / c.sroka.app return NXDOMAIN at the authoritative NS although the Worker custom domains are attached (edge serves them fine via --resolve). Need proxied DNS records (AAAA 100::) or a dashboard re-attach.
+- RESOLVED: api.sroka.app / c.sroka.app now resolve (Cloudflare NS, 1.1.1.1, 8.8.8.8); /v1/config 200 over https.
+- Redeployed sroka-api from main (version 415b1efd) with the `full=1` sync pull flag (50501a7) needed by Android full resync; smoke /v1/config 200, /v1/sync/pull unauthenticated 401.
 - OPEN: real email OTP sign-in in production not yet exercised; shared-content GC built on feat/content-gc, not deployed yet.

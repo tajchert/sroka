@@ -50,6 +50,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -177,9 +178,12 @@ fun SettingsScreen(
                 Text(stringResource(R.string.feature_settings_text_size), style = MaterialTheme.typography.bodyLarge)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("A", style = MaterialTheme.typography.bodySmall)
+                    // Local draft while dragging; persisted once on release.
+                    var draft by remember(prefs.readerTextScale) { mutableFloatStateOf(prefs.readerTextScale) }
                     Slider(
-                        value = prefs.readerTextScale,
-                        onValueChange = vm::setReaderTextScale,
+                        value = draft,
+                        onValueChange = { draft = it },
+                        onValueChangeFinished = { vm.setReaderTextScale(draft) },
                         valueRange = UserPreferences.READER_TEXT_SCALE_MIN..UserPreferences.READER_TEXT_SCALE_MAX,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     )

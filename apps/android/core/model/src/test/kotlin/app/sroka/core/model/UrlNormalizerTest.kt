@@ -76,7 +76,9 @@ class UrlNormalizerTest {
     /** Android's ICU regex engine rejects inline flags the JVM accepts (e.g. `(?U)`), so JVM tests cannot catch them. */
     @Test
     fun mainSourcesUseNoAndroidIncompatibleRegexFlags() {
-        val offenders = java.io.File("src/main").walkTopDown().filter { it.extension == "kt" }
+        val main = java.io.File("src/main")
+        assertTrue("guard must scan real sources: ${main.absolutePath}", main.resolve("kotlin").isDirectory)
+        val offenders = main.walkTopDown().filter { it.extension == "kt" }
             .filter { f -> f.readLines().any { "(?U)" in it || "UNICODE_CHARACTER_CLASS" in it } }.toList()
         assertEquals(emptyList<java.io.File>(), offenders)
     }

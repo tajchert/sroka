@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Shared Sroka UI strings (ItemRow, OfflineBadge, …) are added by the core:ui owner. -->
+    <string name="core_ui_no_browser">No app found to open this link.</string>
 </resources>

@@ -3,6 +3,7 @@ package app.sroka.feature.library.impl.list
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import app.sroka.core.ui.openExternalLink
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -29,7 +30,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import app.sroka.core.model.Item
 import app.sroka.core.model.ItemStatus
 import app.sroka.feature.library.impl.R
@@ -98,7 +98,7 @@ private fun shareLink(context: Context, url: String) {
 }
 
 private fun openOriginal(context: Context, url: String) {
-    startSafely(context, Intent(Intent.ACTION_VIEW, url.toUri()))
+    openExternalLink(context, url)
 }
 
 private fun startSafely(context: Context, intent: Intent) {

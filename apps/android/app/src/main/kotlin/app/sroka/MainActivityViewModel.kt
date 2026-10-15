@@ -3,7 +3,9 @@ package app.sroka
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sroka.core.domain.AuthRepository
+import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.SettingsRepository
+import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.SessionState
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** What MainActivity needs before showing any screen: theme preferences and the session. */
@@ -32,6 +35,7 @@ sealed interface MainActivityUiState {
 class MainActivityViewModel @Inject constructor(
     settingsRepository: SettingsRepository,
     authRepository: AuthRepository,
+    private val libraryRepository: LibraryRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<MainActivityUiState> = combine(
@@ -43,6 +47,11 @@ class MainActivityViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = MainActivityUiState.Loading,
         )
+
+    /** Undo of "archive" from the reader (the snackbar lives in the app shell). */
+    fun unarchive(itemId: String) {
+        viewModelScope.launch { libraryRepository.setStatus(itemId, ItemStatus.UNREAD) }
+    }
 }
 
 /** Dark theme per the stored [ThemeMode]; while loading, follow the system. */

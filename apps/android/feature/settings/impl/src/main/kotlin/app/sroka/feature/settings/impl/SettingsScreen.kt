@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.ui.rememberWithNotificationPermission
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -56,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -76,11 +78,11 @@ private enum class Dialog { None, RemoveDownloads, SignOut, DeleteAccount, Serve
 fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { msg ->
             snackbar.showSnackbar(
-                context.getString(
+                resources.getString(
                     when (msg) {
                         SettingsMessage.FetchStarted -> R.string.feature_settings_fetch_started
                         SettingsMessage.DownloadsRemoved -> R.string.feature_settings_downloads_removed
@@ -119,6 +121,7 @@ fun SettingsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        val downloadAllNow = rememberWithNotificationPermission(vm::downloadAllNow)
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
             SectionHeader(R.string.feature_settings_section_downloads)
             DownloadPolicy.entries.forEach { policy ->
@@ -131,7 +134,7 @@ fun SettingsScreen(
             ListItem(
                 headlineContent = { Text(stringResource(R.string.feature_settings_download_all)) },
                 supportingContent = { Text(stringResource(R.string.feature_settings_download_all_hint)) },
-                modifier = Modifier.clickable { vm.downloadAllNow() },
+                modifier = Modifier.clickable(onClick = downloadAllNow),
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.feature_settings_storage_used)) },

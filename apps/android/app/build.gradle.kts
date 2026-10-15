@@ -125,10 +125,8 @@ dependencies {
     implementation(projects.core.model)
     implementation(projects.core.common)
     implementation(projects.core.domain)
-    // TODO(integration): add core:data (+ database/network/datastore come with it) and delete
-    // di/TemporaryBindings.kt. Kept out while core:data is built in parallel so its @Binds
-    // cannot clash with the temporary bindings.
-    // implementation(projects.core.data)
+    // Real implementations of the core:domain interfaces, workers, Room, network, DataStore.
+    implementation(projects.core.data)
     implementation(projects.core.ui)
 
     // Android Core

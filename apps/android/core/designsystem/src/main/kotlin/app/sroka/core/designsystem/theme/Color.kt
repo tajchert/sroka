@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
  * ## Color Naming Convention
  *
  * Colors are named with format: `{ColorFamily}{Shade}`
- * - ColorFamily: Blue, Green, Orange, etc.
+ * - ColorFamily: Brand, Teal, Orange, etc.
  * - Shade: 10 (lightest) to 90 (darkest) in steps of 10
  *
  * This follows Material 3 conventions and makes it easy to
@@ -21,20 +21,12 @@ import androidx.compose.ui.graphics.Color
  *
  * ```kotlin
  * // DON'T do this:
- * Text(color = Blue40)
+ * Text(color = Brand40)
  *
  * // DO this:
  * Text(color = MaterialTheme.colorScheme.primary)
  * ```
  */
-
-// Primary - Blue palette
-internal val Blue10 = Color(0xFF001F2A)
-internal val Blue20 = Color(0xFF003547)
-internal val Blue30 = Color(0xFF004D67)
-internal val Blue40 = Color(0xFF006688)
-internal val Blue80 = Color(0xFF86D1FF)
-internal val Blue90 = Color(0xFFC5E7FF)
 
 // Secondary - Teal palette
 internal val Teal10 = Color(0xFF001F26)
@@ -73,3 +65,13 @@ internal val GrayVariant50 = Color(0xFF72777F)
 internal val GrayVariant60 = Color(0xFF8C9198)
 internal val GrayVariant80 = Color(0xFFC2C7CF)
 internal val GrayVariant90 = Color(0xFFDEE3EB)
+
+// Brand fallback (DECISIONS A2): black/white neutrals + teal accent #1F8A84.
+internal val Brand10 = Color(0xFF00201E)
+internal val Brand20 = Color(0xFF003733)
+internal val Brand30 = Color(0xFF00504B)
+internal val Brand40 = Color(0xFF1F8A84)
+internal val Brand80 = Color(0xFF7DD7CF)
+internal val Brand90 = Color(0xFFB4EFE9)
+internal val Ink = Color(0xFF111414)
+internal val Paper = Color(0xFFFFFFFF)

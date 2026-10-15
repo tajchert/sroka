@@ -13,13 +13,13 @@ import androidx.compose.ui.platform.LocalContext
 /**
  * Light color scheme for the app.
  *
- * Uses the Blue palette as primary color family.
+ * Brand fallback (no dynamic color): white surfaces, black text, teal accent.
  */
 private val LightColorScheme = lightColorScheme(
-    primary = Blue40,
-    onPrimary = Gray99,
-    primaryContainer = Blue90,
-    onPrimaryContainer = Blue10,
+    primary = Brand40,
+    onPrimary = Paper,
+    primaryContainer = Brand90,
+    onPrimaryContainer = Brand10,
     secondary = Teal40,
     onSecondary = Gray99,
     secondaryContainer = Teal90,
@@ -32,10 +32,10 @@ private val LightColorScheme = lightColorScheme(
     onError = Gray99,
     errorContainer = Red90,
     onErrorContainer = Red10,
-    background = Gray99,
-    onBackground = Gray10,
-    surface = Gray99,
-    onSurface = Gray10,
+    background = Paper,
+    onBackground = Ink,
+    surface = Paper,
+    onSurface = Ink,
     surfaceVariant = GrayVariant90,
     onSurfaceVariant = GrayVariant30,
     outline = GrayVariant50,
@@ -48,10 +48,10 @@ private val LightColorScheme = lightColorScheme(
  * Uses lighter tones of the color palette for better contrast.
  */
 private val DarkColorScheme = darkColorScheme(
-    primary = Blue80,
-    onPrimary = Blue20,
-    primaryContainer = Blue30,
-    onPrimaryContainer = Blue90,
+    primary = Brand80,
+    onPrimary = Brand20,
+    primaryContainer = Brand30,
+    onPrimaryContainer = Brand90,
     secondary = Teal80,
     onSecondary = Teal20,
     secondaryContainer = Teal30,
@@ -64,9 +64,9 @@ private val DarkColorScheme = darkColorScheme(
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = Gray10,
+    background = Ink,
     onBackground = Gray90,
-    surface = Gray10,
+    surface = Ink,
     onSurface = Gray90,
     surfaceVariant = GrayVariant30,
     onSurfaceVariant = GrayVariant80,

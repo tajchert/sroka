@@ -1,6 +1,16 @@
 package app.sroka.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -8,9 +18,13 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -18,6 +32,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import app.sroka.R
+import app.sroka.core.model.SessionState
 import app.sroka.feature.auth.api.AuthKey
 import app.sroka.feature.auth.impl.navigation.authEntries
 import app.sroka.feature.library.api.TagItemsKey
@@ -26,6 +42,7 @@ import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.feature.reader.impl.navigation.readerEntries
 import app.sroka.feature.settings.api.SettingsKey
 import app.sroka.feature.settings.impl.navigation.settingsEntries
+import kotlinx.coroutines.launch
 
 /**
  * App shell: one Navigation 3 back stack plus a [NavigationSuiteScaffold] (bottom bar on phones,
@@ -33,19 +50,48 @@ import app.sroka.feature.settings.impl.navigation.settingsEntries
  * root is on top; reader, settings, tag lists and sign-in are full screen.
  *
  * The session drives the stack: signed out ⇒ only [AuthKey]; signing in replaces it with My List.
+ * An expired session keeps the library (local-first) and opens sign-in on demand.
  * Features never see each other's keys; their navigation callbacks are mapped to keys here.
  */
 @Composable
 fun SrokaApp(
-    isSignedIn: Boolean,
+    session: SessionState,
+    onUndoArchive: (itemId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val startKey = if (isSignedIn) TopLevelDestination.MY_LIST.key else AuthKey
+    val signedOut = session is SessionState.SignedOut
+    val startKey = if (signedOut) AuthKey else TopLevelDestination.MY_LIST.key
     val backStack = rememberNavBackStack(startKey)
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(isSignedIn) {
-        val showsAuth = backStack.contains(AuthKey)
-        if (isSignedIn == showsAuth) backStack.replaceAll(if (isSignedIn) TopLevelDestination.MY_LIST.key else AuthKey)
+    // Signed out: only sign-in. Signed in: drop any sign-in screen (also the one opened from the
+    // Expired banner, which keeps the library underneath). Expired: leave the stack alone.
+    LaunchedEffect(session::class) {
+        when (session) {
+            SessionState.SignedOut ->
+                if (backStack.toList() != listOf(AuthKey)) backStack.replaceAll(AuthKey)
+            is SessionState.SignedIn -> if (AuthKey in backStack) {
+                val rest = backStack.filter { it != AuthKey }
+                backStack.replaceAll(*rest.ifEmpty { listOf(TopLevelDestination.MY_LIST.key) }.toTypedArray())
+            }
+            is SessionState.Expired -> Unit
+        }
+    }
+
+    val archivedMessage = stringResource(R.string.reader_archived)
+    val undoLabel = stringResource(R.string.reader_archived_undo)
+    val scope = rememberCoroutineScope()
+    val onArchived: (String) -> Unit = { itemId ->
+        if (backStack.size > 1) backStack.removeLastOrNull()
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            val result = snackbarHostState.showSnackbar(
+                message = archivedMessage,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) onUndoArchive(itemId)
+        }
     }
 
     val current = TopLevelDestination.of(backStack.lastOrNull())
@@ -71,12 +117,29 @@ fun SrokaApp(
             }
         },
     ) {
-        SrokaNavDisplay(backStack)
+        Box(Modifier.fillMaxSize()) {
+            SrokaNavDisplay(backStack, onArchived)
+            // App-level snackbar for results that outlive a screen (archive from the reader).
+            // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = if (current != null) FabClearance else 0.dp),
+            )
+        }
     }
 }
 
+/** FAB height (56dp) plus its two 16dp margins. */
+private val FabClearance = 88.dp
+
 @Composable
-private fun SrokaNavDisplay(backStack: NavBackStack<NavKey>) {
+private fun SrokaNavDisplay(
+    backStack: NavBackStack<NavKey>,
+    onArchived: (itemId: String) -> Unit,
+) {
     val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeLastOrNull() }
     NavDisplay(
         backStack = backStack,
@@ -94,8 +157,10 @@ private fun SrokaNavDisplay(backStack: NavBackStack<NavKey>) {
                 onOpenTag = { name -> backStack.add(TagItemsKey(name)) },
                 onOpenSettings = { backStack.add(SettingsKey) },
                 onBack = goBack,
+                // From the Expired banner: sign in on top of the library; success pops it.
+                onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
             )
-            readerEntries(onBack = goBack)
+            readerEntries(onBack = goBack, onArchived = onArchived)
             settingsEntries(onBack = goBack)
         },
     )

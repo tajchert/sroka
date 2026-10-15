@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.activity.compose)
 
     testImplementation(libs.junit)
 

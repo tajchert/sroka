@@ -1,5 +1,7 @@
 package app.sroka.core.testing.fake
 
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
 import androidx.paging.PagingData
 import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.SaveSource
@@ -36,7 +38,15 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
 
     override fun pagedItems(query: ItemQuery): Flow<PagingData<ItemSummary>> {
         lastQuery = query
-        return items.map { PagingData.from(filter(it, query).map(Item::toSummary)) }
+        return items.map { PagingData.from(
+                filter(it, query).map(Item::toSummary),
+                // Report "loaded" so UIs leave their loading state in tests (empty states render).
+                sourceLoadStates = LoadStates(
+                    refresh = LoadState.NotLoading(endOfPaginationReached = true),
+                    prepend = LoadState.NotLoading(endOfPaginationReached = true),
+                    append = LoadState.NotLoading(endOfPaginationReached = true),
+                ),
+            ) }
     }
 
     /** The rows [pagedItems] would page through for [query]. */

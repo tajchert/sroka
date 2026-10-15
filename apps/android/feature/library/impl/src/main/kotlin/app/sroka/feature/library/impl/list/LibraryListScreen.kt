@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.list
 
+import app.sroka.core.ui.rememberWithNotificationPermission
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -159,6 +160,7 @@ fun LibraryListRoute(
     }
 
     val isEmpty = items.loadState.refresh is LoadState.NotLoading && items.itemCount == 0
+    val fetch = rememberWithNotificationPermission(viewModel::fetchNewArticles)
     val isTopLevel = scope is ListScope.Tab
 
     Scaffold(
@@ -175,7 +177,7 @@ fun LibraryListRoute(
                     viewModel.onSearchTextChange("")
                 },
                 onSortChange = viewModel::setSort,
-                onFetch = viewModel::fetchNewArticles,
+                onFetch = fetch,
                 onOpenSettings = onOpenSettings,
                 onBack = onBack,
             )
@@ -198,7 +200,7 @@ fun LibraryListRoute(
                 isRefreshing = pulled && state.busy,
                 onRefresh = {
                     pulled = true
-                    viewModel.fetchNewArticles()
+                    fetch()
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {

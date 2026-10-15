@@ -5,4 +5,7 @@
     <string name="nav_archive">Archive</string>
     <string name="nav_favorites">Favorites</string>
     <string name="nav_tags">Tags</string>
+    <string name="share_label">Save to Sroka</string>
+    <string name="reader_archived">Archived</string>
+    <string name="reader_archived_undo">Undo</string>
 </resources>

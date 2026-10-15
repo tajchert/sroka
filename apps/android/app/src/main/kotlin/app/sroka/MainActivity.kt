@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = uiState.shouldUseDarkTheme(isSystemInDarkTheme()),
                 dynamicColor = uiState.shouldUseDynamicColor(),
             ) {
-                if (state != null) SrokaApp(isSignedIn = state.isSignedIn)
+                if (state != null) SrokaApp(session = state.session, onUndoArchive = viewModel::unarchive)
             }
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -155,7 +156,12 @@ private fun SrokaNavDisplay(
     directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
 ) {
-    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
+    // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
+    // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
+    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(
+        backNavigationBehavior = BackNavigationBehavior.PopLatest,
+        directive = directive,
+    )
     val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeLastOrNull() }
     NavDisplay(
         backStack = backStack,

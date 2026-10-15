@@ -1,6 +1,7 @@
 package app.sroka.core.data.sync
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -11,6 +12,7 @@ import app.sroka.core.domain.SyncEvent
 import app.sroka.core.model.SyncErrorKind
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 
 /**
  * Runs [SyncEngine.sync] (DECISIONS A8). Background runs retry with backoff on network/server
@@ -42,7 +44,14 @@ class SyncWorker @AssistedInject constructor(
         return when (val outcome = engine.sync()) {
             is SyncOutcome.Success -> {
                 if (!user) scheduler.enqueueAutoDownload()
-                contentStore.evict()
+                // Maintenance must never fail the sync (or cancel a chained user download).
+                try {
+                    contentStore.evict()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "eviction failed", e)
+                }
                 Result.success()
             }
             is SyncOutcome.Failure -> when {
@@ -58,6 +67,7 @@ class SyncWorker @AssistedInject constructor(
     }
 
     private companion object {
+        const val TAG = "SrokaSync"
         const val MAX_ATTEMPTS = 5
     }
 }

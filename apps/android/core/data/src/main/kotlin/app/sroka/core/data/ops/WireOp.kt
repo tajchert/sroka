@@ -1,6 +1,7 @@
 package app.sroka.core.data.ops
 
 import app.sroka.core.model.ItemStatus
+import app.sroka.core.model.clampTitle
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -43,7 +44,7 @@ sealed interface WireOp {
         override val type get() = ADD
         override fun toJson() = op {
             put("url", url)
-            title?.let { put("title", it) }
+            clampTitle(title)?.let { put("title", it) }
             put("tags", JsonArray(tags.map(::JsonPrimitive)))
             source?.let { put("source", it) }
             put("savedAt", savedAt)
@@ -107,7 +108,7 @@ sealed interface WireOp {
         val title: String?,
     ) : WireOp {
         override val type get() = SET_TITLE
-        override fun toJson() = op { put("title", title.orEmpty()) }
+        override fun toJson() = op { put("title", clampTitle(title).orEmpty()) }
     }
 
     data class Delete(override val opId: String, override val itemId: String, override val at: Long) : WireOp {

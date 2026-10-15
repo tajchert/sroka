@@ -9,6 +9,7 @@ import app.sroka.core.domain.AuthResult
 import app.sroka.core.domain.SyncController
 import app.sroka.core.model.SessionState
 import app.sroka.core.network.ApiResult
+import app.sroka.core.network.SessionProvider
 import app.sroka.core.network.SrokaApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -28,6 +29,7 @@ internal class AuthRepositoryImpl @Inject constructor(
     private val itemDao: ItemDao,
     private val pendingOpDao: PendingOpDao,
     private val syncController: SyncController,
+    private val sessionProvider: SessionProvider,
 ) : AuthRepository {
 
     override val session: Flow<SessionState> = sessionStore.session
@@ -61,10 +63,18 @@ internal class AuthRepositoryImpl @Inject constructor(
             is ApiResult.Success -> {
                 val signedInAs = r.value.userEmail.ifBlank { address }
                 val owner = accountMarker.email ?: sessionStore.current()?.email
-                val otherAccount = if (owner == null) hasLocalData() else !owner.equals(signedInAs, ignoreCase = true)
+                val server = sessionProvider.baseUrl()
+                val dataServer = accountMarker.serverUrl
+                val otherAccount = when {
+                    owner == null -> hasLocalData()
+                    !owner.equals(signedInAs, ignoreCase = true) -> true
+                    // Same email on a different server is a different account.
+                    else -> dataServer != null && dataServer != server
+                }
                 if (otherAccount) wiper.wipe()
                 sessionStore.save(r.value.token, signedInAs)
                 accountMarker.email = signedInAs
+                accountMarker.serverUrl = server
                 syncController.requestSync()
                 AuthResult.Success
             }
@@ -82,6 +92,7 @@ internal class AuthRepositoryImpl @Inject constructor(
         wiper.wipe()
         sessionStore.clear()
         accountMarker.email = null
+        accountMarker.serverUrl = null
     }
 
     private suspend fun hasLocalData(): Boolean {

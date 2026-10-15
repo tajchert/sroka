@@ -47,8 +47,8 @@ internal class OkHttpSrokaApi(
     override suspend fun push(deviceId: String, ops: List<JsonObject>): ApiResult<PushResponseDto> =
         execute(post("/v1/sync/push", json.encodeToString(PushRequest(deviceId, ops)))) { decode(it) }
 
-    override suspend fun pull(cursor: Long, limit: Int): ApiResult<PullResponseDto> =
-        execute(get("/v1/sync/pull?cursor=$cursor&limit=$limit")) { decode(it) }
+    override suspend fun pull(cursor: Long, limit: Int, full: Boolean): ApiResult<PullResponseDto> =
+        execute(get("/v1/sync/pull?cursor=$cursor&limit=$limit" + if (full) "&full=1" else "")) { decode(it) }
 
     override suspend fun contentUrls(itemId: String): ApiResult<ContentUrlsDto> =
         execute(get("/v1/items/${segment(itemId)}/content")) { decode(it) }

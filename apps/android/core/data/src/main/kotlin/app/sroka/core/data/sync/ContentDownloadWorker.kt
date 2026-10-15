@@ -7,10 +7,10 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.sroka.core.data.content.ContentStoreImpl
+import app.sroka.core.data.content.DownloadOutcome
 import app.sroka.core.database.dao.ContentFileDao
 import app.sroka.core.database.dao.ItemDao
 import app.sroka.core.datastore.SessionStore
-import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.domain.SyncEvent
 import app.sroka.core.model.SyncErrorKind
@@ -57,13 +57,18 @@ class ContentDownloadWorker @AssistedInject constructor(
 
     private suspend fun downloadOne(itemId: String): Result =
         when (val r = contentStore.download(itemId)) {
-            is DownloadResult.Failed -> if (r.reason == RemoteFailure.NETWORK && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
+            is DownloadOutcome.Failed -> if (r.reason == RemoteFailure.NETWORK && runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
             else -> Result.success()
         }
 
     private suspend fun downloadAll(): Result {
-        contentFileDao.resetDownloading()
-        val eligible = contentFileDao.eligibleForDownload()
+        // Once per process (not per run): a second worker must not reset rows the first is downloading.
+        contentStore.recoverInterrupted()
+        val clearGen = contentStore.clearGeneration()
+        val eligible = (
+            contentFileDao.eligibleForDownload() +
+                contentFileDao.thumbsToRetry(ContentStoreImpl.THUMB_MAX_ATTEMPTS)
+            ).distinctBy { it.itemId }
         val total = eligible.size
         if (total == 0) return finish(downloaded = 0, failure = null)
         foreground(0, total)
@@ -72,25 +77,31 @@ class ContentDownloadWorker @AssistedInject constructor(
         var done = 0
         var downloaded = 0
         var failure: SyncErrorKind? = null
+        var storageFull = false
         val permits = Semaphore(PARALLEL)
         coroutineScope {
             eligible.map { row ->
                 async {
                     permits.withPermit {
-                        if (lock.withLock { failure } != null) return@withPermit
+                        if (lock.withLock { failure != null || storageFull }) return@withPermit
+                        // "Remove downloads" ran meanwhile: do not re-fetch what the user cleared.
+                        if (contentStore.clearGeneration() != clearGen) return@withPermit
                         val result = contentStore.download(row.itemId)
                         val title = itemDao.getItem(row.itemId)?.let { it.title ?: displayDomain(it.url) }
                         lock.withLock {
                             done++
                             when (result) {
-                                DownloadResult.Downloaded -> downloaded++
-                                is DownloadResult.Failed -> when (result.reason) {
+                                // Only packages this run fetched count (not ones another run already had).
+                                DownloadOutcome.Downloaded -> downloaded++
+                                DownloadOutcome.AlreadyCurrent, DownloadOutcome.NotReady -> Unit
+                                // Out of space: stop the batch, do not retry, tell the user.
+                                DownloadOutcome.StorageFull -> storageFull = true
+                                is DownloadOutcome.Failed -> when (result.reason) {
                                     // No point hammering the rest of the queue.
                                     RemoteFailure.NETWORK -> failure = SyncErrorKind.NETWORK
                                     RemoteFailure.UNAUTHORIZED -> failure = SyncErrorKind.AUTH
                                     else -> Unit
                                 }
-                                DownloadResult.NotReady -> Unit
                             }
                             setProgress(workDataOf(SyncWork.KEY_DONE to done, SyncWork.KEY_TOTAL to total, SyncWork.KEY_TITLE to title))
                             foreground(done, total)
@@ -99,7 +110,7 @@ class ContentDownloadWorker @AssistedInject constructor(
                 }
             }.awaitAll()
         }
-        return finish(downloaded, failure)
+        return finish(downloaded, if (storageFull) SyncErrorKind.SERVER else failure)
     }
 
     private fun finish(downloaded: Int, failure: SyncErrorKind?): Result {

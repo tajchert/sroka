@@ -8,7 +8,9 @@ import app.sroka.core.data.content.ContentPaths
 import app.sroka.core.data.sync.SyncControllerImpl
 import app.sroka.core.data.sync.SyncEngine
 import app.sroka.core.data.sync.WorkScheduler
+import app.sroka.core.database.SrokaDatabase
 import app.sroka.core.database.dao.MaintenanceDao
+import app.sroka.core.database.vacuum
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -26,6 +28,7 @@ internal class LocalDataWiper @Inject constructor(
     private val syncController: SyncControllerImpl,
     private val engine: SyncEngine,
     private val maintenanceDao: MaintenanceDao,
+    private val db: SrokaDatabase,
     private val paths: ContentPaths,
     @Dispatcher(SrokaDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
@@ -35,6 +38,8 @@ internal class LocalDataWiper @Inject constructor(
         engine.exclusive {
             maintenanceDao.wipeAll()
             withContext(io) { paths.deleteAll() }
+            // DELETE never shrinks the file: reclaim the article text the FTS index held.
+            runCatching { db.vacuum() }
         }
     }
 }
@@ -52,8 +57,14 @@ internal class AccountMarker @Inject constructor(@ApplicationContext context: Co
         get() = prefs.getString(KEY_EMAIL, null)
         set(value) = prefs.edit { if (value == null) remove(KEY_EMAIL) else putString(KEY_EMAIL, value) }
 
+    /** Server the local data was synced from (null = unknown, e.g. data from before this was recorded). */
+    var serverUrl: String?
+        get() = prefs.getString(KEY_SERVER, null)
+        set(value) = prefs.edit { if (value == null) remove(KEY_SERVER) else putString(KEY_SERVER, value) }
+
     private companion object {
         const val FILE = "sroka_account"
         const val KEY_EMAIL = "email"
+        const val KEY_SERVER = "server"
     }
 }

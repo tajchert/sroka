@@ -4,6 +4,7 @@ import android.content.Context
 import app.sroka.core.data.AppBuildInfo
 import app.sroka.core.data.content.ContentPaths
 import app.sroka.core.data.content.ContentStoreImpl
+import app.sroka.core.data.content.DownloadCanceller
 import app.sroka.core.data.repository.AccountRepositoryImpl
 import app.sroka.core.data.repository.AuthRepositoryImpl
 import app.sroka.core.data.repository.LibraryRepositoryImpl
@@ -12,6 +13,7 @@ import app.sroka.core.data.repository.TagRepositoryImpl
 import app.sroka.core.data.session.SessionProviderImpl
 import app.sroka.core.data.sync.SyncControllerImpl
 import app.sroka.core.data.sync.SyncStatusRepositoryImpl
+import app.sroka.core.data.sync.WorkDownloadCanceller
 import app.sroka.core.domain.AccountRepository
 import app.sroka.core.domain.AuthRepository
 import app.sroka.core.domain.ContentStore
@@ -46,6 +48,7 @@ internal abstract class DataModule {
     @Binds abstract fun settings(impl: SettingsRepositoryImpl): SettingsRepository
     @Binds abstract fun account(impl: AccountRepositoryImpl): AccountRepository
     @Binds abstract fun sessionProvider(impl: SessionProviderImpl): SessionProvider
+    @Binds abstract fun downloadCanceller(impl: WorkDownloadCanceller): DownloadCanceller
 
     companion object {
         @Provides

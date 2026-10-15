@@ -6,6 +6,7 @@ import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.MAX_TAGS_PER_ITEM
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.UrlNormalizer
+import app.sroka.core.model.clampTitle
 import app.sroka.core.model.tagKey
 import javax.inject.Inject
 
@@ -26,7 +27,7 @@ internal class LocalOpApplier @Inject constructor(private val itemDao: ItemDao) 
         is WireOp.SetProgress -> ifExists(op.itemId) {
             itemDao.setProgress(op.itemId, op.progress.coerceIn(0f, 1f), op.anchor, op.at)
         }
-        is WireOp.SetTitle -> ifExists(op.itemId) { itemDao.setTitle(op.itemId, op.title?.takeIf { it.isNotBlank() }) }
+        is WireOp.SetTitle -> ifExists(op.itemId) { itemDao.setTitle(op.itemId, clampTitle(op.title)) }
         is WireOp.Tag -> ifExists(op.itemId) {
             val current = itemDao.tagNames(op.itemId)
             val key = tagKey(op.tag)
@@ -59,7 +60,7 @@ internal class LocalOpApplier @Inject constructor(private val itemDao: ItemDao) 
                     id = op.itemId,
                     url = op.url,
                     canonicalUrl = canonical,
-                    title = op.title?.takeIf { it.isNotBlank() },
+                    title = clampTitle(op.title),
                     excerpt = null,
                     siteName = null,
                     author = null,
@@ -89,7 +90,7 @@ internal class LocalOpApplier @Inject constructor(private val itemDao: ItemDao) 
                     status = ItemStatus.UNREAD,
                     archivedAt = null,
                     savedAt = maxOf(existing.savedAt, op.savedAt),
-                    title = existing.title ?: op.title?.takeIf { it.isNotBlank() },
+                    title = existing.title ?: clampTitle(op.title),
                 ),
                 unionTags(itemDao.tagNames(op.itemId), op.tags),
             )

@@ -13,8 +13,12 @@ interface SrokaApi {
 
     suspend fun push(deviceId: String, ops: List<JsonObject>): ApiResult<PushResponseDto>
 
-    /** 410 surfaces as [ApiResult.HttpError] with code `resync_required`. */
-    suspend fun pull(cursor: Long, limit: Int = 500): ApiResult<PullResponseDto>
+    /**
+     * 410 surfaces as [ApiResult.HttpError] with code `resync_required`. [full] (`full=1`) marks a
+     * pass that started at cursor 0 and continues it with later cursors: the server must not answer
+     * 410 for it (api.md §7.2).
+     */
+    suspend fun pull(cursor: Long, limit: Int = 500, full: Boolean = false): ApiResult<PullResponseDto>
 
     /** 409 `not_parsed` when the item has no content yet. */
     suspend fun contentUrls(itemId: String): ApiResult<ContentUrlsDto>

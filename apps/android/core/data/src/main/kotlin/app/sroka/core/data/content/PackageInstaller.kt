@@ -24,9 +24,13 @@ internal class PackageInstaller(
     sealed interface Result {
         data class Installed(val bytes: Long) : Result
         data class Invalid(val reason: String) : Result
+
+        /** Local I/O failure (disk full, ...): transient, not the package's fault. */
+        data object IoError : Result
     }
 
     fun install(zip: File, articlesDir: File, itemId: String): Result {
+        if (!ContentPaths.isSafeId(itemId)) return Result.Invalid("unsafe_id")
         articlesDir.mkdirs()
         val tmp = File(articlesDir, itemId + ContentPaths.TMP_SUFFIX)
         tmp.deleteRecursively()
@@ -42,7 +46,7 @@ internal class PackageInstaller(
             Result.Invalid(e.message ?: "invalid_package")
         } catch (e: IOException) {
             tmp.deleteRecursively()
-            Result.Invalid("io_error")
+            Result.IoError
         }
     }
 

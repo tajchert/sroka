@@ -2,7 +2,9 @@ package app.sroka.core.data.repository
 
 import app.sroka.core.data.AppBuildInfo
 import app.sroka.core.data.sync.WorkScheduler
+import app.sroka.core.datastore.SessionStore
 import app.sroka.core.datastore.UserPreferencesDataSource
+import app.sroka.core.domain.AuthRepository
 import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.ReaderTheme
@@ -10,6 +12,7 @@ import app.sroka.core.model.SortOrder
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +22,8 @@ internal class SettingsRepositoryImpl @Inject constructor(
     private val dataSource: UserPreferencesDataSource,
     private val buildInfo: AppBuildInfo,
     private val scheduler: WorkScheduler,
+    private val sessionStore: SessionStore,
+    private val auth: AuthRepository,
 ) : SettingsRepository {
 
     override val preferences: Flow<UserPreferences> = dataSource.userPreferences
@@ -51,12 +56,15 @@ internal class SettingsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setServerUrl(url: String?): Boolean {
-        if (url.isNullOrBlank()) {
-            dataSource.setServerUrl(null)
-            return true
+        val normalized = if (url.isNullOrBlank()) null else normalizeServerUrl(url) ?: return false
+        val stored = normalized?.takeUnless { it == buildInfo.defaultServerUrl.trimEnd('/') }
+        if (stored != dataSource.userPreferences.first().serverUrl && sessionStore.current() != null) {
+            // The bearer token, library, cursor and queued ops belong to the old server: never send
+            // them to the new host. Sign out first (revokes the token against the old base URL and
+            // wipes local data), then switch.
+            auth.signOut()
         }
-        val normalized = normalizeServerUrl(url) ?: return false
-        dataSource.setServerUrl(if (normalized == buildInfo.defaultServerUrl.trimEnd('/')) null else normalized)
+        dataSource.setServerUrl(stored)
         return true
     }
 }

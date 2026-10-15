@@ -1,6 +1,7 @@
 package app.sroka.core.data
 
 import app.sroka.core.data.ops.WireOp
+import app.sroka.core.data.ops.toEntity
 import app.sroka.core.data.sync.SyncOutcome
 import app.sroka.core.database.entity.ContentFileEntity
 import app.sroka.core.database.entity.ContentState
@@ -79,6 +80,178 @@ internal class SyncEngineTest : DataTestBase() {
         val queued = pendingOpDao.batch(10).single()
         assertEquals("server-1", queued.itemId)
         assertTrue(queued.payload.contains(""""itemId":"server-1""""))
+    }
+
+    @Test fun rejectedAddRemovesLocalOnlyOrphanButKeepsServerRows() = runBlocking {
+        val orphan = (library.save("https://example.com/o") as SaveResult.Saved).itemId
+        library.setFavorite(orphan, true)
+        itemDao.upsertItem(entity("known")) // serverSeq = 1: exists on the server
+        val ops = pendingOpDao.batch(10)
+        val add = ops.first { it.type == WireOp.ADD }.opId
+        enqueueJson("""{"applied":[],"rejected":[{"opId":"$add","reason":"invalid_op"}],"aliases":{},"cursor":1}""")
+        enqueueJson(pullJson(1))
+        engine.sync()
+        assertNull(itemDao.getItem(orphan))
+        assertEquals(0, pendingOpDao.count())
+        assertNotNull(itemDao.getItem("known"))
+    }
+
+    @Test fun rejectedAddOfServerKnownItemKeepsRow() = runBlocking {
+        itemDao.upsertItem(entity("known"))
+        val add = WireOp.Add("op-add", "known", now, "https://example.com/known", null, emptyList(), "web", now)
+        pendingOpDao.enqueue(add.toEntity(now))
+        enqueueJson("""{"applied":[],"rejected":[{"opId":"op-add","reason":"invalid_op"}],"aliases":{},"cursor":1}""")
+        enqueueJson(pullJson(1))
+        engine.sync()
+        assertNotNull(itemDao.getItem("known"))
+    }
+
+    @Test fun reSaveAfterRemoteDeleteRekeysTheAddOnItemDeleted() = runBlocking {
+        itemDao.upsertItem(entity("y")) // known to the server; deleted there by another device
+        val saved = library.save("https://example.com/y", tags = listOf("t")) as SaveResult.Saved
+        assertEquals("y", saved.itemId)
+        library.setFavorite("y", true)
+        val ops = pendingOpDao.batch(10)
+        val addId = ops[0].opId
+        val favId = ops[1].opId
+        enqueueJson("""{"applied":[],"rejected":[{"opId":"$addId","reason":"item_deleted"},{"opId":"$favId","reason":"item_deleted"}],"aliases":{},"cursor":1}""")
+        server.enqueue(MockResponse.Builder().code(503).build()) // stop after the re-keyed push
+        engine.sync()
+
+        assertNull(itemDao.getItem("y"))
+        val queued = pendingOpDao.batch(10)
+        assertEquals(listOf(WireOp.ADD, WireOp.SET_FAVORITE), queued.map { it.type })
+        val newId = queued[0].itemId!!
+        assertTrue(newId != "y")
+        assertEquals(newId, queued[1].itemId)
+        assertTrue(queued[0].opId != addId) // the server already acknowledged the old op id
+        assertTrue(queued[0].payload.contains(""""opId":"${queued[0].opId}""""))
+        assertTrue(queued[0].payload.contains(""""itemId":"$newId""""))
+        val local = itemDao.getItem(newId)!!
+        assertTrue(local.isFavorite)
+        assertEquals(listOf("t"), itemDao.tagNames(newId))
+        // the re-keyed ops were actually sent on the next push
+        takeRequest()
+        val second = takeRequest().body!!.utf8()
+        assertTrue(second, second.contains(""""itemId":"$newId""""))
+    }
+
+    @Test fun reSaveWhileTombstonePullsInRekeysThePendingAdd() = runBlocking {
+        itemDao.upsertItem(entity("y"))
+        serve { request ->
+            if (request.url.encodedPath == "/v1/sync/pull") {
+                // The user re-saves the URL while the page carrying y's tombstone is in flight.
+                runBlocking { library.save("https://example.com/y") }
+                json(pullJson(2, deletedItems = listOf("y")))
+            } else {
+                json("""{"applied":[],"rejected":[],"aliases":{},"cursor":2}""")
+            }
+        }
+        assertTrue(engine.sync() is SyncOutcome.Success)
+        assertNull(itemDao.getItem("y"))
+        val queued = pendingOpDao.batch(10).single()
+        assertEquals(WireOp.ADD, queued.type)
+        val newId = queued.itemId!!
+        assertTrue(newId != "y")
+        assertNotNull(itemDao.getItem(newId))
+        assertTrue(queued.payload.contains(""""itemId":"$newId""""))
+    }
+
+    @Test fun aliasKeepsSavedItemWhenThePullFails() = runBlocking {
+        val client = (library.save("https://example.com/dup2") as SaveResult.Saved).itemId
+        val addOp = pendingOpDao.batch(1).single().opId
+        enqueueJson("""{"applied":["$addOp"],"rejected":[],"aliases":{"$client":"server-9"},"cursor":3}""")
+        server.enqueue(MockResponse.Builder().code(503).build()) // pull fails
+        assertTrue(engine.sync() is SyncOutcome.Failure)
+        assertNull(itemDao.getItem(client))
+        val kept = itemDao.getItem("server-9")
+        assertNotNull(kept) // the user's save did not vanish
+        assertEquals("https://example.com/dup2", kept!!.url)
+        // writes made meanwhile on the displayed item are not dropped
+        library.setFavorite("server-9", true)
+        assertEquals(1, pendingOpDao.count())
+    }
+
+    @Test fun pendingTagRenameSurvivesAPageThatCarriesOnlyTags() = runBlocking {
+        itemDao.upsertItemWithTags(entity("a"), listOf("ml"))
+        serve { request ->
+            if (request.url.encodedPath == "/v1/sync/pull") {
+                runBlocking {
+                    val op = WireOp.TagRename(writer.newOpId(now), now, "ml", "machine-learning")
+                    writer.write { listOf(op) }
+                }
+                // page: only a tags row, no items
+                json(pullJson(5, tags = """{"id":"t1","name":"ml","seq":5}"""))
+            } else {
+                json("""{"applied":[],"rejected":[],"aliases":{},"cursor":5}""")
+            }
+        }
+        // The rename is queued during the pull, so it is re-applied on top of the page's tag row.
+        engine.sync()
+        assertEquals(listOf("machine-learning"), itemDao.tagNames("a"))
+        assertTrue(itemDao.allTagRows().none { it.nameKey == "ml" })
+    }
+
+    @Test fun pullFromZeroIsFullAndNeverGets410AfterTheHorizon() = runBlocking {
+        val horizon = 100L
+        syncStateDao.update { it.copy(cursor = 5) }
+        itemDao.upsertItem(entity("stale"))
+        val seen = mutableListOf<String>()
+        serve { request ->
+            if (request.url.encodedPath != "/v1/sync/pull") {
+                json("""{"applied":[],"rejected":[],"aliases":{},"cursor":0}""")
+            } else {
+                val cursor = request.url.queryParameter("cursor")!!.toLong()
+                val full = request.url.queryParameter("full") == "1"
+                seen += "$cursor/$full"
+                when {
+                    // the server's rule: only an incremental cursor below the horizon is refused
+                    !full && cursor in 1 until horizon -> json("""{"error":"resync_required"}""", 410)
+                    cursor == 0L -> json(pullJson(50, listOf(itemJson("a", 50)), hasMore = true))
+                    else -> json(pullJson(120, listOf(itemJson("b", 120)), hasMore = false))
+                }
+            }
+        }
+        assertEquals(SyncOutcome.Success(2), engine.sync())
+        assertEquals(listOf("5/false", "0/true", "50/true"), seen)
+        assertEquals(120, syncStateDao.get().cursor)
+        assertFalse(syncStateDao.get().fullResync)
+        assertNull(itemDao.getItem("stale")) // did not come back in the full pass
+        assertNotNull(itemDao.getItem("a"))
+
+        // a later incremental pull is not "full"
+        seen.clear()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                seen += request.url.queryParameter("full").toString()
+                return json(pullJson(121))
+            }
+        }
+        engine.sync()
+        assertEquals(listOf("null"), seen)
+    }
+
+    @Test fun firstSyncFromZeroUsesFullPass() = runBlocking {
+        val seen = mutableListOf<String>()
+        serve { request ->
+            val cursor = request.url.queryParameter("cursor")!!.toLong()
+            seen += "$cursor/${request.url.queryParameter("full")}"
+            if (cursor == 0L) json(pullJson(10, listOf(itemJson("a", 10)), hasMore = true)) else json(pullJson(20, listOf(itemJson("b", 20))))
+        }
+        assertEquals(SyncOutcome.Success(2), engine.sync())
+        assertEquals(listOf("0/1", "10/1"), seen)
+        assertFalse(syncStateDao.get().fullResync)
+    }
+
+    @Test fun unsafeServerIdsNeverReachTheDiskOrRoom() = runBlocking {
+        val sibling = tmp.newFile("files/sibling.txt").also { it.writeText("keep") }
+        itemDao.upsertItem(entity("a"))
+        serve { json(pullJson(5, listOf(itemJson("../datastore", 5), itemJson("b", 5)), deletedItems = listOf("..", "../x", "a"))) }
+        engine.sync()
+        assertTrue(sibling.exists())
+        assertNull(itemDao.getItem("../datastore"))
+        assertNotNull(itemDao.getItem("b"))
+        assertNull(itemDao.getItem("a"))
     }
 
     @Test fun pullPagesAdvanceCursorPerPageAtomically() = runBlocking {

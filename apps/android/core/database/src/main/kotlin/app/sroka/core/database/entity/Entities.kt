@@ -152,4 +152,6 @@ data class ContentFileEntity(
     @ColumnInfo(name = "downloaded_at") val downloadedAt: Long? = null,
     /** Absolute path of the local thumbnail file. */
     @ColumnInfo(name = "thumb_path") val thumbPath: String? = null,
+    /** Failed thumbnail fetches (capped so a permanently broken image is not retried forever). */
+    @ColumnInfo(name = "thumb_attempts", defaultValue = "0") val thumbAttempts: Int = 0,
 )

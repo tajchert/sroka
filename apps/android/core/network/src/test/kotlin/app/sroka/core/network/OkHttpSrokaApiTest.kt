@@ -165,6 +165,14 @@ class OkHttpSrokaApiTest {
         val req = server.takeRequest()
         assertEquals("2", req.url.queryParameter("cursor"))
         assertEquals("100", req.url.queryParameter("limit"))
+        assertNull(req.url.queryParameter("full"))
+    }
+
+    @Test
+    fun pullFullPassSendsFullFlag() = runBlocking {
+        json("""{"cursor":5,"hasMore":false,"items":[],"tags":[],"deleted":{"items":[],"tags":[]}}""")
+        assertTrue(api.pull(40, 100, full = true) is ApiResult.Success)
+        assertEquals("1", server.takeRequest().url.queryParameter("full"))
     }
 
     @Test

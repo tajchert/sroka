@@ -20,6 +20,8 @@ import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.LibraryCounts
 import app.sroka.core.model.MAX_TAGS_PER_ITEM
 import app.sroka.core.model.MAX_TAG_LENGTH
+import app.sroka.core.model.MAX_URL_LENGTH
+import app.sroka.core.model.clampTitle
 import app.sroka.core.model.SaveResult
 import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.newUuidV7
@@ -56,6 +58,7 @@ internal class LibraryRepositoryImpl @Inject constructor(
 
     override suspend fun save(url: String, title: String?, tags: List<String>, source: SaveSource): SaveResult {
         val trimmed = url.trim()
+        if (trimmed.length > MAX_URL_LENGTH) return SaveResult.InvalidUrl
         val canonical = UrlNormalizer.normalize(trimmed) ?: return SaveResult.InvalidUrl
         var result: SaveResult = SaveResult.InvalidUrl
         writer.write { now ->
@@ -68,7 +71,7 @@ internal class LibraryRepositoryImpl @Inject constructor(
                     itemId = id,
                     at = now,
                     url = trimmed,
-                    title = title?.trim()?.takeIf { it.isNotEmpty() },
+                    title = clampTitle(title),
                     tags = normalizeTags(tags),
                     source = source.wire,
                     savedAt = now,
@@ -89,7 +92,7 @@ internal class LibraryRepositoryImpl @Inject constructor(
         write { now -> listOf(WireOp.SetProgress(writer.newOpId(now), id, now, progress.coerceIn(0f, 1f), anchor)) }
 
     override suspend fun setTitle(id: String, title: String?) =
-        write { now -> listOf(WireOp.SetTitle(writer.newOpId(now), id, now, title?.trim()?.takeIf { it.isNotEmpty() })) }
+        write { now -> listOf(WireOp.SetTitle(writer.newOpId(now), id, now, clampTitle(title))) }
 
     override suspend fun setTags(id: String, names: List<String>) = write { now ->
         if (itemDao.getItem(id) == null) return@write emptyList()

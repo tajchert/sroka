@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.sroka.core.common.Clock
 import app.sroka.core.data.content.ContentPaths
 import app.sroka.core.data.content.ContentStoreImpl
+import app.sroka.core.data.content.DownloadCanceller
 import app.sroka.core.data.ops.LocalOpApplier
 import app.sroka.core.data.ops.OpWriter
 import app.sroka.core.data.ops.WireOp
@@ -56,6 +57,7 @@ internal abstract class DataTestBase {
     protected lateinit var library: LibraryRepositoryImpl
     protected lateinit var writer: OpWriter
     protected val syncController = FakeSyncController()
+    protected var cancelledDownloads = 0
     protected var now = 1_700_000_000_000L
     protected val clock = Clock { now }
 
@@ -84,7 +86,7 @@ internal abstract class DataTestBase {
         val applier = LocalOpApplier(db.itemDao())
         writer = OpWriter(db, applier, db.pendingOpDao(), clock)
         engine = SyncEngine(db, db.itemDao(), db.pendingOpDao(), db.syncStateDao(), api, sessionStore, applier, paths, clock, Dispatchers.IO)
-        contentStore = ContentStoreImpl(db, db.itemDao(), db.contentFileDao(), api, sessionStore, paths, clock, Dispatchers.IO)
+        contentStore = ContentStoreImpl(db, db.itemDao(), db.contentFileDao(), api, sessionStore, paths, clock, Dispatchers.IO, DownloadCanceller { cancelledDownloads++ })
         library = LibraryRepositoryImpl(db.itemDao(), writer, syncController, paths, Dispatchers.IO)
     }
 

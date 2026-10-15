@@ -5,6 +5,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import app.sroka.core.common.di.ApplicationScope
+import app.sroka.core.data.content.ContentStoreImpl
 import app.sroka.core.datastore.SessionStore
 import app.sroka.core.domain.SyncController
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,6 +25,7 @@ class SyncInitializer @Inject internal constructor(
     @ApplicationContext private val context: Context,
     private val syncController: SyncController,
     private val sessionStore: SessionStore,
+    private val contentStore: ContentStoreImpl,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val started = AtomicBoolean(false)
@@ -31,6 +33,8 @@ class SyncInitializer @Inject internal constructor(
     fun start() {
         if (!started.compareAndSet(false, true)) return
         SyncNotifications.ensureChannel(context)
+        // Rows left in DOWNLOADING by a previous process go back to QUEUED before any download starts.
+        scope.launch { contentStore.recoverInterrupted() }
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {

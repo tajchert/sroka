@@ -60,4 +60,21 @@ class PackageInstallerTest {
         assertNull(PackageInstaller.safeRelativePath("C:/a"))
         assertNull(PackageInstaller.safeRelativePath("a//b"))
     }
+
+    @Test fun unsafeItemIdIsRejectedBeforeTouchingTheDisk() {
+        val outside = File(tmp.root, "datastore").also { it.mkdirs(); File(it, "keep").writeText("x") }
+        val pkg = TestPackages.validZip(tmp.newFile(), "<p>x</p>")
+        for (bad in listOf("..", "../datastore", "a/b", "")) {
+            assertEquals(PackageInstaller.Result.Invalid("unsafe_id"), installer.install(pkg, articles, bad))
+        }
+        assertTrue(File(outside, "keep").exists())
+        assertEquals(0, articles.list()!!.size)
+    }
+
+    @Test fun ioFailureIsTransientNotInvalid() {
+        // `articles` is a regular file: creating the tmp directory fails like a full disk would.
+        val notADir = tmp.newFile("articles-file")
+        val result = installer.install(TestPackages.validZip(tmp.newFile(), "<p>x</p>"), notADir, "i1")
+        assertEquals(PackageInstaller.Result.IoError, result)
+    }
 }

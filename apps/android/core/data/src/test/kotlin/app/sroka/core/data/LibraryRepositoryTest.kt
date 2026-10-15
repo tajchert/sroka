@@ -46,6 +46,24 @@ internal class LibraryRepositoryTest : DataTestBase() {
         assertEquals(listOf(WireOp.ADD, WireOp.SET_STATUS, WireOp.ADD), pendingOps().map { it.type })
     }
 
+    @Test fun overlongTitleIsTruncatedLocallyAndOnTheWire() = runBlocking {
+        val long = "x".repeat(1500)
+        val r = library.save("https://example.com/t", long) as SaveResult.Saved
+        assertEquals(1000, itemDao.getItem(r.itemId)!!.title!!.length)
+        assertEquals(1000, (pendingOps().single() as WireOp.Add).title!!.length)
+        assertTrue(pendingOpDao.batch(1).single().payload.contains("x".repeat(1000)))
+        assertFalse(pendingOpDao.batch(1).single().payload.contains("x".repeat(1001)))
+
+        library.setTitle(r.itemId, "  " + "y".repeat(2000))
+        assertEquals("y".repeat(1000), itemDao.getItem(r.itemId)!!.title)
+        assertEquals("y".repeat(1000), (pendingOps().last() as WireOp.SetTitle).title)
+    }
+
+    @Test fun overlongUrlIsInvalid() = runBlocking {
+        assertEquals(SaveResult.InvalidUrl, library.save("https://example.com/" + "a".repeat(4100)))
+        assertEquals(0, pendingOpDao.count())
+    }
+
     @Test fun invalidUrl() = runBlocking {
         assertEquals(SaveResult.InvalidUrl, library.save("not a url"))
         assertEquals(0, pendingOpDao.count())

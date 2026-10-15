@@ -3,6 +3,9 @@ package app.sroka.core.network
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.asCoroutineDispatcher
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okio.buffer
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -269,5 +272,42 @@ class OkHttpSrokaApiTest {
         server.takeRequest(5, TimeUnit.SECONDS)
         d.cancelAndJoin()
         assertTrue(d.isCancelled)
+    }
+
+    @Test
+    fun responseBodiesAreReadOnTheIoDispatcherNotTheCaller() = runBlocking {
+        val readers = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        val recording = okhttp3.Interceptor { chain ->
+            val response = chain.proceed(chain.request())
+            val body = response.body
+            val source = object : okio.ForwardingSource(body.source()) {
+                override fun read(sink: okio.Buffer, byteCount: Long): Long {
+                    readers += Thread.currentThread().name
+                    return super.read(sink, byteCount)
+                }
+            }
+            response.newBuilder().body(
+                source.buffer().asResponseBody(body.contentType(), body.contentLength()),
+            ).build()
+        }
+        val session = object : SessionProvider {
+            override suspend fun token() = token
+            override suspend fun deviceId() = "and_dev1"
+            override suspend fun baseUrl() = server.url("/").toString().trimEnd('/')
+        }
+        val io = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "test-io") }
+        try {
+            val client = OkHttpClient.Builder().addInterceptor(recording).build()
+            val api = OkHttpSrokaApi(client, client, session, Json { ignoreUnknownKeys = true }, io.asCoroutineDispatcher())
+            json("""{"code":"TURNSTILE_FAILED","message":"x"}""", code = 400)
+            val r = api.sendOtp("a@b.c") as ApiResult.HttpError
+            assertEquals("TURNSTILE_FAILED", r.code)
+            json("""{"user":{"id":"u","email":"a@b.c"},"stats":{"unread":2}}""")
+            assertTrue(api.me() is ApiResult.Success)
+            assertTrue(readers.isNotEmpty())
+            assertTrue(readers.toString(), readers.all { it.startsWith("test-io") })
+        } finally {
+            io.shutdown()
+        }
     }
 }

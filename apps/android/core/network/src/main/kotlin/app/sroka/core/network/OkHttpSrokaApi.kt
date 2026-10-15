@@ -1,6 +1,9 @@
 package app.sroka.core.network
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -27,6 +30,8 @@ internal class OkHttpSrokaApi(
     private val downloadClient: OkHttpClient,
     private val session: SessionProvider,
     private val json: Json,
+    /** Response bodies are read and closed here: never on the caller's (possibly Main) dispatcher. */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SrokaApi {
 
     override suspend fun sendOtp(email: String): ApiResult<Unit> =
@@ -114,6 +119,9 @@ internal class OkHttpSrokaApi(
         executeWith(client, request, parse)
 
     private suspend fun <T> executeWith(client: OkHttpClient, request: Request, parse: (Response) -> T): ApiResult<T> =
+        withContext(ioDispatcher) { executeBlockingParts(client, request, parse) }
+
+    private suspend fun <T> executeBlockingParts(client: OkHttpClient, request: Request, parse: (Response) -> T): ApiResult<T> =
         try {
             client.newCall(request).await().use { response ->
                 if (response.isSuccessful) {

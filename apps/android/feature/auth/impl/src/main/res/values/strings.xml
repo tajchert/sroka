@@ -26,5 +26,5 @@
         <item quantity="other">Too many requests. Try again in %1$d seconds.</item>
     </plurals>
     <string name="feature_auth_error_network">You appear to be offline. Check your connection and try again.</string>
-    <string name="feature_auth_error_server">Could not reach the server. Try again later.</string>
+    <string name="feature_auth_error_server">The server could not complete the request. Try again later.</string>
 </resources>

@@ -11,6 +11,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - `workers/parser` — Worker `sroka-parser`: queue consumer for `sroka-parse`
 - `apps/web` — React SPA (`/app`) + landing (`/`)
 - `apps/extension` — WXT MV3 Chrome extension
+- `apps/android` — native Android app (Kotlin, Compose, Room, WorkManager); own Gradle root, not an npm workspace. See `apps/android/CLAUDE.md`
 
 ## Commands
 - Install: `npm install` (root)
@@ -19,6 +20,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - Local stack: `npm run dev:setup` once (.dev.vars, local D1 migrations, web build), then `npm run dev -w @sroka/api` (wrangler dev :8787, api + parser in one process) + optionally `npm run dev -w @sroka/web` (vite :5173, proxies /api,/v1). Details: `workers/api/CLAUDE.md` "Local stack".
 - Local e2e: `DEV_LOG=<wrangler dev log> npm run e2e:local` (`scripts/e2e-local.sh`, curl + jq + node; non-zero exit on failure).
 - Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`
+- Android: in `apps/android` with JDK 21, `./gradlew testDebugUnitTest lintDebug assembleDebug` (details: `apps/android/CLAUDE.md`)
 - Each workspace has its own CLAUDE.md with specifics.
 
 ## Conventions

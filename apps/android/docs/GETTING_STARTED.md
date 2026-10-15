@@ -1,5 +1,7 @@
 # First run and troubleshooting
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 Start with the unchanged sample before adopting its identity. The current toolchain is in the [README](../README.md) and `gradle/libs.versions.toml`.
 
 ## Configure your machine
@@ -29,7 +31,7 @@ adb shell am start -n app.sroka.debug/app.sroka.MainActivity
 
 These examples use the original identity. After adoption, substitute your package; the debug application ID keeps the `.debug` suffix. With several devices attached, select the target explicitly, for example with `adb -s <serial>` and Android Studio's run-device selector.
 
-The first database creation seeds two tasks. Create a task, relaunch, open its detail, and try preferences. Demo import replaces local tasks only after confirmation. For the separate development app, see [Tasks feature host](../samples/tasks-app/README.md).
+On first launch the app shows sign-in. Debug builds use `http://localhost:8787`: run the local stack (repo root `npm run dev -w @sroka/api`), then `adb reverse tcp:8787 tcp:8787`; the dev OTP is printed in the wrangler log. See the [README](../README.md#build--run).
 
 ## Common failures
 

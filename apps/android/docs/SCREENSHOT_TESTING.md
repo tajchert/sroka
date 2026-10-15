@@ -1,5 +1,7 @@
 # Compose screenshot testing
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 This template uses Google's experimental Compose Preview Screenshot Testing plugin to catch visual regressions locally. A screenshot test renders a composable, compares it with a reviewed reference PNG, and produces an HTML diff when pixels change.
 
 The September 2026 baseline uses `0.0.1-alpha16` with stable AGP 9.4.1. The standalone plugin no longer exposes the old `testOptions.screenshotTests.imageDifferenceThreshold` setting; this template uses the default exact comparison. Native AGP screenshot test suites require AGP 9.5 previews, so migration is deferred until that build tooling is stable. See the [official release notes](https://developer.android.com/studio/preview/compose-screenshot-testing-release-notes).
@@ -66,7 +68,7 @@ Update all configured modules:
 ./gradlew \
   :core:designsystem:updateDebugScreenshotTest \
   :core:ui:updateDebugScreenshotTest \
-  :feature:tasks:impl:updateDebugScreenshotTest
+  :feature:library:impl:updateDebugScreenshotTest
 ```
 
 References are written below each module:
@@ -91,7 +93,7 @@ Validate the complete local suite:
 ./gradlew \
   :core:designsystem:validateDebugScreenshotTest \
   :core:ui:validateDebugScreenshotTest \
-  :feature:tasks:impl:validateDebugScreenshotTest
+  :feature:library:impl:validateDebugScreenshotTest
 ```
 
 A mismatch fails the task and creates an HTML report at:

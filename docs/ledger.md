@@ -17,6 +17,7 @@
 
 | Observability | done (branch feat/observability) | structured logger (`@sroka/shared` log.ts/metrics.ts), request logging + onError requestId, parser per-job `parse` log, Analytics Engine `METRICS`/`sroka_events`, `/v1/client-errors` + web reporting, `docs/observability.md`. Deploy: enable Analytics Engine in dashboard once; set up alerts per doc |
 | Shared-content GC | done (not deployed) | feat/content-gc — LibraryDO content-ref outbox (DO schema v3) → D1 `content_refs` (migration 0002), content row for every public dir, cache-hit touch, weekly cron backfill (operator-started) + GC of unreferenced content after 30 days. Production rollout steps: workers/parser/CLAUDE.md "Shared-content GC" |
+| Android app (`apps/android`) | done (branch feat/android) | Native Kotlin/Compose client: Room v1 + FTS4 local library, pending-ops outbox + push/pull sync (410 resync), offline article packages via WorkManager with progress, share target, WebView reader, settings. Ledger `apps/android/docs/LEDGER.md`. Open: device e2e vs local stack, review pass, branding |
 
 ## Open items
 - Shared-content GC deployed 2026-10-15 (migration 0002 applied, backfill started via gc_state). The Sunday cron re-emits refs and sets gc_backfill_done; verify afterwards: `select * from gc_state; select count(*) from content_refs;`

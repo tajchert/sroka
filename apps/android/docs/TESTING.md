@@ -1,5 +1,7 @@
 # Testing
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 Six layers, each answering a different question, ordered by how fast they run.
 
 The included CI configuration targets GitHub Actions. On GitLab, run these commands locally or provide an equivalent pipeline; no GitLab CI configuration is included.
@@ -23,7 +25,7 @@ The included CI configuration targets GitHub Actions. On GitLab, run these comma
 # Screenshot validation (also runs in CI)
 ./gradlew :core:designsystem:validateDebugScreenshotTest \
   :core:ui:validateDebugScreenshotTest \
-  :feature:tasks:impl:validateDebugScreenshotTest
+  :feature:library:impl:validateDebugScreenshotTest
 
 # Adoption-script checks
 python3 -m unittest discover -s scripts/tests -v
@@ -33,7 +35,7 @@ python3 -m unittest discover -s scripts/tests -v
 
 # Instrumented tests; requires an emulator or device
 ./gradlew :core:database:connectedDebugAndroidTest \
-  :feature:tasks:impl:connectedDebugAndroidTest
+  :feature:library:impl:connectedDebugAndroidTest
 ```
 
 Reports:
@@ -84,7 +86,7 @@ behaviour, real lifecycle and process death, system UI interaction.
 The GitHub Actions device job executes SQLite migrations and reopen persistence, feature lifecycle/accessibility tests, and functional app journeys. The journey APK lives in the existing `:benchmark` module so it can force-stop the app without killing its own test runner; these tests do not collect performance timings.
 
 ```bash
-./gradlew :core:database:connectedDebugAndroidTest :feature:tasks:impl:connectedDebugAndroidTest
+./gradlew :core:database:connectedDebugAndroidTest :feature:library:impl:connectedDebugAndroidTest
 ./gradlew :benchmark:connectedNonMinifiedReleaseAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=app.sroka.benchmark.TasksSmokeTest
 ```

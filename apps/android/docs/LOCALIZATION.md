@@ -1,10 +1,12 @@
 # Localization and RTL checks
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 The sample currently ships English default resources only. Resource-backed labels and typed errors make translation possible; they do not mean translations have been supplied. Demo task text and test fixtures are English sample data.
 
 ## Add translations
 
-- Keep default strings complete in each owning module: `app`, `feature/tasks/impl`, `core/ui`, and `core/designsystem`. Add language-specific `res/values-<language>/strings.xml` files alongside them and use locale qualifiers for regional variants when needed.
+- Keep default strings complete in each owning module: `app`, `feature/*/impl`, `core/ui`, and `core/designsystem`. Add language-specific `res/values-<language>/strings.xml` files alongside them and use locale qualifiers for regional variants when needed.
 - Resolve UI labels/errors with resources rather than exception text or hardcoded strings. Use positional formatting arguments for task-specific accessibility labels; do not assemble sentences by concatenating translated fragments.
 - Use quantity resources when adding count-dependent messages. Mark identifiers and other intentionally untranslated constants appropriately.
 - Keep dates and times locale-aware. Task details already format with the configured UI locale and device time zone. Format any new numbers, currencies, and units for their intended locale too.

@@ -1,5 +1,7 @@
 # Performance testing
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 The `:benchmark` Android test module targets the complete app and contains two
 small examples. `BaselineProfileGenerator` captures startup and the Navigation 3
 journey from the task list into the Create task form. `StartupBenchmark` measures

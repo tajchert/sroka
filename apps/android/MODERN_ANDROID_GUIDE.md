@@ -2283,4 +2283,4 @@ Navigation updated on **October 1, 2026**:
 - Android compile/target SDK 37, min SDK 26
 
 Use [gradle/libs.versions.toml](gradle/libs.versions.toml) as the source of truth
-and [the refresh notes](docs/SEPTEMBER_2026_REFRESH.md) for sources and scope.
+for sources and scope.

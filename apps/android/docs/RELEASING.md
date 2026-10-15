@@ -1,10 +1,12 @@
 # Release workflow
 
+> Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
+
 The starter verifies a minified release build but has no production signing configuration or publishing automation. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants.
 
 ## Prepare a product release
 
-1. Finish identity adoption, remove demo bindings/data, and review the [product checklist](TEMPLATE_CHECKLIST.md). Configure CI on the forge you use; the included workflow targets GitHub Actions, not GitLab.
+1. Replace the template launcher icon with Sroka branding and review [security defaults](SECURITY_DEFAULTS.md). Configure CI on the forge you use; the included workflow targets GitHub Actions, not GitLab.
 2. Set `versionCode` and `versionName` in `app/build.gradle.kts`. Use an increasing code for successive product releases and define a user-visible naming policy.
 3. Choose the upload/signing arrangement for your distribution channel. For Google Play, distinguish the upload key from the app signing key. Configure release signing in Gradle using protected local/CI inputs, or use Android Studio's **Generate Signed Bundle / APK** workflow. The repository defines no signing-secret variable names to populate.
 4. Keep keystores and passwords outside tracked files. The existing ignore rules cover `.jks` and `.keystore`; they are not a substitute for controlling access and backups. CI signing material belongs in protected secrets and restricted release jobs.

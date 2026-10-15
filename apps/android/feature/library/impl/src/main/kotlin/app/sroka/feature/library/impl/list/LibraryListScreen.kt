@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,9 +61,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -214,6 +218,7 @@ fun LibraryListRoute(
                         onLongClick = { viewModel.showActions(it.id) },
                         onArchive = { viewModel.toggleArchive(it.id, it.status) },
                         onFavorite = { viewModel.toggleFavorite(it.id, it.isFavorite) },
+                        bottomPadding = if (isTopLevel && !searching) FAB_CLEARANCE else 0.dp,
                     )
                 }
             }
@@ -290,6 +295,8 @@ private fun ListTopBar(
 ) {
     if (searching) {
         val focus = remember { FocusRequester() }
+        val keyboard = LocalSoftwareKeyboardController.current
+        val focusManager = LocalFocusManager.current
         LaunchedEffect(Unit) { focus.requestFocus() }
         TopAppBar(
             navigationIcon = {
@@ -310,7 +317,7 @@ private fun ListTopBar(
                         unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = {}),
+                    keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); focusManager.clearFocus() }),
                     modifier = Modifier.focusRequester(focus),
                 )
             },
@@ -404,6 +411,9 @@ private fun EmptyContent(scope: ListScope, searching: Boolean) {
     }
 }
 
+/** 56dp FAB + 16dp margin + 16dp gap; same as the app-level snackbar clearance. */
+private val FAB_CLEARANCE = 88.dp
+
 @Composable
 private fun ItemList(
     items: LazyPagingItems<ItemSummary>,
@@ -412,8 +422,9 @@ private fun ItemList(
     onLongClick: (ItemSummary) -> Unit,
     onArchive: (ItemSummary) -> Unit,
     onFavorite: (ItemSummary) -> Unit,
+    bottomPadding: Dp,
 ) {
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding)) {
         items(
             count = items.itemCount,
             key = items.itemKey { it.id },

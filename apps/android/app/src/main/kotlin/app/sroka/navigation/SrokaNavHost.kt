@@ -181,7 +181,10 @@ private fun SrokaNavDisplay(
                 },
                 onOpenTag = { name -> backStack.add(TagItemsKey(name)) },
                 onOpenSettings = { backStack.add(SettingsKey) },
-                onBack = goBack,
+                onCloseTag = { key ->
+                    val i = backStack.lastIndexOf(key)
+                    if (i > 0) backStack.subList(i, backStack.size).clear()
+                },
                 // From the Expired banner: sign in on top of the library; success pops it.
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
             )

@@ -29,7 +29,7 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param onOpenItem open the reader for an item id
  * @param onOpenTag open the list of items with a tag
  * @param onOpenSettings open settings
- * @param onBack pop the current entry (tag item list)
+ * @param onCloseTag close the given tag list (and any reader opened from it)
  * @param onSignIn the "sign in again" banner action; the app navigates to auth
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -37,7 +37,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onOpenItem: (itemId: String) -> Unit,
     onOpenTag: (name: String) -> Unit,
     onOpenSettings: () -> Unit,
-    onBack: () -> Unit,
+    onCloseTag: (TagItemsKey) -> Unit,
     onSignIn: () -> Unit = {},
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
@@ -57,7 +57,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             scope = ListScope.Tag(key.name),
             onOpenItem = onOpenItem,
             onSignIn = onSignIn,
-            onBack = onBack,
+            onBack = { onCloseTag(key) },
         )
     }
 }

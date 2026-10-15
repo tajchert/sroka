@@ -17,7 +17,7 @@ Never logged: OTPs (except the `ENVIRONMENT=development` console line used by lo
 ### Log events (field `event`)
 
 API: `http_request` (api/auth routes always; assets, SPA, `/v1/health` and the content host only if status >= 500 or >= 1.5 s), `unhandled_error`, `client_error`, `otp_send_failed`, `account_delete` (`step`: start / library_destroyed / d1_deleted), `account_r2_wipe_failed`, `import_failed`, `import_upload_failed`, `import_workflow_create_failed`, `queue_send_failed`, `sweep_schedule_failed`, `sync_rejected` (count `byReason`), `do_op_failed`, `do_alarm_sweep`, `do_r2_cleanup_failed`, `config_read_failed`, `stats_failed`.
-Parser: `parse` (domain, status, error, source capture|refresh|fetch, durationMs, bytes, images, cacheHit, parserVersion, attempts), `parse_retry` (warn), `dlq` (warn), `mark_parsed_failed`, `dlq_mark_failed`, `gc_sweep`, `gc_throttle_cleanup_failed`, `cache_lookup_failed`, `build_content_failed`.
+Parser: `parse` (domain, status, error, errorDetail, source capture|refresh|fetch|dlq, method fetch|render|capture|cache, fallbackOutcome none|ok|partial|failed|budget|disabled, ruleApplied, durationMs, renderMs, textChars, httpStatus, bytes, images, cacheHit, parserVersion, attempts), `render` (Browser Run call: domain, trigger, ok, ms), `render_failed` (warn), `render_budget_failed`, `site_rule_invalid` (warn: KV rule ignored), `site_rule_lookup_failed`, `parse_attempt_insert_failed`, `parse_retry` (warn), `dlq` (warn), `mark_parsed_failed`, `dlq_mark_failed`, `gc_sweep` (incl. `parseAnalytics` purge counts), `gc_throttle_cleanup_failed`, `cache_lookup_failed`, `build_content_failed`.
 Common fields: `level`, `msg`, `event`, `requestId` (= `cf-ray`, also in the `x-request-id` response header and in the 500 body), `userHash` (SHA-256 prefix of the user id), `route` (pattern, no ids), `colo`.
 
 ### Analytics Engine layout
@@ -26,7 +26,7 @@ Common fields: `level`, `msg`, `event`, `requestId` (= `cf-ray`, also in the `x-
 
 | event | blob2.. | double1.. | index |
 |---|---|---|---|
-| `parse` | domain, status (ok/partial/failed), error code, source, cache (hit/miss) | durationMs, bytes, images | domain |
+| `parse` | blob2 domain, blob3 status (ok/partial/failed), blob4 error code, blob5 source (fetch/refresh/capture/dlq), blob6 cache (hit/miss), blob7 method (fetch/render/capture/cache), blob8 fallbackOutcome (none/ok/partial/failed/budget/disabled), blob9 ruleApplied (1/0) | double1 durationMs, double2 bytes, double3 images, double4 renderMs, double5 textChars, double6 attempt | domain |
 | `save` | source, result (ok / reject reason) | | `save` |
 | `sync_push` | ok / rejected | ops, applied, rejected | `sync_push` |
 | `otp_send` | otp type, ok / failed | | `otp_send` |
@@ -75,6 +75,21 @@ sql "SELECT blob4 AS error, SUM(_sample_interval) AS n FROM sroka_events
 sql "SELECT quantileWeighted(0.5, double1, _sample_interval) AS p50, quantileWeighted(0.95, double1, _sample_interval) AS p95
      FROM sroka_events WHERE blob1 = 'parse' AND blob6 = 'miss' AND timestamp > NOW() - INTERVAL '1' DAY FORMAT JSON"
 
+# Per-domain success + Browser Run fallback success rate, last 7 days (D10)
+sql "SELECT blob2 AS domain, SUM(_sample_interval) AS jobs,
+       round(100 * SUM(IF(blob3 = 'ok', _sample_interval, 0)) / SUM(_sample_interval), 1) AS ok_pct,
+       SUM(IF(blob8 IN ('ok','partial','failed'), _sample_interval, 0)) AS renders,
+       round(100 * SUM(IF(blob8 = 'ok', _sample_interval, 0)) / greatest(SUM(IF(blob8 IN ('ok','partial','failed'), _sample_interval, 0)), 1), 1) AS render_ok_pct,
+       SUM(IF(blob8 = 'budget', _sample_interval, 0)) AS over_budget
+     FROM sroka_events WHERE blob1 = 'parse' AND timestamp > NOW() - INTERVAL '7' DAY
+     GROUP BY domain HAVING jobs >= 5 ORDER BY ok_pct ASC LIMIT 25 FORMAT JSON"
+
+# Browser Run usage per day (renders, p95 render ms)
+sql "SELECT toStartOfInterval(timestamp, INTERVAL '1' DAY) AS day, SUM(_sample_interval) AS renders,
+       quantileWeighted(0.95, double4, _sample_interval) AS p95_render_ms
+     FROM sroka_events WHERE blob1 = 'parse' AND double4 > 0 AND timestamp > NOW() - INTERVAL '14' DAY
+     GROUP BY day ORDER BY day FORMAT JSON"
+
 # Errors per route, last 24 h
 sql "SELECT blob2 AS route, blob3 AS error, SUM(_sample_interval) AS n FROM sroka_events
      WHERE blob1 = 'error' AND timestamp > NOW() - INTERVAL '1' DAY GROUP BY route, error ORDER BY n DESC FORMAT JSON"
@@ -90,6 +105,31 @@ sql "SELECT blob2 AS source, SUM(_sample_interval) AS saves FROM sroka_events
 ```
 
 Grafana can use the same SQL API (ClickHouse-style datasource) for dashboards.
+
+## D1 `parse_attempts` (per-attempt detail, 30-day retention)
+
+One row per finished parse job (final outcome of a delivery incl. cache hits, plus DLQ failures; transient retries are
+not recorded). Columns: decisions D10 / `workers/api/src/db/schema.ts`. `url` is NULL for captured/private content;
+`user_hash` = sha256(userId) prefix 16. The parser's weekly cron deletes rows older than 30 days and expired
+`render_budget` rows. Query from `workers/api`:
+
+```sh
+q() { npx wrangler d1 execute sroka --remote --command "$1"; }
+# Per-domain outcomes, last 7 days (worst first)
+q "SELECT domain, COUNT(*) AS total, SUM(status='ok') AS ok, SUM(status='partial') AS partial, SUM(status='failed') AS failed,
+     SUM(fallback_outcome IN ('ok','partial','failed')) AS render_tried, SUM(fallback_outcome='ok') AS render_ok,
+     SUM(rule_applied) AS with_rule
+   FROM parse_attempts WHERE created_at > (unixepoch() - 7*86400) * 1000
+   GROUP BY domain HAVING total >= 3 ORDER BY 1.0 * ok / total ASC LIMIT 30"
+# Top error codes / details for one domain
+q "SELECT error_code, error_detail, http_status, method, COUNT(*) AS n FROM parse_attempts
+   WHERE domain = 'example.com' AND status != 'ok' GROUP BY 1,2,3,4 ORDER BY n DESC LIMIT 20"
+# Recent failures (with URL for public content) to try a site rule against
+q "SELECT datetime(created_at/1000,'unixepoch') AS at, url, error_code, error_detail, fallback_outcome, text_chars
+   FROM parse_attempts WHERE status = 'failed' ORDER BY created_at DESC LIMIT 20"
+# Today's render budget use
+q "SELECT key, count FROM render_budget WHERE key LIKE 'g:%' OR count >= 20 ORDER BY count DESC LIMIT 20"
+```
 
 ## Recommended alerts (dashboard steps)
 

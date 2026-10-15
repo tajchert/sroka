@@ -26,5 +26,11 @@ export interface ParserEnv {
   APP_ORIGIN: string;
   API_ORIGIN: string;
   CONTENT_ORIGIN: string;
+  /** Browser Run binding (decisions D10); absent in tests unless mocked. */
+  BROWSER?: BrowserRun;
+  /** "true" turns the Browser Run fallback on. */
   BROWSER_RENDER_ENABLED: string;
+  /** Daily render caps (D1 `render_budget`); defaults 30 / 500. */
+  BROWSER_RENDER_DAILY_PER_USER?: string;
+  BROWSER_RENDER_DAILY_GLOBAL?: string;
 }

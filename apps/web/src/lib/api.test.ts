@@ -130,6 +130,40 @@ describe("api client", () => {
   });
 });
 
+describe("admin client", () => {
+  const summary = {
+    days: 7,
+    since: 1,
+    totals: { total: 1, ok: 1, partial: 0, failed: 0, renderTried: 0, renderOk: 0, renderBudgetBlocked: 0 },
+    daily: [],
+    domains: [],
+  };
+  it("adminSummary sends days and parses", async () => {
+    const f = mockFetch(200, summary);
+    expect((await api.adminSummary(7)).totals.total).toBe(1);
+    expect(f.mock.calls[0]![0]).toBe("/v1/admin/parse/summary?days=7");
+  });
+  it("adminAttempts builds filters, skips empty", async () => {
+    const f = mockFetch(200, { attempts: [], nextCursor: null });
+    await api.adminAttempts({ domain: "a.com", status: "failed", method: "", limit: 50 });
+    expect(f.mock.calls[0]![0]).toBe("/v1/admin/parse/attempts?domain=a.com&status=failed&limit=50");
+  });
+  it("adminPutRule PUTs JSON to an encoded host; delete handles 204", async () => {
+    const f = mockFetch(200, { host: "a.com", rule: { render: "always", updatedAt: 1 } });
+    await api.adminPutRule("a.com", { render: "always" });
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/v1/admin/site-rules/a.com");
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe('{"render":"always"}');
+    mockFetch(204, undefined);
+    await expect(api.adminDeleteRule("a.com")).resolves.toBeUndefined();
+  });
+  it("404 for non-admins surfaces as ApiRequestError", async () => {
+    mockFetch(404, { error: "not_found" });
+    await expect(api.adminRules()).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+});
+
 describe("pollDelay", () => {
   it("backs off 2s,4s,8s capped at 30s", () => {
     expect([0, 1, 2, 3, 4, 5, 9].map(pollDelay)).toEqual([2000, 4000, 8000, 16000, 30000, 30000, 30000]);

@@ -40,11 +40,16 @@
   "r2_buckets": [{ "binding": "CONTENT", "bucket_name": "sroka-content" }],
   "kv_namespaces": [{ "binding": "CONFIG", "id": "3fffa4e503274f16a3698f72f9a089c9" }],
   "images": { "binding": "IMAGES" },
+  // Browser Run fallback (decisions D10, src/render.ts): quickAction("content") needs compat date >= 2026-03-24.
+  // Not available in local `wrangler dev` (renders fail -> plain result kept); tests mock env.BROWSER.
+  "browser": { "binding": "BROWSER" },
   "vars": {
     "ENVIRONMENT": "production",
     "APP_ORIGIN": "https://sroka.app",
     "API_ORIGIN": "https://api.sroka.app",
     "CONTENT_ORIGIN": "https://c.sroka.app",
-    "BROWSER_RENDER_ENABLED": "false"
+    "BROWSER_RENDER_ENABLED": "true",
+    "BROWSER_RENDER_DAILY_PER_USER": "30",
+    "BROWSER_RENDER_DAILY_GLOBAL": "500"
   }
 }

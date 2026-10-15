@@ -78,3 +78,51 @@ export const authThrottle = sqliteTable(
   },
   (t) => [index("auth_throttle_expires").on(t.expiresAt)],
 );
+
+/**
+ * One row per finished parse job (parser `src/attempts.ts`, decisions D10): the final outcome of a queue delivery
+ * (ok/partial/failed, incl. shared-cache hits; transient retries are not recorded) and DLQ failures. Retention 30
+ * days (parser weekly cron). `url` = canonical URL for public content, NULL for captured/private content.
+ * `user_hash` = sha256(userId) hex prefix 16.
+ */
+export const parseAttempts = sqliteTable(
+  "parse_attempts",
+  {
+    id: text("id").primaryKey(),
+    createdAt: integer("created_at").notNull(),
+    userHash: text("user_hash").notNull(),
+    itemId: text("item_id").notNull(),
+    domain: text("domain").notNull(),
+    url: text("url"),
+    status: text("status").notNull(), // ok|partial|failed
+    errorCode: text("error_code"),
+    errorDetail: text("error_detail"),
+    method: text("method").notNull(), // fetch|render|capture|cache
+    fallbackOutcome: text("fallback_outcome").notNull(), // none|ok|partial|failed|budget|disabled
+    httpStatus: integer("http_status"),
+    textChars: integer("text_chars"),
+    wordCount: integer("word_count"),
+    images: integer("images"),
+    durationMs: integer("duration_ms"),
+    renderMs: integer("render_ms"),
+    attempt: integer("attempt").notNull(),
+    parserVersion: integer("parser_version").notNull(),
+    ruleApplied: integer("rule_applied").notNull().default(0),
+  },
+  (t) => [
+    index("parse_attempts_created").on(t.createdAt),
+    index("parse_attempts_domain").on(t.domain, t.createdAt),
+    index("parse_attempts_status").on(t.status, t.createdAt),
+  ],
+);
+
+/** Browser Run daily render budget counters (parser `src/render.ts`), key `u:{userHash}:{day}` | `g:{day}`. */
+export const renderBudget = sqliteTable(
+  "render_budget",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (t) => [index("render_budget_expires").on(t.expiresAt)],
+);

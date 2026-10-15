@@ -37,6 +37,9 @@ export interface SafeFetchResult {
 }
 
 export const DEFAULT_UA = "Mozilla/5.0 (compatible; SrokaBot/1.0; +https://sroka.app/bot)";
+/** Realistic desktop browser UA for sites whose rule says `userAgent: "browser"` (decisions D10). */
+export const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 
 export function kindOf(contentType: string): FetchKind {
   const t = contentType.split(";")[0]!.trim().toLowerCase();

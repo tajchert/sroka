@@ -3,3 +3,5 @@ ENVIRONMENT=development
 APP_ORIGIN=http://localhost:8787
 API_ORIGIN=http://localhost:8787
 CONTENT_ORIGIN=http://127.0.0.1:8787
+# Browser Run does not run in local wrangler dev (decisions D10); keep the fallback off locally.
+BROWSER_RENDER_ENABLED=false

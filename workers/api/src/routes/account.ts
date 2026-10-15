@@ -6,6 +6,7 @@ import type { AppEnv, Env } from "../env.ts";
 import * as authSchema from "../db/auth-schema.ts";
 import { jobs } from "../db/schema.ts";
 import { deletePrefix } from "../r2.ts";
+import { isAdminEmail } from "./admin.ts";
 
 export { deletePrefix };
 
@@ -36,6 +37,7 @@ accountRoutes.get("/me", async (c) => {
       createdAt: u.createdAt.getTime(),
     },
     stats,
+    isAdmin: isAdminEmail(c.env, u.email),
   };
   return c.json(body);
 });

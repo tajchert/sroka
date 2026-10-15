@@ -16,6 +16,8 @@ export default defineConfig({
           API_ORIGIN: "http://localhost:8787",
           CONTENT_ORIGIN: "http://127.0.0.1:8787",
           CONTENT_URL_SIGNING_KEY: "test-signing-0123456789abcdef0123456789",
+          // Browser Run is off by default in tests; render tests turn it on with a mocked env.BROWSER.
+          BROWSER_RENDER_ENABLED: "false",
         },
       },
     }),

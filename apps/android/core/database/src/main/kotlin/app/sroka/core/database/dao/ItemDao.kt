@@ -1,6 +1,7 @@
 package app.sroka.core.database.dao
 
 import androidx.paging.PagingSource
+import androidx.room3.ColumnInfo
 import androidx.room3.Dao
 import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
@@ -35,57 +36,131 @@ interface ItemDao {
     /** The library list for [query]: tab / tag filter, optional FTS search, sort. */
     fun pagedItems(query: ItemQuery): PagingSource<Int, ItemSummaryRow> {
         val tagKey = query.tag?.let { tagKey(it) }
-        val status = if (tagKey == null) {
-            when (query.tab) {
-                LibraryTab.MY_LIST -> ItemStatus.UNREAD.name
-                LibraryTab.ARCHIVE -> ItemStatus.ARCHIVED.name
-                LibraryTab.FAVORITES -> null
-            }
-        } else {
-            null
-        }
-        val favorites = if (tagKey == null && query.tab == LibraryTab.FAVORITES) 1 else 0
         val match = query.search?.let { FtsQuery.build(it) }
-        return if (match == null) {
-            when (query.sort) {
-                SortOrder.NEWEST -> listNewest(tagKey, status, favorites)
-                SortOrder.OLDEST -> listOldest(tagKey, status, favorites)
-                SortOrder.SHORTEST -> listShortest(tagKey, status, favorites)
-                SortOrder.LONGEST -> listLongest(tagKey, status, favorites)
+        val sort = query.sort
+        return when {
+            tagKey != null -> if (match == null) {
+                when (sort) {
+                    SortOrder.NEWEST -> listTagNewest(tagKey)
+                    SortOrder.OLDEST -> listTagOldest(tagKey)
+                    SortOrder.SHORTEST -> listTagShortest(tagKey)
+                    SortOrder.LONGEST -> listTagLongest(tagKey)
+                }
+            } else {
+                when (sort) {
+                    SortOrder.NEWEST -> searchTagNewest(match, tagKey)
+                    SortOrder.OLDEST -> searchTagOldest(match, tagKey)
+                    SortOrder.SHORTEST -> searchTagShortest(match, tagKey)
+                    SortOrder.LONGEST -> searchTagLongest(match, tagKey)
+                }
             }
-        } else {
-            when (query.sort) {
-                SortOrder.NEWEST -> searchNewest(match, tagKey, status, favorites)
-                SortOrder.OLDEST -> searchOldest(match, tagKey, status, favorites)
-                SortOrder.SHORTEST -> searchShortest(match, tagKey, status, favorites)
-                SortOrder.LONGEST -> searchLongest(match, tagKey, status, favorites)
+            query.tab == LibraryTab.FAVORITES -> if (match == null) {
+                when (sort) {
+                    SortOrder.NEWEST -> listFavNewest()
+                    SortOrder.OLDEST -> listFavOldest()
+                    SortOrder.SHORTEST -> listFavShortest()
+                    SortOrder.LONGEST -> listFavLongest()
+                }
+            } else {
+                when (sort) {
+                    SortOrder.NEWEST -> searchFavNewest(match)
+                    SortOrder.OLDEST -> searchFavOldest(match)
+                    SortOrder.SHORTEST -> searchFavShortest(match)
+                    SortOrder.LONGEST -> searchFavLongest(match)
+                }
+            }
+            else -> {
+                val status = if (query.tab == LibraryTab.ARCHIVE) ItemStatus.ARCHIVED.name else ItemStatus.UNREAD.name
+                if (match == null) {
+                    when (sort) {
+                        SortOrder.NEWEST -> listStatusNewest(status)
+                        SortOrder.OLDEST -> listStatusOldest(status)
+                        SortOrder.SHORTEST -> listStatusShortest(status)
+                        SortOrder.LONGEST -> listStatusLongest(status)
+                    }
+                } else {
+                    when (sort) {
+                        SortOrder.NEWEST -> searchStatusNewest(match, status)
+                        SortOrder.OLDEST -> searchStatusOldest(match, status)
+                        SortOrder.SHORTEST -> searchStatusShortest(match, status)
+                        SortOrder.LONGEST -> searchStatusLongest(match, status)
+                    }
+                }
             }
         }
     }
 
-    @Query("$ROW_COLUMNS $LIST_FROM WHERE $FILTER $ORDER_NEWEST")
-    fun listNewest(tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_NEWEST")
+    fun listStatusNewest(status: String): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $LIST_FROM WHERE $FILTER $ORDER_OLDEST")
-    fun listOldest(tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_OLDEST")
+    fun listStatusOldest(status: String): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $LIST_FROM WHERE $FILTER $ORDER_SHORTEST")
-    fun listShortest(tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_SHORTEST")
+    fun listStatusShortest(status: String): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $LIST_FROM WHERE $FILTER $ORDER_LONGEST")
-    fun listLongest(tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_LONGEST")
+    fun listStatusLongest(status: String): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE items_fts MATCH :match AND $FILTER $ORDER_NEWEST")
-    fun searchNewest(match: String, tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_NEWEST")
+    fun listFavNewest(): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE items_fts MATCH :match AND $FILTER $ORDER_OLDEST")
-    fun searchOldest(match: String, tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_OLDEST")
+    fun listFavOldest(): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE items_fts MATCH :match AND $FILTER $ORDER_SHORTEST")
-    fun searchShortest(match: String, tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_SHORTEST")
+    fun listFavShortest(): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE items_fts MATCH :match AND $FILTER $ORDER_LONGEST")
-    fun searchLongest(match: String, tagKey: String?, status: String?, favoritesOnly: Int): PagingSource<Int, ItemSummaryRow>
+    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_LONGEST")
+    fun listFavLongest(): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_NEWEST")
+    fun listTagNewest(tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_OLDEST")
+    fun listTagOldest(tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_SHORTEST")
+    fun listTagShortest(tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_LONGEST")
+    fun listTagLongest(tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_NEWEST")
+    fun searchStatusNewest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_OLDEST")
+    fun searchStatusOldest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_SHORTEST")
+    fun searchStatusShortest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_LONGEST")
+    fun searchStatusLongest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_NEWEST")
+    fun searchFavNewest(match: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_OLDEST")
+    fun searchFavOldest(match: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_SHORTEST")
+    fun searchFavShortest(match: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_LONGEST")
+    fun searchFavLongest(match: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_NEWEST")
+    fun searchTagNewest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_OLDEST")
+    fun searchTagOldest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_SHORTEST")
+    fun searchTagShortest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_LONGEST")
+    fun searchTagLongest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
 
     // ---- Single item / counts / tags ---------------------------------------------------------
 
@@ -122,8 +197,9 @@ interface ItemDao {
 
     /** Most recently used tags (by newest item carrying them). */
     @Query(
-        """SELECT MIN(it.name) FROM item_tags it JOIN items i ON i.id = it.item_id
-           GROUP BY it.name_key ORDER BY MAX(i.saved_at) DESC, it.name_key LIMIT :limit""",
+        """WITH recent AS (SELECT id, saved_at FROM items ORDER BY saved_at DESC LIMIT 500)
+           SELECT MIN(it.name) FROM recent r JOIN item_tags it ON it.item_id = r.id
+           GROUP BY it.name_key ORDER BY MAX(r.saved_at) DESC, it.name_key LIMIT :limit""",
     )
     fun observeRecentTags(limit: Int): Flow<List<String>>
 
@@ -133,8 +209,12 @@ interface ItemDao {
     @Query("SELECT item_id FROM item_tags WHERE name_key = :nameKey")
     suspend fun itemIdsWithTag(nameKey: String): List<String>
 
+    @Transaction
+    suspend fun existingIds(ids: List<String>): List<String> =
+        ids.chunked(SQL_CHUNK).flatMap { existingIdsChunk(it) }
+
     @Query("SELECT id FROM items WHERE id IN (:ids)")
-    suspend fun existingIds(ids: List<String>): List<String>
+    suspend fun existingIdsChunk(ids: List<String>): List<String>
 
     // ---- Writes ------------------------------------------------------------------------------
 
@@ -144,18 +224,26 @@ interface ItemDao {
      */
     @Transaction
     suspend fun upsertItem(item: ItemEntity) {
-        val rowId = ftsRowIdOf(item.id) ?: nextFtsRowId()
+        val old = getItem(item.id)
+        val rowId = old?.ftsRowId ?: nextFtsRowId()
         upsertRaw(item.copy(ftsRowId = rowId))
-        refreshFts(item.id)
+        if (old == null || old.indexedFieldsDiffer(item)) refreshFts(item.id)
     }
 
     /** [upsertItem] plus a full replacement of the item's tags, with one FTS write. */
     @Transaction
     suspend fun upsertItemWithTags(item: ItemEntity, tagNames: List<String>) {
-        val rowId = ftsRowIdOf(item.id) ?: nextFtsRowId()
+        val old = getItem(item.id)
+        val rowId = old?.ftsRowId ?: nextFtsRowId()
         upsertRaw(item.copy(ftsRowId = rowId))
-        replaceTagRows(item.id, tagNames)
-        refreshFts(item.id)
+        val wanted = cleanTagRows(item.id, tagNames)
+        val tagsChanged = old == null || wanted.sortedBy { it.nameKey }.map { it.name } != tagNames(item.id)
+        if (tagsChanged) {
+            deleteTagRows(item.id)
+            if (wanted.isNotEmpty()) insertTagRows(wanted)
+        }
+        // refreshFts is itself a no-op when the stored FTS metadata already matches.
+        if (old == null || tagsChanged || old.indexedFieldsDiffer(item)) refreshFts(item.id)
     }
 
     /** Replaces the tags of [itemId] (names are de-duplicated by key; first spelling wins). */
@@ -172,6 +260,28 @@ interface ItemDao {
         ftsRowIdOf(id)?.let { deleteFtsRow(it) }
         deleteItemRow(id)
     }
+
+    /**
+     * Re-keys a local-only item [fromId] to [toId] (server alias): the row, its FTS rowid and its
+     * tags move to the new id; any `content_files` row of [fromId] is dropped (no package yet).
+     * Done as copy + move + delete because `item_tags` has a foreign key without ON UPDATE.
+     */
+    @Transaction
+    suspend fun rekeyItem(fromId: String, toId: String) {
+        val old = getItem(fromId) ?: return
+        if (getItem(toId) != null) return
+        // Park the copy on a temporary (negative) rowid: fts_rowid is UNIQUE.
+        upsertRaw(old.copy(id = toId, ftsRowId = -old.ftsRowId))
+        moveTagRows(fromId, toId)
+        deleteItemRow(fromId)
+        setFtsRowId(toId, old.ftsRowId)
+    }
+
+    @Query("UPDATE item_tags SET item_id = :toId WHERE item_id = :fromId")
+    suspend fun moveTagRows(fromId: String, toId: String)
+
+    @Query("UPDATE items SET fts_rowid = :rowId WHERE id = :id")
+    suspend fun setFtsRowId(id: String, rowId: Long)
 
     @Transaction
     suspend fun deleteItems(ids: List<String>) {
@@ -228,8 +338,13 @@ interface ItemDao {
     @Upsert
     suspend fun upsertTagRows(tags: List<TagEntity>)
 
+    @Transaction
+    suspend fun deleteTagRowsById(ids: List<String>) {
+        ids.chunked(SQL_CHUNK).forEach { deleteTagRowsByIdChunk(it) }
+    }
+
     @Query("DELETE FROM tags WHERE id IN (:ids)")
-    suspend fun deleteTagRowsById(ids: List<String>)
+    suspend fun deleteTagRowsByIdChunk(ids: List<String>)
 
     @Query("DELETE FROM tags WHERE name_key = :nameKey")
     suspend fun deleteTagRowByKey(nameKey: String)
@@ -285,6 +400,9 @@ interface ItemDao {
     @Query("UPDATE items SET title = :title WHERE id = :id")
     suspend fun updateTitle(id: String, title: String?)
 
+    @Query("SELECT title, excerpt, site_name, tags FROM items_fts WHERE rowid = :rowId")
+    suspend fun ftsMeta(rowId: Long): FtsMeta?
+
     @Query("SELECT body FROM items_fts WHERE rowid = :rowId")
     suspend fun ftsRowExists(rowId: Long): String?
 
@@ -300,26 +418,42 @@ interface ItemDao {
     @Query("UPDATE items_fts SET body = :body WHERE rowid = :rowId")
     suspend fun updateFtsBody(rowId: Long, body: String)
 
-    private suspend fun replaceTagRows(itemId: String, names: List<String>) {
-        deleteTagRows(itemId)
-        val rows = names.map { it.trim() }.filter { it.isNotEmpty() }
+    /** Tag rows for [names] as stored: trimmed, normalized, de-duplicated by key (first wins). */
+    private fun cleanTagRows(itemId: String, names: List<String>): List<ItemTagEntity> =
+        names.map { it.trim() }.filter { it.isNotEmpty() }
             .map { ItemTagEntity(itemId, tagKey(it), app.sroka.core.model.normalizeTagName(it)) }
             .distinctBy { it.nameKey }
+
+    private suspend fun replaceTagRows(itemId: String, names: List<String>) {
+        deleteTagRows(itemId)
+        val rows = cleanTagRows(itemId, names)
         if (rows.isNotEmpty()) insertTagRows(rows)
     }
+
+    private fun ItemEntity.indexedFieldsDiffer(other: ItemEntity) =
+        title != other.title || excerpt != other.excerpt || siteName != other.siteName
 
     /** Rewrites the item's FTS row from current item + tags, keeping any stored body. */
     private suspend fun refreshFts(itemId: String) {
         val item = getItem(itemId) ?: return
-        val body = ftsRowExists(item.ftsRowId).orEmpty()
-        deleteFtsRow(item.ftsRowId)
-        insertFtsRow(
-            rowId = item.ftsRowId,
+        val want = FtsMeta(
             title = item.title.orEmpty(),
             excerpt = item.excerpt.orEmpty(),
             siteName = item.siteName.orEmpty(),
             tags = tagNames(itemId).joinToString(" "),
-            body = body,
         )
+        // Re-tokenizing a stored body is expensive: leave the row alone when nothing indexed changed.
+        if (ftsMeta(item.ftsRowId) == want) return
+        val body = ftsRowExists(item.ftsRowId).orEmpty()
+        deleteFtsRow(item.ftsRowId)
+        insertFtsRow(item.ftsRowId, want.title, want.excerpt, want.siteName, want.tags, body)
     }
 }
+
+/** The indexed metadata columns of an `items_fts` row (everything but `body`). */
+data class FtsMeta(
+    val title: String,
+    val excerpt: String,
+    @ColumnInfo(name = "site_name") val siteName: String,
+    val tags: String,
+)

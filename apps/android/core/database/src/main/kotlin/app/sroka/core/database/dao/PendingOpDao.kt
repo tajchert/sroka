@@ -16,6 +16,9 @@ val COALESCING_OP_TYPES: Set<String> = setOf(
     "item.setTitle",
 )
 
+/** Stay below SQLITE_MAX_VARIABLE_NUMBER = 999 (Android API 26-30) for server/queue-sized IN lists. */
+internal const val SQL_CHUNK = 900
+
 @Dao
 interface PendingOpDao {
 
@@ -39,20 +42,43 @@ interface PendingOpDao {
     @Query("SELECT * FROM pending_ops ORDER BY local_seq LIMIT :limit")
     suspend fun batch(limit: Int): List<PendingOpEntity>
 
+    /** Queued ops of [itemIds] in `local_seq` order (chunked below SQLite's variable limit). */
+    @Transaction
+    suspend fun forItems(itemIds: List<String>): List<PendingOpEntity> =
+        itemIds.chunked(SQL_CHUNK).flatMap { forItemsChunk(it) }.sortedBy { it.localSeq }
+
     @Query("SELECT * FROM pending_ops WHERE item_id IN (:itemIds) ORDER BY local_seq")
-    suspend fun forItems(itemIds: List<String>): List<PendingOpEntity>
+    suspend fun forItemsChunk(itemIds: List<String>): List<PendingOpEntity>
+
+    /** Ops of [itemIds] plus every tag-level op (`item_id IS NULL`), in `local_seq` order. */
+    @Query("SELECT * FROM pending_ops WHERE item_id IN (:itemIds) OR item_id IS NULL ORDER BY local_seq")
+    suspend fun forItemsOrGlobal(itemIds: List<String>): List<PendingOpEntity>
+
+    /** Tag-level ops (`tag.rename` / `tag.delete`). */
+    @Query("SELECT * FROM pending_ops WHERE item_id IS NULL ORDER BY local_seq")
+    suspend fun globalOps(): List<PendingOpEntity>
 
     @Query("SELECT * FROM pending_ops WHERE item_id = :itemId ORDER BY local_seq")
     suspend fun forItem(itemId: String): List<PendingOpEntity>
 
+    @Transaction
+    suspend fun deleteByOpIds(opIds: List<String>) {
+        opIds.chunked(SQL_CHUNK).forEach { deleteByOpIdsChunk(it) }
+    }
+
     @Query("DELETE FROM pending_ops WHERE op_id IN (:opIds)")
-    suspend fun deleteByOpIds(opIds: List<String>)
+    suspend fun deleteByOpIdsChunk(opIds: List<String>)
 
     @Query("DELETE FROM pending_ops WHERE item_id = :itemId")
     suspend fun deleteForItem(itemId: String)
 
+    @Transaction
+    suspend fun markAttempted(opIds: List<String>, error: String?) {
+        opIds.chunked(SQL_CHUNK).forEach { markAttemptedChunk(it, error) }
+    }
+
     @Query("UPDATE pending_ops SET attempts = attempts + 1, last_error = :error WHERE op_id IN (:opIds)")
-    suspend fun markAttempted(opIds: List<String>, error: String?)
+    suspend fun markAttemptedChunk(opIds: List<String>, error: String?)
 
     @Query("SELECT COUNT(*) FROM pending_ops")
     fun observeCount(): Flow<Int>
@@ -75,6 +101,14 @@ interface PendingOpDao {
            WHERE item_id = :fromId""",
     )
     suspend fun rewriteItemId(fromId: String, toId: String)
+
+    /** Gives a queued op a new id (the server already acknowledged the old one); payload follows. */
+    @Query(
+        """UPDATE pending_ops SET op_id = :newId,
+           payload = replace(payload, '"opId":"' || :oldId || '"', '"opId":"' || :newId || '"')
+           WHERE op_id = :oldId""",
+    )
+    suspend fun rewriteOpId(oldId: String, newId: String)
 
     @Query("DELETE FROM pending_ops")
     suspend fun deleteAll()

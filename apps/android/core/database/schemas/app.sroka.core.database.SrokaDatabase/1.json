@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "5b3769f4d59789b6105350fecb66ad1c",
+    "identityHash": "0d4054b56c42766b0d6e7358473e6285",
     "entities": [
       {
         "tableName": "items",
@@ -159,34 +159,35 @@
         },
         "indices": [
           {
-            "name": "index_items_status_saved_at",
+            "name": "index_items_status_saved_at_id",
             "unique": false,
             "columnNames": [
               "status",
-              "saved_at"
+              "saved_at",
+              "id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_status_saved_at` ON `${TABLE_NAME}` (`status`, `saved_at`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_status_saved_at_id` ON `${TABLE_NAME}` (`status`, `saved_at`, `id`)"
           },
           {
-            "name": "index_items_is_favorite_saved_at",
+            "name": "index_items_is_favorite_saved_at_id",
             "unique": false,
             "columnNames": [
               "is_favorite",
+              "saved_at",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_is_favorite_saved_at_id` ON `${TABLE_NAME}` (`is_favorite`, `saved_at`, `id`)"
+          },
+          {
+            "name": "index_items_saved_at",
+            "unique": false,
+            "columnNames": [
               "saved_at"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_is_favorite_saved_at` ON `${TABLE_NAME}` (`is_favorite`, `saved_at`)"
-          },
-          {
-            "name": "index_items_status_word_count",
-            "unique": false,
-            "columnNames": [
-              "status",
-              "word_count"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_status_word_count` ON `${TABLE_NAME}` (`status`, `word_count`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_items_saved_at` ON `${TABLE_NAME}` (`saved_at`)"
           },
           {
             "name": "index_items_canonical_url",
@@ -306,7 +307,7 @@
       },
       {
         "tableName": "items_fts",
-        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`title` TEXT NOT NULL, `excerpt` TEXT NOT NULL, `site_name` TEXT NOT NULL, `tags` TEXT NOT NULL, `body` TEXT NOT NULL, tokenize=unicode61 `remove_diacritics=1`, prefix=`2,3`)",
+        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`title` TEXT NOT NULL, `excerpt` TEXT NOT NULL, `site_name` TEXT NOT NULL, `tags` TEXT NOT NULL, `body` TEXT NOT NULL, tokenize=unicode61 `remove_diacritics=1`)",
         "fields": [
           {
             "fieldPath": "title",
@@ -355,10 +356,7 @@
           "languageIdColumnName": "",
           "matchInfo": "FTS4",
           "notIndexedColumns": [],
-          "prefixSizes": [
-            2,
-            3
-          ],
+          "prefixSizes": [],
           "preferredOrder": "ASC"
         },
         "contentSyncTriggers": []
@@ -569,7 +567,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5b3769f4d59789b6105350fecb66ad1c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0d4054b56c42766b0d6e7358473e6285')"
     ]
   }
 }

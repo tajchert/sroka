@@ -3,6 +3,7 @@ package app.sroka.core.database
 import androidx.room3.Database
 import androidx.room3.DaoReturnTypeConverters
 import androidx.room3.RoomDatabase
+import androidx.room3.useWriterConnection
 import androidx.room3.paging.PagingSourceDaoReturnTypeConverter
 import app.sroka.core.database.dao.ContentFileDao
 import app.sroka.core.database.dao.ItemDao
@@ -45,5 +46,16 @@ abstract class SrokaDatabase : RoomDatabase() {
 
     companion object {
         const val FILE_NAME = "sroka.db"
+    }
+}
+
+/**
+ * Reclaims free pages (DELETE never shrinks the file). Must run outside any transaction; a WAL
+ * checkpoint first so the -wal file does not keep deleted text around.
+ */
+suspend fun SrokaDatabase.vacuum() {
+    useWriterConnection { connection ->
+        connection.usePrepared("PRAGMA wal_checkpoint(TRUNCATE)") { it.step() }
+        connection.usePrepared("VACUUM") { it.step() }
     }
 }

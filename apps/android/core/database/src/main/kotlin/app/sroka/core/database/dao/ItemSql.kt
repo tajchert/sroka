@@ -21,11 +21,28 @@ FROM items_fts JOIN items i ON i.fts_rowid = items_fts.rowid
 LEFT JOIN content_files cf ON cf.item_id = i.id
 """
 
-/** Tag view (any status) or tab view (status and/or favorites). */
-internal const val FILTER = """
-((:tagKey IS NULL AND (:status IS NULL OR i.status = :status) AND (:favoritesOnly = 0 OR i.is_favorite = 1))
- OR (:tagKey IS NOT NULL AND EXISTS (SELECT 1 FROM item_tags t WHERE t.item_id = i.id AND t.name_key = :tagKey)))
+// Scope fragments: one concrete WHERE per scope so SQLite can plan with the status / favorite / tag
+// indexes (a single OR'ed parameterized filter forces a full scan plus temp B-tree).
+
+/** Tab view by status (`:status`). */
+internal const val SCOPE_STATUS = "WHERE i.status = :status"
+
+/** Favorites tab. */
+internal const val SCOPE_FAV = "WHERE i.is_favorite = 1"
+
+/** Tag view: any status, driven by the `item_tags(name_key)` index. */
+internal const val FROM_TAG = """
+FROM item_tags t JOIN items i ON i.id = t.item_id LEFT JOIN content_files cf ON cf.item_id = i.id
 """
+internal const val SCOPE_TAG = "WHERE t.name_key = :tagKey"
+
+/** Search variants: the FTS match drives the plan, the scope only narrows. */
+internal const val SEARCH_TAG_FROM = """
+FROM items_fts JOIN items i ON i.fts_rowid = items_fts.rowid
+JOIN item_tags t ON t.item_id = i.id
+LEFT JOIN content_files cf ON cf.item_id = i.id
+"""
+internal const val MATCH = "items_fts MATCH :match"
 
 internal const val ORDER_NEWEST = "ORDER BY i.saved_at DESC, i.id DESC"
 internal const val ORDER_OLDEST = "ORDER BY i.saved_at ASC, i.id ASC"

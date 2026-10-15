@@ -181,4 +181,53 @@ class ItemDaoTest : DatabaseTestBase() {
         }
         assertEquals(1, db.pendingOpDao().count())
     }
+
+    @Test fun statusOnlyUpsertKeepsBodyAndTitleChangeReindexes() = runBlocking {
+        dao.upsertItemWithTags(item("a", title = "Plain", siteName = "Blog"), listOf("dev"))
+        dao.setFtsBody("a", "the quick brown fox jumps")
+        // server echo of a status change: indexed metadata identical
+        dao.upsertItemWithTags(item("a", title = "Plain", siteName = "Blog", status = ItemStatus.ARCHIVED, archivedAt = 5), listOf("dev"))
+        assertEquals(listOf("a"), ids(q(LibraryTab.ARCHIVE, search = "brown fox")))
+        assertEquals(listOf("dev"), dao.tagNames("a"))
+        // a title change is re-indexed and the body is still there
+        dao.upsertItemWithTags(item("a", title = "Renamed", siteName = "Blog", status = ItemStatus.ARCHIVED, archivedAt = 5), listOf("dev"))
+        assertEquals(listOf("a"), ids(q(LibraryTab.ARCHIVE, search = "renamed")))
+        assertEquals(emptyList<String>(), ids(q(LibraryTab.ARCHIVE, search = "plain")))
+        assertEquals(listOf("a"), ids(q(LibraryTab.ARCHIVE, search = "quick")))
+        // tag change is re-indexed
+        dao.upsertItemWithTags(item("a", title = "Renamed", siteName = "Blog", status = ItemStatus.ARCHIVED, archivedAt = 5), listOf("ops"))
+        assertEquals(listOf("a"), ids(q(LibraryTab.ARCHIVE, search = "ops")))
+        assertEquals(emptyList<String>(), ids(q(LibraryTab.ARCHIVE, search = "dev")))
+        assertEquals(listOf("a"), ids(q(LibraryTab.ARCHIVE, search = "quick")))
+    }
+
+    @Test fun rekeyItemMovesRowTagsAndFts() = runBlocking {
+        dao.upsertItemWithTags(item("x", title = "Kotlin article"), listOf("t1"))
+        dao.upsertItem(item("other"))
+        db.contentFileDao().upsert(ContentFileEntity("x", "c-x", ContentState.QUEUED))
+        val rowId = dao.ftsRowIdOf("x")
+        dao.rekeyItem("x", "y")
+        assertNull(dao.getItem("x"))
+        assertEquals(rowId, dao.ftsRowIdOf("y"))
+        assertEquals(listOf("t1"), dao.tagNames("y"))
+        assertNull(db.contentFileDao().get("x"))
+        assertEquals(listOf("y"), ids(q(search = "kotlin")))
+        // a later pull of the canonical row overwrites it in place
+        dao.upsertItemWithTags(item("y", title = "Server title"), listOf("t1"))
+        assertEquals(listOf("y"), ids(q(search = "server")))
+        assertEquals(rowId, dao.ftsRowIdOf("y"))
+    }
+
+    @Test fun largeIdListsAreChunked() = runBlocking {
+        dao.upsertItem(item("a"))
+        val ids = (1..2500).map { "id$it" } + "a"
+        assertEquals(listOf("a"), dao.existingIds(ids))
+        dao.deleteTagRowsById(ids)
+        val ops = db.pendingOpDao()
+        ops.enqueue(op("o1", "a", "item.tag"))
+        assertEquals(1, ops.forItems(ids).size)
+        ops.markAttempted((1..2500).map { "o$it" }, "x")
+        ops.deleteByOpIds((1..2500).map { "o$it" })
+        assertEquals(0, ops.count())
+    }
 }

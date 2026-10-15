@@ -14,9 +14,9 @@ import app.sroka.core.model.ParseStatus
 @Entity(
     tableName = "items",
     indices = [
-        Index(value = ["status", "saved_at"]),
-        Index(value = ["is_favorite", "saved_at"]),
-        Index(value = ["status", "word_count"]),
+        Index(value = ["status", "saved_at", "id"]),
+        Index(value = ["is_favorite", "saved_at", "id"]),
+        Index(value = ["saved_at"]),
         Index(value = ["canonical_url"]),
         Index(value = ["fts_rowid"], unique = true),
     ],
@@ -90,7 +90,6 @@ data class TagEntity(
 @Fts4(
     tokenizer = FtsOptions.TOKENIZER_UNICODE61,
     tokenizerArgs = ["remove_diacritics=1"],
-    prefix = [2, 3],
 )
 @Entity(tableName = "items_fts")
 data class ItemFtsEntity(

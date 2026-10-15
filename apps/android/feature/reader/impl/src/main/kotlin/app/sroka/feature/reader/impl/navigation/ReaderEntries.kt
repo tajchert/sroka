@@ -1,5 +1,7 @@
 package app.sroka.feature.reader.impl.navigation
 
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation3.runtime.EntryProviderScope
@@ -16,11 +18,12 @@ import java.io.File
  * @param onArchived the open item was archived: pop and show an undo snackbar (unarchive via
  *   LibraryRepository.setStatus). Defaults to [onBack] with no undo.
  */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun EntryProviderScope<NavKey>.readerEntries(
     onBack: () -> Unit,
     onArchived: (itemId: String) -> Unit = { onBack() },
 ) {
-    entry<ReaderKey> { key ->
+    entry<ReaderKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
         val viewModel = hiltViewModel<ReaderViewModel, ReaderViewModel.Factory>(
             key = key.itemId,
             creationCallback = { factory -> factory.create(key.itemId) },

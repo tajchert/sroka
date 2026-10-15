@@ -12,7 +12,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -53,6 +57,7 @@ import kotlinx.coroutines.launch
  * An expired session keeps the library (local-first) and opens sign-in on demand.
  * Features never see each other's keys; their navigation callbacks are mapped to keys here.
  */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun SrokaApp(
     session: SessionState,
@@ -94,8 +99,16 @@ fun SrokaApp(
         }
     }
 
-    val current = TopLevelDestination.of(backStack.lastOrNull())
-    val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+    // Wide windows show the reader next to the list (list-detail scene), so the tab bar stays.
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    val directive = remember(windowAdaptiveInfo) {
+        calculatePaneScaffoldDirective(windowAdaptiveInfo).copy(horizontalPartitionSpacerSize = 0.dp)
+    }
+    val twoPane = directive.maxHorizontalPartitions > 1
+    val top = backStack.lastOrNull()
+    val current = TopLevelDestination.of(top)
+        ?: if (twoPane && top is ReaderKey) TopLevelDestination.of(backStack.getOrNull(backStack.size - 2)) else null
+    val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
 
     NavigationSuiteScaffold(
         modifier = modifier,
@@ -118,7 +131,7 @@ fun SrokaApp(
         },
     ) {
         Box(Modifier.fillMaxSize()) {
-            SrokaNavDisplay(backStack, onArchived)
+            SrokaNavDisplay(backStack, directive, onArchived)
             // App-level snackbar for results that outlive a screen (archive from the reader).
             // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
             SnackbarHost(
@@ -135,15 +148,19 @@ fun SrokaApp(
 /** FAB height (56dp) plus its two 16dp margins. */
 private val FabClearance = 88.dp
 
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 private fun SrokaNavDisplay(
     backStack: NavBackStack<NavKey>,
+    directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
 ) {
+    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(directive = directive)
     val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeLastOrNull() }
     NavDisplay(
         backStack = backStack,
         onBack = goBack,
+        sceneStrategies = listOf(listDetailStrategy),
         // Specifying entryDecorators replaces the defaults, so the saveable-state
         // decorator is listed explicitly next to the per-entry ViewModel store.
         entryDecorators = listOf(
@@ -153,7 +170,15 @@ private fun SrokaNavDisplay(
         entryProvider = entryProvider {
             authEntries()
             libraryEntries(
-                onOpenItem = { itemId -> backStack.add(ReaderKey(itemId)) },
+                // In two-pane mode a new selection replaces the open article instead of stacking.
+                onOpenItem = { itemId ->
+                    val key = ReaderKey(itemId)
+                    when (backStack.lastOrNull()) {
+                        key -> Unit
+                        is ReaderKey -> backStack[backStack.lastIndex] = key
+                        else -> backStack.add(key)
+                    }
+                },
                 onOpenTag = { name -> backStack.add(TagItemsKey(name)) },
                 onOpenSettings = { backStack.add(SettingsKey) },
                 onBack = goBack,

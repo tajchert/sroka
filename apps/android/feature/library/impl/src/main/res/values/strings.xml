@@ -120,4 +120,5 @@
     <string name="feature_library_share_sign_in_needed">Sign in to Sroka to save articles</string>
     <string name="feature_library_share_add_tags">Add tags</string>
     <string name="feature_library_share_done">Done</string>
+    <string name="feature_library_select_article">Select an article to read</string>
 </resources>

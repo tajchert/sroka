@@ -52,6 +52,13 @@ describe("turnstile", () => {
     expect(f).not.toHaveBeenCalled();
     expect(isWebAppRequest(env, req({ origin: "https://sroka.app" }))).toBe(true);
   });
+  it("exempts no-Origin requests to the app host in development (native debug clients)", async () => {
+    const dev = { ...env, APP_ORIGIN: "http://localhost:8787", ENVIRONMENT: "development" as const };
+    const f = ok({ success: false });
+    expect(await checkTurnstile(dev, req({}, "http://localhost:8787/api/auth/x"), f)).toBeNull();
+    expect(await checkTurnstile(dev, req({ origin: "http://localhost:8787" }), f)).toBe("missing_token");
+    expect(f).not.toHaveBeenCalled();
+  });
   it("skips verification when no secret is configured", async () => {
     const f = ok({ success: false });
     expect(await checkTurnstile({ ...env, TURNSTILE_SECRET_KEY: undefined }, req({ origin: "https://sroka.app" }), f)).toBeNull();

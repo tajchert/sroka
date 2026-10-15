@@ -242,7 +242,7 @@ Processing rules:
 7. `cursor` = `meta.seq` after the push. Clients should still pull from their previous cursor to receive the canonical rows they changed.
 
 ### 7.2 `GET /v1/sync/pull?cursor=&limit=`
-Query `PullQuery`: `cursor` (int ≥0, default 0), `limit` (1–1000, default 500).
+Query `PullQuery`: `cursor` (int ≥0, default 0), `limit` (1–1000, default 500), `full` (optional boolean, `1`/`true`).
 Response `200 PullResponse`:
 ```json
 {"cursor":18423,"hasMore":false,
@@ -254,6 +254,7 @@ Response `200 PullResponse`:
 - `cursor` in the response = seq of the last returned row if `hasMore`, else the current `meta.seq`. Repeat until `hasMore:false`. First sync: `cursor=0`.
 - Required DO test: rename a tag carried by more than `limit` items, pull with small `limit` from before the rename, and assert every item arrives exactly once.
 - `410 {"error":"resync_required"}` if `0 < cursor < meta.tombstone_horizon` (the highest seq of any purged tombstone). The client then merges pending ops, pushes them, and pulls from 0.
+- Clients doing a pass from 0 send `full=1` on every page of that pass; with `full` the horizon check is skipped. A pass from 0 is complete by construction because purged tombstones are only for rows the client never had or that a full pass doesn't need.
 - Item rows include signed `leadImageUrl` (24 h) and the stable `leadImageKey` (§4.1); clients needing content call `GET /v1/items/:id/content`.
 
 ### 7.3 seq rules (for the DO implementer)

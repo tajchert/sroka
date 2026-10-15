@@ -42,7 +42,7 @@ describe("Op schema", () => {
     expect(PushRequest.safeParse({ deviceId: "bad id!", ops: [] }).success).toBe(false);
   });
   it("coerces pull query", () => {
-    expect(PullQuery.parse({ cursor: "18000" })).toEqual({ cursor: 18000, limit: 500 });
+    expect(PullQuery.parse({ cursor: "18000" })).toEqual({ cursor: 18000, limit: 500, full: false });
     expect(PullQuery.safeParse({ limit: "5000" }).success).toBe(false);
   });
 });

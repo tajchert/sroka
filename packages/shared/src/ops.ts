@@ -165,6 +165,11 @@ export type PushResponse = z.infer<typeof PushResponse>;
 export const PullQuery = z.object({
   cursor: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().min(1).max(LIMITS.maxPullLimit).default(LIMITS.defaultPullLimit),
+  /** "1"/"true" = page of a pass that started at cursor 0: skip the tombstone-horizon 410 check. */
+  full: z
+    .enum(["1", "true", "0", "false"])
+    .optional()
+    .transform((v) => v === "1" || v === "true"),
 });
 export type PullQuery = z.infer<typeof PullQuery>;
 

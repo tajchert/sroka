@@ -33,3 +33,4 @@
 - RESOLVED: api.sroka.app / c.sroka.app now resolve (Cloudflare NS, 1.1.1.1, 8.8.8.8); /v1/config 200 over https.
 - Redeployed sroka-api from main (version 415b1efd) with the `full=1` sync pull flag (50501a7) needed by Android full resync; smoke /v1/config 200, /v1/sync/pull unauthenticated 401.
 - OPEN: real email OTP sign-in in production not yet exercised; shared-content GC built on feat/content-gc, not deployed yet.
+- 2026-10-16 Paywalls: parser marks teaser saves `partial`/`paywalled` (774d657, deployed); extension auto-captures rendered HTML on paywalled pages (de57db8). Verified live on a Medium member-only article: capture → ok, 6,974 chars.

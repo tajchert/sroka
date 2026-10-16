@@ -61,7 +61,11 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
               Could not parse
             </span>
           )}
-          {item.parseStatus === "partial" && <span className="rounded border border-rule px-1.5">Partial</span>}
+          {item.parseStatus === "partial" && (
+            <span className="rounded border border-rule px-1.5" title={item.parseError === "paywalled" ? "Subscriber-only article: save it with the extension while signed in" : undefined}>
+              {item.parseError === "paywalled" ? "Preview only" : "Partial"}
+            </span>
+          )}
           {item.progress > 0.02 && item.progress < 0.98 && <span>{Math.round(item.progress * 100)}% read</span>}
         </div>
         {item.excerpt && item.parseStatus !== "pending" && <p className="mt-1 line-clamp-2 text-sm text-ink2">{item.excerpt}</p>}

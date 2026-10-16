@@ -4,6 +4,7 @@ import {
   buildContent,
   decodeHtml,
   detectBotWall,
+  detectPaywall,
   extractArticle,
   FetchError,
   PARTIAL_BELOW_CHARS,
@@ -161,6 +162,8 @@ interface CachedMeta {
   wordCount: number | null;
   readingMinutes: number | null;
   leadImageKey?: string;
+  /** Reason for a `partial` status (default `partial_content`), e.g. `paywalled`. */
+  error?: string;
 }
 
 /**
@@ -202,7 +205,7 @@ function resultFrom(job: ParseJob, contentId: string, isPrivate: boolean, m: Cac
     wordCount: m.wordCount,
     readingMinutes: m.readingMinutes,
     ...(m.leadImageKey ? { leadImageKey: m.leadImageKey } : {}),
-    ...(m.status === "partial" ? { error: "partial_content" } : {}),
+    ...(m.status === "partial" ? { error: m.error ?? "partial_content" } : {}),
     parserVersion: PARSER_VERSION,
   };
 }
@@ -318,16 +321,20 @@ export async function processJob(
   // 2a. extract (cheap) and decide whether the Browser Run fallback is needed (never for captured HTML)
   let wall: BotWall | null = null;
   let chosen: Extracted | null = null;
+  // A logged-out page of a paywalled article only has the teaser (never checked for captures: the user had access).
+  let paywalled = false;
   if (html !== null) {
     wall = isPrivate ? null : detectBotWall(html);
     if (wall !== "challenge") chosen = safeExtract(html, baseUrl, extractOptions, job.itemId);
+    paywalled = !isPrivate && !!chosen && detectPaywall(html);
   }
   let trigger: string | null = null;
   if (!isPrivate) {
     if (fetchErr) trigger = fetchErr.code;
     else if (wall === "challenge") trigger = "challenge";
     else if (!chosen) trigger = wall ?? "extract_failed";
-    else if (chosen.text.length < minChars) trigger = wall ?? "short";
+    // A short paywall teaser stays short when rendered: don't spend render budget on it.
+    else if (chosen.text.length < minChars && !paywalled) trigger = wall ?? "short";
     else if (rule?.render === "always") trigger = "rule_always";
   }
   if (trigger) {
@@ -358,6 +365,7 @@ export async function processJob(
           stats.fallbackOutcome = rex.text.length >= minChars ? "ok" : "partial";
           if (better) {
             chosen = rex;
+            paywalled = detectPaywall(r.html);
             baseUrl = r.finalUrl;
             stats.method = "render";
             if (r.httpStatus !== null) stats.httpStatus = r.httpStatus;
@@ -403,7 +411,8 @@ export async function processJob(
   // 3. write R2 (fresh contentId => write-once keys); meta.json last = cache-validity marker
   const dir = r2Keys.contentDir(contentId, isPrivate ? job.userId : null);
   const cached: CachedMeta = {
-    status: built.status,
+    status: paywalled ? "partial" : built.status,
+    ...(paywalled ? { error: "paywalled" } : {}),
     title: built.meta.title,
     excerpt: built.meta.excerpt,
     siteName: built.meta.siteName,
@@ -427,13 +436,13 @@ export async function processJob(
           hash,
           canonical,
           PARSER_VERSION,
-          built.status,
+          cached.status,
           built.meta.title,
           built.meta.wordCount,
           built.meta.lang,
           built.packageBytes,
           now,
-          sharedCache && built.status === "ok" ? 1 : 0,
+          sharedCache && cached.status === "ok" ? 1 : 0,
         )
         .run();
     } catch (e) {

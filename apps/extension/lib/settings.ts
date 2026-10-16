@@ -50,3 +50,21 @@ export async function getDeviceId(): Promise<string> {
   await ext().storage.local.set({ deviceId: id });
   return id;
 }
+
+/** OTP lifetime on the server (decisions D4: emailOTP expiresIn 300). */
+const PENDING_OTP_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Email awaiting its sign-in code. The popup closes when the user switches to their mailbox,
+ * so the "enter code" step is kept in storage.session until the code expires.
+ */
+export async function getPendingOtp(now = Date.now()): Promise<string | null> {
+  const r = (await ext().storage.session.get("pendingOtp")) as { pendingOtp?: { email: string; sentAt: number } };
+  const p = r.pendingOtp;
+  return p && now - p.sentAt < PENDING_OTP_TTL_MS ? p.email : null;
+}
+
+export async function setPendingOtp(email: string | null, now = Date.now()): Promise<void> {
+  if (email) await ext().storage.session.set({ pendingOtp: { email, sentAt: now } });
+  else await ext().storage.session.remove("pendingOtp");
+}

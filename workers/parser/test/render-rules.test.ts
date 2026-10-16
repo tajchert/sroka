@@ -303,3 +303,45 @@ describe("parse_attempts", () => {
     expect((await attempts()).map((r) => r.id)).toEqual(["new"]);
   });
 });
+
+describe("paywall detection", () => {
+  const LD = `<script type="application/ld+json">{"@type":"NewsArticle","isAccessibleForFree":false}</script>`;
+  const PAYWALLED_SHORT = SHORT.replace("</head>", `${LD}</head>`);
+  const PAYWALLED_LONG = LONG.replace("</head>", `${LD}</head>`);
+
+  it("short teaser with paywall markup: partial/paywalled, no render budget spent", async () => {
+    routes[URL1] = () => htmlRes(PAYWALLED_SHORT);
+    await run(msg(job()));
+    expect(quickAction).not.toHaveBeenCalled();
+    expect(marked[0]).toMatchObject({ status: "partial", error: "paywalled" });
+    const [row] = await attempts();
+    expect(row).toMatchObject({ status: "partial", error_code: "paywalled", method: "fetch", fallback_outcome: "none" });
+    const c = await base.DB.prepare("SELECT status, cacheable FROM content").first();
+    expect(c).toEqual({ status: "partial", cacheable: 0 });
+  });
+
+  it("rendered page behind a bot wall that is a member-only preview: partial/paywalled via render", async () => {
+    routes[URL1] = () => htmlRes("denied", 403);
+    renderHtml = RENDERED.replace("<article>", "<div><span>Member-only story</span></div><article>");
+    await run(msg(job()));
+    expect(quickAction).toHaveBeenCalledTimes(1);
+    expect(marked[0]).toMatchObject({ status: "partial", error: "paywalled" });
+    expect((await attempts())[0]).toMatchObject({ method: "render", error_code: "paywalled" });
+  });
+
+  it("long page with paywall markup is still partial (full text kept)", async () => {
+    routes[URL1] = () => htmlRes(PAYWALLED_LONG);
+    await run(msg(job()));
+    expect(marked[0]).toMatchObject({ status: "partial", error: "paywalled" });
+    expect(await text(marked[0]!)).toContain("REAL");
+  });
+
+  it("captured HTML is never marked paywalled (the user's browser had access)", async () => {
+    const rawKey = r2Keys.raw("u1", ITEM);
+    const gz = await new Response(new Blob([PAYWALLED_LONG]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    await base.CONTENT.put(rawKey, gz);
+    await run(msg(job({ rawKey })));
+    expect(marked[0]).toMatchObject({ status: "ok" });
+    expect(marked[0]!.error).toBeUndefined();
+  });
+});

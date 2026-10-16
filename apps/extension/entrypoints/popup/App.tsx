@@ -4,7 +4,7 @@ import { deleteItem, describeError, getConfig, patchItem, sendOtp, signIn, tagSu
 import { invalidate, setCached } from "../../lib/badge-cache.ts";
 import type { Msg } from "../../lib/messages.ts";
 import type { SaveResult } from "../../lib/save.ts";
-import { getSettings } from "../../lib/settings.ts";
+import { getPendingOtp, getSettings, setPendingOtp } from "../../lib/settings.ts";
 
 type Tab = { id?: number; url?: string; title?: string };
 type Phase =
@@ -103,6 +103,18 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [ready, setReady] = useState(false);
+
+  // Resume the code step: the popup closes while the user reads their email.
+  useEffect(() => {
+    void getPendingOtp().then((pending) => {
+      if (pending) {
+        setEmail(pending);
+        setStep("code");
+      }
+      setReady(true);
+    });
+  }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -116,6 +128,8 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
     }
   };
 
+  if (!ready) return null;
+
   return (
     <form
       onSubmit={(e) => {
@@ -123,9 +137,11 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
         void run(async () => {
           if (step === "email") {
             await sendOtp(email.trim());
+            await setPendingOtp(email.trim());
             setStep("code");
           } else {
             await signIn(email.trim(), code.trim());
+            await setPendingOtp(null);
             await onDone();
           }
         });
@@ -151,7 +167,7 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
       {err && <p className="err">{err}</p>}
       <div className="actions">
         {step === "code" && (
-          <button type="button" className="btn" disabled={busy} onClick={() => { setStep("email"); setCode(""); setErr(""); }}>
+          <button type="button" className="btn" disabled={busy} onClick={() => { void setPendingOtp(null); setStep("email"); setCode(""); setErr(""); }}>
             Back
           </button>
         )}

@@ -199,6 +199,25 @@ export default function Reader() {
         </div>
       </header>
 
+      {contentId && item.parseStatus === "partial" && (
+        <div role="note" className="border-b border-rule bg-ink/5 px-4 py-2 text-sm sm:px-8">
+          <p className="mx-auto max-w-4xl">
+            {item.parseError === "paywalled" ? (
+              <>
+                <strong>Only a preview was saved.</strong> This article is for subscribers. To keep the full text,{" "}
+                <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">open it</a> while signed in and save it
+                again with the Sroka browser extension.
+              </>
+            ) : (
+              <>
+                <strong>This copy may be incomplete.</strong>{" "}
+                <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">Open the original</a> to read the full page, or
+                save it with the Sroka browser extension.
+              </>
+            )}
+          </p>
+        </div>
+      )}
       <div className="relative min-h-0 flex-1">
         {srcdoc ? (
           <iframe

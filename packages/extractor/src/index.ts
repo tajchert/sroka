@@ -8,4 +8,4 @@ export * from "./images.ts";
 export * from "./package.ts";
 export * from "./pipeline.ts";
 export * from "./bot-wall.ts";
-export * from "./paywall.ts";
+export { detectPaywall } from "@sroka/shared";

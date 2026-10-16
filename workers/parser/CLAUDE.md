@@ -34,7 +34,7 @@ Emergency stop: `DELETE FROM gc_state WHERE k = 'gc_backfill_done'` (GC becomes 
 - Fallback render when the plain fetch hits a bot wall (403/429/503 or a challenge page), extracts nothing, or yields < 500 chars
   (rule `minTextChars`), or the rule says `render: "always"`. Never for captures. Budgets per user/day 30 and global/day 500 (vars,
   D1 `render_budget`). Off locally (`.dev.vars` `BROWSER_RENDER_ENABLED=false`; Browser Run doesn't run in `wrangler dev`).
-- Paywalls (`detectPaywall`, extractor `src/paywall.ts`): a fetched/rendered page with paywall markup → `partial` / `paywalled`, no render for a short teaser; captures are never checked.
+- Paywalls (`detectPaywall`, `@sroka/shared` `src/paywall.ts`): a fetched/rendered page with paywall markup → `partial` / `paywalled`, no render for a short teaser; captures are never checked.
 - **Site rules** live in KV `CONFIG` under `site-rules:v1:{host}` (host without `www.`; a rule for `example.com` also covers
   `blog.example.com` unless that has its own). Fields (`SiteRuleSchema`, unknown keys rejected): `render` auto|always|never,
   `contentSelector`, `removeSelectors[]`, `stripParams[]`, `userAgent` default|browser, `minTextChars`, `waitForSelector`,

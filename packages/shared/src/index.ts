@@ -11,3 +11,4 @@ export * from "./hlc.ts";
 export * from "./log.ts";
 export * from "./metrics.ts";
 export * from "./site-rules.ts";
+export * from "./paywall.ts";

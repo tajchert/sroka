@@ -1,4 +1,4 @@
-import { LIMITS, type Item } from "@sroka/shared";
+import { detectPaywall, LIMITS, type Item } from "@sroka/shared";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
 import { setCached } from "./badge-cache.ts";
 import { ext } from "./chrome.ts";
@@ -63,7 +63,10 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
 export async function saveTab(tab: { id?: number; url?: string; title?: string }): Promise<SaveResult> {
   if (!isSavableUrl(tab.url)) return { ok: false, queued: false, reason: "unsupported", message: "This page can't be saved." };
   const s = await getSettings();
-  const html = s.captureHtml && tab.id != null ? await captureHtml(tab.id) : null;
+  // Send the rendered page when the user opted in, or always for paywalled pages: the server only gets the
+  // logged-out teaser, while this tab has whatever the user's subscription unlocks.
+  const page = tab.id != null ? await captureHtml(tab.id) : null;
+  const html = page && (s.captureHtml || detectPaywall(page)) ? page : null;
   return saveWithFallback({ url: tab.url, title: tab.title?.trim().slice(0, LIMITS.maxTitleLength) || undefined, source: "extension", ...(html ? { html } : {}) });
 }
 

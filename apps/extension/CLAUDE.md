@@ -12,4 +12,5 @@ Popup (sign-in email→code, "Saved ✓", tag input with suggestions, open libra
 
 ## Decisions that apply
 D8 (features, server URL option default `https://api.sroka.app`; when the user saves a custom URL the options page must call `chrome.permissions.request({ origins: [new URL(url).origin + "/*"] })` — allowed by `optional_host_permissions` — and refuse to save if denied; "Open library" opens `${appOrigin}/app/` from `GET /v1/config`), D4 (bearer token from `set-auth-token` header, `chrome.storage.local`), D1.
+Capture: `saveTab` sends the rendered `html` when the "always capture" option is on, or automatically when `detectPaywall` (`@sroka/shared`) matches the page (the server would only get the teaser).
 API: `POST /v1/items` (with `html` when capturing), `GET /v1/items?url=` for the badge, `GET /v1/tags/suggestions?url=`, `PATCH /v1/items/:id {tags}`. See `docs/api.md` and research/ext.md gotchas. Don't add deps.

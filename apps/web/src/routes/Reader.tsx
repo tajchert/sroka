@@ -232,7 +232,13 @@ export default function Reader() {
         ) : failed ? (
           <Notice
             title="This page could not be turned into an article"
-            body={item.parseError ? `Reason: ${item.parseError.replaceAll("_", " ")}.` : "Open the original page instead, or try fetching it again."}
+            body={
+              item.parseError === "bot_wall"
+                ? "This site blocks automated fetching. Open it in your browser and save it again with the Sroka browser extension."
+                : item.parseError
+                  ? `Reason: ${item.parseError.replaceAll("_", " ")}.`
+                  : "Open the original page instead, or try fetching it again."
+            }
             actions={<>
               <a className="btn btn-primary" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
               <button className="btn" onClick={() => void actions.refresh(item)}>Retry</button>

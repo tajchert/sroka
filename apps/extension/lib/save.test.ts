@@ -31,6 +31,12 @@ describe("saveTab html capture", () => {
     await saveTab(tab);
     expect(bodies[0]).toMatchObject({ url: tab.url, html, source: "extension" });
   });
+  it("reddit: sends the rendered html even with capture off (Reddit blocks server fetches)", async () => {
+    const html = "<html><body><shreddit-post post-title=\"Q\"></shreddit-post></body></html>";
+    page(html);
+    await saveTab({ id: 7, url: "https://www.reddit.com/r/AskReddit/comments/1/q/", title: "Q" });
+    expect(bodies[0]).toMatchObject({ html });
+  });
   it("capture on: always sends html", async () => {
     await setSettings({ captureHtml: true });
     page("<html><body><p>Free</p></body></html>");

@@ -7,7 +7,7 @@ No Cloudflare bindings here: image transforms/R2 writes are injected by `workers
 - `npm test -w @sroka/extractor` (node vitest, `src/**/*.test.ts`) · `npm run typecheck -w @sroka/extractor`
 
 ## Key files
-- `src/ssrf.ts` (host/IP guard), `safe-fetch.ts` (safeFetch, decodeHtml), `extract.ts` (Readability; `ExtractOptions` removeSelectors/contentSelector/minTextChars from site rules), `bot-wall.ts` (`detectBotWall`, `BOT_WALL_STATUSES`), `sanitize.ts` (allowlist, absolutize, rewriteImages), `images.ts` (processImages, injected transform), `package.ts` (article.html wrapper + zip), `pipeline.ts` (`buildContent`: html or pre-`extracted` article -> files[]), `extractor.test.ts`, `rules.test.ts`.
+- `src/ssrf.ts` (host/IP guard), `safe-fetch.ts` (safeFetch, decodeHtml), `extract.ts` (Readability; `ExtractOptions` removeSelectors/contentSelector/minTextChars from site rules), `bot-wall.ts` (`detectBotWall`, `BOT_WALL_STATUSES`), `reddit.ts` (`extractReddit`: shreddit post + comment tree from rendered/captured HTML, tried before Readability), `sanitize.ts` (allowlist, absolutize, rewriteImages), `images.ts` (processImages, injected transform), `package.ts` (article.html wrapper + zip), `pipeline.ts` (`buildContent`: html or pre-`extracted` article -> files[]), `extractor.test.ts`, `rules.test.ts`.
 - Image transform and R2 are injected by workers/parser; per-image failures never throw (fallback to original raster <=10 MB, else dropped).
 
 ## Decisions that apply

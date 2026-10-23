@@ -14,7 +14,7 @@ Zod 4 schemas + TS types shared by api, parser, web, extension. Consumed as TS s
 - `ops.ts` — sync `Op` discriminated union (design §8.2 + `item.setTitle`, `tag.delete`), `PushRequest/PushResponse`, `PullQuery/PullResponse`, `RejectReason`, `REST_DEVICE_ID`
 - `api.ts` — every `/v1` request/response schema, `ApiError`, `ErrorCode`, `toApiError` (zod error → 400 body), list cursor helpers
 - `parse.ts` — `ParseJobSchema` (queue message), `ParseResultSchema` (`LibraryDO.markParsed`; both carry `parseGen`), `PARSER_VERSION`, `PackageManifest`, `r2Keys`
-- `paywall.ts` — `detectPaywall(html)` (JSON-LD isAccessibleForFree=false, content_tier=locked, Medium member-only banner); used by parser and extension
+- `paywall.ts` — `detectPaywall(html)` (JSON-LD isAccessibleForFree=false, content_tier=locked, Medium member-only banner); used by parser and extension. `alwaysCapture(url)` — hosts that block servers (reddit.com), extension always sends rendered HTML
 - `content-sign.ts` — D7 signed content URLs: `signContentPath`, `verifyContentPath`, `buildContentUrls`, `contentScope`
 - `lww.ts` / `hlc.ts` — per-field LWW (`applyLww`, `pairWins` for item_tags, `clampAt`, `ItemClock`), client `OpClock`
 

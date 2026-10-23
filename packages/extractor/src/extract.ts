@@ -1,5 +1,6 @@
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
+import { extractReddit } from "./reddit.ts";
 import { absolutizeUrl } from "./sanitize.ts";
 
 export interface Extracted {
@@ -82,6 +83,9 @@ function safeQueryAll(doc: Doc, sel: string): El[] {
 
 /** Run Readability over `html`. Returns null if no article content could be extracted. */
 export function extractArticle(html: string, url: string, opts: ExtractOptions = {}): Extracted | null {
+  // Site-specific extractors first (they return null when the page doesn't look as expected).
+  const site = extractReddit(html, url);
+  if (site) return site;
   const { document } = parseHTML(html);
   try {
     Object.defineProperty(document, "baseURI", { value: url, configurable: true });

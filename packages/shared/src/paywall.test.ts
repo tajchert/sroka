@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectPaywall } from "./paywall.ts";
+import { alwaysCapture, detectPaywall } from "./paywall.ts";
 
 describe("detectPaywall", () => {
   it("JSON-LD isAccessibleForFree false (bool or string), nested", () => {
@@ -16,5 +16,15 @@ describe("detectPaywall", () => {
     expect(detectPaywall(`<meta property="article:content_tier" content="free">`)).toBe(false);
     expect(detectPaywall(`<p>I wrote a Member-only story about it last year.</p>`)).toBe(false);
     expect(detectPaywall(`<p>"isAccessibleForFree": false appears in code samples</p>`)).toBe(false);
+  });
+});
+
+describe("alwaysCapture", () => {
+  it("matches reddit and its subdomains only", () => {
+    expect(alwaysCapture("https://www.reddit.com/r/AskReddit/comments/1/x/")).toBe(true);
+    expect(alwaysCapture("https://old.reddit.com/")).toBe(true);
+    expect(alwaysCapture("https://reddit.com.evil.example/")).toBe(false);
+    expect(alwaysCapture("https://notreddit.com/")).toBe(false);
+    expect(alwaysCapture("not a url")).toBe(false);
   });
 });

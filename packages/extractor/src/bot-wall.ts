@@ -21,6 +21,8 @@ const CHALLENGE_MARKERS: readonly RegExp[] = [
   /_Incapsula_Resource/i,
   /\bgeo\.captcha-delivery\.com\b/i,
   /captcha\.px-cdn\.net/i,
+  // Reddit's own block page (served to servers and headless browsers)
+  /<title>[^<]{0,40}Prove your humanity\s*<\/title>/i,
 ];
 
 const JS_MARKERS: readonly RegExp[] = [

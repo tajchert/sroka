@@ -20,3 +20,19 @@ export function detectPaywall(html: string): boolean {
   for (const m of html.matchAll(LD_JSON)) if (NOT_FREE.test(m[1] ?? "")) return true;
   return MARKERS.some((re) => re.test(html));
 }
+
+/**
+ * Sites that block server fetches outright (and serve challenges to headless browsers), so the extension always
+ * sends the rendered page for them instead of only on paywalls. Matches the host and its subdomains.
+ */
+const ALWAYS_CAPTURE_HOSTS: readonly string[] = ["reddit.com"];
+
+export function alwaysCapture(url: string): boolean {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return ALWAYS_CAPTURE_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+}

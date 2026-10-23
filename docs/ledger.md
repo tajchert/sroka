@@ -34,3 +34,4 @@
 - Redeployed sroka-api from main (version 415b1efd) with the `full=1` sync pull flag (50501a7) needed by Android full resync; smoke /v1/config 200, /v1/sync/pull unauthenticated 401.
 - OPEN: real email OTP sign-in in production not yet exercised; shared-content GC built on feat/content-gc, not deployed yet.
 - 2026-10-16 Paywalls: parser marks teaser saves `partial`/`paywalled` (774d657, deployed); extension auto-captures rendered HTML on paywalled pages (de57db8). Verified live on a Medium member-only article: capture → ok, 6,974 chars.
+- 2026-10-23 New landing page (Claude Design 'Sroka Landing' + mobile) and brand icon 6a everywhere (d8eacc0). sroka-api redeployed (version 4d168654); smoke: /, /icon.svg, /app/, /v1/config all 200. Extension zip and Android build need re-publishing to pick up the new icons. OPEN: landing store links (Chrome/App Store/Play) and Privacy/Terms/Contact are placeholders.

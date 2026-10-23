@@ -1,0 +1,670 @@
+/* Toolbar popup — "Sroka Popup" from Claude Design. Dark only, 340px wide. */
+:root {
+  --bg: #1b1e23;
+  --raise: #23272e;
+  --raise-2: #2a2e35;
+  --line: #3a3f48;
+  --line-2: #4a4f58;
+  --fg: #f1efe9;
+  --fg-2: #c8cacf;
+  --muted: #a5a8ae;
+  --cream: #f6f5f1;
+  --ink: #15171c;
+  --blue: #1e6f8f;
+  --blue-soft: #7cc0da;
+  --focus: #4f9fbf;
+  --tag-bg: #1d3a47;
+  --tag-fg: #9fd0e3;
+  --beak: #f2c84b;
+  --danger: #f08f7f;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 340px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.45 Outfit, Helvetica, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+h1,
+p {
+  margin: 0;
+}
+svg {
+  display: block;
+  flex: none;
+}
+
+.popup-card {
+  width: 340px;
+  overflow: hidden;
+}
+.body {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.body-auth {
+  padding: 22px 18px 20px;
+  gap: 18px;
+}
+.hint {
+  color: var(--muted);
+}
+
+/* Brand header (sign-in screens) */
+.brand-bar {
+  padding: 14px 18px;
+  border-bottom: 1px solid #2c3038;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px;
+  padding: 4px 8px 4px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.brand:hover {
+  background: var(--raise);
+}
+.mark {
+  border-radius: 7px;
+  box-shadow: 0 0 0 1px rgba(21, 23, 28, 0.12);
+}
+
+/* Headings & fields */
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.heading h1 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.sub {
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.sub b {
+  color: var(--fg);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.input {
+  height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  padding: 0 14px;
+  font-size: 15px;
+  background: var(--raise);
+  outline: none;
+}
+.input:focus {
+  border-color: var(--focus);
+  background: var(--bg);
+}
+.input::placeholder,
+.tag-input::placeholder {
+  color: #6b6f78;
+}
+.err {
+  font-size: 13px;
+  color: var(--danger);
+}
+.note {
+  color: var(--fg-2);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* OTP: six boxes painted under one transparent input */
+.otp {
+  position: relative;
+}
+.otp-boxes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+.otp-box {
+  height: 50px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--raise);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 600;
+}
+.otp-box.is-filled {
+  border-color: var(--line-2);
+  background: var(--raise-2);
+}
+.otp-box.is-active {
+  border-color: var(--focus);
+  background: var(--raise-2);
+}
+.otp-box.is-error {
+  border-color: var(--danger);
+}
+.otp-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: 16px;
+  cursor: text;
+}
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue-soft);
+}
+.link:hover {
+  color: var(--fg);
+}
+
+/* Buttons */
+.btn {
+  height: 46px;
+  border-radius: 999px;
+  border: 0;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--fg);
+  color: var(--ink);
+}
+.btn-primary:hover {
+  background: #ffffff;
+}
+.btn-primary:disabled:not([aria-busy="true"]) {
+  opacity: 0.35;
+}
+.btn-ghost {
+  height: 44px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+}
+.btn-ghost:hover {
+  border-color: var(--line-2);
+  background: var(--raise);
+}
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+.pair .btn {
+  height: 44px;
+  font-size: 14px;
+}
+.pair .btn:only-child {
+  grid-column: 1 / -1;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.btn-tile {
+  height: 42px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-tile:hover {
+  border-color: var(--line-2);
+}
+.btn-tile svg path,
+.btn-tile .star polygon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn-tile.is-fav {
+  border-color: var(--beak);
+  background: #3a3220;
+}
+.btn-tile.is-fav .star polygon {
+  fill: var(--beak);
+  stroke: #c99a1e;
+  stroke-width: 1.4;
+}
+.btn-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.ext-arrow path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Coloured status bars */
+.bar {
+  position: relative;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cream);
+}
+.bar-blue {
+  background: var(--blue);
+}
+.bar-muted {
+  background: var(--raise-2);
+}
+.bar-error {
+  background: #5a2b26;
+}
+.bar-tight {
+  padding: 12px 14px;
+  gap: 8px;
+}
+.bar-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+}
+.tick {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.tick polyline {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.back {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0;
+  background: rgba(246, 245, 241, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back:hover {
+  background: rgba(246, 245, 241, 0.24);
+}
+.back polyline {
+  fill: none;
+  stroke: var(--cream);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(246, 245, 241, 0.2);
+  overflow: hidden;
+}
+.progress span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--beak);
+  animation: spBar 1.1s ease-in-out infinite;
+}
+
+/* Item preview */
+.item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  flex: none;
+  object-fit: cover;
+}
+.thumb-grey {
+  background: repeating-linear-gradient(135deg, #2a2e35 0 6px, #30343c 6px 12px);
+}
+.thumb-blue {
+  background: repeating-linear-gradient(135deg, #1d3a47 0 6px, #22485a 6px 12px);
+}
+.item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.item-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.item-meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--raise);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+/* Success */
+.success {
+  background: var(--blue);
+  color: var(--cream);
+  padding: 44px 18px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.badge {
+  position: relative;
+  width: 76px;
+  height: 76px;
+}
+.badge-ring,
+.badge-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.badge-ring {
+  border: 2px solid var(--cream);
+  animation: spRing 0.9s ease-out 0.2s both;
+}
+.badge-disc {
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.badge-disc polyline {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 24;
+  animation: spDraw 0.35s ease-out 0.3s both;
+}
+.success-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.success-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #e4eef2;
+}
+
+/* Tags */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  border: 0;
+  font-size: 13px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+.chip-tag {
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+}
+.chip-add {
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  color: var(--fg-2);
+  padding: 4px 11px;
+}
+.chip-add:hover {
+  border-color: var(--blue-soft);
+  color: var(--blue-soft);
+}
+.chip-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 10px;
+}
+.chip-draft button {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.chip-draft button:hover {
+  background: #2a5568;
+}
+.chip-draft path {
+  stroke: var(--tag-fg);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.chip-create {
+  background: var(--blue);
+  color: var(--cream);
+}
+.chip-sugg {
+  background: var(--raise-2);
+  color: var(--fg-2);
+}
+.chip-sugg:hover {
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+}
+.tag-box {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  padding: 6px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: var(--raise);
+  cursor: text;
+}
+.tag-box:focus-within {
+  border-color: var(--focus);
+}
+.tag-input {
+  flex: 1;
+  min-width: 80px;
+  height: 28px;
+  border: 0;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+}
+
+/* Spinners */
+.spin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid;
+  flex: none;
+  animation: spSpin 0.7s linear infinite;
+}
+.spin-light {
+  border-color: rgba(21, 23, 28, 0.18);
+  border-top-color: var(--ink);
+}
+.spin-dark {
+  border-color: rgba(241, 239, 233, 0.2);
+  border-top-color: var(--fg);
+}
+.spin-blue {
+  border-color: rgba(124, 192, 218, 0.2);
+  border-top-color: var(--blue-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-ring {
+    display: none;
+  }
+  .badge-disc,
+  .badge-disc polyline {
+    animation: none;
+  }
+  .progress span {
+    animation-duration: 3s;
+  }
+}
+
+@keyframes spSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spBar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+@keyframes spPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes spDraw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes spRing {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}

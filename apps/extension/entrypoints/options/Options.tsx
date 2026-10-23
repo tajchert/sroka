@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Mark } from "../../components/Mark.tsx";
 import { describeError, signOut } from "../../lib/api.ts";
 import { clearCache } from "../../lib/badge-cache.ts";
 import { DEFAULT_SERVER, getSettings, normalizeServerUrl, setSettings, clearSession, type Settings } from "../../lib/settings.ts";
@@ -43,7 +44,10 @@ export function Options() {
 
   return (
     <div className="page">
-      <h1 className="serif">Sroka settings</h1>
+      <h1>
+        <Mark size={40} />
+        Sroka settings
+      </h1>
 
       <div className="section">
         <label className="label" htmlFor="server" style={{ marginTop: 0 }}>

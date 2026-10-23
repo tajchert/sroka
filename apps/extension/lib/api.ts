@@ -5,6 +5,7 @@ import type {
   Item,
   ListItemsResponse,
   TagSuggestionsResponse,
+  TagsResponse,
 } from "@sroka/shared";
 import { clearCache } from "./badge-cache.ts";
 import { clearSession, getDeviceId, getSettings, setSettings } from "./settings.ts";
@@ -104,6 +105,8 @@ export const deleteItem = async (id: string) => {
 export const tagSuggestions = (url: string) =>
   json<TagSuggestionsResponse>(`/v1/tags/suggestions?url=${encodeURIComponent(url)}`);
 
+export const listTags = () => json<TagsResponse>("/v1/tags");
+
 export const getConfig = () => json<ConfigResponse>("/v1/config", { auth: false });
 
 export const getMe = () => json<{ user: { email: string } }>("/v1/me");
@@ -138,7 +141,7 @@ export function describeError(e: unknown): string {
   if (e instanceof ApiFailure) {
     switch (e.code) {
       case "INVALID_OTP":
-        return "That code is not right. Check it and try again.";
+        return "That code didn’t work. Check it and try again.";
       case "OTP_EXPIRED":
         return "That code expired. Request a new one.";
       case "TOO_MANY_ATTEMPTS":

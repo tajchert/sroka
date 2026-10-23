@@ -8,7 +8,7 @@ export async function paintBadge(tabId: number, saved: boolean) {
   const a = ext().action;
   await a.setBadgeText({ tabId, text: saved ? "✓" : "" });
   if (saved) {
-    await a.setBadgeBackgroundColor({ tabId, color: "#0f766e" });
+    await a.setBadgeBackgroundColor({ tabId, color: "#1e6f8f" });
     await a.setBadgeTextColor?.({ tabId, color: "#ffffff" });
   }
 }

@@ -1,6 +1,6 @@
 # @sroka/extension — WXT MV3 Chrome extension
 
-Popup (sign-in email→code, "Saved ✓", tag input with suggestions, open library), context menus, `Alt+Shift+S`, per-tab badge, retry queue, options page.
+Popup (sign-in email → 6-box code, saving → success → saved with tags/favourite/remove/open, tag editor, removed, queued/failed), context menus (save link/page; right-click the toolbar icon → "Open Sroka" opens `${appOrigin}/app/` in a new tab via `lib/open-app.ts`), `Alt+Shift+S`, per-tab badge, retry queue, options page.
 
 ## Commands
 - `npm run dev -w @sroka/extension` · `npm run build -w @sroka/extension` → `.output/chrome-mv3` · `npm run zip -w @sroka/extension`
@@ -8,6 +8,7 @@ Popup (sign-in email→code, "Saved ✓", tag input with suggestions, open libra
 - `npm run typecheck -w @sroka/extension` (runs `wxt prepare` first) · `npm test -w @sroka/extension`
 
 ## Key files
+- Popup implements Claude Design "Sroka Popup"/"Sroka Extension" (dark only, 340px): `entrypoints/popup/App.tsx` + `assets/popup.css`. Options page uses `assets/tailwind.css` (light/dark). Brand mark + glyph in `components/Mark.tsx`.
 - `wxt.config.ts` (manifest, permissions, dev host permission for localhost:8787), `entrypoints/background.ts`, `entrypoints/popup/*`, `entrypoints/options/*`, `assets/tailwind.css`.
 
 ## Decisions that apply

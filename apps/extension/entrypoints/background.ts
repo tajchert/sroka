@@ -1,5 +1,6 @@
 import { refreshBadge, paintBadge } from "../lib/badge.ts";
 import type { Msg } from "../lib/messages.ts";
+import { openApp } from "../lib/open-app.ts";
 import { ALARM, processQueue, releaseQueue, removeQueuedUrl } from "../lib/queue.ts";
 import { saveLink, saveTab, type SaveResult } from "../lib/save.ts";
 
@@ -20,6 +21,8 @@ export default defineBackground(() => {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({ id: "save-link", title: "Save link to Sroka", contexts: ["link"] });
       chrome.contextMenus.create({ id: "save-page", title: "Save page to Sroka", contexts: ["page"] });
+      // Right-click on the toolbar icon.
+      chrome.contextMenus.create({ id: "open-app", title: "Open Sroka", contexts: ["action"] });
     });
   });
 
@@ -30,6 +33,8 @@ export default defineBackground(() => {
       if (tab?.id != null && tab.url === info.linkUrl) await flash(tab.id, r);
     } else if (info.menuItemId === "save-page" && tab) {
       await flash(tab.id, await saveTab(tab));
+    } else if (info.menuItemId === "open-app") {
+      await openApp();
     }
   });
 

@@ -1,6 +1,6 @@
 # @sroka/extension — WXT MV3 Chrome extension
 
-Popup (sign-in email → 6-box code, saving → success → saved with tags/favourite/remove/open, tag editor, removed, queued/failed), context menus (save link/page; right-click the toolbar icon → "Open Sroka" opens `${appOrigin}/app/` in a new tab via `lib/open-app.ts`), `Alt+Shift+S`, per-tab badge, retry queue, options page.
+Popup (sign-in email → 6-box code, saving → success → saved with tags/favourite/remove/open, tag editor, removed, queued/failed), context menus (save link/page; right-click the toolbar icon → "Open Sroka" opens `${appOrigin}/app/` in a new tab via `lib/open-app.ts`), per-tab badge, retry queue, options page.
 
 ## Commands
 - `npm run dev -w @sroka/extension` · `npm run build -w @sroka/extension` → `.output/chrome-mv3` · `npm run zip -w @sroka/extension`

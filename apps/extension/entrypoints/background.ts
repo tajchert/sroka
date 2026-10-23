@@ -38,12 +38,6 @@ export default defineBackground(() => {
     }
   });
 
-  chrome.commands.onCommand.addListener(async (cmd) => {
-    if (cmd !== "save-page") return;
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) await flash(tab.id, await saveTab(tab));
-  });
-
   chrome.tabs.onActivated.addListener(async ({ tabId }) => {
     try {
       const tab = await chrome.tabs.get(tabId);

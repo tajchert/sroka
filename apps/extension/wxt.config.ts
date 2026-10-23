@@ -20,17 +20,5 @@ export default defineConfig({
     ],
     // Custom server URL (options page): requested at runtime via chrome.permissions.request.
     optional_host_permissions: ["https://*/*", "http://localhost/*"],
-    commands: {
-      // Opens the popup, which saves immediately.
-      _execute_action: {
-        suggested_key: { default: "Alt+Shift+S", mac: "Alt+Shift+S" },
-        description: "Save current page to Sroka (open popup)",
-      },
-      // Saves in the background without opening the popup.
-      "save-page": {
-        suggested_key: { default: "Alt+Shift+A", mac: "Alt+Shift+A" },
-        description: "Quick-save current page to Sroka",
-      },
-    },
   }),
 });

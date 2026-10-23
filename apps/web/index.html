@@ -3,123 +3,186 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Sroka is an open source read-later app. Save articles from your browser, read them offline, tag them, and bring your Pocket library with you." />
-    <title>Sroka, a quiet place to read later</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230b0c0d'/%3E%3Cpath d='M11 22c1-6 6-10 14-10-1 7-6 11-14 10z' fill='%2327a9b8'/%3E%3C/svg%3E" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="Sroka is a read-later app. Save any article in one click from your browser; it lands on your phone, downloaded and ready to read offline." />
+    <title>Sroka · Save it now. Read it later.</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..600&family=Schibsted+Grotesk:wght@400..700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/landing.css" />
+    <script type="module" src="/src/landing.ts"></script>
   </head>
   <body>
-    <header class="top">
-      <a class="brand" href="/" aria-label="Sroka home">
-        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-          <defs>
-            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#1fb7a6" />
-              <stop offset=".55" stop-color="#2b7fe0" />
-              <stop offset="1" stop-color="#7a56d6" />
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="9" fill="currentColor" />
-          <path d="M6 20c0-6 5-11 12-11 3 0 5 1 8 3l-4 1.5c1 1.5 1 3.5 0 5.5-2 3.5-6 5-9.5 5-3 0-6.5-1-6.5-4z" fill="var(--paper)" />
-          <path d="M11 22c1-6 6-10 14-10-1 7-6 11-14 10z" fill="url(#g)" />
-          <circle cx="21" cy="12.5" r="1" fill="currentColor" />
-        </svg>
-        <span>Sroka</span>
-      </a>
-      <nav aria-label="Primary">
-        <a href="#pocket">Coming from Pocket</a>
-        <a href="#features">Features</a>
-        <a class="pill" href="/app/">Open Sroka</a>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <!-- Icon 6a (Sroka Icons v2). Source of truth: scripts/make-icons.mjs -->
+        <symbol id="ic" viewBox="0 0 100 100">
+          <rect width="100" height="100" fill="#ffffff" />
+          <path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c" />
+          <polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f" />
+          <polygon points="69,27 83,33 69,39" fill="#f2c84b" />
+          <circle cx="58" cy="32" r="4" fill="#ffffff" />
+        </symbol>
+        <symbol id="gl" viewBox="26 16 60 70">
+          <path fill-rule="evenodd" d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z M30 56 L70 46 L70 58 L30 68 Z M54 32 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z" fill="currentColor" />
+          <polygon points="69,27 83,33 69,39" fill="#f2c84b" />
+        </symbol>
+        <symbol id="check" viewBox="0 0 12 12">
+          <polyline points="2.5,6.3 5,8.6 9.5,3.6" fill="none" stroke="#1e6f8f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <header class="hero">
+      <div class="stripe" aria-hidden="true"></div>
+      <nav class="nav wrap" aria-label="Primary">
+        <a class="brand" href="/" aria-label="Sroka home">
+          <span class="tile"><svg viewBox="0 0 100 100"><use href="#ic" /></svg></span>
+          <span>Sroka</span>
+        </a>
+        <div class="nav-links">
+          <a class="nav-how" href="#how">How it works</a>
+          <a class="btn btn-solid btn-sm" href="#get">Get Sroka</a>
+        </div>
       </nav>
+
+      <div class="hero-body wrap">
+        <div class="hero-copy">
+          <div class="chip"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span>Works offline</div>
+          <h1>
+            <span class="sizer" aria-hidden="true">Save it now.<br />Read it in the waiting room.</span>
+            <span class="typed-line" aria-hidden="true">Save it now.<br />Read it <span class="typed" data-typed>later.</span><span class="typed-emoji" data-typed-emoji></span><span class="caret" data-caret></span></span>
+            <span class="sr-only">Save it now. Read it later.</span>
+          </h1>
+          <p class="lede">Save any article in one click from your browser. It lands on your phone, downloaded and ready — on the train, on a plane, anywhere without signal.</p>
+          <div class="cta">
+            <a class="btn btn-solid btn-lg" href="#get"><span class="d-only">Add to Chrome — free</span><span class="m-only">Get the app — free</span></a>
+            <a class="btn btn-outline btn-lg" href="#get"><span class="d-only">Get the app</span><span class="m-only">Add to Chrome</span></a>
+          </div>
+        </div>
+
+        <div class="stage-wrap" aria-hidden="true">
+          <div class="stage-box">
+            <div class="stage">
+              <div class="browser">
+                <div class="browser-bar">
+                  <span class="dot"></span><span class="dot"></span>
+                  <span class="url">longreads.example/slow-art<span class="d-only">-of-reading</span></span>
+                  <span class="ext"><svg viewBox="0 0 100 100"><use href="#ic" /></svg></span>
+                </div>
+                <div class="browser-page">
+                  <div class="kicker">Essay</div>
+                  <div class="page-title">The slow art of reading on the internet</div>
+                  <div class="hatch hatch-img"></div>
+                  <div class="bar"></div>
+                  <div class="bar bar-80"></div>
+                </div>
+              </div>
+              <div class="pointer"></div>
+              <div class="toast"><div class="toast-head"><svg viewBox="0 0 60 70"><use href="#gl" /></svg>Saved to Sroka</div></div>
+              <div class="phone">
+                <div class="screen">
+                  <div class="clock">9:41</div>
+                  <div class="list-head"><svg viewBox="0 0 60 70"><use href="#gl" /></svg>My list</div>
+                  <div class="slot"></div>
+                  <div class="row"><span class="hatch thumb"></span><span class="row-text"><b>Why we collect things</b><i>aeon · 12 min · offline</i></span></div>
+                  <div class="row"><span class="hatch thumb"></span><span class="row-text"><b>A field guide to city birds</b><i>outdoors · 6 min · offline</i></span></div>
+                  <div class="row"><span class="hatch thumb"></span><span class="row-text"><b>Notes on deep work</b><i>blog · 8 min · offline</i></span></div>
+                  <div class="done"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span><span>Downloaded — read it anywhere<span class="d-only">, no signal needed</span></span></div>
+                </div>
+              </div>
+              <div class="flyer row">
+                <span class="hatch thumb thumb-blue"></span>
+                <span class="row-text"><b>The slow art of reading on the internet</b><i class="accent">longreads · 9 min · offline</i></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </header>
 
     <main>
-      <section class="hero">
-        <div class="hero-copy">
-          <h1>A quiet place for everything you meant to read.</h1>
-          <p class="lede">
-            Save an article with one click. Sroka strips it down to the words and pictures, keeps a copy that works offline, and waits until you have the time.
-          </p>
-          <div class="cta">
-            <a class="pill solid" href="/app/">Open Sroka</a>
-            <a class="pill" href="#extension">Get the Chrome extension</a>
-          </div>
-          <p class="fine">Free and open source. Sign in with just your email.</p>
-        </div>
-
-        <figure class="stage" aria-label="Preview of the Sroka reader">
-          <div class="wing" aria-hidden="true"></div>
-          <div class="page">
-            <p class="meta">example.org, 9 min read</p>
-            <h2>How magpies learned to count the days</h2>
-            <p>Long before anyone kept a calendar, corvids were keeping score. A magpie will return to the same hidden cache weeks later, and it will remember who was watching when it was buried.</p>
-            <p>The feathers are the first thing people notice. Black from a distance, they turn out to be teal, then blue, then violet as the bird moves through the light.</p>
-            <p class="fade">Researchers at a field station outside Kraków spent three winters&hellip;</p>
-          </div>
-        </figure>
+      <section id="how" class="how wrap">
+        <h2>Find it now. Read it when you’re ready.</h2>
+        <ol class="steps">
+          <li class="card">
+            <div class="card-top"><span class="num">1</span></div>
+            <h3>Spot it</h3>
+            <p>Click the magpie in your toolbar, or share from any app on your phone.</p>
+          </li>
+          <li class="card">
+            <div class="card-top"><span class="num">2</span></div>
+            <h3>Stash it</h3>
+            <p>Sroka grabs the article — text, images, everything — and tucks it into your list.</p>
+          </li>
+          <li class="card">
+            <div class="card-top">
+              <span class="num">3</span>
+              <span class="chip"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span>Works offline</span>
+            </div>
+            <h3>Read it</h3>
+            <p>Downloaded to every device. On the train, on a plane, offline — it’s waiting.</p>
+          </li>
+        </ol>
       </section>
 
-      <section id="pocket" class="band">
-        <div class="band-inner">
-          <h2>Pocket closed in July 2025. Your list does not have to.</h2>
-          <div class="cols">
-            <p>
-              Download your export from Pocket, upload it to Sroka, and your saved pages, tags and archive come across. Pages are fetched again in the background, so articles that Pocket kept for you can be rescued while they are still online.
-            </p>
-            <p>
-              Sroka reads Pocket&rsquo;s CSV, ZIP and HTML exports, Instapaper CSV files and browser bookmark files. It does not need your Pocket password, and you can export everything again whenever you like.
-            </p>
+      <section class="offline-wrap wrap">
+        <div class="offline">
+          <div class="offline-copy">
+            <div class="chip"><span class="chip-dot"></span>Offline</div>
+            <h2>No signal? Keep reading.</h2>
+            <p>Every article you save is downloaded to your devices — text and images. Airplane mode, subway tunnels, mountain cabins: your list goes with you.</p>
+          </div>
+          <ul class="points">
+            <li><b>Downloaded on save</b><span>No extra step. Saved means available offline.</span></li>
+            <li><b>Images included</b><span>Articles look the same with or without a connection.</span></li>
+            <li><b>Progress syncs later</b><span>Where you stopped is remembered once you’re back online.</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="words">
+        <div class="words-inner wrap">
+          <div class="words-copy">
+            <h2>Just the words.</h2>
+            <p>Ads, pop-ups and clutter stay behind. Your saved articles open in a calm reader view with adjustable type, dark mode, and progress that syncs everywhere.</p>
+          </div>
+          <div class="reader" aria-hidden="true">
+            <div class="reader-page">
+              <div class="reader-tools"><span>Aa</span><span class="moon"></span><span class="progress"><span></span></span></div>
+              <div class="reader-meta">longreads · 9 min</div>
+              <div class="reader-title">The slow art of reading on the internet</div>
+              <div class="reader-lines"><span></span><span></span><span></span><span class="short"></span></div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="features" class="features">
-        <h2>Made for reading, not for collecting.</h2>
-        <dl>
-          <div>
-            <dt>Save from your browser</dt>
-            <dd>A toolbar button, a right-click menu and Alt+Shift+S. Paste a link in the app, or share one from your phone.</dd>
-          </div>
-          <div>
-            <dt>Read offline</dt>
-            <dd>Every saved article is cleaned up and stored with its images, so it opens on a plane and looks the same every time.</dd>
-          </div>
-          <div>
-            <dt>Tags, search and a short list</dt>
-            <dd>Tag as you save, search titles and text, and archive what you have finished. My List stays as short as you keep it.</dd>
-          </div>
-          <div>
-            <dt>Light, dark and sepia</dt>
-            <dd>Pick a typeface, size and line width. Sroka remembers where you stopped and takes you back to the paragraph.</dd>
-          </div>
-          <div>
-            <dt>Import and export</dt>
-            <dd>Bring a Pocket library in, take a CSV or JSON copy out. Your reading list is yours.</dd>
-          </div>
-          <div>
-            <dt>Open source</dt>
-            <dd>The code is public. Read it, run your own, or send a fix.</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section id="extension" class="closing">
-        <h2>Start with the page open in front of you.</h2>
-        <div class="cta">
-          <a class="pill solid" href="/app/">Open Sroka</a>
-          <a class="pill" href="#extension">Get the Chrome extension</a>
+      <section id="get" class="get wrap">
+        <div class="tile tile-xl"><svg viewBox="0 0 100 100"><use href="#ic" /></svg></div>
+        <h2>One nest, every device.</h2>
+        <div class="platforms">
+          <a href="#get"><small>Add to</small><span>Chrome</span></a>
+          <a href="#get"><small>Download on the</small><span>App Store</span></a>
+          <a href="#get"><small>Get it on</small><span>Google Play</span></a>
+          <a href="/app/"><small>Open in</small><span>Browser</span></a>
         </div>
-        <p class="fine">The Chrome extension is coming to the Chrome Web Store. Until then, the web app saves any link you paste.</p>
       </section>
     </main>
 
-    <footer>
-      <span>Sroka is the Polish word for magpie.</span>
-      <a href="/app/">Open Sroka</a>
+    <footer class="foot">
+      <div class="foot-inner wrap">
+        <a class="foot-brand" href="/"><svg viewBox="0 0 60 70"><use href="#gl" /></svg><span>Sroka</span></a>
+        <div class="foot-links">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
     </footer>
   </body>
 </html>

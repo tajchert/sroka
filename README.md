@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/icon-rounded.svg" width="96" height="96" alt="Sroka icon" /></p>
+
 # Sroka
 
 Read-later app (a Pocket successor) on Cloudflare Workers: web app, Chrome extension, sync API for future mobile apps.

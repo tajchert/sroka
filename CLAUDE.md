@@ -27,3 +27,4 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - TypeScript strict, ESM. Zod schemas live in `@sroka/shared` and are reused by api/web/extension.
 - Wire JSON camelCase, SQL snake_case. Errors `{error, message?}`.
 - Keep test/build output short (`| tail -30`). Conventional commits.
+- Brand icon ("6a": black bookmark-magpie, blue band, yellow beak, white tile) has one source, `scripts/make-icons.mjs`. It generates `docs/brand/*`, web favicons (`apps/web/public`), extension PNGs and Android launcher icons. Change the mark there and rerun it (needs `sharp` via `SHARP_PREFIX`; see the script header).

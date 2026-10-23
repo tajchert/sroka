@@ -1,19 +1,13 @@
+/** Brand mark: icon 6a (bookmark magpie on a white tile). Source of truth: scripts/make-icons.mjs. */
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <defs>
-        <linearGradient id="sroka-wing" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#1fb7a6" />
-          <stop offset="0.55" stopColor="#2b7fe0" />
-          <stop offset="1" stopColor="#7a56d6" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="9" fill="currentColor" />
-      {/* body */}
-      <path d="M6 20c0-6 5-11 12-11 3 0 5 1 8 3l-4 1.5c1 1.5 1 3.5 0 5.5-2 3.5-6 5-9.5 5-3 0-6.500-1-6.500-4z" fill="var(--paper)" />
-      {/* wing sheen */}
-      <path d="M11 22c1-6 6-10 14-10-1 7-6 11-14 10z" fill="url(#sroka-wing)" />
-      <circle cx="21" cy="12.500" r="1" fill="currentColor" />
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" className="shrink-0">
+      <rect width="100" height="100" rx="22" fill="#ffffff" />
+      <rect x="0.75" y="0.75" width="98.5" height="98.5" rx="21.25" fill="none" stroke="#15171c" strokeOpacity="0.12" strokeWidth="1.5" />
+      <path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c" />
+      <polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f" />
+      <polygon points="69,27 83,33 69,39" fill="#f2c84b" />
+      <circle cx="58" cy="32" r="4" fill="#ffffff" />
     </svg>
   );
 }

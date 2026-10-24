@@ -13,7 +13,10 @@ import app.sroka.core.model.LibraryCounts
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.MatchIn
 import app.sroka.core.model.SaveResult
+import app.sroka.core.model.SearchResult
+import app.sroka.core.model.SearchScope
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.newUuidV7
@@ -78,6 +81,65 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
                     SortOrder.LONGEST -> list.sortedByDescending { it.wordCount ?: -1 }
                 }
             }
+    }
+
+    /** Last search passed to [search]. */
+    var lastSearch: Pair<String, SearchScope>? = null
+        private set
+
+    /**
+     * Case-insensitive substring search over title/excerpt/site/tags/url (every term must occur), newest
+     * first. The fake has no article body: matches in the excerpt count as TEXT and yield a snippet
+     * with highlights.
+     */
+    override fun search(query: String, scope: SearchScope): Flow<PagingData<SearchResult>> {
+        lastSearch = query to scope
+        val terms = query.lowercase().split(' ').filter { it.isNotBlank() }
+        return items.map { all ->
+            val hits = if (terms.isEmpty()) emptyList() else all
+                .filter {
+                    when (scope) {
+                        SearchScope.ALL -> true
+                        SearchScope.ARCHIVE -> it.status == ItemStatus.ARCHIVED
+                        SearchScope.FAVORITES -> it.isFavorite
+                    }
+                }
+                .mapNotNull { item -> searchResultOf(item, terms) }
+                .sortedByDescending { it.summary.savedAt }
+            PagingData.from(
+                hits,
+                sourceLoadStates = LoadStates(
+                    refresh = LoadState.NotLoading(endOfPaginationReached = true),
+                    prepend = LoadState.NotLoading(endOfPaginationReached = true),
+                    append = LoadState.NotLoading(endOfPaginationReached = true),
+                ),
+            )
+        }
+    }
+
+    private fun searchResultOf(item: Item, terms: List<String>): SearchResult? {
+        val title = item.displayTitle.lowercase()
+        val excerpt = item.excerpt.orEmpty()
+        val meta = listOfNotNull(item.siteName, item.url).joinToString(" ").lowercase() + " " +
+            item.tags.joinToString(" ").lowercase()
+        if (!terms.all { it in title || it in excerpt.lowercase() || it in meta }) return null
+        val inTitle = terms.any { it in title } || terms.any { it in meta }
+        val ranges = terms.flatMap { t ->
+            val lower = excerpt.lowercase()
+            val i = lower.indexOf(t)
+            if (i >= 0) listOf(i until i + t.length) else emptyList()
+        }.sortedBy { it.first }
+        val inText = ranges.isNotEmpty()
+        return SearchResult(
+            summary = item.toSummary(),
+            matchIn = when {
+                inTitle && inText -> MatchIn.BOTH
+                inText -> MatchIn.TEXT
+                else -> MatchIn.TITLE
+            },
+            snippet = excerpt.takeIf { inText },
+            highlights = ranges,
+        )
     }
 
     override fun observeItem(id: String): Flow<Item?> = items.map { list -> list.firstOrNull { it.id == id } }

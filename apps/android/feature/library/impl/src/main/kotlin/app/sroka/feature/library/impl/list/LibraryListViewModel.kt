@@ -63,7 +63,7 @@ data class LibraryListUiState(
     val needsSignIn: Boolean = false,
 ) {
     /** True while a sync or download is running. */
-    val busy: Boolean get() = sync.phase is SyncPhase.Syncing || sync.phase is SyncPhase.Downloading
+    val busy: Boolean get() = sync.phase is SyncPhase.Syncing || sync.phase is SyncPhase.Resyncing || sync.phase is SyncPhase.Downloading
 }
 
 /** One-shot UI messages shown as snackbars. */

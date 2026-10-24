@@ -4,6 +4,7 @@ import app.sroka.core.model.Item
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.PendingChange
 
 /** Builds an [Item] with sensible defaults; override only what a test cares about. */
 fun testItem(
@@ -21,6 +22,7 @@ fun testItem(
     contentId: String? = "c-$id",
     parseStatus: ParseStatus = ParseStatus.OK,
     offline: OfflineState = OfflineState.DOWNLOADED,
+    pendingChange: PendingChange? = null,
 ): Item = Item(
     id = id,
     url = url,
@@ -48,4 +50,5 @@ fun testItem(
     tags = tags,
     offline = offline,
     thumbnailPath = null,
+    pendingChange = pendingChange,
 )

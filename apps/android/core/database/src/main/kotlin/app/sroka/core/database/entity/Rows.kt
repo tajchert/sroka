@@ -7,6 +7,7 @@ import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.PendingChange
 import app.sroka.core.model.displayDomain
 
 /** Separator of the `group_concat` tag list (ASCII unit separator). */
@@ -30,6 +31,8 @@ data class ItemSummaryRow(
     @ColumnInfo(name = "thumb_path") val thumbPath: String?,
     /** Tag names joined by [TAG_SEPARATOR], null if none. */
     val tags: String?,
+    /** Type of the item's newest non-progress pending op, null if none (R6). */
+    @ColumnInfo(name = "pending_type") val pendingType: String? = null,
 ) {
     fun toSummary(): ItemSummary = ItemSummary(
         id = id,
@@ -45,7 +48,17 @@ data class ItemSummaryRow(
         thumbnailPath = thumbPath,
         tags = splitTags(tags),
         savedAt = savedAt,
+        pendingChange = pendingChangeOf(pendingType),
     )
+}
+
+/** Maps a `pending_ops.type` (wire op type) to the list flag (R6). */
+fun pendingChangeOf(type: String?): PendingChange? = when (type) {
+    null -> null
+    "item.add" -> PendingChange.SAVE
+    "item.tag" -> PendingChange.TAGS
+    "item.setFavorite" -> PendingChange.FAVORITE
+    else -> PendingChange.OTHER
 }
 
 /** Item with tags and offline state, for the reader / detail. */
@@ -112,4 +125,12 @@ data class CountsRow(val unread: Int, val archived: Int, val favorites: Int)
 data class EligibleDownloadRow(
     @ColumnInfo(name = "item_id") val itemId: String,
     @ColumnInfo(name = "content_id") val contentId: String,
+)
+
+/** Search hit: list row plus FTS4 `snippet()` of the body and `offsets()` of all matches. */
+data class SearchRow(
+    @Embedded val row: ItemSummaryRow,
+    val snippet: String?,
+    /** FTS4 `offsets()`: groups of four ints (column, term, byte offset, size), space separated. */
+    val offsets: String?,
 )

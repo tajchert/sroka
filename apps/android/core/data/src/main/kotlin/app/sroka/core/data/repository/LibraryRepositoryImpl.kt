@@ -9,6 +9,7 @@ import app.sroka.core.common.di.SrokaDispatchers
 import app.sroka.core.data.content.ContentPaths
 import app.sroka.core.data.ops.OpWriter
 import app.sroka.core.data.ops.WireOp
+import app.sroka.core.database.FtsQuery
 import app.sroka.core.database.dao.ItemDao
 import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.SaveSource
@@ -23,6 +24,8 @@ import app.sroka.core.model.MAX_TAG_LENGTH
 import app.sroka.core.model.MAX_URL_LENGTH
 import app.sroka.core.model.clampTitle
 import app.sroka.core.model.SaveResult
+import app.sroka.core.model.SearchResult
+import app.sroka.core.model.SearchScope
 import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.newUuidV7
 import app.sroka.core.model.normalizeTagName
@@ -30,6 +33,7 @@ import app.sroka.core.model.tagKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -49,6 +53,17 @@ internal class LibraryRepositoryImpl @Inject constructor(
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false)) { itemDao.pagedItems(query) }
             .flow
             .map { page -> page.map { it.toSummary() } }
+
+    override fun search(query: String, scope: SearchScope): Flow<PagingData<SearchResult>> {
+        val match = FtsQuery.build(query) ?: return flowOf(PagingData.empty())
+        return Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false)) {
+            when (scope) {
+                SearchScope.ALL -> itemDao.searchAll(match)
+                SearchScope.ARCHIVE -> itemDao.searchArchived(match)
+                SearchScope.FAVORITES -> itemDao.searchFavorites(match)
+            }
+        }.flow.map { page -> page.map { it.toSearchResult() } }
+    }
 
     override fun observeItem(id: String): Flow<Item?> =
         itemDao.observeItem(id).map { it?.toItem() }.distinctUntilChanged()

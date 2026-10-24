@@ -14,6 +14,7 @@ import app.sroka.core.database.entity.ItemDetailRow
 import app.sroka.core.database.entity.ItemEntity
 import app.sroka.core.database.entity.ItemSummaryRow
 import app.sroka.core.database.entity.ItemTagEntity
+import app.sroka.core.database.entity.SearchRow
 import app.sroka.core.database.entity.TagCountRow
 import app.sroka.core.database.entity.TagEntity
 import app.sroka.core.model.ItemQuery
@@ -161,6 +162,18 @@ interface ItemDao {
 
     @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_LONGEST")
     fun searchTagLongest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
+
+    // ---- Search (R8) --------------------------------------------------------------------------
+
+    /** FTS hits among every live item, newest first. */
+    @Query("$SEARCH_COLUMNS $SEARCH_FROM WHERE $MATCH $ORDER_NEWEST")
+    fun searchAll(match: String): PagingSource<Int, SearchRow>
+
+    @Query("$SEARCH_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = 'ARCHIVED' $ORDER_NEWEST")
+    fun searchArchived(match: String): PagingSource<Int, SearchRow>
+
+    @Query("$SEARCH_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_NEWEST")
+    fun searchFavorites(match: String): PagingSource<Int, SearchRow>
 
     // ---- Single item / counts / tags ---------------------------------------------------------
 

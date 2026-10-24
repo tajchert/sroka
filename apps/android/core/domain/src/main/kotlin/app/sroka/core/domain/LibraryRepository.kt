@@ -7,6 +7,8 @@ import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.LibraryCounts
 import app.sroka.core.model.SaveResult
+import app.sroka.core.model.SearchResult
+import app.sroka.core.model.SearchScope
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -18,6 +20,12 @@ interface LibraryRepository {
 
     /** Paged list rows for [query] (tab or tag filter, optional FTS search, sort). */
     fun pagedItems(query: ItemQuery): Flow<PagingData<ItemSummary>>
+
+    /**
+     * Full-text search (local FTS only, works offline) over [scope], newest first. Blank / symbol-only
+     * [query] yields an empty list. Hits carry a body snippet with match ranges (R8).
+     */
+    fun search(query: String, scope: SearchScope): Flow<PagingData<SearchResult>>
 
     /** One item with full detail, or null once it no longer exists locally. */
     fun observeItem(id: String): Flow<Item?>

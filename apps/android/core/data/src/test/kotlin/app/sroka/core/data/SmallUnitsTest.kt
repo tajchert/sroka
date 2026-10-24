@@ -5,6 +5,8 @@ import app.sroka.core.data.repository.normalizeTags
 import app.sroka.core.data.sync.SyncStatusRepositoryImpl
 import app.sroka.core.database.entity.SyncStateEntity
 import app.sroka.core.model.SyncErrorKind
+import app.sroka.core.data.repository.matchedColumns
+import app.sroka.core.data.repository.parseSnippet
 import app.sroka.core.model.SyncPhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,5 +37,35 @@ class SmallUnitsTest {
         assertEquals(SyncPhase.Error(SyncErrorKind.SERVER), phase(idle, state.copy(lastError = "SERVER"), true, false))
         assertEquals(SyncPhase.Idle, phase(idle, state.copy(lastError = "NETWORK"), true, false))
         assertEquals(SyncPhase.Idle, phase(idle, state, true, false))
+    }
+
+    @Test fun resyncingWhileFullPassRuns() {
+        val idle = SyncStatusRepositoryImpl.WorkSnapshot(syncing = false, downloading = null)
+        val full = SyncStateEntity(fullResync = true)
+        val phase = SyncStatusRepositoryImpl.Companion::phaseOf
+        assertEquals(SyncPhase.Resyncing(null), phase(idle.copy(syncing = true), full, true, false))
+        assertEquals(SyncPhase.Idle, phase(idle, full, true, false)) // flag alone, no running sync
+        assertEquals(SyncPhase.Error(SyncErrorKind.AUTH), phase(idle.copy(syncing = true), full, true, true))
+    }
+}
+
+class SearchMappingTest {
+    @Test fun parseSnippetStripsMarkersIntoRanges() {
+        val (text, ranges) = parseSnippet("…a \uE000zebra\uE001 and \uE000stripes\uE001 end")!!
+        assertEquals("…a zebra and stripes end", text)
+        assertEquals(listOf(3..7, 13..19), ranges)
+        assertEquals("zebra", text.substring(ranges[0].first, ranges[0].last + 1))
+        assertEquals("stripes", text.substring(ranges[1].first, ranges[1].last + 1))
+    }
+
+    @Test fun parseSnippetHandlesNullAndNoMarkers() {
+        assertNull(parseSnippet(null))
+        assertNull(parseSnippet(" "))
+        assertEquals("plain" to emptyList<IntRange>(), parseSnippet("plain"))
+    }
+
+    @Test fun matchedColumnsReadsOffsets() {
+        assertEquals(setOf(0, 4), matchedColumns("0 0 0 5 4 0 12 5 4 1 30 3"))
+        assertEquals(emptySet<Int>(), matchedColumns(null))
     }
 }

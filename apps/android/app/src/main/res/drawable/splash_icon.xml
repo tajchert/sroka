@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash mark: the 6a bookmark-magpie (geometry from scripts/make-icons.mjs) on a white tile circle,
+     so it stays visible on the dark splash background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,54 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0 Z" />
+    <group
+        android:scaleX="0.6"
+        android:scaleY="0.6"
+        android:translateX="20.4"
+        android:translateY="23.4">
+        <path
+            android:fillColor="#FF15171C"
+            android:pathData="M30,20 H62 Q70,20 70,28 V82 L50,77 L30,82 Z" />
+        <path
+            android:fillColor="#FF1E6F8F"
+            android:pathData="M30,56 L70,46 L70,58 L30,68 Z" />
+        <path
+            android:fillColor="#FFF2C84B"
+            android:pathData="M69,27 L83,33 L69,39 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M54,32 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+    </group>
+</vector>

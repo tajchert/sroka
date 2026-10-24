@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -123,66 +125,100 @@ private fun EmailStep(
     onSendCode: () -> Unit,
     onOpenServer: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, top = 64.dp),
-            verticalArrangement = Arrangement.spacedBy(32.dp),
-        ) {
-            SrokaMark(size = 64.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.feature_auth_title), style = MaterialTheme.typography.headlineLarge)
-                Text(
-                    stringResource(R.string.feature_auth_email_hint),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            OutlinedTextField(
-                value = state.email,
-                onValueChange = onEmailChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { contentType = ContentType.EmailAddress },
-                label = { Text(stringResource(R.string.feature_auth_email_label)) },
-                singleLine = true,
-                enabled = !state.loading,
-                isError = state.error != null,
-                supportingText = { ErrorText(state.error) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { onSendCode() }),
-            )
-            Button(
-                onClick = onSendCode,
-                enabled = !state.loading && state.email.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val twoColumn = maxWidth > maxHeight && maxHeight < 480.dp
+        val capped = maxWidth >= 600.dp && !twoColumn
+        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 24.dp, end = 24.dp, top = if (twoColumn) 24.dp else 64.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (state.loading) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                if (twoColumn) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                            EmailHeader()
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                            EmailForm(state, onEmailChange, onSendCode)
+                        }
+                    }
                 } else {
-                    Text(stringResource(R.string.feature_auth_send_code))
+                    Column(
+                        Modifier.fillMaxWidth().then(if (capped) Modifier.widthIn(max = 400.dp) else Modifier),
+                        verticalArrangement = Arrangement.spacedBy(32.dp),
+                    ) {
+                        EmailHeader()
+                        EmailForm(state, onEmailChange, onSendCode)
+                    }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ListItem(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                leadingContent = {
+                    Icon(
+                        Icons.Rounded.Dns,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                headlineContent = { Text(stringResource(R.string.feature_auth_server_row)) },
+                supportingContent = { Text(serverHost(state.serverUrl)) },
+                trailingContent = {
+                    TextButton(onClick = onOpenServer) { Text(stringResource(R.string.feature_auth_change_server)) }
+                },
+            )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        ListItem(
-            modifier = Modifier.padding(horizontal = 8.dp),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            leadingContent = {
-                Icon(
-                    Icons.Rounded.Dns,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            headlineContent = { Text(stringResource(R.string.feature_auth_server_row)) },
-            supportingContent = { Text(serverHost(state.serverUrl)) },
-            trailingContent = {
-                TextButton(onClick = onOpenServer) { Text(stringResource(R.string.feature_auth_change_server)) }
-            },
+    }
+}
+
+@Composable
+private fun EmailHeader() {
+    SrokaMark(size = 64.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.feature_auth_title), style = MaterialTheme.typography.headlineLarge)
+        Text(
+            stringResource(R.string.feature_auth_email_hint),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun EmailForm(
+    state: AuthUiState,
+    onEmailChange: (String) -> Unit,
+    onSendCode: () -> Unit,
+) {
+    OutlinedTextField(
+        value = state.email,
+        onValueChange = onEmailChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentType = ContentType.EmailAddress },
+        label = { Text(stringResource(R.string.feature_auth_email_label)) },
+        singleLine = true,
+        enabled = !state.loading,
+        isError = state.error != null,
+        supportingText = { ErrorText(state.error) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onSendCode() }),
+    )
+    Button(
+        onClick = onSendCode,
+        enabled = !state.loading && state.email.isNotBlank(),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+    ) {
+        if (state.loading) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Text(stringResource(R.string.feature_auth_send_code))
+        }
     }
 }
 
@@ -197,75 +233,111 @@ private fun CodeStep(
     onResend: () -> Unit,
     onChangeEmail: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-        TopAppBar(
-            title = {},
-            navigationIcon = {
-                IconButton(onClick = onChangeEmail) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = stringResource(R.string.feature_auth_back),
-                    )
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-        )
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.feature_auth_code_title), style = MaterialTheme.typography.headlineMedium)
-                val full = stringResource(R.string.feature_auth_code_hint, state.email)
-                val emphasised = remember(full, state.email) {
-                    buildAnnotatedString {
-                        append(full)
-                        val i = full.lastIndexOf(state.email)
-                        if (i >= 0 && state.email.isNotEmpty()) {
-                            addStyle(SpanStyle(fontWeight = FontWeight.Medium), i, i + state.email.length)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val twoColumn = maxWidth > maxHeight && maxHeight < 480.dp
+        val capped = maxWidth >= 600.dp && !twoColumn
+        Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
+            TopAppBar(
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = onChangeEmail) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.feature_auth_back),
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 24.dp, end = 24.dp, top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (twoColumn) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            CodeHeader(state)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                            CodeForm(state, onCodeChange, onResend, onChangeEmail)
                         }
                     }
+                } else {
+                    Column(
+                        Modifier.fillMaxWidth().then(if (capped) Modifier.widthIn(max = 400.dp) else Modifier),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        CodeHeader(state)
+                        CodeForm(state, onCodeChange, onResend, onChangeEmail)
+                    }
                 }
-                Text(
-                    emphasised,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OtpInput(
-                    code = state.code,
-                    onCodeChange = onCodeChange,
-                    readOnly = state.loading,
-                    isError = state.error != null,
-                    refocusKey = state.error,
-                )
-                if (state.loading) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
-                if (state.error != null) {
-                    Text(
-                        errorMessage(state.error),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-            Row(Modifier.offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onResend, enabled = !state.loading && state.resendSeconds == 0) {
-                    Text(
-                        if (state.resendSeconds > 0) {
-                            stringResource(R.string.feature_auth_resend_in, state.resendSeconds)
-                        } else {
-                            stringResource(R.string.feature_auth_resend)
-                        },
-                    )
-                }
-                TextButton(onClick = onChangeEmail) { Text(stringResource(R.string.feature_auth_change_email)) }
             }
         }
+    }
+}
+
+@Composable
+private fun CodeHeader(state: AuthUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.feature_auth_code_title), style = MaterialTheme.typography.headlineMedium)
+        val full = stringResource(R.string.feature_auth_code_hint, state.email)
+        val emphasised = remember(full, state.email) {
+            buildAnnotatedString {
+                append(full)
+                val i = full.lastIndexOf(state.email)
+                if (i >= 0 && state.email.isNotEmpty()) {
+                    addStyle(SpanStyle(fontWeight = FontWeight.Medium), i, i + state.email.length)
+                }
+            }
+        }
+        Text(
+            emphasised,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CodeForm(
+    state: AuthUiState,
+    onCodeChange: (String) -> Unit,
+    onResend: () -> Unit,
+    onChangeEmail: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OtpInput(
+            code = state.code,
+            onCodeChange = onCodeChange,
+            readOnly = state.loading,
+            isError = state.error != null,
+            refocusKey = state.error,
+        )
+        if (state.loading) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        if (state.error != null) {
+            Text(
+                errorMessage(state.error),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+    Row(Modifier.fillMaxWidth().offset(x = (-12).dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = onResend, enabled = !state.loading && state.resendSeconds == 0) {
+            Text(
+                if (state.resendSeconds > 0) {
+                    stringResource(R.string.feature_auth_resend_in, state.resendSeconds)
+                } else {
+                    stringResource(R.string.feature_auth_resend)
+                },
+            )
+        }
+        TextButton(onClick = onChangeEmail) { Text(stringResource(R.string.feature_auth_change_email)) }
     }
 }
 

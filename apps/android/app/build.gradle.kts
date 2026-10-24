@@ -24,6 +24,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.screenshot)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kover)
@@ -33,6 +34,7 @@ plugins {
 android {
     namespace = "app.sroka"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     defaultConfig {
         applicationId = "app.sroka"
@@ -167,6 +169,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Testing
+    screenshotTestImplementation(libs.screenshot.validation.api)
+    screenshotTestImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(projects.core.testing)
 

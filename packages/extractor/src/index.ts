@@ -10,3 +10,4 @@ export * from "./pipeline.ts";
 export * from "./bot-wall.ts";
 export * from "./reddit.ts";
 export { detectPaywall } from "@sroka/shared";
+export * from "./twitter.ts";

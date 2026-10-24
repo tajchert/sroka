@@ -186,79 +186,35 @@ fun LibraryListRoute(
 
     val isEmpty = items.loadState.refresh is LoadState.NotLoading && items.itemCount == 0
     val fetch = rememberWithNotificationPermission(viewModel::fetchNewArticles)
-    val tab = (scope as? ListScope.Tab)?.tab
-    val isTopLevel = tab != null
-    val fabExpanded = isEmpty || listState.isScrollingUpOrAtTop()
 
-    Scaffold(
-        topBar = {
-            if (tab != null) {
-                SearchPill(
-                    tab = tab,
-                    email = state.email,
-                    sort = state.sort,
-                    onSortChange = viewModel::setSort,
-                    onOpenSearch = { onOpenSearch?.invoke(tab) },
-                    onOpenSettings = onOpenSettings.takeUnless { navRailShown },
-                )
-            } else {
-                TopAppBar(
-                    title = { Text(scopeTitle(scope)) },
-                    navigationIcon = {
-                        if (onBack != null) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.feature_library_back))
-                            }
-                        }
-                    },
-                    actions = { SortMenu(state.sort, viewModel::setSort) },
-                )
-            }
+    LibraryListContent(
+        scope = scope,
+        state = state,
+        snackbarHostState = snackbarHostState,
+        refreshing = pulled && state.busy,
+        onRefresh = {
+            pulled = true
+            fetch()
         },
-        floatingActionButton = {
-            if (isTopLevel && !navRailShown) {
-                val brand = MaterialTheme.srokaColors
-                ExtendedFloatingActionButton(
-                    onClick = { showAdd = true },
-                    expanded = fabExpanded,
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = brand.brand,
-                    contentColor = brand.onBrand,
-                    icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                    text = { Text(stringResource(R.string.feature_library_save_link)) },
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            StatusCards(selectStatusCard(state.sync, state.needsSignIn), onSignIn = onSignIn)
-            PullToRefreshBox(
-                isRefreshing = pulled && state.busy,
-                onRefresh = {
-                    pulled = true
-                    fetch()
-                },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                if (isEmpty) {
-                    EmptyContent(scope)
-                } else {
-                    ItemList(
-                        items = items,
-                        listState = listState,
-                        archiveTab = tab == LibraryTab.ARCHIVE,
-                        onOpenItem = onOpenItem,
-                        onLongClick = { viewModel.showActions(it.id) },
-                        onArchive = { viewModel.toggleArchive(it.id, it.status) },
-                        bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
-                        selectedItemId = selectedItemId,
-                        inset = twoPane,
-                    )
-                }
-            }
-        }
-    }
+        isEmpty = isEmpty,
+        listState = listState,
+        itemCount = { items.itemCount },
+        itemAt = { items[it] },
+        itemKey = items.itemKey { it.id },
+        itemContentType = items.itemContentType { "item" },
+        onSortChange = viewModel::setSort,
+        onOpenSearch = onOpenSearch,
+        onOpenSettings = onOpenSettings,
+        onBack = onBack,
+        onSignIn = onSignIn,
+        onAddLink = { showAdd = true },
+        onOpenItem = onOpenItem,
+        onLongClick = { viewModel.showActions(it.id) },
+        onArchive = { viewModel.toggleArchive(it.id, it.status) },
+        selectedItemId = selectedItemId,
+        twoPane = twoPane,
+        navRailShown = navRailShown,
+    )
 
     selected?.let { item ->
         ItemActionsSheet(
@@ -297,6 +253,111 @@ fun LibraryListRoute(
     }
     if (showAdd) {
         AddUrlDialog(onSubmit = viewModel::addLink, onDismiss = { showAdd = false })
+    }
+}
+
+/**
+ * Stateless list screen: top bar (search pill or title bar), status cards, the list (or empty state),
+ * FAB and snackbar host. The route feeds it from the ViewModel; screenshot tests feed it fixtures.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LibraryListContent(
+    scope: ListScope,
+    state: LibraryListUiState,
+    snackbarHostState: SnackbarHostState,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    isEmpty: Boolean,
+    listState: LazyListState,
+    itemCount: () -> Int,
+    itemAt: (Int) -> ItemSummary?,
+    itemKey: (Int) -> Any,
+    itemContentType: (Int) -> Any?,
+    onSortChange: (SortOrder) -> Unit,
+    onOpenSearch: ((LibraryTab) -> Unit)?,
+    onOpenSettings: (() -> Unit)?,
+    onBack: (() -> Unit)?,
+    onSignIn: () -> Unit,
+    onAddLink: () -> Unit,
+    onOpenItem: (String) -> Unit,
+    onLongClick: (ItemSummary) -> Unit,
+    onArchive: (ItemSummary) -> Unit,
+    selectedItemId: String?,
+    twoPane: Boolean,
+    navRailShown: Boolean,
+) {
+    val tab = (scope as? ListScope.Tab)?.tab
+    val isTopLevel = tab != null
+    val fabExpanded = isEmpty || listState.isScrollingUpOrAtTop()
+    Scaffold(
+        topBar = {
+            if (tab != null) {
+                SearchPill(
+                    tab = tab,
+                    email = state.email,
+                    sort = state.sort,
+                    onSortChange = onSortChange,
+                    onOpenSearch = { onOpenSearch?.invoke(tab) },
+                    onOpenSettings = onOpenSettings.takeUnless { navRailShown },
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(scopeTitle(scope)) },
+                    navigationIcon = {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.feature_library_back))
+                            }
+                        }
+                    },
+                    actions = { SortMenu(state.sort, onSortChange) },
+                )
+            }
+        },
+        floatingActionButton = {
+            if (isTopLevel && !navRailShown) {
+                val brand = MaterialTheme.srokaColors
+                ExtendedFloatingActionButton(
+                    onClick = onAddLink,
+                    expanded = fabExpanded,
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = brand.brand,
+                    contentColor = brand.onBrand,
+                    icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                    text = { Text(stringResource(R.string.feature_library_save_link)) },
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            StatusCards(selectStatusCard(state.sync, state.needsSignIn), onSignIn = onSignIn)
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (isEmpty) {
+                    EmptyContent(scope)
+                } else {
+                    ItemList(
+                        itemCount = itemCount,
+                        itemAt = itemAt,
+                        itemKey = itemKey,
+                        itemContentType = itemContentType,
+                        listState = listState,
+                        archiveTab = tab == LibraryTab.ARCHIVE,
+                        onOpenItem = onOpenItem,
+                        onLongClick = onLongClick,
+                        onArchive = onArchive,
+                        bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
+                        selectedItemId = selectedItemId,
+                        inset = twoPane,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -472,7 +533,10 @@ private fun tabScope(scope: ListScope) = scope is ListScope.Tab
 
 @Composable
 private fun ItemList(
-    items: LazyPagingItems<ItemSummary>,
+    itemCount: () -> Int,
+    itemAt: (Int) -> ItemSummary?,
+    itemKey: (Int) -> Any,
+    itemContentType: (Int) -> Any?,
     listState: LazyListState,
     archiveTab: Boolean,
     onOpenItem: (String) -> Unit,
@@ -489,11 +553,11 @@ private fun ItemList(
         verticalArrangement = Arrangement.spacedBy(if (inset) ROW_GAP else 0.dp),
     ) {
         items(
-            count = items.itemCount,
-            key = items.itemKey { it.id },
-            contentType = items.itemContentType { "item" },
+            count = itemCount(),
+            key = itemKey,
+            contentType = itemContentType,
         ) { index ->
-            val item = items[index] ?: return@items
+            val item = itemAt(index) ?: return@items
             SwipeableRow(
                 modifier = Modifier.animateItem(),
                 item = item,

@@ -101,7 +101,7 @@ private fun listPaneMetadata() =
 
 /** Fills the empty detail pane on wide windows until an article is opened. */
 @Composable
-private fun DetailPlaceholder() {
+fun DetailPlaceholder() {
     DetailPaneCard {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(

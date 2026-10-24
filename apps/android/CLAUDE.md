@@ -8,6 +8,7 @@ Built from the ai-android-template (adopted as `app.sroka`); template guides und
 - JDK 21 required: `export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
 - One module: `./gradlew :core:data:testDebugUnitTest --console=plain 2>&1 | tail -30`
 - Gate: `./gradlew testDebugUnitTest lintDebug assembleDebug :app:assembleRelease --console=plain 2>&1 | tail -30`
+- Screenshot tests (Compose Preview Screenshot Testing; `src/screenshotTest` of core:designsystem, feature:{auth,library,settings}:impl, app; `@FoldablePreviews` = Folded/Unfolded/Unfolded landscape): update references `./gradlew :<module>:updateDebugScreenshotTest`, check `./gradlew :<module>:validateDebugScreenshotTest` (e.g. `:feature:library:impl`, `:app`). Tests use stateless `…Content` composables + fixed fixtures; WebView/NavDisplay don't render.
 - Install debug on a running emulator: `./gradlew :app:installDebug`; local backend: repo root `npm run dev -w @sroka/api`, then `adb reverse tcp:8787 tcp:8787` (debug default server `http://localhost:8787`; dev OTP is printed in the wrangler log as `[sroka] OTP for …`).
 
 ## Layout

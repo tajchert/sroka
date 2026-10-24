@@ -103,3 +103,12 @@ annotation class LargeFontPreview
     apiLevel = 36,
 )
 annotation class ComponentThemePreviews
+
+/**
+ * Foldable windows (R13): the cover display folded, the inner display unfolded in portrait and in
+ * landscape. Dimensions are pinned (no dots in names: they become reference file names).
+ */
+@Preview(name = "Folded", showBackground = true, widthDp = 360, heightDp = 800, apiLevel = 36)
+@Preview(name = "Unfolded", showBackground = true, widthDp = 673, heightDp = 841, apiLevel = 36)
+@Preview(name = "Unfolded landscape", showBackground = true, widthDp = 841, heightDp = 673, apiLevel = 36)
+annotation class FoldablePreviews

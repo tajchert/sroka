@@ -99,14 +99,43 @@ fun SettingsRoute(
             )
         }
     }
-    SettingsScreen(state, viewModel, snackbar, onBack, onOpenImport, onOpenExport)
+    SettingsScreen(state, SettingsActions.of(viewModel), snackbar, onBack, onOpenImport, onOpenExport)
+}
+
+/** What the settings screen can ask for; [of] binds it to the ViewModel, tests pass no-ops. */
+class SettingsActions(
+    val clearServerError: () -> Unit = {},
+    val setThemeMode: (ThemeMode) -> Unit = {},
+    val setReaderTheme: (ReaderTheme) -> Unit = {},
+    val setReaderTextScale: (Float) -> Unit = {},
+    val setDownloadPolicy: (DownloadPolicy) -> Unit = {},
+    val downloadAllNow: () -> Unit = {},
+    val removeDownloads: () -> Unit = {},
+    val signOut: () -> Unit = {},
+    val deleteAccount: () -> Unit = {},
+    val saveServerUrl: (String, () -> Unit) -> Unit = { _, _ -> },
+) {
+    companion object {
+        fun of(vm: SettingsViewModel) = SettingsActions(
+            clearServerError = { vm.clearServerError() },
+            setThemeMode = { vm.setThemeMode(it) },
+            setReaderTheme = { vm.setReaderTheme(it) },
+            setReaderTextScale = { vm.setReaderTextScale(it) },
+            setDownloadPolicy = { vm.setDownloadPolicy(it) },
+            downloadAllNow = { vm.downloadAllNow() },
+            removeDownloads = { vm.removeDownloads() },
+            signOut = { vm.signOut() },
+            deleteAccount = { vm.deleteAccount() },
+            saveServerUrl = { url, done -> vm.saveServerUrl(url, done) },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
-    vm: SettingsViewModel,
+    vm: SettingsActions,
     snackbar: SnackbarHostState,
     onBack: () -> Unit,
     onOpenImport: () -> Unit,
@@ -129,7 +158,7 @@ fun SettingsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        val downloadAllNow = rememberWithNotificationPermission(vm::downloadAllNow)
+        val downloadAllNow = rememberWithNotificationPermission(vm.downloadAllNow)
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
             SectionHeader(R.string.feature_settings_section_reading)
             SettingRow(
@@ -268,7 +297,7 @@ fun SettingsScreen(
         Dialog.Server -> ServerDialog(
             initial = state.serverUrl,
             invalid = state.serverUrlInvalid,
-            onSave = { vm.saveServerUrl(it, onDone = close) },
+            onSave = { vm.saveServerUrl(it, close) },
             onDismiss = close,
         )
     }

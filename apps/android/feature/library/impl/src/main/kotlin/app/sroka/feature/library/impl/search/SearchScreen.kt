@@ -78,7 +78,10 @@ fun SearchRoute(
     SearchScreen(
         query = query,
         scope = scope,
-        results = results,
+        loaded = results.loadState.refresh is LoadState.NotLoading,
+        itemCount = results.itemCount,
+        itemAt = { results[it] },
+        itemKey = results.itemKey { it.summary.id },
         resultCount = resultCount,
         onQueryChange = viewModel::onQueryChange,
         onScopeChange = viewModel::onScopeChange,
@@ -91,7 +94,10 @@ fun SearchRoute(
 internal fun SearchScreen(
     query: String,
     scope: SearchScope,
-    results: LazyPagingItems<SearchResult>,
+    loaded: Boolean,
+    itemCount: Int,
+    itemAt: (Int) -> SearchResult?,
+    itemKey: (Int) -> Any,
     resultCount: Int?,
     onQueryChange: (String) -> Unit,
     onScopeChange: (SearchScope) -> Unit,
@@ -100,9 +106,31 @@ internal fun SearchScreen(
 ) {
     BackHandler(onBack = onBack)
     val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    SearchContent(
+        query, scope, loaded, itemCount, itemAt, itemKey, resultCount,
+        onQueryChange, onScopeChange, onOpenItem, onBack, focus,
+    )
+}
+
+/** Stateless search screen body (screenshot tests pass fixtures and no focus requester). */
+@Composable
+internal fun SearchContent(
+    query: String,
+    scope: SearchScope,
+    loaded: Boolean,
+    itemCount: Int,
+    itemAt: (Int) -> SearchResult?,
+    itemKey: (Int) -> Any,
+    resultCount: Int?,
+    onQueryChange: (String) -> Unit,
+    onScopeChange: (SearchScope) -> Unit,
+    onOpenItem: (String) -> Unit,
+    onBack: () -> Unit,
+    focus: FocusRequester?,
+) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    LaunchedEffect(Unit) { focus.requestFocus() }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.surfaceContainer) { padding ->
         Column(Modifier.padding(padding).imePadding().fillMaxSize()) {
@@ -123,7 +151,7 @@ internal fun SearchScreen(
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); focusManager.clearFocus() }),
-                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    modifier = Modifier.weight(1f).then(if (focus != null) Modifier.focusRequester(focus) else Modifier),
                 )
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
@@ -142,10 +170,9 @@ internal fun SearchScreen(
                 ScopeChip(SearchScope.FAVORITES, scope, R.string.feature_library_search_chip_favorites, onScopeChange)
             }
             val searching = query.isNotBlank()
-            val loaded = results.loadState.refresh is LoadState.NotLoading
             when {
                 !searching -> Message(R.string.feature_library_search_idle, null)
-                loaded && results.itemCount == 0 ->
+                loaded && itemCount == 0 ->
                     Message(R.string.feature_library_empty_search_title, R.string.feature_library_empty_search_body)
                 else -> {
                     Text(
@@ -159,8 +186,8 @@ internal fun SearchScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                     LazyColumn(Modifier.fillMaxSize()) {
-                        items(count = results.itemCount, key = results.itemKey { it.summary.id }) { index ->
-                            results[index]?.let { ResultRow(it, onClick = { onOpenItem(it.summary.id) }) }
+                        items(count = itemCount, key = itemKey) { index ->
+                            itemAt(index)?.let { ResultRow(it, onClick = { onOpenItem(it.summary.id) }) }
                         }
                     }
                 }

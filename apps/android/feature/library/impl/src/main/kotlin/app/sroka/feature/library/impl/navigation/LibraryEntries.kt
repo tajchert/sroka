@@ -12,12 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import app.sroka.core.model.LibraryTab
 import app.sroka.feature.library.api.LibraryKey
 import app.sroka.feature.library.impl.R
+import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
 import app.sroka.feature.library.api.TagsKey
 import app.sroka.feature.library.impl.list.LibraryListRoute
 import app.sroka.feature.library.impl.list.ListScope
+import app.sroka.feature.library.impl.search.SearchRoute
 import app.sroka.feature.library.impl.tags.TagsRoute
 
 /**
@@ -30,6 +33,8 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param onOpenTag open the list of items with a tag
  * @param onOpenSettings open settings
  * @param onCloseTag close the given tag list (and any reader opened from it)
+ * @param onOpenSearch open the full-screen search, starting from the given tab
+ * @param onCloseSearch leave the search screen
  * @param onSignIn the "sign in again" banner action; the app navigates to auth
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -39,6 +44,8 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onOpenSettings: () -> Unit,
     onCloseTag: (TagItemsKey) -> Unit,
     onSignIn: () -> Unit = {},
+    onOpenSearch: (LibraryTab) -> Unit = {},
+    onCloseSearch: () -> Unit = {},
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
     entry<LibraryKey>(metadata = ListDetailSceneStrategy.listPane(detailPlaceholder = { DetailPlaceholder() })) { key ->
@@ -47,7 +54,11 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             onOpenItem = onOpenItem,
             onSignIn = onSignIn,
             onOpenSettings = onOpenSettings,
+            onOpenSearch = onOpenSearch,
         )
+    }
+    entry<SearchKey> { key ->
+        SearchRoute(initialTab = key.tab, onOpenItem = onOpenItem, onBack = onCloseSearch)
     }
     entry<TagsKey> {
         TagsRoute(onOpenTag = onOpenTag, onOpenSettings = onOpenSettings)

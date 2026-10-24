@@ -2,14 +2,14 @@ package app.sroka.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Bookmarks
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.rounded.Label
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.Bookmarks
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation3.runtime.NavKey
 import app.sroka.R
@@ -24,10 +24,11 @@ enum class TopLevelDestination(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 ) {
-    MY_LIST(LibraryKey(LibraryTab.MY_LIST), R.string.nav_my_list, Icons.Filled.Bookmarks, Icons.Outlined.Bookmarks),
-    ARCHIVE(LibraryKey(LibraryTab.ARCHIVE), R.string.nav_archive, Icons.Filled.Archive, Icons.Outlined.Archive),
-    FAVORITES(LibraryKey(LibraryTab.FAVORITES), R.string.nav_favorites, Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
-    TAGS(TagsKey, R.string.nav_tags, Icons.AutoMirrored.Filled.Label, Icons.AutoMirrored.Outlined.Label),
+    // Rounded (filled) when selected, outlined otherwise: the icon set has no unfilled Rounded variants.
+    MY_LIST(LibraryKey(LibraryTab.MY_LIST), R.string.nav_my_list, Icons.Rounded.Bookmarks, Icons.Outlined.Bookmarks),
+    FAVORITES(LibraryKey(LibraryTab.FAVORITES), R.string.nav_favorites, Icons.Rounded.Star, Icons.Outlined.StarBorder),
+    ARCHIVE(LibraryKey(LibraryTab.ARCHIVE), R.string.nav_archive, Icons.Rounded.Archive, Icons.Outlined.Archive),
+    TAGS(TagsKey, R.string.nav_tags, Icons.AutoMirrored.Rounded.Label, Icons.AutoMirrored.Outlined.Label),
     ;
 
     companion object {

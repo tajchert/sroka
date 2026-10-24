@@ -7,7 +7,9 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
+import app.sroka.core.model.OfflineState
 import app.sroka.core.designsystem.theme.SrokaTheme
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.LibraryTab
@@ -42,7 +44,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
+@Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
 class LibraryListScreenTest {
 
     @get:Rule
@@ -55,6 +57,8 @@ class LibraryListScreenTest {
     private val auth = FakeAuthRepository(SessionState.SignedIn("a@b.c"))
     private val opened = mutableListOf<String>()
     private var signInClicks = 0
+    private var settingsClicks = 0
+    private val searchOpened = mutableListOf<LibraryTab>()
 
     private fun show(scope: ListScope = ListScope.Tab(LibraryTab.MY_LIST)) {
         val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), sync, status, auth, FakeSettingsRepository())
@@ -64,7 +68,8 @@ class LibraryListScreenTest {
                     scope = scope,
                     onOpenItem = { opened += it },
                     onSignIn = { signInClicks++ },
-                    onOpenSettings = {},
+                    onOpenSettings = { settingsClicks++ },
+                    onOpenSearch = { searchOpened += it },
                     viewModel = vm,
                 )
             }
@@ -100,23 +105,51 @@ class LibraryListScreenTest {
     }
 
     @Test
-    fun fetchButtonTriggersController() {
+    fun pullToRefreshTriggersController() {
+        fake.items.value = listOf(testItem(id = "a", title = "Alpha"))
         show()
-        compose.onNodeWithContentDescription("Fetch new articles").performClick()
-        assertEquals(1, sync.fetchRequests)
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithText("Alpha").performTouchInput { swipeDown(startY = top, endY = bottom + 600f) }
+        compose.waitUntil(5_000) { sync.fetchRequests == 1 }
+    }
+
+    @Test
+    fun searchBarShowsHintAndAvatarOpensSettings() {
+        show()
+        compose.onNodeWithText("Search My List").assertIsDisplayed()
+        compose.onNodeWithText("A").assertIsDisplayed()
+        compose.onNodeWithText("A").performClick()
+        assertEquals(1, settingsClicks)
+    }
+
+    @Test
+    fun searchBarOpensSearch() {
+        show()
+        compose.onNodeWithText("Search My List").performClick()
+        assertEquals(listOf(LibraryTab.MY_LIST), searchOpened)
+    }
+
+    @Test
+    fun rowsShowStatusLineAndFavouriteStar() {
+        fake.items.value = listOf(
+            testItem(id = "a", title = "Alpha", offline = OfflineState.DOWNLOADED, isFavorite = true),
+        )
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Available offline") }
+        compose.onNodeWithContentDescription("Favourite").assertIsDisplayed()
     }
 
     @Test
     fun downloadingProgressText() {
         status.statusFlow.value = SyncStatus(phase = SyncPhase.Downloading(3, 12, null))
         show()
-        compose.waitUntil(5_000) { compose.onAllNodesMatching("Downloading 3 of 12") }
-        compose.onNodeWithText("Downloading 3 of 12").assertIsDisplayed()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("3 of 12") }
+        compose.onNodeWithText("3 of 12").assertIsDisplayed()
     }
 
     @Test
     fun offlineAndSignInBanners() {
-        status.statusFlow.value = SyncStatus(phase = SyncPhase.Offline)
+        status.statusFlow.value = SyncStatus(phase = SyncPhase.Offline, pendingOps = 3)
         auth.sessionFlow.value = SessionState.Expired("a@b.c")
         show()
         compose.waitUntil(5_000) { compose.onAllNodesMatching("Sign in again to sync") }

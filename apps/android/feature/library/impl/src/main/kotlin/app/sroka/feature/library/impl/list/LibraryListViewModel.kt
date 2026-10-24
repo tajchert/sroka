@@ -37,7 +37,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -57,7 +56,8 @@ sealed interface ListScope {
 /** Typed screen state (the paged rows are exposed separately as [LibraryListViewModel.items]). */
 data class LibraryListUiState(
     val sort: SortOrder = SortOrder.NEWEST,
-    val searchText: String = "",
+    /** Signed-in account email; the avatar shows its first letter. */
+    val email: String = "",
     val sync: SyncStatus = SyncStatus(),
     /** The session expired: show the "sign in again" banner. */
     val needsSignIn: Boolean = false,
@@ -71,6 +71,15 @@ sealed interface ListEvent {
     data class Undoable(@StringRes val message: Int, val undo: UndoAction) : ListEvent
 
     data class Info(@StringRes val message: Int) : ListEvent
+}
+
+/** Snackbar text for archive/unarchive; offline adds "Syncs when you're online" (R6). */
+@StringRes
+internal fun archiveMessage(archived: Boolean, offline: Boolean): Int = when {
+    archived && offline -> R.string.feature_library_snack_archived_offline
+    archived -> R.string.feature_library_snack_archived
+    offline -> R.string.feature_library_snack_unarchived_offline
+    else -> R.string.feature_library_snack_unarchived
 }
 
 /** Reverts a swipe action. */
@@ -92,7 +101,6 @@ class LibraryListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val scope = MutableStateFlow<ListScope?>(null)
-    private val searchText = MutableStateFlow("")
     private val selectedId = MutableStateFlow<String?>(null)
     private val eventChannel = Channel<ListEvent>(Channel.BUFFERED)
 
@@ -105,28 +113,30 @@ class LibraryListViewModel @Inject constructor(
 
     val uiState: StateFlow<LibraryListUiState> = combine(
         sort,
-        searchText,
         syncStatus.status,
         auth.session,
-    ) { sortOrder, text, status, session ->
+    ) { sortOrder, status, session ->
         LibraryListUiState(
             sort = sortOrder,
-            searchText = text,
+            email = when (session) {
+                is SessionState.SignedIn -> session.email
+                is SessionState.Expired -> session.email
+                SessionState.SignedOut -> ""
+            },
             sync = status,
             needsSignIn = session is SessionState.Expired ||
                 (status.phase as? SyncPhase.Error)?.kind == SyncErrorKind.AUTH,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryListUiState())
 
-    /** Rows for the current scope, sort and (debounced) search text. */
+    /** Rows for the current scope and sort. Search lives in its own screen (`search/`). */
     val items: Flow<PagingData<ItemSummary>> = combine(
         scope.filterNotNull(),
-        searchText.debounce { if (it.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }.map { it.trim().ifEmpty { null } },
         sort,
-    ) { scope, search, sortOrder ->
+    ) { scope, sortOrder ->
         when (scope) {
-            is ListScope.Tab -> ItemQuery(tab = scope.tab, search = search, sort = sortOrder)
-            is ListScope.Tag -> ItemQuery(tab = LibraryTab.MY_LIST, tag = scope.name, search = search, sort = sortOrder)
+            is ListScope.Tab -> ItemQuery(tab = scope.tab, sort = sortOrder)
+            is ListScope.Tag -> ItemQuery(tab = LibraryTab.MY_LIST, tag = scope.name, sort = sortOrder)
         }
     }
         .distinctUntilChanged()
@@ -146,10 +156,6 @@ class LibraryListViewModel @Inject constructor(
     /** Results of user-initiated fetches; collected only by the visible screen. */
     val fetchEvents: Flow<SyncEvent> = syncStatus.events
 
-    fun onSearchTextChange(text: String) {
-        searchText.value = text
-    }
-
     fun setSort(order: SortOrder) {
         viewModelScope.launch { settings.setSortOrder(order) }
     }
@@ -167,11 +173,12 @@ class LibraryListViewModel @Inject constructor(
     /** Swipe end to start: archive, or move back to My List when [ItemSummary.status] is archived. */
     fun toggleArchive(id: String, current: ItemStatus) {
         val target = if (current == ItemStatus.UNREAD) ItemStatus.ARCHIVED else ItemStatus.UNREAD
+        val offline = uiState.value.sync.phase is SyncPhase.Offline
         viewModelScope.launch {
             library.setStatus(id, target)
             eventChannel.send(
                 ListEvent.Undoable(
-                    if (target == ItemStatus.ARCHIVED) R.string.feature_library_snack_archived else R.string.feature_library_snack_unarchived,
+                    archiveMessage(archived = target == ItemStatus.ARCHIVED, offline = offline),
                     UndoAction.Status(id, current),
                 ),
             )
@@ -238,7 +245,6 @@ class LibraryListViewModel @Inject constructor(
     }
 
     private companion object {
-        const val SEARCH_DEBOUNCE_MS = 300L
         const val RECENT_TAGS = 20
     }
 }

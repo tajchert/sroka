@@ -6,7 +6,7 @@
 | T0a core library (pending flag, Resyncing, search) | done | tests green, assembleDebug ok; API in notes below |
 | T0b core transfer (import/export) | done | see notes below |
 | T2 auth | done | Email + OTP-box screens; single hidden BasicTextField (NumberPassword, SmsOtpCode), auto-submit on 6th digit; server row = M3 ListItem opening existing dialog |
-| T3 library list + search + nav | todo | |
+| T3 library list + search + nav | done | see Notes (T3) |
 | T4 share sheet + tags | done | see notes |
 | T5 reader | done | Header + partial row inside WebView HTML (system sans, Outfit not loaded in WebView); app bar collapses via WebView nested scroll; refresh state/snackbars + start-over in ReaderViewModel (new SyncStatusRepository ctor param). |
 | T6 settings + import + export | todo | |
@@ -19,6 +19,11 @@
 - T1: only notification is `core/data/.../sync/SyncNotifications.kt` (uses `android.R.drawable.stat_sys_download`); core:data does not depend on core:designsystem, so NOT switched. T0b/whoever owns it must add the dependency (or copy the drawable) to use `ic_stat_sroka`.
 - T4: Share sheet (07/08), tag sheet (11) and tag list (12) done. `SaveSheetHost` has new `onOpenApp(itemId)`; ShareActivity launches MainActivity with extra `EXTRA_OPEN_ITEM_ID` (`app.sroka.extra.OPEN_ITEM_ID`, const in ShareActivity.kt). Nav host/MainActivity must read it and open `ReaderKey(itemId)` (not wired; until then it just opens the app). Auto-dismiss 4 s lives in `SaveSheetViewModel` (`autoDismissed`, `onInteraction()`). "Saved <date> · in My List|Archive" shows current status; re-saving moves an item to My List first, so Archive rarely appears.
 - T4: `EditTagsDialog` (list/TagEditor.kt) keeps its signature but is now a ModalBottomSheet; `suggestions` = known tags (T3 may pass all tags, not just recent, so the Create chip is accurate). `TagsRoute(onOpenTag, onOpenSettings)` unchanged; avatar letter comes from `TagsViewModel` (injects AuthRepository). Tag search filters in place (no list-search hand-off). ConfirmDialog (T3's Dialogs.kt) reused for delete.
+- T3: new nav key `SearchKey(tab)` (feature/library/api) -> `search/SearchRoute` (full screen, nav bar hidden); `libraryEntries(onOpenSearch, onCloseSearch)` wired in SrokaNavHost. Search opens with the chip of the originating tab (Archive/Favourites tabs preselect theirs), debounce 250 ms.
+- T3: SyncStrip.kt deleted; `list/StatusCards.kt` has pure `selectStatusCard(SyncStatus, needsSignIn)` (SignIn card first, then Resync > Offline > Downloading). Routine sync/errors show no card; fetch failures still surface via snackbar. The old "Fetch new articles" app-bar button is removed: pull-to-refresh is the only manual fetch trigger.
+- T3: sort menu has no place in the mock; kept as a sort icon inside the search pill (sort order is not in Settings). Swipe start-to-end (favourite) removed per R6; favourite toggling stays in the long-press sheet. Tag-scoped lists keep a plain TopAppBar (back + title + sort), no search pill. Row tag chips and progress line dropped (not in R6).
+- T3: no unfilled Rounded icons exist in material-icons-extended, so nav unselected = Icons.Outlined.*, selected = Icons.Rounded.*. Library strings switched to British "Favourites"; app `nav_favorites` too.
+- T3: ListScreen tests now `@Config(sdk=[35])`. Not touched: TagEditor.kt, save/**, tags/** (they still use old Filled/Outlined icons).
 ### T0a (core library) API
 - `enum class PendingChange { SAVE, TAGS, FAVORITE, OTHER }`; `ItemSummary.pendingChange: PendingChange? = null` (newest non-`item.setProgress` pending op of the item: item.add SAVE, item.tag TAGS, item.setFavorite FAVORITE, else OTHER). Also `Item.pendingChange` (default null; only list projections fill it). `testItem(pendingChange = ...)`.
 - `SyncPhase.Resyncing(val fraction: Float? = null)`: emitted while a sync runs and `sync_state.full_resync` is set (410 or pass from cursor 0, so also the very first sync). Fraction always null: pull response has no total. `FakeSyncStatusRepository.emitResyncing(fraction)`. SyncStrip/VM `busy` treat it like Syncing.

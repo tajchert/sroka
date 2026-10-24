@@ -10,6 +10,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.encodeToString
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import app.sroka.core.model.ExportFormat
+import app.sroka.core.model.ImportFormat
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okio.buffer
 import okio.sink
 import okhttp3.Call
@@ -103,6 +108,49 @@ internal class OkHttpSrokaApi(
         }
     }
 
+    override suspend fun createImport(source: File, fileName: String, mimeType: String, format: ImportFormat): ApiResult<JobDto> {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("format", format.wire)
+            .addFormDataPart("file", fileName, source.asRequestBody(mimeType.toMediaTypeOrNull() ?: OCTET_TYPE))
+            .build()
+        return execute(request("/v1/imports") { post(body) }) { decode<JobEnvelope>(it).job }
+    }
+
+    override suspend fun getImport(id: String): ApiResult<JobDto> =
+        execute(get("/v1/imports/${segment(id)}")) { decode<JobEnvelope>(it).job }
+
+    override suspend fun export(format: ExportFormat, dest: File): ApiResult<ExportFileDto> {
+        val part = File(dest.parentFile, dest.name + ".part")
+        val context = currentCoroutineContext()
+        var success = false
+        try {
+            // The authenticated client, not downloadClient: this is a /v1 call.
+            val result = executeWith(client, get("/v1/exports?format=${format.wire}")) { response ->
+                part.parentFile?.mkdirs()
+                var read = 0L
+                response.body.source().use { source ->
+                    part.sink().buffer().use { sink ->
+                        val buffer = okio.Buffer()
+                        while (true) {
+                            context.ensureActive()
+                            val n = source.read(buffer, BUFFER_BYTES)
+                            if (n == -1L) break
+                            sink.write(buffer, n)
+                            read += n
+                        }
+                    }
+                }
+                dest.delete()
+                if (!part.renameTo(dest)) throw IOException("rename failed")
+                ExportFileDto(exportFileName(response.header("Content-Disposition"), format), read)
+            }
+            success = result is ApiResult.Success
+            return result
+        } finally {
+            if (!success) part.delete()
+        }
+    }
+
     // --- plumbing ---
 
     private suspend fun get(path: String): Request = request(path) { get() }
@@ -154,6 +202,7 @@ internal class OkHttpSrokaApi(
 
     private companion object {
         val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+        val OCTET_TYPE = "application/octet-stream".toMediaType()
         const val BUFFER_BYTES = 16L * 1024
     }
 }

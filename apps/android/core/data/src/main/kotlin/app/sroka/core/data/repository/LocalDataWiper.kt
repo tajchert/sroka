@@ -29,11 +29,13 @@ internal class LocalDataWiper @Inject constructor(
     private val engine: SyncEngine,
     private val maintenanceDao: MaintenanceDao,
     private val db: SrokaDatabase,
+    private val importJobs: app.sroka.core.data.transfer.ImportJobStore,
     private val paths: ContentPaths,
     @Dispatcher(SrokaDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
     suspend fun wipe() {
         scheduler.cancelAll()
+        importJobs.clear()
         syncController.resetPeriodic()
         engine.exclusive {
             maintenanceDao.wipeAll()

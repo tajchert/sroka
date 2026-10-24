@@ -46,7 +46,7 @@ object SyncNotifications {
     private fun build(context: Context, text: String, done: Int, total: Int): Notification {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_stat_sroka)
             .setContentTitle(text)
             .setOnlyAlertOnce(true)
             .setOngoing(true)

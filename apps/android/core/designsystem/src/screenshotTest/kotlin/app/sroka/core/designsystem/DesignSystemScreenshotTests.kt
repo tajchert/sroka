@@ -40,7 +40,7 @@ private annotation class ComponentThemes
 @ComponentThemes
 @Composable
 fun ButtonsScreenshotTest() {
-    SrokaTheme {
+    ThemedSurface {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -58,7 +58,7 @@ fun ButtonsScreenshotTest() {
 @ComponentThemes
 @Composable
 fun CardsScreenshotTest() {
-    SrokaTheme {
+    ThemedSurface {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -79,7 +79,7 @@ fun CardsScreenshotTest() {
 @ComponentThemes
 @Composable
 fun LoadingIndicatorsScreenshotTest() {
-    SrokaTheme {
+    ThemedSurface {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -94,7 +94,7 @@ fun LoadingIndicatorsScreenshotTest() {
 @Preview(name = "Empty and error", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
 fun EmptyAndErrorStatesScreenshotTest() {
-    SrokaTheme {
+    ThemedSurface {
         Column {
             SrokaEmptyState(
                 icon = Icons.Outlined.Inbox,
@@ -117,10 +117,18 @@ fun EmptyAndErrorStatesScreenshotTest() {
 @ComponentThemes
 @Composable
 fun TopAppBarsScreenshotTest() {
-    SrokaTheme {
+    ThemedSurface {
         Column {
             SrokaTopAppBar(title = "Overview")
             SrokaTopAppBar(title = "Details", onNavigationClick = {})
         }
+    }
+}
+
+/** Theme plus its background, so dark references aren't drawn on the preview's white canvas. */
+@Composable
+private fun ThemedSurface(content: @Composable () -> Unit) {
+    SrokaTheme {
+        androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) { content() }
     }
 }

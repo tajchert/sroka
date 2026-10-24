@@ -92,6 +92,15 @@ export interface SanitizeResult {
   images: string[];
 }
 
+/** Classes of the X / Twitter post cards (twitter.ts), styled by the readers. Everything else loses its class. */
+export const POST_CLASSES = {
+  div: ["sr-thread", "sr-post", "sr-post-focus", "sr-post-body"],
+  blockquote: ["sr-post", "sr-post-quote", "sr-note"],
+  p: ["sr-post-head", "sr-post-stats", "sr-thread-foot"],
+  span: ["sr-post-who", "sr-post-date"],
+  img: ["sr-avatar"],
+};
+
 const ALLOWED_TAGS = [
   "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "img", "ul", "ol", "li", "blockquote", "pre", "code", "em", "strong", "b", "i", "u",
   "s", "del", "ins", "mark", "small", "br", "hr", "figure", "figcaption", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
@@ -115,7 +124,7 @@ export function sanitizeArticle(contentHtml: string, baseUrl: string): SanitizeR
       abbr: ["title"],
       ol: ["start"],
     },
-    allowedClasses: { a: ["embed-card"] },
+    allowedClasses: { a: ["embed-card"], ...POST_CLASSES },
     allowedSchemes: ["http", "https", "mailto"],
     allowedSchemesAppliedToAttributes: ["href", "src"],
     allowProtocolRelative: false,
@@ -140,7 +149,7 @@ export function sanitizeArticle(contentHtml: string, baseUrl: string): SanitizeR
         const abs = absolutizeUrl(pickImgSrc(attribs), baseUrl);
         const out: Record<string, string> = {};
         if (abs && !isTrackerUrl(abs)) out["src"] = abs;
-        for (const k of ["alt", "title", "width", "height"]) if (attribs[k] !== undefined) out[k] = attribs[k]!;
+        for (const k of ["alt", "title", "width", "height", "class"]) if (attribs[k] !== undefined) out[k] = attribs[k]!;
         return { tagName: tag, attribs: out };
       },
       iframe: (_tag, attribs) => {

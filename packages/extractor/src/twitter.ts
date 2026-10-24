@@ -67,6 +67,8 @@ export interface Tweet {
   url: string;
   name: string;
   handle: string;
+  /** Profile picture (200×200), if known. */
+  avatar: string | null;
   /** ISO 8601. */
   createdAt: string | null;
   lang: string | null;
@@ -131,6 +133,7 @@ function emptyTweet(id: string, handle: string, name: string): Tweet {
     url: `https://x.com/${handle || "i"}/status/${id}`,
     name,
     handle,
+    avatar: null,
     createdAt: null,
     lang: null,
     text: "",
@@ -176,6 +179,7 @@ function fxTweet(raw: unknown, depth = 0): Tweet | null {
   const handle = str(author?.["screen_name"]) ?? "i";
   const t = emptyTweet(id, handle, str(author?.["name"]) ?? handle);
   t.url = str(s["url"]) ?? t.url;
+  t.avatar = str(author?.["avatar_url"]);
   t.createdAt = isoFrom(num(s["created_timestamp"]), str(s["created_at"]));
   t.lang = str(s["lang"]);
   const rawText = obj(s["raw_text"]);
@@ -389,6 +393,7 @@ function syndicationTweet(raw: unknown, depth = 0): Tweet | null {
   const t = emptyTweet(id, handle, str(user?.["name"]) ?? handle);
   t.createdAt = isoFrom(null, str(s["created_at"]));
   t.lang = str(s["lang"]);
+  t.avatar = str(user?.["profile_image_url_https"])?.replace(/_normal(\.\w+)$/, "_200x200$1") ?? null;
   const note = str(obj(obj(obj(s["note_tweet"])?.["note_tweet_results"])?.["result"])?.["text"]);
   t.text = unescapeEntities(note ?? str(s["text"]) ?? "");
   const entities = obj(s["entities"]);
@@ -539,15 +544,37 @@ function pollHtml(p: Poll): string {
   return `<ul>${items}</ul>${meta ? `<p><small>Poll · ${esc(meta)}</small></p>` : ""}`;
 }
 
-function headerHtml(t: Tweet, extra?: string): string {
-  const date = t.createdAt ? ` · <a href="${esc(t.url)}"><time datetime="${esc(t.createdAt)}">${esc(formatTweetDate(t.createdAt))}</time></a>` : "";
-  const who = `<strong>${esc(t.name)}</strong> <a href="https://x.com/${esc(t.handle)}">@${esc(t.handle)}</a>`;
-  return `<p><small>${extra ? `${esc(extra)} ` : ""}${who}${date}</small></p>`;
-}
-
 interface Rendered {
   html: string;
   text: string[];
+}
+
+/**
+ * Card markup. Only these `sr-` classes survive sanitizing (sanitize.ts `POST_CLASSES`); the reader styles them as
+ * X-like post cards. Without that CSS it still reads as plain text: header line, paragraphs, blockquote quotes.
+ */
+function headerHtml(t: Tweet): string {
+  const avatar = t.avatar ? `<img class="sr-avatar" src="${esc(t.avatar)}" alt="" width="40" height="40"> ` : "";
+  const date = t.createdAt
+    ? `<span class="sr-post-date"> · <a href="${esc(t.url)}"><time datetime="${esc(t.createdAt)}">${esc(formatTweetDate(t.createdAt))}</time></a></span>`
+    : "";
+  return `<p class="sr-post-head">${avatar}<span class="sr-post-who"><strong>${esc(t.name)}</strong> <a href="https://x.com/${esc(t.handle)}">@${esc(t.handle)}</a></span>${date}</p>`;
+}
+
+function statsHtml(t: Tweet): string {
+  const stats = [
+    t.replies ? plural(t.replies, "reply", "replies") : null,
+    t.reposts ? plural(t.reposts, "repost") : null,
+    t.likes ? plural(t.likes, "like") : null,
+    t.views ? plural(t.views, "view") : null,
+  ].filter((x): x is string => !!x);
+  return stats.length ? `<p class="sr-post-stats"><small>${esc(stats.join(" · "))}</small></p>` : "";
+}
+
+/** One post as a card: header, body, per-post counts. Quotes are nested (smaller) cards without counts. */
+function cardHtml(t: Tweet, prevHandle: string | null, out: Rendered, focus = false): string {
+  const cls = `sr-post${focus ? " sr-post-focus" : ""}`;
+  return `<div class="${cls}">${headerHtml(t)}<div class="sr-post-body">${bodyHtml(t, prevHandle, 0, out)}</div>${statsHtml(t)}</div>`;
 }
 
 /** One post's body (no header): reply note, text or article, media, poll, card, quote, community note. */
@@ -580,13 +607,13 @@ function bodyHtml(t: Tweet, prevHandle: string | null, depth: number, out: Rende
   if (t.quote) {
     if ("unavailable" in t.quote) {
       const link = t.quote.url ? ` <a href="${esc(t.quote.url)}">View on X</a>` : "";
-      parts.push(`<blockquote><p><small>${esc(t.quote.unavailable || "Quoted post")}${link}</small></p></blockquote>`);
+      parts.push(`<blockquote class="sr-post sr-post-quote"><p><small>${esc(t.quote.unavailable || "Quoted post")}${link}</small></p></blockquote>`);
     } else {
-      parts.push(`<blockquote>${headerHtml(t.quote)}${bodyHtml(t.quote, null, depth + 1, out)}</blockquote>`);
+      parts.push(`<blockquote class="sr-post sr-post-quote">${headerHtml(t.quote)}<div class="sr-post-body">${bodyHtml(t.quote, null, depth + 1, out)}</div></blockquote>`);
     }
   }
   if (t.communityNote) {
-    parts.push(`<blockquote><p><small><strong>Community note</strong></small></p><p>${esc(t.communityNote)}</p></blockquote>`);
+    parts.push(`<blockquote class="sr-note"><p><small><strong>Community note</strong></small></p><p>${esc(t.communityNote)}</p></blockquote>`);
     out.text.push(t.communityNote);
   }
   return parts.join("\n");
@@ -603,8 +630,8 @@ function titleFrom(t: Tweet): string {
 }
 
 /**
- * Build the article: posts before the saved post's author run (a reply's parents) as quoted context, then the
- * author's run(s) as continuous text with one header per run, then a stats footer.
+ * Build the article: every post (a reply's parents, the saved post's author run, anything after) as a card in one
+ * stack joined by a thread line; the saved post is highlighted when it has context. Footer: thread length + link.
  */
 export function renderTweets(tweets: Tweet[], focusId: string): Extracted | null {
   const focus = tweets.find((t) => t.id === focusId) ?? tweets[0];
@@ -619,32 +646,17 @@ export function renderTweets(tweets: Tweet[], focusId: string): Extracted | null
   while (end + 1 < tweets.length && tweets[end + 1]!.handle.toLowerCase() === author) end++;
 
   const out: Rendered = { html: "", text: [] };
-  const parts: string[] = [];
-  // Context: the conversation the thread replies to.
+  const cards: string[] = [];
   let prev: string | null = null;
-  for (const t of tweets.slice(0, start)) {
-    parts.push(`<blockquote>${headerHtml(t)}${bodyHtml(t, prev, 1, out)}</blockquote>`);
-    prev = t.handle;
-  }
-  parts.push(headerHtml(main));
-  for (const t of tweets.slice(start, end + 1)) {
-    parts.push(bodyHtml(t, prev, 0, out));
-    prev = t.handle;
-  }
-  // Anything after the run (rare: replies by others included by the API) keeps its own headers.
-  for (const t of tweets.slice(end + 1)) {
-    parts.push(`<hr>${headerHtml(t)}${bodyHtml(t, prev, 0, out)}`);
+  for (const t of tweets) {
+    cards.push(cardHtml(t, prev, out, t === focus && start > 0));
     prev = t.handle;
   }
   const count = end - start + 1;
-  const stats = [
-    count > 1 ? `Thread · ${plural(count, "post")}` : null,
-    main.replies ? plural(main.replies, "reply", "replies") : null,
-    main.reposts ? plural(main.reposts, "repost") : null,
-    main.likes ? plural(main.likes, "like") : null,
-    main.views ? plural(main.views, "view") : null,
-  ].filter(Boolean);
-  parts.push(`<hr>\n<p><small>${stats.map((s) => esc(s!)).join(" · ")}${stats.length ? " · " : ""}<a href="${esc(main.url)}">View on X</a></small></p>`);
+  const parts = [
+    `<div class="sr-thread">\n${cards.join("\n")}\n</div>`,
+    `<p class="sr-thread-foot"><small>${count > 1 ? `Thread · ${esc(plural(count, "post"))} · ` : ""}<a href="${esc(main.url)}">View on X</a></small></p>`,
+  ];
 
   const text = normalizeText(out.text.filter(Boolean).join("\n\n"));
   if (!text && !tweets.some((t) => t.media.length)) return null;

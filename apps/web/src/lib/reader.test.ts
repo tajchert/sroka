@@ -37,6 +37,7 @@ describe("buildSrcdoc", () => {
     expect(out).toContain("sroka:metrics");
     expect(out).toContain("sroka:scrollToAnchor");
     expect(out).toContain("p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,figure");
+    expect(out).toContain(".sr-post{"); // X / Twitter post cards
     expect(out).not.toContain("document.cookie");
   });
 

@@ -3,7 +3,12 @@ import { sanitizeArticle } from "./sanitize.ts";
 import { extractTweet, formatTweetDate, parseFxThread, parseSyndication, renderTweets, syndicationToken, tweetRef } from "./twitter.ts";
 
 // Trimmed FxTwitter API v2 shapes (fields as api.fxtwitter.com/2/thread/{id} serves them).
-const author = (screen_name: string, name: string) => ({ screen_name, name, url: `https://x.com/${screen_name}` });
+const author = (screen_name: string, name: string) => ({
+  screen_name,
+  name,
+  url: `https://x.com/${screen_name}`,
+  avatar_url: `https://pbs.twimg.com/profile_images/1/${screen_name}_200x200.jpg`,
+});
 const status = (id: string, over: Record<string, unknown> = {}) => ({
   type: "status",
   id,
@@ -71,7 +76,7 @@ describe("tweetRef", () => {
 });
 
 describe("FxTwitter thread", () => {
-  it("renders the whole author thread from a middle post, with one header, quote, media and stats", () => {
+  it("renders the whole author thread from a middle post as cards, with quote, media and stats", () => {
     const { ex, html: out } = html("https://x.com/ann/status/101", thread);
     expect(ex).toMatchObject({
       title: "Big news & more!",
@@ -81,8 +86,10 @@ describe("FxTwitter thread", () => {
       publishedTime: "2026-10-24T01:41:45.000Z",
       leadImage: "https://pbs.twimg.com/amplify_video_thumb/1/img/p.jpg",
     });
-    // one author header (thread start), linked date
-    expect(out.match(/@ann<\/a>/g)).toHaveLength(1);
+    // one card per post in a thread stack, each with avatar, author and linked date
+    expect(out).toMatch(/^<div class="sr-thread">\n<div class="sr-post"><p class="sr-post-head"><img src="https:\/\/pbs.twimg.com\/profile_images\/1\/ann_200x200.jpg"[^>]* class="sr-avatar" \/> <span class="sr-post-who"><strong>Ann Example<\/strong>/);
+    expect(out.match(/<div class="sr-post">/g)).toHaveLength(2);
+    expect(out.match(/@ann<\/a>/g)).toHaveLength(2);
     expect(out).toContain('<time datetime="2026-10-24T01:41:45.000Z">Oct 24, 2026, 1:41 AM UTC</time>');
     // text: entities decoded, t.co expanded, media link dropped, mention + hashtag linked, paragraphs kept
     expect(out).toContain("<p>Big news &amp; more!</p>");
@@ -95,8 +102,11 @@ describe("FxTwitter thread", () => {
     expect(out).toContain('src="https://pbs.twimg.com/media/HVW?format=jpg&amp;name=large"');
     expect(out).toContain("<figcaption>A phone</figcaption>");
     // quoted post as blockquote with its own author + date
-    expect(out).toMatch(/<blockquote><p><small><strong>Carl<\/strong>.*Oct 22, 2026.*<\/small><\/p><p>The original announcement<\/p><\/blockquote>/s);
-    expect(out).toContain("Thread · 2 posts · 31 replies · 38 reposts · 968 likes · 38,931 views");
+    expect(out).toMatch(
+      /<blockquote class="sr-post sr-post-quote"><p class="sr-post-head">.*<strong>Carl<\/strong>.*Oct 22, 2026.*<\/p><div class="sr-post-body"><p>The original announcement<\/p><\/div><\/blockquote>/s,
+    );
+    expect(out).toContain('<p class="sr-post-stats"><small>31 replies · 38 reposts · 968 likes · 38,931 views</small></p>');
+    expect(out).toMatch(/<p class="sr-thread-foot"><small>Thread · 2 posts · <a href="https:\/\/x.com\/ann\/status\/100"/);
     expect(ex.text).toContain("Second post with a photo");
     expect(ex.text).toContain("The original announcement");
   });
@@ -115,8 +125,8 @@ describe("FxTwitter thread", () => {
     const { ex, html: out } = html("https://x.com/zed/status/200", { code: 200, status: reply, thread: [t1, reply] });
     expect(ex.title).toBe("Great thread");
     expect(ex.byline).toBe("Zed (@zed)");
-    expect(out).toMatch(/^<blockquote><p><small><strong>Ann Example<\/strong>/);
-    expect(out).toContain("<p>Great thread</p>");
+    expect(out).toMatch(/^<div class="sr-thread">\n<div class="sr-post"><p class="sr-post-head">.*?<strong>Ann Example<\/strong>/);
+    expect(out).toMatch(/<div class="sr-post sr-post-focus">.*?<strong>Zed<\/strong>.*?<p>Great thread<\/p>/s);
     expect(out).not.toContain("Replying to"); // the parent is shown
     expect(out).not.toMatch(/0 likes|0 replies/);
   });
@@ -201,7 +211,7 @@ describe("syndication fallback", () => {
     const ex = renderTweets(p.tweets, p.focusId)!;
     const out = sanitizeArticle(ex.contentHtml, "https://x.com/bob/status/500").html;
     expect(ex.byline).toBe("Bob (@bob)");
-    expect(out).toMatch(/^<blockquote>.*Is it\?/s);
+    expect(out).toMatch(/^<div class="sr-thread">\n<div class="sr-post">.*Is it\?.*<div class="sr-post sr-post-focus">.*Yes/s);
     expect(out).toContain("<p>Yes &gt; no <a href=\"https://example.org/\"");
     expect(out).toContain('src="https://pbs.twimg.com/media/P?format=png&amp;name=large"');
     expect(out).toContain("2 replies · 12 likes");

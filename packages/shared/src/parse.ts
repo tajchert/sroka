@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ParseStatus } from "./model.ts";
 
 /** Bump when extraction output changes meaningfully (invalidates the shared D1 content cache). */
-export const PARSER_VERSION = 3;
+export const PARSER_VERSION = 4;
 
 /** Message on queue `sroka-parse` (producer: sroka-api, consumer: sroka-parser). */
 export const ParseJobSchema = z.object({

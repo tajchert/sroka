@@ -125,8 +125,30 @@ blockquote{margin-inline:0;padding-inline-start:1em;border-inline-start:3px soli
 pre,code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.88em}
 pre{overflow-x:auto;padding:.9em 1em;border:1px solid var(--rule);border-radius:6px}
 hr{border:0;border-top:1px solid var(--rule);margin:2em 0}
-table{border-collapse:collapse;display:block;overflow-x:auto}td,th{border:1px solid var(--rule);padding:.35em .6em}`;
+table{border-collapse:collapse;display:block;overflow-x:auto}td,th{border:1px solid var(--rule);padding:.35em .6em}
+${POST_CARD_CSS}`;
 }
+
+/**
+ * X / Twitter post cards (extractor `twitter.ts`, classes allowlisted in `sanitize.ts` POST_CLASSES): one card per
+ * post, a thread line joining the avatars of consecutive cards, quoted posts as nested cards.
+ */
+const POST_CARD_CSS = `.sr-thread{display:flex;flex-direction:column;gap:1rem;margin:0 0 1.1em}
+.sr-post{position:relative;padding:.9rem 1rem;border:1px solid var(--rule);border-radius:14px;background:color-mix(in srgb,var(--fg) 2.5%,var(--bg))}
+.sr-thread>.sr-post+.sr-post::before{content:"";position:absolute;left:calc(1rem + 19px);top:calc(-1rem - 1px);height:1rem;width:2px;background:var(--rule)}
+.sr-post-focus{border-color:var(--link)}
+.sr-post-head{display:flex;align-items:center;flex-wrap:wrap;column-gap:.35em;margin:0 0 .6rem;font-size:.8em;line-height:1.3;color:var(--muted)}
+.sr-post-head .sr-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;margin-right:.35em;flex:none}
+.sr-post-who strong{color:var(--fg)}
+.sr-post-head a{color:inherit;text-decoration:none}.sr-post-head a:hover{text-decoration:underline}
+.sr-post-body>:last-child{margin-bottom:0}
+.sr-post-body figure img{display:block;width:100%;border-radius:10px;border:1px solid var(--rule)}
+.sr-post-body figure>a{display:block}
+.sr-post-stats{margin:.6rem 0 0;color:var(--muted);font-size:.85em}
+blockquote.sr-post-quote{margin:0 0 1.1em;padding:.7rem .85rem;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--fg);font-size:.92em}
+blockquote.sr-post-quote .sr-avatar{width:22px;height:22px}
+blockquote.sr-note{padding:.6rem .85rem;border:1px solid var(--rule);border-radius:10px;color:var(--fg);font-size:.9em}
+.sr-thread-foot{color:var(--muted);text-align:center}`;
 
 export interface SrcdocInput {
   html: string;

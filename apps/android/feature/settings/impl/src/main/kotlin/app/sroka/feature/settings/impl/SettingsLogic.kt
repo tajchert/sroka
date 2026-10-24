@@ -8,7 +8,7 @@ fun isDeleteConfirmed(typed: String, email: String?): Boolean =
     !email.isNullOrBlank() && typed.trim().equals(email.trim(), ignoreCase = true)
 
 /** Reader body size at scale 1.0, in sp. */
-const val READER_BASE_SP = 17
+const val READER_BASE_SP = 18
 
 /** Text-size steps offered in the settings dialog (reader scale range is 0.8..1.6). */
 val TextScaleSteps: List<Float> = listOf(0.8f, 0.9f, 1.0f, 1.15f, 1.3f, 1.45f, 1.6f)

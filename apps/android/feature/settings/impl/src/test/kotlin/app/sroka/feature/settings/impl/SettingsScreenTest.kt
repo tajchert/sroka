@@ -88,7 +88,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("Wi-Fi only", substring = true).assertExists()
         compose.onNodeWithText("CSV or JSON").assertExists()
         compose.onNodeWithText("From Pocket and others").assertExists()
-        compose.onNodeWithText("Default · 17 sp").assertExists()
+        compose.onNodeWithText("Default · 18 sp").assertExists()
     }
 
     @Test

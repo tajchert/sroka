@@ -19,3 +19,9 @@ Branch `feat/pdf-android`, on top of the data layer (d31166e). Gate green: `test
 - Password-protected/corrupt PDFs show "Can't display" + Open with another app.
 - No screenshot test of the reader (PdfRenderer does not render in previews); no UI test of the Hilt `ShareActivity` itself.
 - Reader error strings for PDFs reuse article wording ("article could not be downloaded").
+
+## Smoke fixes
+
+- Reader: `ReaderViewModel.onPdfPage` now persists every page change immediately (no 2 s throttle; the old trailing update was lost on force-stop). ON_STOP/onCleared flush is unchanged.
+- Failed-upload row: upload file name comes only from the provider display name (or a `*.pdf` last segment), else `document.pdf`; a raw URI id like "23" is never shown (`cleanPdfName`).
+- Share sheet: `PdfShareViewModel` watches the accepted uploads and moves Queued to `Saved`/`Duplicate`; the sheet shows "Already in Sroka" / "PDF added to Sroka" and Queued now waits 8 s before auto-dismiss. In-app picker already surfaces duplicates via `uploadEvents` (test exists).

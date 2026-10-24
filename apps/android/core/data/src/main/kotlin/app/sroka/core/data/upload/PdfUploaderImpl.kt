@@ -88,7 +88,7 @@ class PdfUploaderImpl @Inject internal constructor(
         val now = clock.now()
         val id = newUuidV7(now)
         val (displayName, declaredSize) = describe(uri)
-        val name = cleanName(displayName ?: uri.lastPathSegment)
+        val name = cleanPdfName(displayName ?: uri.lastPathSegment?.takeIf { it.endsWith(".pdf", ignoreCase = true) })
         fun reject(error: PdfUploadError, size: Long = declaredSize ?: 0): PdfUpload {
             val upload = PdfUpload(id, name, size, PdfUploadState.Failed(error))
             rejected.value = rejected.value + Entry(now, upload)
@@ -194,11 +194,11 @@ class PdfUploaderImpl @Inject internal constructor(
         const val BACKOFF_SECONDS = 30L
         const val BUFFER_BYTES = 64 * 1024
         const val SNIFF_BYTES = 1024
-        const val MAX_NAME = 255
-
-        fun cleanName(raw: String?): String {
-            val base = raw?.substringAfterLast('/')?.trim().orEmpty().ifEmpty { "document.pdf" }
-            return if (base.length <= MAX_NAME) base else base.take(MAX_NAME - 4) + ".pdf"
-        }
     }
+}
+
+/** File name shown and sent for an upload: the provider's display name only, never a URI segment (internal ids). */
+internal fun cleanPdfName(raw: String?): String {
+    val base = raw?.substringAfterLast('/')?.trim().orEmpty().ifEmpty { "document.pdf" }
+    return if (base.length <= 255) base else base.take(255 - 4) + ".pdf"
 }

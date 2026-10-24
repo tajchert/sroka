@@ -46,8 +46,9 @@ fun PdfShareHost(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     LaunchedEffect(state) {
-        if (state is PdfShareState.Queued) {
-            delay(AUTO_DISMISS_MS)
+        if (state is PdfShareState.Queued || state is PdfShareState.Duplicate || state is PdfShareState.Saved) {
+            // Queued waits longer: the server's saved / duplicate answer replaces it and restarts this timer.
+            delay(if (state is PdfShareState.Queued) QUEUED_DISMISS_MS else AUTO_DISMISS_MS)
             sheetState.hide()
             onFinish()
         }
@@ -65,6 +66,20 @@ fun PdfShareHost(
                     iconTint = MaterialTheme.srokaColors.onBrand,
                     title = pluralStringResource(R.plurals.feature_library_snack_pdf_queued, s.count, s.count),
                     sub = stringResource(R.string.feature_library_share_pdf_uploading_sub),
+                )
+                is PdfShareState.Duplicate -> Header(
+                    icon = SrokaIcons.BookmarkAdded,
+                    circle = MaterialTheme.srokaColors.brand,
+                    iconTint = MaterialTheme.srokaColors.onBrand,
+                    title = stringResource(R.string.feature_library_snack_pdf_duplicate),
+                    sub = null,
+                )
+                is PdfShareState.Saved -> Header(
+                    icon = SrokaIcons.BookmarkAdded,
+                    circle = MaterialTheme.srokaColors.brand,
+                    iconTint = MaterialTheme.srokaColors.onBrand,
+                    title = stringResource(R.string.feature_library_snack_pdf_done),
+                    sub = null,
                 )
                 is PdfShareState.Failed -> {
                     Header(
@@ -103,3 +118,5 @@ fun PdfShareHost(
 }
 
 private const val AUTO_DISMISS_MS = 2_500L
+private const val QUEUED_DISMISS_MS = 8_000L
+

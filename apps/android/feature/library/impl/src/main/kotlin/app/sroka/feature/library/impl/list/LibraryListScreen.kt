@@ -1,5 +1,8 @@
 package app.sroka.feature.library.impl.list
 
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -330,6 +333,7 @@ private fun SearchPill(
     )
     Surface(
         modifier = Modifier
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()
             .height(56.dp),

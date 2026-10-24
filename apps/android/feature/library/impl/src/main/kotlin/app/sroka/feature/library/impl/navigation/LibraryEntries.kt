@@ -1,5 +1,7 @@
 package app.sroka.feature.library.impl.navigation
 
+import androidx.compose.runtime.Composable
+import app.sroka.core.designsystem.component.DetailPaneCard
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.ui.unit.dp
@@ -89,16 +91,20 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     // Detail pane on wide windows (the opened article covers it); no back arrow beside the tag list.
     entry<TagItemsKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
         val layout = LocalPaneLayout.current
-        LibraryListRoute(
-            scope = ListScope.Tag(key.name),
-            onOpenItem = onOpenItem,
-            onSignIn = onSignIn,
-            onBack = if (layout.twoPane) null else ({ onCloseTag(key) }),
-            selectedItemId = selectedItemId(),
-            twoPane = layout.twoPane,
-            navRailShown = layout.railShown,
-            detailCard = layout.twoPane,
-        )
+        val list = @Composable {
+            LibraryListRoute(
+                scope = ListScope.Tag(key.name),
+                onOpenItem = onOpenItem,
+                onSignIn = onSignIn,
+                onBack = if (layout.twoPane) null else ({ onCloseTag(key) }),
+                selectedItemId = selectedItemId(),
+                twoPane = layout.twoPane,
+                navRailShown = layout.railShown,
+                detailCard = layout.twoPane,
+            )
+        }
+        // Beside the tag list the articles sit in the detail card, like the reader (R14.5).
+        if (layout.twoPane) DetailPaneCard { list() } else list()
     }
 }
 

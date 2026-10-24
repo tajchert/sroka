@@ -1,5 +1,6 @@
 package app.sroka.navigation
 
+import app.sroka.core.model.LibraryTab
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -326,7 +327,7 @@ private fun SrokaNavDisplay(
                 },
                 // From the Expired banner: sign in on top of the library; success pops it.
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
-                onOpenSearch = { tab -> backStack.add(SearchKey(tab)) },
+                onOpenSearch = { tab -> backStack.openSearch(tab, twoPaneState.value) },
                 onCloseSearch = { key ->
                     val i = backStack.lastIndexOf(key)
                     if (i > 0) backStack.subList(i, backStack.size).clear()
@@ -376,6 +377,15 @@ internal fun NavBackStack<NavKey>.openTag(name: String, twoPane: Boolean) {
         if (tags >= 0) subList(tags + 1, size).clear()
     }
     add(TagItemsKey(name))
+}
+
+/**
+ * Opens search from [tab]. In two-pane mode an article open beside the list is closed first, so the
+ * results don't pair with a reader that wasn't opened from them.
+ */
+internal fun NavBackStack<NavKey>.openSearch(tab: LibraryTab, twoPane: Boolean) {
+    if (twoPane) while (lastOrNull() is ReaderKey) removeLastOrNull()
+    add(SearchKey(tab))
 }
 
 /** Opens [itemId] in the reader; a reader already on top is replaced rather than stacked. */

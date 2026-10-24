@@ -83,6 +83,9 @@ internal class SyncStatusRepositoryImpl @Inject constructor(
     internal companion object {
         fun phaseOf(work: WorkSnapshot, state: SyncStateEntity, online: Boolean, expired: Boolean): SyncPhase = when {
             expired -> SyncPhase.Error(SyncErrorKind.AUTH)
+            // A full pass (410 or from cursor 0) is flagged in sync_state; the pull response carries
+            // no total (api.md §7.2), so the fraction is unknown.
+            work.syncing && state.fullResync -> SyncPhase.Resyncing(null)
             work.syncing -> SyncPhase.Syncing
             work.downloading != null -> work.downloading
             !online -> SyncPhase.Offline

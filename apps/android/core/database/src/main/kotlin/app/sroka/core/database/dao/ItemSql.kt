@@ -9,7 +9,9 @@ SELECT i.id AS id, i.title AS title, i.url AS url, substr(i.excerpt, 1, 200) AS 
   i.content_id AS content_id, cf.content_id AS file_content_id, cf.state AS file_state,
   cf.thumb_path AS thumb_path,
   (SELECT group_concat(name, char(31)) FROM
-     (SELECT name FROM item_tags WHERE item_id = i.id ORDER BY name_key)) AS tags
+     (SELECT name FROM item_tags WHERE item_id = i.id ORDER BY name_key)) AS tags,
+  (SELECT po.type FROM pending_ops po WHERE po.item_id = i.id AND po.type != 'item.setProgress'
+     ORDER BY po.local_seq DESC LIMIT 1) AS pending_type
 """
 
 internal const val LIST_FROM = """
@@ -54,4 +56,18 @@ SELECT i.*, cf.content_id AS file_content_id, cf.state AS file_state, cf.thumb_p
   (SELECT group_concat(name, char(31)) FROM
      (SELECT name FROM item_tags WHERE item_id = i.id ORDER BY name_key)) AS tags
 FROM items i LEFT JOIN content_files cf ON cf.item_id = i.id
+"""
+
+// ---- R8 search: summary columns + FTS4 snippet of the body and offsets() (which columns matched) ----
+
+/** Private-use marker characters wrapped around matched terms by `snippet()`. */
+internal const val HL_START = '\uE000'
+internal const val HL_END = '\uE001'
+
+/** `items_fts` column order: title 0, excerpt 1, site_name 2, tags 3, body 4. */
+internal const val FTS_BODY_COLUMN = 4
+
+internal const val SEARCH_COLUMNS = """$ROW_COLUMNS,
+  snippet(items_fts, '$HL_START', '$HL_END', '…', $FTS_BODY_COLUMN, 12) AS snippet,
+  offsets(items_fts) AS offsets
 """

@@ -33,7 +33,7 @@ internal fun SyncStrip(
 ) {
     val text: String? = when {
         needsSignIn -> stringResource(R.string.feature_library_status_sign_in)
-        phase is SyncPhase.Syncing -> stringResource(R.string.feature_library_status_syncing)
+        phase is SyncPhase.Syncing || phase is SyncPhase.Resyncing -> stringResource(R.string.feature_library_status_syncing)
         phase is SyncPhase.Downloading ->
             if (phase.currentTitle.isNullOrBlank()) {
                 stringResource(R.string.feature_library_status_downloading, phase.done, phase.total)
@@ -56,7 +56,7 @@ internal fun SyncStrip(
                         progress = { (phase.done.toFloat() / phase.total).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                phase is SyncPhase.Syncing || phase is SyncPhase.Downloading ->
+                phase is SyncPhase.Syncing || phase is SyncPhase.Resyncing || phase is SyncPhase.Downloading ->
                     LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             Row(

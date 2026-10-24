@@ -3,6 +3,7 @@ package app.sroka.core.testing.fake
 import app.sroka.core.domain.SyncController
 import app.sroka.core.domain.SyncEvent
 import app.sroka.core.domain.SyncStatusRepository
+import app.sroka.core.model.SyncPhase
 import app.sroka.core.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -38,4 +39,9 @@ class FakeSyncStatusRepository(initial: SyncStatus = SyncStatus()) : SyncStatusR
     override val events: Flow<SyncEvent> = eventFlow
 
     suspend fun emit(event: SyncEvent) = eventFlow.emit(event)
+
+    /** Emits a full-resync phase ([fraction] null = unknown). */
+    fun emitResyncing(fraction: Float? = null) {
+        statusFlow.value = statusFlow.value.copy(phase = SyncPhase.Resyncing(fraction))
+    }
 }

@@ -36,6 +36,8 @@ data class Item(
     val offline: OfflineState,
     /** Absolute path of the local thumbnail file, or null. */
     val thumbnailPath: String?,
+    /** Newest un-pushed local change (R6); only filled by list projections. */
+    val pendingChange: PendingChange? = null,
 ) {
     /** Host without a leading `www.`, for display. */
     val domain: String get() = displayDomain(url)
@@ -59,7 +61,12 @@ data class ItemSummary(
     val thumbnailPath: String?,
     val tags: List<String>,
     val savedAt: Long,
+    /** Newest un-pushed local change to this item, ignoring reading progress (R6). */
+    val pendingChange: PendingChange? = null,
 )
+
+/** Kind of local change waiting in `pending_ops` (R6). */
+enum class PendingChange { SAVE, TAGS, FAVORITE, OTHER }
 
 /** Hostname of [url] without a leading `www.`; empty if [url] has no parsable host. */
 fun displayDomain(url: String): String =
@@ -80,4 +87,5 @@ fun Item.toSummary(): ItemSummary = ItemSummary(
     thumbnailPath = thumbnailPath,
     tags = tags,
     savedAt = savedAt,
+    pendingChange = pendingChange,
 )

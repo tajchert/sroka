@@ -1,8 +1,5 @@
 package app.sroka.feature.reader.impl.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -28,7 +28,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -47,14 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.sroka.core.designsystem.icon.SrokaIcons
 import app.sroka.core.designsystem.theme.srokaColors
-import androidx.window.layout.FoldingFeature
-import androidx.window.layout.WindowInfoTracker
-import androidx.window.layout.WindowMetricsCalculator
 import app.sroka.feature.reader.impl.R
-import app.sroka.feature.reader.impl.ReaderLayout
-import app.sroka.feature.reader.impl.readerLayoutFor
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import app.sroka.feature.reader.impl.percentRead
 
 internal val TabletopSidePadding = 64.dp
@@ -114,6 +105,9 @@ internal fun TabletopChrome(
                 .padding(top = hingeBottom)
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
+                // Scrolls when the content is taller than the space below the hinge (never clips Up next).
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .padding(horizontal = 32.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
             content = controls,
@@ -267,34 +261,4 @@ internal fun ColumnScope.TabletopControls(
 @Composable
 private fun TonalCircle(icon: ImageVector, description: String, onClick: () -> Unit) {
     FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, description) }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
-/** Current posture-based reader layout, from the window's folding feature (R15.2). */
-@Composable
-internal fun rememberReaderLayout(): ReaderLayout {
-    val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() } ?: return ReaderLayout.Normal
-    val flow = remember(activity) {
-        WindowInfoTracker.getOrCreate(activity).windowLayoutInfo(activity).map { info ->
-            val fold = info.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull()
-            if (fold == null) {
-                ReaderLayout.Normal
-            } else {
-                readerLayoutFor(
-                    halfOpened = fold.state == FoldingFeature.State.HALF_OPENED,
-                    horizontal = fold.orientation == FoldingFeature.Orientation.HORIZONTAL,
-                    hingeTopPx = fold.bounds.top,
-                    hingeBottomPx = fold.bounds.bottom,
-                    windowHeightPx = WindowMetricsCalculator.getOrCreate().computeCurrentWindowMetrics(activity).bounds.height(),
-                )
-            }
-        }.distinctUntilChanged()
-    }
-    return flow.collectAsState(ReaderLayout.Normal).value
 }

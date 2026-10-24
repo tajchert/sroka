@@ -39,7 +39,9 @@ class ReaderUpNextTest {
         library.items.value = listOf(testItem(id = "a", savedAt = 2_000L), testItem(id = "b", savedAt = 1_000L))
         val vm = vm()
         vm.upNext.onEach { }.launchIn(backgroundScope)
-        // The newest unread is the open item itself: no card.
+        // The newest unread is the open item itself: the card shows the next one instead.
+        assertEquals("b", vm.upNext.value?.id)
+        library.items.value = listOf(testItem(id = "a", savedAt = 2_000L))
         assertEquals(null, vm.upNext.value)
         library.items.value = listOf(testItem(id = "a", savedAt = 1_000L), testItem(id = "b", savedAt = 2_000L))
         assertEquals("b", vm.upNext.value?.id)

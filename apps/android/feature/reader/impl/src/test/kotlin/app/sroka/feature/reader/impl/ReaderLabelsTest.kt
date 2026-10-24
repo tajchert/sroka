@@ -5,21 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ReaderLayoutTest {
-    @Test
-    fun halfOpenedHorizontalIsTabletop() {
-        assertEquals(ReaderLayout.Tabletop(1000, 1040), readerLayoutFor(true, true, 1000, 1040, 2000))
-    }
-
-    @Test
-    fun flatFoldedVerticalOrBadBoundsAreNormal() {
-        assertEquals(ReaderLayout.Normal, readerLayoutFor(false, true, 1000, 1040, 2000))
-        assertEquals(ReaderLayout.Normal, readerLayoutFor(true, false, 1000, 1040, 2000))
-        assertEquals(ReaderLayout.Normal, readerLayoutFor(true, true, 0, 0, 2000))
-        assertEquals(ReaderLayout.Normal, readerLayoutFor(true, true, 1040, 1000, 2000))
-        assertEquals(ReaderLayout.Normal, readerLayoutFor(true, true, 1000, 2000, 2000))
-    }
-
+class ReaderLabelsTest {
     @Test
     fun scrubAndLabels() {
         assertEquals(0f, scrubFraction(-1f), 0f)

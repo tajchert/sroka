@@ -127,8 +127,7 @@ class ReaderViewModel @AssistedInject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /** Next unread item other than this one, for the tabletop "Up next in My List" card (R15.2). */
-    val upNext: StateFlow<ItemSummary?> = library.observeNextUnread()
-        .map { next -> next?.takeIf { it.id != itemId } }
+    val upNext: StateFlow<ItemSummary?> = library.observeNextUnread(itemId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /** Live reading progress for the indicator (0..1). */

@@ -68,7 +68,12 @@ import app.sroka.core.ui.openExternalLink
 import app.sroka.feature.reader.impl.NotDownloadedReason
 import app.sroka.feature.reader.impl.R
 import app.sroka.feature.reader.impl.ReaderHtml
-import app.sroka.feature.reader.impl.ReaderLayout
+import app.sroka.core.ui.posture.ReaderLayout
+import app.sroka.core.ui.posture.rememberReaderLayout
+import app.sroka.core.ui.posture.localSplit
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlin.math.roundToInt
 import app.sroka.feature.reader.impl.minutesLeft
 import app.sroka.feature.reader.impl.textSizePx
 import androidx.compose.foundation.layout.statusBars
@@ -111,7 +116,12 @@ internal fun ReaderScreen(
     val snackbarHost = remember { SnackbarHostState() }
     val upNext by viewModel.upNext.collectAsStateWithLifecycle()
     val layout = rememberReaderLayout()
-    val tabletop = layout as? ReaderLayout.Tabletop
+    // Hinge bounds are window coordinates: convert into this container's space once it is laid out.
+    var container by remember { mutableStateOf<IntArray?>(null) }
+    val tabletop = (layout as? ReaderLayout.Tabletop)?.let { t ->
+        container?.let { c -> localSplit(t.hingeTopPx, t.hingeBottomPx, c[0], c[1]) }
+    }
+    val tabletopRequested = layout is ReaderLayout.Tabletop
     var scrubRequest by remember { mutableStateOf<ScrubRequest?>(null) }
     var scrollTopSignal by remember { mutableStateOf(0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -187,7 +197,7 @@ internal fun ReaderScreen(
         contentWindowInsets = if (detailPane) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
-            if (tabletop == null) Column {
+            if (!tabletopRequested) Column {
                 TopAppBar(
                     title = {},
                     navigationIcon = {
@@ -282,7 +292,13 @@ internal fun ReaderScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .then(if (tabletop == null) Modifier.padding(padding) else Modifier),
+                .onGloballyPositioned { c ->
+                    val top = c.boundsInWindow().top.roundToInt()
+                    val h = c.size.height
+                    val old = container
+                    if (old == null || old[0] != top || old[1] != h) container = intArrayOf(top, h)
+                }
+                .then(if (!tabletopRequested) Modifier.padding(padding) else Modifier),
         ) {
             when (val s = state) {
                 is ReaderUiState.Ready -> {
@@ -351,7 +367,7 @@ internal fun ReaderScreen(
                         modifier = if (tabletop != null) {
                             val density = LocalDensity.current
                             val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-                            Modifier.tabletopArticle(statusBar, with(density) { tabletop.hingeTopPx.toDp() })
+                            Modifier.tabletopArticle(statusBar, with(density) { tabletop.topPx.toDp() })
                         } else {
                             Modifier.fillMaxSize()
                         },
@@ -407,7 +423,7 @@ internal fun ReaderScreen(
                 val site = current?.let { it.siteName?.takeIf(String::isNotBlank) ?: it.domain }.orEmpty()
                 TabletopChrome(
                     statusBar = statusBar,
-                    hingeBottom = with(density) { tabletop.hingeBottomPx.toDp() },
+                    hingeBottom = with(density) { tabletop.bottomPx.toDp() },
                     titleLine = listOf(site, current?.displayTitle.orEmpty()).filter { it.isNotBlank() }.joinToString(" \u00b7 "),
                     progress = progress,
                 ) {

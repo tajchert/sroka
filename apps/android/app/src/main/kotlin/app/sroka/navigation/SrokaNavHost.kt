@@ -61,6 +61,8 @@ import app.sroka.R
 import app.sroka.core.model.SessionState
 import app.sroka.core.ui.adaptive.LocalPaneLayout
 import app.sroka.core.ui.adaptive.PaneLayout
+import app.sroka.core.ui.posture.rememberReaderLayout
+import app.sroka.core.ui.posture.shellLayoutFor
 import app.sroka.feature.auth.api.AuthKey
 import app.sroka.feature.auth.impl.navigation.authEntries
 import app.sroka.feature.library.api.SearchKey
@@ -140,15 +142,25 @@ fun SrokaApp(
     // Wide windows show the reader next to the list (list-detail scene), so the tab bar stays.
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
     // The 24dp gutter between the panes holds the drag handle (R13); single pane has no gutter.
-    val directive = remember(windowAdaptiveInfo) {
+    val windowDirective = remember(windowAdaptiveInfo) {
         val base = calculatePaneScaffoldDirective(windowAdaptiveInfo)
         base.copy(horizontalPartitionSpacerSize = if (base.maxHorizontalPartitions > 1) PaneGutter else 0.dp)
     }
-    val twoPane = directive.maxHorizontalPartitions > 1
+    // Tabletop (R15.2) with a reader on top: the reader takes the whole window, so no navigation suite and one
+    // pane. The back stack is untouched, leaving tabletop restores the previous layout.
     val top = backStack.lastOrNull()
+    val shell = shellLayoutFor(rememberReaderLayout(), readerOnTop = top is ReaderKey)
+    val directive = if (shell.forceSinglePane) {
+        windowDirective.copy(maxHorizontalPartitions = 1, horizontalPartitionSpacerSize = 0.dp)
+    } else {
+        windowDirective
+    }
+    // Window truth for back-stack decisions; what is drawn side by side is `drawnTwoPane`.
+    val twoPane = windowDirective.maxHorizontalPartitions > 1
+    val drawnTwoPane = directive.maxHorizontalPartitions > 1
     val current = currentTab(backStack, twoPane)
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
-    val layoutType = if (current != null) adaptiveType else NavigationSuiteType.None
+    val layoutType = if (current != null && !shell.hideNavigation) adaptiveType else NavigationSuiteType.None
     val railShown = layoutType.isRail()
     // The rail's "Save link" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
@@ -209,12 +221,13 @@ fun SrokaApp(
         ) {
             Box(Modifier.fillMaxSize()) {
                 // Live layout for entry content (NavDisplay keeps content across window changes).
-                CompositionLocalProvider(LocalPaneLayout provides PaneLayout(twoPane = twoPane, railShown = railShown)) {
+                CompositionLocalProvider(LocalPaneLayout provides PaneLayout(twoPane = drawnTwoPane, railShown = railShown)) {
                     SrokaNavDisplay(
                         backStack = backStack,
                         directive = directive,
                         onArchived = onArchived,
                         twoPane = twoPane,
+                        drawnTwoPane = drawnTwoPane,
                         addLinkRequested = { addLinkRequested },
                         onAddLinkHandled = { addLinkRequested = false },
                     )
@@ -260,6 +273,7 @@ private fun SrokaNavDisplay(
     directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
     twoPane: Boolean,
+    drawnTwoPane: Boolean,
     addLinkRequested: () -> Boolean,
     onAddLinkHandled: () -> Unit,
 ) {
@@ -281,6 +295,7 @@ private fun SrokaNavDisplay(
     val scope = rememberCoroutineScope()
     // Entry callbacks and getters below outlive recompositions: read the window state through State.
     val twoPaneState = rememberUpdatedState(twoPane)
+    val drawnTwoPaneState = rememberUpdatedState(drawnTwoPane)
     val detailItemId = detailPaneItemId(backStack, twoPane)
     val expanded = twoPane && anchorIndex == COLLAPSED_INDEX
     // Read through State: NavDisplay keeps entry content while the back stack is unchanged, so a plain
@@ -342,7 +357,7 @@ private fun SrokaNavDisplay(
                 onBack = goBack,
                 onOpenItem = backStack::openReader,
                 onArchived = onArchived,
-                detailPaneActive = { detailPaneItemId(backStack, twoPaneState.value) != null },
+                detailPaneActive = { drawnTwoPaneState.value && detailPaneItemId(backStack, twoPaneState.value) != null },
                 isExpanded = { expandedState.value },
                 onToggleExpanded = {
                     if (expandedState.value) restoreList()

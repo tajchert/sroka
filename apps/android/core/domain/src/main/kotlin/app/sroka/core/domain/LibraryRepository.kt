@@ -34,7 +34,10 @@ interface LibraryRepository {
     fun observeItem(id: String): Flow<Item?>
 
     /** The newest unread (My List) item, or null when My List is empty. */
-    fun observeNextUnread(): Flow<ItemSummary?>
+    fun observeNextUnread(): Flow<ItemSummary?> = observeNextUnread(null)
+
+    /** The newest unread item whose id is not [excludeId] (null excludes nothing), or null when there is none. */
+    fun observeNextUnread(excludeId: String?): Flow<ItemSummary?>
 
     /** Counts for tab badges / empty states. */
     fun observeCounts(): Flow<LibraryCounts>

@@ -42,14 +42,19 @@ class ShareActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            SrokaTheme(
-                darkTheme = darkTheme,
-                dynamicColor = uiState.shouldUseDynamicColor(),
-            ) {
+            SrokaTheme(darkTheme = darkTheme) {
                 SaveSheetHost(
                     sharedText = sharedText,
                     subject = subject,
                     onFinish = ::finish,
+                    onOpenApp = { itemId ->
+                        startActivity(
+                            Intent(this, MainActivity::class.java)
+                                .putExtra(EXTRA_OPEN_ITEM_ID, itemId)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                        )
+                        finish()
+                    },
                     onSignIn = {
                         startActivity(
                             Intent(this, MainActivity::class.java)
@@ -62,6 +67,12 @@ class ShareActivity : ComponentActivity() {
         }
     }
 }
+
+/**
+ * Intent extra on the MainActivity launch from the save sheet ("Open Sroka" / "Continue reading"):
+ * the item id whose reader should open. The nav host does not consume it yet (see LEDGER T4 note).
+ */
+const val EXTRA_OPEN_ITEM_ID = "app.sroka.extra.OPEN_ITEM_ID"
 
 private val LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
 private val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)

@@ -38,6 +38,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -269,7 +270,9 @@ private fun SrokaNavDisplay(
     // R14.3: the anchor index at rest and the last non-collapsed one are saved here so rotation keeps both.
     var anchorIndex by rememberSaveable { mutableIntStateOf(-1) }
     var listIndex by rememberSaveable { mutableIntStateOf(DEFAULT_LIST_INDEX) }
-    val expansionState = rememberPaneExpansionState(anchors = PaneAnchors, initialAnchoredIndex = anchorIndex)
+    // Only the restored value seeds the state: passing the live index would recreate it on every change.
+    val initialAnchorIndex = remember { anchorIndex }
+    val expansionState = rememberPaneExpansionState(anchors = PaneAnchors, initialAnchoredIndex = initialAnchorIndex)
     LaunchedEffect(expansionState) {
         snapshotFlow { PaneAnchors.indexOf(expansionState.currentAnchor) }.collect {
             anchorIndex = it
@@ -278,6 +281,9 @@ private fun SrokaNavDisplay(
     }
     val scope = rememberCoroutineScope()
     val expanded = twoPane && anchorIndex == COLLAPSED_INDEX
+    // Read through State: NavDisplay keeps entry content while the back stack is unchanged, so a plain
+    // Boolean captured here would go stale when only the divider moves.
+    val expandedState = rememberUpdatedState(expanded)
     val restoreList: () -> Unit = {
         scope.launch { expansionState.animateTo(PaneAnchors[restoreIndex(listIndex, PaneAnchors.size)]) }
     }
@@ -335,9 +341,10 @@ private fun SrokaNavDisplay(
                 onBack = goBack,
                 onArchived = onArchived,
                 detailPaneActive = detailItemId != null,
-                isExpanded = expanded,
+                isExpanded = { expandedState.value },
                 onToggleExpanded = {
-                    if (expanded) restoreList() else scope.launch { expansionState.animateTo(PaneAnchors[COLLAPSED_INDEX]) }
+                    if (expandedState.value) restoreList()
+                    else scope.launch { expansionState.animateTo(PaneAnchors[COLLAPSED_INDEX]) }
                 },
             )
             settingsEntries(

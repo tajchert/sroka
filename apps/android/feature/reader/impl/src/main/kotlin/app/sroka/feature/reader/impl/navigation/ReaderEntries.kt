@@ -31,7 +31,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
     onBack: () -> Unit,
     onArchived: (itemId: String) -> Unit = { onBack() },
     detailPaneActive: Boolean = false,
-    isExpanded: Boolean = false,
+    isExpanded: () -> Boolean = { false },
     onToggleExpanded: (() -> Unit)? = null,
 ) {
     entry<ReaderKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
@@ -48,7 +48,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
                 itemId = key.itemId,
                 detailPane = detailPaneActive,
                 paneWidthDp = paneWidthDp,
-                isExpanded = isExpanded,
+                isExpanded = isExpanded(),
                 onToggleExpanded = onToggleExpanded,
             )
         }

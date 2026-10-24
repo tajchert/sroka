@@ -122,4 +122,23 @@
     <string name="feature_library_share_add_tags">Add tags</string>
     <string name="feature_library_share_done">Done</string>
     <string name="feature_library_select_article">Select an article to read</string>
+    <!-- Share sheet and tag sheet (R9) -->
+    <string name="feature_library_share_sub_downloading">Downloading for offline…</string>
+    <string name="feature_library_share_sub_saved">Saved</string>
+    <string name="feature_library_share_favourite">Favourite</string>
+    <string name="feature_library_share_open">Open Sroka</string>
+    <string name="feature_library_share_already_title">Already in Sroka</string>
+    <string name="feature_library_share_already_in_list">Saved %1$s · in My List</string>
+    <string name="feature_library_share_already_in_archive">Saved %1$s · in Archive</string>
+    <string name="feature_library_share_card_meta">%1$s · %2$d min</string>
+    <string name="feature_library_share_progress">%1$d%% read · %2$d min left</string>
+    <string name="feature_library_share_close">Close</string>
+    <string name="feature_library_share_continue">Continue reading</string>
+    <string name="feature_library_share_thumbnail">Article thumbnail</string>
+    <string name="feature_library_tags_sheet_title">Tags</string>
+    <string name="feature_library_tags_field_label">Add a tag</string>
+    <string name="feature_library_tags_create">Create “%1$s”</string>
+    <string name="feature_library_tags_search">Search tags</string>
+    <string name="feature_library_tags_search_close">Close search</string>
+    <string name="feature_library_tags_no_match">No tags match</string>
 </resources>

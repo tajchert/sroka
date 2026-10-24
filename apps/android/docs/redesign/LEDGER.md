@@ -7,7 +7,7 @@
 | T0b core transfer (import/export) | todo | |
 | T2 auth | todo | |
 | T3 library list + search + nav | todo | |
-| T4 share sheet + tags | todo | |
+| T4 share sheet + tags | done | see notes |
 | T5 reader | todo | |
 | T6 settings + import + export | todo | |
 | Review + gate | todo | |
@@ -17,6 +17,8 @@
 - T1: `SrokaTheme(darkTheme, dynamicColor = false /* ignored */, content)`. Extended colours: `MaterialTheme.srokaColors` (`app.sroka.core.designsystem.theme.srokaColors`) with fields `brand, onBrand, warning, warningContainer, progress, progressTrack, readerBody`. Font family val: `OutfitFontFamily` (theme/Type.kt); `SrokaTypography` uses it. Mark: `SrokaMark(modifier, size = 64.dp)` (component/SrokaMark.kt), drawables `app.sroka.core.designsystem.R.drawable.ic_sroka_mark` / `ic_stat_sroka`.
 - T1: `shouldUseDynamicColor()` kept in MainActivityViewModel.kt, now always false (ShareActivity still calls it; T4 may drop the call).
 - T1: only notification is `core/data/.../sync/SyncNotifications.kt` (uses `android.R.drawable.stat_sys_download`); core:data does not depend on core:designsystem, so NOT switched. T0b/whoever owns it must add the dependency (or copy the drawable) to use `ic_stat_sroka`.
+- T4: Share sheet (07/08), tag sheet (11) and tag list (12) done. `SaveSheetHost` has new `onOpenApp(itemId)`; ShareActivity launches MainActivity with extra `EXTRA_OPEN_ITEM_ID` (`app.sroka.extra.OPEN_ITEM_ID`, const in ShareActivity.kt). Nav host/MainActivity must read it and open `ReaderKey(itemId)` (not wired; until then it just opens the app). Auto-dismiss 4 s lives in `SaveSheetViewModel` (`autoDismissed`, `onInteraction()`). "Saved <date> · in My List|Archive" shows current status; re-saving moves an item to My List first, so Archive rarely appears.
+- T4: `EditTagsDialog` (list/TagEditor.kt) keeps its signature but is now a ModalBottomSheet; `suggestions` = known tags (T3 may pass all tags, not just recent, so the Create chip is accurate). `TagsRoute(onOpenTag, onOpenSettings)` unchanged; avatar letter comes from `TagsViewModel` (injects AuthRepository). Tag search filters in place (no list-search hand-off). ConfirmDialog (T3's Dialogs.kt) reused for delete.
 ### T0a (core library) API
 - `enum class PendingChange { SAVE, TAGS, FAVORITE, OTHER }`; `ItemSummary.pendingChange: PendingChange? = null` (newest non-`item.setProgress` pending op of the item: item.add SAVE, item.tag TAGS, item.setFavorite FAVORITE, else OTHER). Also `Item.pendingChange` (default null; only list projections fill it). `testItem(pendingChange = ...)`.
 - `SyncPhase.Resyncing(val fraction: Float? = null)`: emitted while a sync runs and `sync_state.full_resync` is set (410 or pass from cursor 0, so also the very first sync). Fraction always null: pull response has no total. `FakeSyncStatusRepository.emitResyncing(fraction)`. SyncStrip/VM `busy` treat it like Syncing.

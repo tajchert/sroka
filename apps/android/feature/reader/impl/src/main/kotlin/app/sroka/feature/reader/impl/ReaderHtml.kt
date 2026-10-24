@@ -155,10 +155,11 @@ window.__srokaScrollToId=function(id){var el=document.getElementById(id);if(el)e
 """.trimIndent()
 
     private val CSS = """
-:root{--scale:1;--warn:#7a5a00;--bg:#fbfbf9;--fg:#1b1c1d;--muted:#6b6e71;--link:#0b7f7c;--rule:#e3e3df}
-html[data-theme=dark]{--bg:#121314;--fg:#d9d7d1;--muted:#a5a8ae;--link:#7cc0da;--rule:#2a2d2f;--warn:#e8cf86}
+:root{--scale:1;--warn:#7a5a00;--bg:#f6f5f1;--fg:#15171c;--muted:#5d5f66;--link:#1e6f8f;--rule:#e3e3df}
+html[data-theme=dark]{--bg:#15171c;--fg:#d9d7d1;--muted:#a5a8ae;--link:#7cc0da;--rule:#2a2d2f;--warn:#e8cf86}
 html[data-theme=sepia]{--bg:#f3ead8;--fg:#40321f;--muted:#8a7656;--link:#1f6f6a;--rule:#e0d3b8}
 .sk-head{margin:0 0 1.4em}.sk-site{font-size:14px;font-weight:500;color:var(--link);margin-bottom:14px}.sk-title{font-size:28px;font-weight:600;line-height:1.2;margin-bottom:14px}.sk-meta{font-size:14px;color:var(--muted)}.sk-warn{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--warn);margin-top:14px}
+.sk-head~article>h1:first-child{display:none}.sk-head~article>h1:first-child+.byline{font-size:14px;color:var(--muted);margin-top:0}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
 body{margin:0 auto;max-width:42em;padding:1.25rem 1.1rem 6rem;background:var(--bg);color:var(--fg);font-family:system-ui,Roboto,sans-serif;font-size:calc(18px*var(--scale));line-height:1.65;overflow-wrap:break-word}
 h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.6em 0 .6em}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}

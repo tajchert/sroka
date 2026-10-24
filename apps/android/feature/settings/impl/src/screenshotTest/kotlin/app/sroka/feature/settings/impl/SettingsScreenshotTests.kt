@@ -90,7 +90,7 @@ private fun SettingsTwoPane(selected: SettingsSelection?, detail: @Composable ()
                     )
                 }
                 Spacer(Modifier.width(24.dp))
-                Box(Modifier.weight(1f)) { DetailPaneCard { detail() } }
+                Box(Modifier.weight(1f)) { DetailPaneCard(topMargin = 0.dp) { detail() } }
             }
         }
     }

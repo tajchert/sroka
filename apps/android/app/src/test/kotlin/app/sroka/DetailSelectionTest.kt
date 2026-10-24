@@ -64,6 +64,9 @@ class DetailSelectionTest {
         assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey, TagItemsKey("x"), ReaderKey("a")), twoPane = true))
         assertEquals(TopLevelDestination.MY_LIST, currentTab(listOf(root, ReaderKey("a")), twoPane = true))
         assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey), twoPane = false))
+        val tagsSearch = SearchKey(fromTags = true)
+        assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey, tagsSearch), twoPane = true))
+        assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey, tagsSearch, ReaderKey("a")), twoPane = true))
     }
 
     @Test

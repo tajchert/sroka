@@ -56,17 +56,20 @@ import app.sroka.core.model.TagCount
 import app.sroka.core.model.tagKey
 import app.sroka.feature.library.impl.R
 import app.sroka.feature.library.impl.list.ConfirmDialog
+import app.sroka.feature.library.impl.list.SearchPill
+import androidx.compose.foundation.layout.Column
 import kotlinx.coroutines.launch
 
 /**
- * The Tags tab (screen 12): large top app bar with a search action (filters the tag list in place)
- * and the avatar (opens Settings via [onOpenSettings]); rows show `label` icon, name and article
+ * The Tags tab (screen 12): the My List search pill (opens full search via [onOpenSearch], avatar opens
+ * Settings via [onOpenSettings]) above a large "Tags" title; rows show `label` icon, name and article
  * count. Tap opens the tag's items, long-press offers rename / delete.
  */
 @Composable
 fun TagsRoute(
     onOpenTag: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit = {},
     selectedTag: String? = null,
     navRailShown: Boolean = false,
     viewModel: TagsViewModel = hiltViewModel(),
@@ -84,6 +87,7 @@ fun TagsRoute(
         navRailShown = navRailShown,
         onOpenTag = onOpenTag,
         onOpenSettings = onOpenSettings,
+        onOpenSearch = onOpenSearch,
         onRename = { renaming = it },
         onDelete = { deleting = it },
     )
@@ -117,7 +121,6 @@ fun TagsRoute(
  * Stateless Tags list. [selectedTag] is highlighted (two-pane); [navRailShown] hides the avatar,
  * which the rail hosts.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagsContent(
     tags: List<TagCount>?,
@@ -128,99 +131,54 @@ fun TagsContent(
     onOpenSettings: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onOpenSearch: () -> Unit = {},
 ) {
-    var searching by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
-                title = { Text(stringResource(R.string.feature_library_tags)) },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = {
-                        searching = !searching
-                        if (!searching) query = ""
-                    }) {
-                        Icon(
-                            if (searching) SrokaIcons.Close else SrokaIcons.Search,
-                            contentDescription = stringResource(
-                                if (searching) R.string.feature_library_tags_search_close else R.string.feature_library_tags_search,
-                            ),
-                        )
-                    }
-                    if (!navRailShown) Avatar(avatar, onOpenSettings)
-                },
+            SearchPill(
+                hint = stringResource(R.string.feature_library_search_bar_tags),
+                email = avatar.orEmpty(),
+                sort = null,
+                onSortChange = null,
+                onOpenSearch = onOpenSearch,
+                onOpenSettings = onOpenSettings.takeUnless { navRailShown },
             )
         },
     ) { padding ->
-        val shown = if (query.isBlank()) tags else tags?.filter { tagKey(it.name).contains(tagKey(query)) }
         when {
             tags == null -> Box(Modifier.padding(padding).fillMaxSize())
-            tags.isEmpty() -> SrokaEmptyState(
-                icon = SrokaIcons.Label,
-                title = stringResource(R.string.feature_library_empty_tags_title),
-                description = stringResource(R.string.feature_library_empty_tags_body),
-                modifier = Modifier.padding(padding),
-            )
-            else -> Box(Modifier.padding(padding).fillMaxSize()) {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    if (searching) {
-                        item(key = "search", contentType = "search") {
-                            OutlinedTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                singleLine = true,
-                                placeholder = { Text(stringResource(R.string.feature_library_tags_search)) },
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-                    if (shown.isNullOrEmpty()) {
-                        item(key = "none", contentType = "none") {
-                            Text(
-                                stringResource(R.string.feature_library_tags_no_match),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(24.dp),
-                            )
-                        }
-                    }
-                    items(shown.orEmpty(), key = { it.name }, contentType = { "tag" }) { tag ->
-                        TagRow(
-                            tag = tag,
-                            selected = tag.name == selectedTag,
-                            onClick = { onOpenTag(tag.name) },
-                            onRename = { onRename(tag.name) },
-                            onDelete = { onDelete(tag.name) },
-                        )
-                    }
+            tags.isEmpty() -> Column(Modifier.padding(padding).fillMaxSize()) {
+                TagsTitle()
+                SrokaEmptyState(
+                    icon = SrokaIcons.Label,
+                    title = stringResource(R.string.feature_library_empty_tags_title),
+                    description = stringResource(R.string.feature_library_empty_tags_body),
+                )
+            }
+            else -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+                item(key = "title", contentType = "title") { TagsTitle() }
+                items(tags, key = { it.name }, contentType = { "tag" }) { tag ->
+                    TagRow(
+                        tag = tag,
+                        selected = tag.name == selectedTag,
+                        onClick = { onOpenTag(tag.name) },
+                        onRename = { onRename(tag.name) },
+                        onDelete = { onDelete(tag.name) },
+                    )
                 }
             }
         }
     }
 }
 
+/** The large "Tags" title below the search pill. */
 @Composable
-private fun Avatar(letter: String?, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .padding(start = 4.dp, end = 12.dp)
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.feature_library_settings), onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            letter.orEmpty(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-    }
+private fun TagsTitle() {
+    Text(
+        stringResource(R.string.feature_library_tags),
+        style = MaterialTheme.typography.headlineMedium,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

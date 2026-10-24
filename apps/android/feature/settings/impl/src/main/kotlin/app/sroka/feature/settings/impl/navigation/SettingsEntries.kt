@@ -49,7 +49,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
     entry<SettingsKey>(
         metadata = ListDetailSceneStrategy.listPane(
             sceneKey = SettingsSceneKey,
-            detailPlaceholder = { DetailPaneCard { SettingsDetailPlaceholder() } },
+            detailPlaceholder = { DetailPaneCard(topMargin = 0.dp) { SettingsDetailPlaceholder() } },
         ) + ListDetailSceneStrategy.preferredPaneSize(width = 360.dp),
     ) {
         val twoPane = LocalPaneLayout.current.twoPane
@@ -63,15 +63,15 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     entry<SettingsChoiceKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) { key ->
-        DetailPaneCard { SettingsChoiceRoute(key.kind) }
+        DetailPaneCard(topMargin = 0.dp) { SettingsChoiceRoute(key.kind) }
     }
     entry<ImportKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) {
         val twoPane = LocalPaneLayout.current.twoPane
-        if (twoPane) DetailPaneCard { ImportRoute(onBack = onBack, detailPane = true) } else ImportRoute(onBack = onBack)
+        if (twoPane) DetailPaneCard(topMargin = 0.dp) { ImportRoute(onBack = onBack, detailPane = true) } else ImportRoute(onBack = onBack)
     }
     entry<ExportKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) {
         val twoPane = LocalPaneLayout.current.twoPane
-        if (twoPane) DetailPaneCard { ExportRoute(onBack = onBack, detailPane = true) } else ExportRoute(onBack = onBack)
+        if (twoPane) DetailPaneCard(topMargin = 0.dp) { ExportRoute(onBack = onBack, detailPane = true) } else ExportRoute(onBack = onBack)
     }
 }
 

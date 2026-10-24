@@ -328,6 +328,7 @@ private fun SrokaNavDisplay(
                 // From the Expired banner: sign in on top of the library; success pops it.
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
                 onOpenSearch = { tab -> backStack.openSearch(tab, twoPaneState.value) },
+                onOpenTagsSearch = { backStack.openSearch(LibraryTab.MY_LIST, twoPaneState.value, fromTags = true) },
                 onCloseSearch = { key ->
                     val i = backStack.lastIndexOf(key)
                     if (i > 0) backStack.subList(i, backStack.size).clear()
@@ -384,9 +385,9 @@ internal fun NavBackStack<NavKey>.openTag(name: String, twoPane: Boolean) {
  * Opens search from [tab]. In two-pane mode an article open beside the list is closed first, so the
  * results don't pair with a reader that wasn't opened from them.
  */
-internal fun NavBackStack<NavKey>.openSearch(tab: LibraryTab, twoPane: Boolean) {
+internal fun NavBackStack<NavKey>.openSearch(tab: LibraryTab, twoPane: Boolean, fromTags: Boolean = false) {
     if (twoPane) while (lastOrNull() is ReaderKey) removeLastOrNull()
-    add(SearchKey(tab))
+    add(SearchKey(tab, fromTags))
 }
 
 /** Opens [itemId] in the reader; a reader already on top is replaced rather than stacked. */

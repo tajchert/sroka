@@ -361,7 +361,13 @@ fun LibraryListContent(
         topBar = {
             if (tab != null) {
                 SearchPill(
-                    tab = tab,
+                    hint = stringResource(
+                        when (tab) {
+                            LibraryTab.MY_LIST -> R.string.feature_library_search_bar_my_list
+                            LibraryTab.FAVORITES -> R.string.feature_library_search_bar_favorites
+                            LibraryTab.ARCHIVE -> R.string.feature_library_search_bar_archive
+                        },
+                    ),
                     email = state.email,
                     sort = state.sort,
                     onSortChange = onSortChange,
@@ -500,78 +506,12 @@ private fun scopeTitle(scope: ListScope): String = when (scope) {
     )
 }
 
-/** M3-style search pill (surfaceContainerHigh) with sort and the avatar that opens Settings. */
-@Composable
-private fun SearchPill(
-    tab: LibraryTab,
-    email: String,
-    sort: SortOrder,
-    onSortChange: (SortOrder) -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenSettings: (() -> Unit)?,
-) {
-    val hint = stringResource(
-        when (tab) {
-            LibraryTab.MY_LIST -> R.string.feature_library_search_bar_my_list
-            LibraryTab.FAVORITES -> R.string.feature_library_search_bar_favorites
-            LibraryTab.ARCHIVE -> R.string.feature_library_search_bar_archive
-        },
-    )
-    Surface(
-        modifier = Modifier
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .fillMaxWidth()
-            .height(56.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        onClick = onOpenSearch,
-    ) {
-        Row(
-            Modifier.padding(start = 16.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(SrokaIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                hint,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f).padding(start = 16.dp),
-            )
-            SortMenu(sort, onSortChange)
-            if (onOpenSettings != null) Avatar(email, onOpenSettings)
-        }
-    }
-}
-
-@Composable
-private fun Avatar(email: String, onClick: () -> Unit) {
-    val label = stringResource(R.string.feature_library_settings)
-    Box(
-        Modifier
-            .size(48.dp)
-            .clickable(onClick = onClick, role = Role.Button, onClickLabel = label),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier.size(32.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                avatarLetter(email),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
 /** First letter of the account email, upper-cased; "?" when unknown. */
 internal fun avatarLetter(email: String): String =
     email.trim().firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
 
 @Composable
-private fun SortMenu(sort: SortOrder, onSortChange: (SortOrder) -> Unit) {
+internal fun SortMenu(sort: SortOrder, onSortChange: (SortOrder) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {

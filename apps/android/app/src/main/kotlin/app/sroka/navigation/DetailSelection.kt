@@ -38,7 +38,7 @@ internal fun currentTab(backStack: List<NavKey>, twoPane: Boolean): TopLevelDest
     var i = backStack.lastIndex
     if (backStack.getOrNull(i) is ReaderKey) i--
     return when (val key = backStack.getOrNull(i)) {
-        is SearchKey -> TopLevelDestination.of(LibraryKey(key.tab))
+        is SearchKey -> if (key.fromTags) TopLevelDestination.TAGS else TopLevelDestination.of(LibraryKey(key.tab))
         is TagItemsKey -> TopLevelDestination.TAGS
         is LibraryKey, is TagsKey -> TopLevelDestination.of(key)
         else -> null

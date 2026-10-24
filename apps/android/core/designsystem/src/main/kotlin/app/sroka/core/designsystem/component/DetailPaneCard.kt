@@ -22,12 +22,13 @@ val DetailPaneCardCorner: Dp = 24.dp
 
 /**
  * The rounded `surfaceContainerLow` card that holds the detail pane (reader or empty placeholder)
- * next to the list on wide windows (R13, screen 17): 24dp margin at the top, end and bottom, 24dp
- * corners. The start side is the pane gutter. System-bar insets are added on top of the margin.
+ * next to the list on wide windows (R13, screen 17): 8dp below the status bar at the top (aligned with the list pane's search pill, R16.2), 24dp at the end and bottom, 24dp
+ * corners. [topMargin] is 0 beside a list with a top app bar instead of a pill (Settings, R16.2). The start side is the pane gutter. System-bar insets are added on top of the margin.
  */
 @Composable
 fun DetailPaneCard(
     modifier: Modifier = Modifier,
+    topMargin: Dp = 8.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Surface(
@@ -36,7 +37,7 @@ fun DetailPaneCard(
             .windowInsetsPadding(
                 WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.Bottom + WindowInsetsSides.End),
             )
-            .padding(top = 24.dp, end = 24.dp, bottom = 24.dp),
+            .padding(top = topMargin, end = 24.dp, bottom = 24.dp),
         shape = RoundedCornerShape(DetailPaneCardCorner),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {

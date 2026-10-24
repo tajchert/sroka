@@ -47,6 +47,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onCloseTag: (TagItemsKey) -> Unit,
     onSignIn: () -> Unit = {},
     onOpenSearch: (LibraryTab) -> Unit = {},
+    onOpenTagsSearch: () -> Unit = {},
     onCloseSearch: (SearchKey) -> Unit = {},
     selectedTag: () -> String? = { null },
     selectedItemId: () -> String? = { null },
@@ -72,6 +73,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     entry<SearchKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
         val layout = LocalPaneLayout.current
         SearchRoute(
+            // From Tags the scope is All (the default tab filter), whatever the key's tab says.
             initialTab = key.tab,
             onOpenItem = onOpenItem,
             onBack = { onCloseSearch(key) },
@@ -84,6 +86,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
         TagsRoute(
             onOpenTag = onOpenTag,
             onOpenSettings = onOpenSettings,
+            onOpenSearch = onOpenTagsSearch,
             selectedTag = selectedTag(),
             navRailShown = layout.railShown,
         )

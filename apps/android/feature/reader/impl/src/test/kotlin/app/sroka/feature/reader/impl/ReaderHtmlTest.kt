@@ -127,6 +127,16 @@ class ReaderPaneStyleTest {
     }
 
     @Test
+    fun centeredPaneCentresTheColumn() {
+        fun css(centered: Boolean) = ReaderHtml.wrap(
+            "<p>Hello</p>", "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f,
+            "abc123", pane = ReaderPaneStyle.forWidth(0xFF1B1E23.toInt(), 900, centered = centered),
+        )
+        org.junit.Assert.assertTrue(css(true).contains("body{margin:0 auto;max-width:640px"))
+        org.junit.Assert.assertTrue(css(false).contains("body{margin:0;max-width:640px"))
+    }
+
+    @Test
     fun narrowPaneKeepsPhoneTitleAndPadding() {
         assertEquals(ReaderPaneStyle(0xFF000000.toInt(), narrow = true), ReaderPaneStyle.forWidth(0xFF000000.toInt(), 479))
         assertEquals(ReaderPaneStyle(0xFF000000.toInt(), narrow = false), ReaderPaneStyle.forWidth(0xFF000000.toInt(), 480))

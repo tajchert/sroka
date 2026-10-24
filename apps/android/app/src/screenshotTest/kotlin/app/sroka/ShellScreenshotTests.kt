@@ -72,7 +72,7 @@ private val shellItems = listOf(
 )
 
 @Composable
-private fun ShellFixture(darkTheme: Boolean, detail: @Composable () -> Unit) {
+private fun ShellFixture(darkTheme: Boolean, listCollapsed: Boolean = false, detail: @Composable () -> Unit) {
     SrokaTheme(darkTheme = darkTheme) {
         Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             SrokaRail(
@@ -85,7 +85,7 @@ private fun ShellFixture(darkTheme: Boolean, detail: @Composable () -> Unit) {
                 onSelect = {},
                 onOpenSettings = {},
             )
-            Box(Modifier.width(360.dp).fillMaxHeight()) {
+            if (!listCollapsed) Box(Modifier.width(360.dp).fillMaxHeight()) {
                 LibraryListContent(
                     scope = ListScope.Tab(LibraryTab.MY_LIST),
                     state = LibraryListUiState(email = "magpie@example.com"),
@@ -122,9 +122,12 @@ private fun ShellFixture(darkTheme: Boolean, detail: @Composable () -> Unit) {
 private fun stringResourceFor(id: Int): String = androidx.compose.ui.res.stringResource(id)
 
 @Composable
-private fun StubArticle() {
+private fun StubArticle(centered: Boolean = false) {
     DetailPaneCard {
-        Column(Modifier.widthIn(max = 640.dp).padding(horizontal = 48.dp, vertical = 32.dp)) {
+        Column(
+            Modifier.then(if (centered) Modifier.align(Alignment.TopCenter) else Modifier)
+                .widthIn(max = 640.dp).padding(horizontal = 48.dp, vertical = 32.dp),
+        ) {
             Text("longreads.example.com", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(
                 "The slow web: why reading later still matters",
@@ -163,3 +166,9 @@ fun ShellPlaceholderDark() = ShellFixture(darkTheme = true) { DetailPlaceholder(
 @UnfoldedPreviews
 @Composable
 fun ShellReaderDark() = ShellFixture(darkTheme = true) { StubArticle() }
+
+/** R14.3: list pane collapsed to 0, rail stays, the reader card spans the rest (column stays <= 640dp, centred). */
+@PreviewTest
+@UnfoldedPreviews
+@Composable
+fun ShellReaderExpandedLight() = ShellFixture(darkTheme = false, listCollapsed = true) { StubArticle(centered = true) }

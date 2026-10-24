@@ -4,6 +4,8 @@
     <string name="feature_reader_back">Back</string>
     <string name="feature_reader_favorite">Add to favorites</string>
     <string name="feature_reader_unfavorite">Remove from favorites</string>
+    <string name="feature_reader_expand">Expand article</string>
+    <string name="feature_reader_show_list">Show list</string>
     <string name="feature_reader_archive">Archive</string>
     <string name="feature_reader_unarchive">Move to My List</string>
     <string name="feature_reader_share">Share link</string>

@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.CloseFullscreen
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.outlined.Delete
@@ -89,6 +91,7 @@ import app.sroka.feature.reader.impl.resolveTheme
  *
  * @param onBack leave the reader
  * @param onArchived the item was archived; caller pops and shows an undo snackbar (defaults to [onBack])
+ * @param isExpanded list pane collapsed (R14.3); [onToggleExpanded] shows the expand/show-list button (detail pane only)
  * @param detailPane true while shown in the two-pane detail card (R13): no back arrow, transparent
  *   bars, the page background follows the card and the article column is wider-pane styled
  */
@@ -102,6 +105,8 @@ internal fun ReaderScreen(
     itemId: String,
     detailPane: Boolean = false,
     paneWidthDp: Int = Int.MAX_VALUE,
+    isExpanded: Boolean = false,
+    onToggleExpanded: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -198,6 +203,16 @@ internal fun ReaderScreen(
                     },
                     actions = {
                         val current = item
+                        if (detailPane && onToggleExpanded != null) {
+                            IconButton(onClick = onToggleExpanded) {
+                                Icon(
+                                    if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                                    stringResource(
+                                        if (isExpanded) R.string.feature_reader_show_list else R.string.feature_reader_expand,
+                                    ),
+                                )
+                            }
+                        }
                         if (current != null) {
                             IconButton(onClick = viewModel::toggleFavorite) {
                                 Icon(
@@ -294,7 +309,7 @@ internal fun ReaderScreen(
                         null
                     }
                     // Keyed on the article only: header changes are pushed into the live page by script.
-                    val pane = if (detailPane) ReaderPaneStyle.forWidth(cardArgb, paneWidthDp) else null
+                    val pane = if (detailPane) ReaderPaneStyle.forWidth(cardArgb, paneWidthDp, centered = isExpanded) else null
                     val wrapped = remember(s.html, s.baseUrl, pane) {
                         val restore = viewModel.restorePoint()
                         ReaderHtml.wrap(

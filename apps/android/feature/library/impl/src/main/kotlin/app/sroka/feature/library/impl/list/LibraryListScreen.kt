@@ -5,6 +5,22 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.background
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.mimeTypes
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -127,6 +143,34 @@ fun LibraryListRoute(
     var confirmDeleteFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val currentOpenItem by rememberUpdatedState(onOpenItem)
+    var dropState by remember { mutableStateOf(DropState.Idle) }
+    val dropTarget = remember {
+        object : DragAndDropTarget {
+            override fun onStarted(event: DragAndDropEvent) { dropState = DropState.Active }
+            override fun onEntered(event: DragAndDropEvent) { dropState = DropState.Hovered }
+            override fun onExited(event: DragAndDropEvent) { dropState = DropState.Active }
+            override fun onEnded(event: DragAndDropEvent) { dropState = DropState.Idle }
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                dropState = DropState.Idle
+                val clip = event.toAndroidDragEvent().clipData
+                val dropped = (0 until (clip?.itemCount ?: 0)).map { i ->
+                    val item = clip!!.getItemAt(i)
+                    DroppedItem(
+                        text = item.text?.toString(),
+                        uri = item.uri?.takeIf { it.scheme == "http" || it.scheme == "https" }?.toString(),
+                        html = item.htmlText,
+                    )
+                }
+                viewModel.dropUrls(extractDroppedUrls(dropped))
+                return true
+            }
+        }
+    }
+    val dropModifier = Modifier.dragAndDropTarget(
+        shouldStartDragAndDrop = { event -> event.mimeTypes().any { it in DROP_MIME_TYPES } },
+        target = dropTarget,
+    )
     LaunchedEffect(addLinkRequested) {
         if (addLinkRequested && tabScope(scope)) {
             showAdd = true
@@ -141,6 +185,27 @@ fun LibraryListRoute(
             coroutineScope.launch {
                 when (event) {
                     is ListEvent.Info -> snackbarHostState.showSnackbar(resources.getString(event.message))
+                    is ListEvent.DropSaved -> {
+                        val message = if (event.ids.size == 1) {
+                            resources.getString(R.string.feature_library_drop_saved)
+                        } else {
+                            resources.getQuantityString(R.plurals.feature_library_drop_saved_many, event.ids.size, event.ids.size)
+                        }
+                        val result = snackbarHostState.showSnackbar(
+                            message = message,
+                            actionLabel = resources.getString(R.string.feature_library_undo),
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) viewModel.undo(UndoAction.Delete(event.ids))
+                    }
+                    is ListEvent.DropAlready -> {
+                        val result = snackbarHostState.showSnackbar(
+                            message = resources.getString(R.string.feature_library_drop_already),
+                            actionLabel = resources.getString(R.string.feature_library_drop_open),
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) currentOpenItem(event.itemId)
+                    }
                     is ListEvent.Undoable -> {
                         val result = snackbarHostState.showSnackbar(
                             message = resources.getString(event.message),
@@ -209,6 +274,8 @@ fun LibraryListRoute(
         twoPane = twoPane,
         navRailShown = navRailShown,
         detailCard = detailCard,
+        dropState = dropState,
+        dropModifier = dropModifier,
     )
 
     selected?.let { item ->
@@ -282,11 +349,14 @@ fun LibraryListContent(
     twoPane: Boolean,
     navRailShown: Boolean,
     detailCard: Boolean = false,
+    dropState: DropState = DropState.Idle,
+    dropModifier: Modifier = Modifier,
 ) {
     val tab = (scope as? ListScope.Tab)?.tab
     val isTopLevel = tab != null
     val fabExpanded = isEmpty || listState.isScrollingUpOrAtTop()
     Scaffold(
+        modifier = dropModifier,
         containerColor = if (detailCard) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             if (tab != null) {
@@ -331,10 +401,11 @@ fun LibraryListContent(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             StatusCards(selectStatusCard(state.sync, state.needsSignIn), onSignIn = onSignIn)
+            AnimatedVisibility(dropState != DropState.Idle) { DropTargetCard(hovered = dropState == DropState.Hovered) }
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = onRefresh,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().alpha(if (dropState != DropState.Idle) 0.5f else 1f),
             ) {
                 if (isEmpty) {
                     EmptyContent(scope)
@@ -356,6 +427,43 @@ fun LibraryListContent(
                 }
             }
         }
+    }
+}
+
+/** Drag-to-save state (R15.1): nothing dragged, a compatible drag over the window, or over the drop zone. */
+enum class DropState { Idle, Active, Hovered }
+
+/** 96dp dashed drop target shown above the list while a link is dragged over the window. */
+@Composable
+internal fun DropTargetCard(hovered: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    val fill = if (hovered) colors.primary.copy(alpha = 0.24f).compositeOver(colors.primaryContainer) else colors.primaryContainer
+    val label = stringResource(R.string.feature_library_drop_to_save)
+    val shape = RoundedCornerShape(16.dp)
+    val dashed = colors.primary
+    Row(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)
+            .fillMaxWidth()
+            .height(96.dp)
+            .clip(shape)
+            .background(fill)
+            .drawBehind {
+                val stroke = 2.dp.toPx()
+                drawRoundRect(
+                    color = dashed,
+                    topLeft = androidx.compose.ui.geometry.Offset(stroke / 2, stroke / 2),
+                    size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = CornerRadius(16.dp.toPx() - stroke / 2),
+                    style = Stroke(width = stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx()))),
+                )
+            }
+            .semantics { liveRegion = LiveRegionMode.Polite; contentDescription = label },
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(SrokaIcons.AddLink, contentDescription = null, modifier = Modifier.size(28.dp), tint = colors.onPrimaryContainer)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = colors.onPrimaryContainer)
     }
 }
 

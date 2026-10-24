@@ -71,6 +71,12 @@ sealed interface ListEvent {
     data class Undoable(@StringRes val message: Int, val undo: UndoAction) : ListEvent
 
     data class Info(@StringRes val message: Int) : ListEvent
+
+    /** Links dropped into the list were saved: "Saved to Sroka" / "Saved N links" with Undo. */
+    data class DropSaved(val ids: List<String>) : ListEvent
+
+    /** The dropped link was already saved: "Already in Sroka" with Open. */
+    data class DropAlready(val itemId: String) : ListEvent
 }
 
 /** Snackbar text for archive/unarchive; offline adds "Syncs when you're online" (R6). */
@@ -87,6 +93,9 @@ sealed interface UndoAction {
     data class Status(val id: String, val previous: ItemStatus) : UndoAction
 
     data class Favorite(val id: String, val previous: Boolean) : UndoAction
+
+    /** Removes items created by a drop. */
+    data class Delete(val ids: List<String>) : UndoAction
 }
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -203,6 +212,7 @@ class LibraryListViewModel @Inject constructor(
             when (action) {
                 is UndoAction.Status -> library.setStatus(action.id, action.previous)
                 is UndoAction.Favorite -> library.setFavorite(action.id, action.previous)
+                is UndoAction.Delete -> action.ids.forEach { library.delete(it) }
             }
         }
     }
@@ -241,6 +251,36 @@ class LibraryListViewModel @Inject constructor(
                 true
             }
             SaveResult.InvalidUrl -> false
+        }
+    }
+
+    /** Saves links dragged into the list (R15.1); local-first, so it also works offline. */
+    fun dropUrls(urls: List<String>) {
+        viewModelScope.launch {
+            if (urls.isEmpty()) {
+                eventChannel.send(ListEvent.Info(R.string.feature_library_drop_no_link))
+                return@launch
+            }
+            val created = mutableListOf<String>()
+            var duplicate: String? = null
+            for (url in urls) {
+                when (val result = library.save(url, source = SaveSource.SHARE)) {
+                    is SaveResult.Saved ->
+                        if (result.alreadySaved) {
+                            if (duplicate == null) duplicate = result.itemId
+                        } else {
+                            created += result.itemId
+                        }
+                    SaveResult.InvalidUrl -> Unit
+                }
+            }
+            eventChannel.send(
+                when {
+                    created.isNotEmpty() -> ListEvent.DropSaved(created)
+                    duplicate != null -> ListEvent.DropAlready(duplicate)
+                    else -> ListEvent.Info(R.string.feature_library_drop_no_link)
+                },
+            )
         }
     }
 

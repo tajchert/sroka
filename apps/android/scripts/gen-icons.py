@@ -13,6 +13,7 @@ from pathlib import Path
 # (KotlinName, symbol_name, fill 0|1, autoMirror)
 ICONS = [
     ("Add", "add", 0, False),
+    ("AddLink", "add_link", 0, False),
     ("Archive", "archive", 0, False),
     ("ArchiveFilled", "archive", 1, False),
     ("ArrowBack", "arrow_back", 0, True),
@@ -35,6 +36,7 @@ ICONS = [
     ("Download", "download", 0, False),
     ("DownloadForOffline", "download_for_offline", 0, False),
     ("Downloading", "downloading", 0, False),
+    ("DownloadingFilled", "downloading", 1, False),
     ("FolderZip", "folder_zip", 0, False),
     ("FormatSize", "format_size", 0, False),
     ("Inbox", "inbox", 0, False),
@@ -48,12 +50,14 @@ ICONS = [
     ("MoveToInbox", "move_to_inbox", 0, False),
     ("NewLabel", "new_label", 0, False),
     ("OfflinePin", "offline_pin", 0, False),
+    ("OfflinePinFilled", "offline_pin", 1, False),
     ("OpenInBrowser", "open_in_browser", 0, False),
     ("OpenInFull", "open_in_full", 0, False),
     ("OpenInNew", "open_in_new", 0, True),
     ("Palette", "palette", 0, False),
     ("Refresh", "refresh", 0, False),
     ("Schedule", "schedule", 0, False),
+    ("ScheduleFilled", "schedule", 1, False),
     ("Search", "search", 0, False),
     ("Settings", "settings", 0, False),
     ("Share", "share", 0, False),
@@ -64,6 +68,7 @@ ICONS = [
     ("Unarchive", "unarchive", 0, False),
     ("UploadFile", "upload_file", 0, False),
     ("Warning", "warning", 0, False),
+    ("WarningFilled", "warning", 1, False),
 ]
 
 BASE = ("https://raw.githubusercontent.com/google/material-design-icons/master/"

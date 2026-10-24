@@ -13,6 +13,7 @@ import app.sroka.core.testing.testItem
 import app.sroka.core.testing.util.MainDispatcherRule
 import app.sroka.feature.library.impl.list.LibraryListViewModel
 import app.sroka.feature.library.impl.list.ListEvent
+import app.sroka.feature.library.impl.list.UndoAction
 import app.sroka.feature.library.impl.save.SaveSheetViewModel
 import app.sroka.feature.library.impl.save.SaveState
 import kotlinx.coroutines.flow.first
@@ -79,5 +80,41 @@ class LibraryViewModelsTest {
         signedOut.start("https://example.com", null)
         assertEquals(SaveState.NeedsSignIn, signedOut.state.value)
         assertEquals(0, library.items.value.size)
+    }
+
+    @Test
+    fun dropSavesLinkWithUndoThatDeletes() = runTest {
+        val vm = listVm()
+        vm.events.test {
+            vm.dropUrls(listOf("https://example.com/a"))
+            val event = awaitItem() as ListEvent.DropSaved
+            assertEquals(1, library.items.value.size)
+            vm.undo(UndoAction.Delete(event.ids))
+            testScheduler.advanceUntilIdle()
+            assertTrue(library.items.value.isEmpty())
+        }
+    }
+
+    @Test
+    fun dropDuplicateOffersOpen() = runTest {
+        library.items.value = listOf(testItem(id = "a", url = "https://example.com/a"))
+        val vm = listVm()
+        vm.events.test {
+            vm.dropUrls(listOf("https://example.com/a"))
+            assertEquals(ListEvent.DropAlready("a"), awaitItem())
+            assertEquals(1, library.items.value.size)
+        }
+    }
+
+    @Test
+    fun dropSeveralSavesAllAndNoUrlInforms() = runTest {
+        val vm = listVm()
+        vm.events.test {
+            vm.dropUrls(listOf("https://example.com/a", "https://example.com/b"))
+            assertEquals(2, (awaitItem() as ListEvent.DropSaved).ids.size)
+            vm.dropUrls(emptyList())
+            assertTrue(awaitItem() is ListEvent.Info)
+        }
+        assertEquals(2, library.items.value.size)
     }
 }

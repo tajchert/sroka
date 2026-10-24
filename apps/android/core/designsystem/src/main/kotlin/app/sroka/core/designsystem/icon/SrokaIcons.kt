@@ -24,6 +24,14 @@ object SrokaIcons {
         }.build()
     }
 
+    val AddLink: ImageVector by lazy {
+        ImageVector.Builder("AddLink", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
+            group(translationY = 960f) {
+            addPath(PathParser().parsePathString("M680-280h-81q-17 0-28-11.5T560-320q0-17 11.5-28.5T600-360h80v-80q0-17 11.5-28.5T720-480q17 0 28.5 11.5T760-440v80h80q17 0 28.5 11.5T880-320q0 17-11.5 28.5T840-280h-80v80q0 17-11.5 28.5T720-160q-17 0-28.5-11.5T680-200v-80Zm-280 0H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h120q17 0 28.5 11.5T440-640q0 17-11.5 28.5T400-600H280q-50 0-85 35t-35 85q0 50 35 85t85 35h120q17 0 28.5 11.5T440-320q0 17-11.5 28.5T400-280Zm-40-160q-17 0-28.5-11.5T320-480q0-17 11.5-28.5T360-520h240q17 0 28.5 11.5T640-480q0 17-11.5 28.5T600-440H360Zm520-40h-80q0-50-35-85t-85-35H559q-17 0-28-11.5T520-640q0-17 11.5-28.5T560-680h120q83 0 141.5 58.5T880-480Z").toNodes(), fill = SolidColor(Color.Black))
+            }
+        }.build()
+    }
+
     val Archive: ImageVector by lazy {
         ImageVector.Builder("Archive", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
             group(translationY = 960f) {
@@ -200,6 +208,14 @@ object SrokaIcons {
         }.build()
     }
 
+    val DownloadingFilled: ImageVector by lazy {
+        ImageVector.Builder("DownloadingFilled", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
+            group(translationY = 960f) {
+            addPath(PathParser().parsePathString("M392-90q-137-31-224.5-140T80-480q0-141 87.5-250T392-870q19-5 33.5 7t14.5 32q0 14-8 25t-22 14q-110 25-180 112t-70 200q0 113 70 200t180 112q14 3 22 14t8 25q0 20-14.5 32T392-90Zm176 0q-19 5-33.5-7T520-129q0-14 8-25t22-14q27-6 52.5-16.5T651-210q11-8 24.5-6t23.5 12q14 14 12 32.5T693-142q-29 18-60.5 31T568-90Zm188-170q-10-10-12-23.5t6-24.5q15-23 25.5-49t16.5-53q3-14 14-21.5t25-7.5q20 0 32 14.5t7 33.5q-8 33-21 64.5T818-266q-11 16-29.5 18T756-260Zm75-260q-14 0-25-8t-14-22q-6-27-16.5-52.5T750-651q-8-12-6-25.5t12-23.5q14-14 32.5-12t29.5 19q18 29 31 60.5t21 64.5q5 19-7 33.5T831-520ZM651-750q-23-15-48.5-25.5T550-792q-14-3-22-14t-8-25q0-20 14.5-32t33.5-7q33 8 64.5 21t60.5 31q17 11 19 29.5T700-756q-10 10-23.5 12t-25.5-6ZM519-435l74-74q12-12 29-12t29 12q12 12 11.5 29T650-451L507-308q-11 11-28 11t-28-11L306-454q-12-12-11.5-28.5T307-511q12-12 28.5-12t28.5 12l75 76v-205q0-17 11.5-28.5T479-680q17 0 28.5 11.5T519-640v205Z").toNodes(), fill = SolidColor(Color.Black))
+            }
+        }.build()
+    }
+
     val FolderZip: ImageVector by lazy {
         ImageVector.Builder("FolderZip", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
             group(translationY = 960f) {
@@ -304,6 +320,14 @@ object SrokaIcons {
         }.build()
     }
 
+    val OfflinePinFilled: ImageVector by lazy {
+        ImageVector.Builder("OfflinePinFilled", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
+            group(translationY = 960f) {
+            addPath(PathParser().parsePathString("M360-280h240q17 0 28.5-11.5T640-320q0-17-11.5-28.5T600-360H360q-17 0-28.5 11.5T320-320q0 17 11.5 28.5T360-280Zm78-232-58-58q-11-11-28-11t-28 11q-11 11-11 28t11 28l86 86q12 12 28 12t28-12l170-170q12-12 11.5-28.5T635-654q-12-11-28.5-10.5T579-653L438-512Zm42 432q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z").toNodes(), fill = SolidColor(Color.Black))
+            }
+        }.build()
+    }
+
     val OpenInBrowser: ImageVector by lazy {
         ImageVector.Builder("OpenInBrowser", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
             group(translationY = 960f) {
@@ -348,6 +372,14 @@ object SrokaIcons {
         ImageVector.Builder("Schedule", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
             group(translationY = 960f) {
             addPath(PathParser().parsePathString("M520-496v-144q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640v159q0 8 3 15.5t9 13.5l132 132q11 11 28 11t28-11q11-11 11-28t-11-28L520-496ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-400Zm0 320q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Z").toNodes(), fill = SolidColor(Color.Black))
+            }
+        }.build()
+    }
+
+    val ScheduleFilled: ImageVector by lazy {
+        ImageVector.Builder("ScheduleFilled", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
+            group(translationY = 960f) {
+            addPath(PathParser().parsePathString("M520-496v-144q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640v159q0 8 3 15.5t9 13.5l132 132q11 11 28 11t28-11q11-11 11-28t-11-28L520-496ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z").toNodes(), fill = SolidColor(Color.Black))
             }
         }.build()
     }
@@ -428,6 +460,14 @@ object SrokaIcons {
         ImageVector.Builder("Warning", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
             group(translationY = 960f) {
             addPath(PathParser().parsePathString("M109-120q-11 0-20-5.5T75-140q-5-9-5.5-19.5T75-180l370-640q6-10 15.5-15t19.5-5q10 0 19.5 5t15.5 15l370 640q6 10 5.5 20.5T885-140q-5 9-14 14.5t-20 5.5H109Zm69-80h604L480-720 178-200Zm302-40q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm0-120q17 0 28.5-11.5T520-400v-120q0-17-11.5-28.5T480-560q-17 0-28.5 11.5T440-520v120q0 17 11.5 28.5T480-360Zm0-100Z").toNodes(), fill = SolidColor(Color.Black))
+            }
+        }.build()
+    }
+
+    val WarningFilled: ImageVector by lazy {
+        ImageVector.Builder("WarningFilled", 24.dp, 24.dp, viewportWidth = 960f, viewportHeight = 960f, autoMirror = false).apply {
+            group(translationY = 960f) {
+            addPath(PathParser().parsePathString("M109-120q-11 0-20-5.5T75-140q-5-9-5.5-19.5T75-180l370-640q6-10 15.5-15t19.5-5q10 0 19.5 5t15.5 15l370 640q6 10 5.5 20.5T885-140q-5 9-14 14.5t-20 5.5H109Zm371-120q17 0 28.5-11.5T520-280q0-17-11.5-28.5T480-320q-17 0-28.5 11.5T440-280q0 17 11.5 28.5T480-240Zm0-120q17 0 28.5-11.5T520-400v-120q0-17-11.5-28.5T480-560q-17 0-28.5 11.5T440-520v120q0 17 11.5 28.5T480-360Z").toNodes(), fill = SolidColor(Color.Black))
             }
         }.build()
     }

@@ -177,4 +177,13 @@
     <string name="feature_library_tags_search">Search tags</string>
     <string name="feature_library_tags_search_close">Close search</string>
     <string name="feature_library_tags_no_match">No tags match</string>
+    <string name="feature_library_drop_to_save">Drop to save</string>
+    <string name="feature_library_drop_saved">Saved to Sroka</string>
+    <string name="feature_library_drop_already">Already in Sroka</string>
+    <string name="feature_library_drop_open">Open</string>
+    <string name="feature_library_drop_no_link">Couldn\u2019t find a link to save</string>
+    <plurals name="feature_library_drop_saved_many">
+        <item quantity="one">Saved %d link</item>
+        <item quantity="other">Saved %d links</item>
+    </plurals>
 </resources>

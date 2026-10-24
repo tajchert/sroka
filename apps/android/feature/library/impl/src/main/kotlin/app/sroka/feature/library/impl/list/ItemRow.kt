@@ -162,13 +162,13 @@ private fun StatusLine(status: RowStatus) {
     val warning = MaterialTheme.srokaColors.warning
     val primary = MaterialTheme.colorScheme.primary
     val (icon: ImageVector, label: Int, color: Color) = when (status) {
-        RowStatus.SAVE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_save_waiting, warning)
-        RowStatus.TAGS_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_tags_waiting, warning)
-        RowStatus.FAVORITE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_favorite_waiting, warning)
-        RowStatus.CHANGE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_change_waiting, warning)
-        RowStatus.PARTIAL -> Triple(SrokaIcons.Warning, R.string.feature_library_status_partial, warning)
-        RowStatus.DOWNLOADING -> Triple(SrokaIcons.Downloading, R.string.feature_library_status_row_downloading, primary)
-        RowStatus.OFFLINE -> Triple(SrokaIcons.OfflinePin, R.string.feature_library_row_available_offline, primary)
+        RowStatus.SAVE_WAITING -> Triple(SrokaIcons.ScheduleFilled, R.string.feature_library_status_save_waiting, warning)
+        RowStatus.TAGS_WAITING -> Triple(SrokaIcons.ScheduleFilled, R.string.feature_library_status_tags_waiting, warning)
+        RowStatus.FAVORITE_WAITING -> Triple(SrokaIcons.ScheduleFilled, R.string.feature_library_status_favorite_waiting, warning)
+        RowStatus.CHANGE_WAITING -> Triple(SrokaIcons.ScheduleFilled, R.string.feature_library_status_change_waiting, warning)
+        RowStatus.PARTIAL -> Triple(SrokaIcons.WarningFilled, R.string.feature_library_status_partial, warning)
+        RowStatus.DOWNLOADING -> Triple(SrokaIcons.DownloadingFilled, R.string.feature_library_status_row_downloading, primary)
+        RowStatus.OFFLINE -> Triple(SrokaIcons.OfflinePinFilled, R.string.feature_library_row_available_offline, primary)
     }
     Row(
         Modifier.padding(top = 2.dp),

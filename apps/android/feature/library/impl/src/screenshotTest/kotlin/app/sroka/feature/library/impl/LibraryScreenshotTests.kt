@@ -17,6 +17,7 @@ import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.SearchScope
 import app.sroka.feature.library.impl.detail.DetailPlaceholderContent
 import app.sroka.feature.library.impl.tags.TagsContent
+import app.sroka.feature.library.impl.list.DropState
 import app.sroka.feature.library.impl.list.LibraryListContent
 import app.sroka.feature.library.impl.list.LibraryListUiState
 import app.sroka.feature.library.impl.list.ListScope
@@ -24,7 +25,7 @@ import app.sroka.feature.library.impl.search.SearchContent
 import com.android.tools.screenshot.PreviewTest
 
 @Composable
-private fun ListFixture(darkTheme: Boolean, twoPane: Boolean) {
+private fun ListFixture(darkTheme: Boolean, twoPane: Boolean, dropState: DropState = DropState.Idle) {
     SrokaTheme(darkTheme = darkTheme) {
         LibraryListContent(
             scope = ListScope.Tab(LibraryTab.MY_LIST),
@@ -50,6 +51,7 @@ private fun ListFixture(darkTheme: Boolean, twoPane: Boolean) {
             selectedItemId = if (twoPane) "i2" else null,
             twoPane = twoPane,
             navRailShown = twoPane,
+            dropState = dropState,
         )
     }
 }
@@ -63,6 +65,17 @@ fun LibraryListLight() = ListFixture(darkTheme = false, twoPane = false)
 @FoldablePreviews
 @Composable
 fun LibraryListDark() = ListFixture(darkTheme = true, twoPane = false)
+
+/** Drag-to-save (R15.1): drop target idle (drag started) and hovered; the list dims. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListDropTarget() = ListFixture(darkTheme = true, twoPane = false, dropState = DropState.Active)
+
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListDropTargetHovered() = ListFixture(darkTheme = true, twoPane = false, dropState = DropState.Hovered)
 
 /** The 360dp list pane of the unfolded layout: rounded rows, the second one selected. */
 @PreviewTest

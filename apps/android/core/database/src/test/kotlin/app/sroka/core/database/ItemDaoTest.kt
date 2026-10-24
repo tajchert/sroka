@@ -86,6 +86,20 @@ class ItemDaoTest : DatabaseTestBase() {
         assertEquals(listOf("old", "new", "mid", "nowords"), ids(q(search = "title", sort = SortOrder.LONGEST)))
     }
 
+    @Test fun nextUnreadSkipsTheExcludedItem() = runBlocking {
+        dao.upsertItem(item("old", savedAt = 100))
+        dao.upsertItem(item("new", savedAt = 300))
+        assertEquals("new", dao.observeNextUnread(null).first()?.id)
+        assertEquals("old", dao.observeNextUnread("new").first()?.id)
+        assertEquals("new", dao.observeNextUnread("old").first()?.id)
+        assertEquals("new", dao.observeNextUnread("missing").first()?.id)
+    }
+
+    @Test fun nextUnreadIsNullWhenOnlyTheExcludedItemIsUnread() = runBlocking {
+        dao.upsertItem(item("only", savedAt = 100))
+        assertNull(dao.observeNextUnread("only").first())
+    }
+
     @Test fun tabsAndTagFilters() = runBlocking {
         dao.upsertItemWithTags(item("u1", savedAt = 1), listOf("Read Later"))
         dao.upsertItemWithTags(item("u2", savedAt = 2, favorite = true), listOf("other"))

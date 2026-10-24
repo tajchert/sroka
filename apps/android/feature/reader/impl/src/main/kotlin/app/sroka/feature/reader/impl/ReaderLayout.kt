@@ -3,30 +3,6 @@ package app.sroka.feature.reader.impl
 import app.sroka.core.model.UserPreferences
 import kotlin.math.roundToInt
 
-/** How the reader is arranged for the current device posture (R15.2). */
-sealed interface ReaderLayout {
-    data object Normal : ReaderLayout
-
-    /** Half-opened with a horizontal hinge: article above [hingeTopPx], controls below [hingeBottomPx] (window px). */
-    data class Tabletop(val hingeTopPx: Int, val hingeBottomPx: Int) : ReaderLayout
-}
-
-/**
- * Pure posture decision from the folding feature's facts. Tabletop only for a half-opened,
- * horizontal hinge with a usable position; anything else (flat, folded, vertical hinge, none) is [ReaderLayout.Normal].
- */
-fun readerLayoutFor(
-    halfOpened: Boolean,
-    horizontal: Boolean,
-    hingeTopPx: Int,
-    hingeBottomPx: Int,
-    windowHeightPx: Int = Int.MAX_VALUE,
-): ReaderLayout {
-    if (!halfOpened || !horizontal) return ReaderLayout.Normal
-    if (hingeTopPx <= 0 || hingeBottomPx < hingeTopPx || hingeBottomPx >= windowHeightPx) return ReaderLayout.Normal
-    return ReaderLayout.Tabletop(hingeTopPx, hingeBottomPx)
-}
-
 /** Scrubber value to a reading fraction. */
 fun scrubFraction(value: Float): Float = if (value.isFinite()) value.coerceIn(0f, 1f) else 0f
 

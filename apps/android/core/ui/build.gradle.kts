@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3.adaptive)
 
     testImplementation(libs.junit)
 

@@ -5,9 +5,12 @@ import app.sroka.core.model.LibraryTab
 import app.sroka.feature.library.api.LibraryKey
 import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
+import app.sroka.feature.library.api.TagsKey
 import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.navigation.TopLevelDestination
+import app.sroka.navigation.currentTab
 import app.sroka.navigation.detailPaneItemId
+import app.sroka.navigation.selectedTagName
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -37,7 +40,36 @@ class DetailSelectionTest {
     }
 
     @Test
-    fun readerOverSearchIsNotBesideAList() {
-        assertNull(detailPaneItemId(listOf(root, SearchKey(LibraryTab.MY_LIST), ReaderKey("a")), twoPane = true))
+    fun readerOverSearchIsSelectedInTwoPaneOnly() {
+        val stack = listOf(root, SearchKey(LibraryTab.MY_LIST), ReaderKey("a"))
+        assertEquals("a", detailPaneItemId(stack, twoPane = true))
+        assertNull(detailPaneItemId(stack, twoPane = false))
+    }
+
+    @Test
+    fun selectedTagFollowsTagItemsWithOrWithoutReader() {
+        val tags = listOf(root, TagsKey, TagItemsKey("x"))
+        assertEquals("x", selectedTagName(tags, twoPane = true))
+        assertEquals("x", selectedTagName(tags + ReaderKey("a"), twoPane = true))
+        assertNull(selectedTagName(tags, twoPane = false))
+        assertNull(selectedTagName(listOf(root, TagsKey), twoPane = true))
+    }
+
+    @Test
+    fun currentTabKeepsTheTabBesideTheList() {
+        val search = SearchKey(LibraryTab.ARCHIVE)
+        assertEquals(TopLevelDestination.ARCHIVE, currentTab(listOf(root, search), twoPane = true))
+        assertEquals(TopLevelDestination.ARCHIVE, currentTab(listOf(root, search, ReaderKey("a")), twoPane = true))
+        assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey, TagItemsKey("x")), twoPane = true))
+        assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey, TagItemsKey("x"), ReaderKey("a")), twoPane = true))
+        assertEquals(TopLevelDestination.MY_LIST, currentTab(listOf(root, ReaderKey("a")), twoPane = true))
+        assertEquals(TopLevelDestination.TAGS, currentTab(listOf(root, TagsKey), twoPane = false))
+    }
+
+    @Test
+    fun currentTabIsNullFullScreenOnPhone() {
+        assertNull(currentTab(listOf(root, SearchKey()), twoPane = false))
+        assertNull(currentTab(listOf(root, TagsKey, TagItemsKey("x")), twoPane = false))
+        assertNull(currentTab(listOf(root, ReaderKey("a")), twoPane = false))
     }
 }

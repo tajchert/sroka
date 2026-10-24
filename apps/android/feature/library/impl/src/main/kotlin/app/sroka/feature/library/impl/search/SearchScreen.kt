@@ -1,7 +1,11 @@
 package app.sroka.feature.library.impl.search
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,6 +72,8 @@ fun SearchRoute(
     initialTab: LibraryTab,
     onOpenItem: (String) -> Unit,
     onBack: () -> Unit,
+    selectedItemId: String? = null,
+    twoPane: Boolean = false,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(initialTab) { viewModel.initScope(initialTab) }
@@ -87,6 +93,8 @@ fun SearchRoute(
         onScopeChange = viewModel::onScopeChange,
         onOpenItem = onOpenItem,
         onBack = onBack,
+        selectedItemId = selectedItemId,
+        twoPane = twoPane,
     )
 }
 
@@ -103,19 +111,22 @@ internal fun SearchScreen(
     onScopeChange: (SearchScope) -> Unit,
     onOpenItem: (String) -> Unit,
     onBack: () -> Unit,
+    selectedItemId: String? = null,
+    twoPane: Boolean = false,
 ) {
-    BackHandler(onBack = onBack)
+    // With a reader open beside the results, Back closes the reader first (the nav display handles it).
+    BackHandler(enabled = selectedItemId == null, onBack = onBack)
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     SearchContent(
         query, scope, loaded, itemCount, itemAt, itemKey, resultCount,
-        onQueryChange, onScopeChange, onOpenItem, onBack, focus,
+        onQueryChange, onScopeChange, onOpenItem, onBack, focus, selectedItemId, twoPane,
     )
 }
 
 /** Stateless search screen body (screenshot tests pass fixtures and no focus requester). */
 @Composable
-internal fun SearchContent(
+fun SearchContent(
     query: String,
     scope: SearchScope,
     loaded: Boolean,
@@ -128,6 +139,8 @@ internal fun SearchContent(
     onOpenItem: (String) -> Unit,
     onBack: () -> Unit,
     focus: FocusRequester?,
+    selectedItemId: String? = null,
+    twoPane: Boolean = false,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -187,7 +200,7 @@ internal fun SearchContent(
                     )
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(count = itemCount, key = itemKey) { index ->
-                            itemAt(index)?.let { ResultRow(it, onClick = { onOpenItem(it.summary.id) }) }
+                            itemAt(index)?.let { ResultRow(it, selected = it.summary.id == selectedItemId, rounded = twoPane, onClick = { onOpenItem(it.summary.id) }) }
                         }
                     }
                 }
@@ -231,11 +244,17 @@ private fun Message(title: Int, body: Int?) {
 }
 
 @Composable
-private fun ResultRow(result: SearchResult, onClick: () -> Unit) {
+private fun ResultRow(result: SearchResult, selected: Boolean, rounded: Boolean, onClick: () -> Unit) {
     val summary = result.summary
     val archived = summary.status == ItemStatus.ARCHIVED
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .then(if (rounded) Modifier.padding(horizontal = 8.dp, vertical = 1.dp) else Modifier)
+            .clip(if (rounded) RoundedCornerShape(16.dp) else RectangleShape)
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (rounded) 12.dp else 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(
@@ -244,7 +263,13 @@ private fun ResultRow(result: SearchResult, onClick: () -> Unit) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(summary.displayTitle, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                summary.displayTitle,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else Color.Unspecified,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 "${summary.domain} · ${stringResource(matchLabel(result.matchIn, archived))}",
                 style = MaterialTheme.typography.labelMedium,

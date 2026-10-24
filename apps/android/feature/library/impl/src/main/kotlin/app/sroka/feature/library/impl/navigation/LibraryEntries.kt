@@ -1,25 +1,16 @@
 package app.sroka.feature.library.impl.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
-import app.sroka.core.designsystem.component.DetailPaneCard
 import app.sroka.core.model.LibraryTab
 import app.sroka.feature.library.api.LibraryKey
-import app.sroka.feature.library.impl.R
 import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
 import app.sroka.feature.library.api.TagsKey
+import app.sroka.feature.library.impl.detail.DetailPlaceholder
 import app.sroka.feature.library.impl.list.LibraryListRoute
 import app.sroka.feature.library.impl.list.ListScope
 import app.sroka.feature.library.impl.search.SearchRoute
@@ -36,7 +27,8 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param onOpenSettings open settings
  * @param onCloseTag close the given tag list (and any reader opened from it)
  * @param onOpenSearch open the full-screen search, starting from the given tab
- * @param onCloseSearch leave the search screen
+ * @param onCloseSearch leave the search screen (and any reader opened from it)
+ * @param selectedTag the tag open in the detail pane, or null (two-pane highlight in the Tags list)
  * @param onSignIn the "sign in again" banner action; the app navigates to auth
  * @param selectedItemId the article open in the detail pane, or null (read lazily; two-pane highlight)
  * @param twoPane the list is the left pane of the list-detail layout
@@ -52,7 +44,8 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onCloseTag: (TagItemsKey) -> Unit,
     onSignIn: () -> Unit = {},
     onOpenSearch: (LibraryTab) -> Unit = {},
-    onCloseSearch: () -> Unit = {},
+    onCloseSearch: (SearchKey) -> Unit = {},
+    selectedTag: () -> String? = { null },
     selectedItemId: () -> String? = { null },
     twoPane: Boolean = false,
     navRailShown: Boolean = false,
@@ -60,7 +53,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onAddLinkHandled: () -> Unit = {},
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
-    entry<LibraryKey>(metadata = listPaneMetadata()) { key ->
+    entry<LibraryKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
         LibraryListRoute(
             scope = ListScope.Tab(key.tab),
             onOpenItem = onOpenItem,
@@ -74,41 +67,40 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             onAddLinkHandled = onAddLinkHandled,
         )
     }
-    entry<SearchKey> { key ->
-        SearchRoute(initialTab = key.tab, onOpenItem = onOpenItem, onBack = onCloseSearch)
+    entry<SearchKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
+        SearchRoute(
+            initialTab = key.tab,
+            onOpenItem = onOpenItem,
+            onBack = { onCloseSearch(key) },
+            selectedItemId = selectedItemId(),
+            twoPane = twoPane,
+        )
     }
-    entry<TagsKey> {
-        TagsRoute(onOpenTag = onOpenTag, onOpenSettings = onOpenSettings)
+    entry<TagsKey>(metadata = listPaneMetadata(onOpenItem)) {
+        TagsRoute(
+            onOpenTag = onOpenTag,
+            onOpenSettings = onOpenSettings,
+            selectedTag = selectedTag(),
+            navRailShown = navRailShown,
+        )
     }
-    entry<TagItemsKey>(metadata = listPaneMetadata()) { key ->
+    // Detail pane on wide windows (the opened article covers it); no back arrow beside the tag list.
+    entry<TagItemsKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
         LibraryListRoute(
             scope = ListScope.Tag(key.name),
             onOpenItem = onOpenItem,
             onSignIn = onSignIn,
-            onBack = { onCloseTag(key) },
+            onBack = if (twoPane) null else ({ onCloseTag(key) }),
             selectedItemId = selectedItemId(),
             twoPane = twoPane,
             navRailShown = navRailShown,
+            detailCard = twoPane,
         )
     }
 }
 
 /** List pane role, 360dp wide by default (R13); the app's drag handle can resize it. */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
-private fun listPaneMetadata() =
-    ListDetailSceneStrategy.listPane(detailPlaceholder = { DetailPlaceholder() }) +
+private fun listPaneMetadata(onOpenItem: (String) -> Unit) =
+    ListDetailSceneStrategy.listPane(detailPlaceholder = { DetailPlaceholder(onOpenItem) }) +
         ListDetailSceneStrategy.preferredPaneSize(width = 360.dp)
-
-/** Fills the empty detail pane on wide windows until an article is opened. */
-@Composable
-fun DetailPlaceholder() {
-    DetailPaneCard {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = stringResource(R.string.feature_library_select_article),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}

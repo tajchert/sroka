@@ -7,6 +7,7 @@ import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.PendingChange
 import app.sroka.core.model.SearchResult
+import app.sroka.core.model.TagCount
 
 private const val SavedAt = 1_768_473_000_000L // 2026-01-15T10:30:00Z
 
@@ -64,4 +65,11 @@ internal val sampleSearchResults: List<SearchResult> = listOf(
         sampleItems[7].copy(status = ItemStatus.ARCHIVED), MatchIn.TITLE,
         null, emptyList(),
     ),
+)
+
+internal val sampleTags = listOf(
+    TagCount("design", 4),
+    TagCount("longreads", 12),
+    TagCount("nature", 7),
+    TagCount("tech", 21),
 )

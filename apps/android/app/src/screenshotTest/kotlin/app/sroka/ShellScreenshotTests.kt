@@ -29,10 +29,16 @@ import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.PendingChange
+import app.sroka.core.model.MatchIn
+import app.sroka.core.model.SearchResult
+import app.sroka.core.model.SearchScope
+import app.sroka.core.model.TagCount
+import app.sroka.feature.library.impl.search.SearchContent
+import app.sroka.feature.library.impl.tags.TagsContent
 import app.sroka.feature.library.impl.list.LibraryListContent
 import app.sroka.feature.library.impl.list.LibraryListUiState
 import app.sroka.feature.library.impl.list.ListScope
-import app.sroka.feature.library.impl.navigation.DetailPlaceholder
+import app.sroka.feature.library.impl.detail.DetailPlaceholderContent
 import app.sroka.navigation.PaneDividerHandle
 import app.sroka.navigation.RailDestination
 import app.sroka.navigation.SrokaRail
@@ -72,20 +78,33 @@ private val shellItems = listOf(
 )
 
 @Composable
-private fun ShellFixture(darkTheme: Boolean, detail: @Composable () -> Unit) {
+private fun ShellFixture(
+    darkTheme: Boolean,
+    selectedTab: Int = 0,
+    list: @Composable () -> Unit = { MyListPane() },
+    detail: @Composable () -> Unit,
+) {
     SrokaTheme(darkTheme = darkTheme) {
         Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             SrokaRail(
                 destinations = TopLevelDestination.entries.map {
                     RailDestination(stringResourceFor(it.label), it.unselectedIcon, it.selectedIcon)
                 },
-                selectedIndex = 0,
+                selectedIndex = selectedTab,
                 avatarLetter = "M",
                 onSaveLink = {},
                 onSelect = {},
                 onOpenSettings = {},
             )
-            Box(Modifier.width(360.dp).fillMaxHeight()) {
+            Box(Modifier.width(360.dp).fillMaxHeight()) { list() }
+            Box(Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.Center) { PaneDividerHandle() }
+            Box(Modifier.weight(1f).fillMaxHeight()) { detail() }
+        }
+    }
+}
+
+@Composable
+private fun MyListPane() {
                 LibraryListContent(
                     scope = ListScope.Tab(LibraryTab.MY_LIST),
                     state = LibraryListUiState(email = "magpie@example.com"),
@@ -112,11 +131,6 @@ private fun ShellFixture(darkTheme: Boolean, detail: @Composable () -> Unit) {
                     navRailShown = true,
                 )
             }
-            Box(Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.Center) { PaneDividerHandle() }
-            Box(Modifier.weight(1f).fillMaxHeight()) { detail() }
-        }
-    }
-}
 
 @Composable
 private fun stringResourceFor(id: Int): String = androidx.compose.ui.res.stringResource(id)
@@ -147,7 +161,7 @@ private fun StubArticle() {
 @PreviewTest
 @UnfoldedPreviews
 @Composable
-fun ShellPlaceholderLight() = ShellFixture(darkTheme = false) { DetailPlaceholder() }
+fun ShellPlaceholderLight() = ShellFixture(darkTheme = false) { DetailPlaceholderContent(nextTitle = "How a magpie decides what to collect", onReadNext = {}) }
 
 @PreviewTest
 @UnfoldedPreviews
@@ -157,9 +171,104 @@ fun ShellReaderLight() = ShellFixture(darkTheme = false) { StubArticle() }
 @PreviewTest
 @UnfoldedPreviews
 @Composable
-fun ShellPlaceholderDark() = ShellFixture(darkTheme = true) { DetailPlaceholder() }
+fun ShellPlaceholderDark() = ShellFixture(darkTheme = true) { DetailPlaceholderContent(nextTitle = "How a magpie decides what to collect", onReadNext = {}) }
 
 @PreviewTest
 @UnfoldedPreviews
 @Composable
 fun ShellReaderDark() = ShellFixture(darkTheme = true) { StubArticle() }
+
+@Composable
+private fun SearchPane() {
+    SearchContent(
+        query = "slow web",
+        scope = SearchScope.ALL,
+        loaded = true,
+        itemCount = 2,
+        itemAt = {
+            SearchResult(
+                shellItems[it],
+                MatchIn.TEXT,
+                "Reading later only works when the library stays small enough to trust, like the slow web.",
+                listOf(66..73),
+            )
+        },
+        itemKey = { shellItems[it].id },
+        resultCount = 2,
+        onQueryChange = {},
+        onScopeChange = {},
+        onOpenItem = {},
+        onBack = {},
+        focus = null,
+        selectedItemId = "i2",
+        twoPane = true,
+    )
+}
+
+@Composable
+private fun TagsPane() {
+    TagsContent(
+        tags = listOf(TagCount("design", 4), TagCount("longreads", 12), TagCount("nature", 7), TagCount("tech", 21)),
+        avatar = "M",
+        selectedTag = "nature",
+        navRailShown = true,
+        onOpenTag = {},
+        onOpenSettings = {},
+        onRename = {},
+        onDelete = {},
+    )
+}
+
+@Composable
+private fun TagItemsPane() {
+    DetailPaneCard {
+        LibraryListContent(
+            scope = ListScope.Tag("nature"),
+            state = LibraryListUiState(email = "magpie@example.com"),
+            snackbarHostState = remember { SnackbarHostState() },
+            refreshing = false,
+            onRefresh = {},
+            isEmpty = false,
+            listState = rememberLazyListState(),
+            itemCount = { 2 },
+            itemAt = { shellItems.getOrNull(it) },
+            itemKey = { shellItems[it].id },
+            itemContentType = { "item" },
+            onSortChange = {},
+            onOpenSearch = null,
+            onOpenSettings = null,
+            onBack = null,
+            onSignIn = {},
+            onAddLink = {},
+            onOpenItem = {},
+            onLongClick = {},
+            onArchive = {},
+            selectedItemId = null,
+            twoPane = true,
+            navRailShown = true,
+            detailCard = true,
+        )
+    }
+}
+
+@PreviewTest
+@UnfoldedPreviews
+@Composable
+fun ShellSearchLight() = ShellFixture(darkTheme = false, list = { SearchPane() }) { StubArticle() }
+
+@PreviewTest
+@UnfoldedPreviews
+@Composable
+fun ShellSearchEmptyDetailDark() = ShellFixture(darkTheme = true, list = { SearchPane() }) {
+    DetailPlaceholderContent(nextTitle = null, onReadNext = {})
+}
+
+@PreviewTest
+@UnfoldedPreviews
+@Composable
+fun ShellTagsDark() = ShellFixture(darkTheme = true, selectedTab = 3, list = { TagsPane() }) { TagItemsPane() }
+
+@PreviewTest
+@UnfoldedPreviews
+@Composable
+fun ShellTagsLight() = ShellFixture(darkTheme = false, selectedTab = 3, list = { TagsPane() }) { TagItemsPane() }

@@ -19,10 +19,10 @@
 
 ## CPU / memory notes
 - The whole PDF is loaded (`arrayBuffer`, up to 50 MiB) and pdf.js holds parsed structures: a 50 MiB PDF can approach the 128 MB isolate limit. An OOM kills the isolate -> queue retry -> eventually DLQ -> `failed`; the item stays readable. Not load-tested with real large files.
-- Extraction is CPU-bound (~0.7 s for a 1-page fixture incl. pdf.js init in the test pool). 300 text-heavy pages may exceed the default 30 s CPU limit on Workers Paid defaults? (limit is configurable via `limits.cpu_ms` in wrangler.jsonc if it shows up in `parse` logs as `durationMs`). Jobs run sequentially in a batch.
+- Extraction is CPU-bound (~0.7 s for a 1-page fixture incl. pdf.js init in the test pool). 300 text-heavy pages may exceed the default 30 s CPU limit (default CPU limit 30 s on paid; the limit is configurable via `limits.cpu_ms` in wrangler.jsonc if it shows up in `parse` logs as `durationMs`). Jobs run sequentially in a batch.
 - pdf.js drops text positioned outside the page box, so fixtures must keep lines short.
 
 ## Open items
 - API branch: markParsed for pdf items must accept `contentId === items.content_id`, not delete the dir, and handle `failed pdf_missing`; `parse_attempts.method` comment in `workers/api/src/db/schema.ts` should list `pdf` (not touched here; ownership).
 - Consider `limits.cpu_ms` and a size guard (e.g. skip extraction above ~40 MiB with `pdf_extract_failed`) after real-world measurement.
-- Bundle size with unpdf was not checked against the Workers size limit beyond the dry run (see commit notes if it printed).
+- Bundle: `wrangler deploy --dry-run` = 4249 KiB / 958 KiB gzip (under the 3 MiB gzip free limit; fine on paid).

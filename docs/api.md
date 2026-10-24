@@ -103,7 +103,10 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
   "lastReadAt": 1760400802000,
   "source": "extension",
   "tags": ["birds", "science"],
-  "seq": 18410
+  "seq": 18410,
+  "kind": "article",
+  "fileName": null,
+  "fileSize": null
 }
 ```
 
@@ -116,6 +119,7 @@ Body: `{"error": "<code>", "message"?: "<human text>", "issues"?: [{path, messag
 - `source`: `share|extension|web|import|email|api` or null.
 - `tags`: names, sorted case-insensitively.
 - `seq`: last change sequence (section 7).
+- `kind`: `article` (default; every pre-v4 item) | `pdf` (uploaded file, §5.8). `fileName` / `fileSize` (bytes): original name and size of an uploaded PDF, else `null`. A `pdf` item has `url = {APP_ORIGIN}/pdf/{sha256hex}` (hash of the file bytes; the dedupe key), `siteName:"PDF"`, `contentPrivate:true` and a `contentId` from the moment it exists, so **it is readable while `parseStatus` is still `pending`**; clients must not wait for parsing. Parsing only fills title/author/lang/excerpt/word count; extraction problems are `parseStatus:"ok"` with `parseError` = `pdf_no_text` | `pdf_encrypted` | `pdf_extract_failed`.
 
 ### 4.2 Tag
 
@@ -149,6 +153,16 @@ Request `CreateItemRequest`:
 - Errors: 400 `invalid_url`, 400 `invalid_request`, 413.
 - **Waiting for parse** (applies to 5.1, 5.6 and a `409 not_parsed` from 5.7): while `parseStatus === "pending"`, clients poll `GET /v1/items/:id` with backoff 2 s, 4 s, 8 s, … capped at 30 s, giving up after 5 min (show "still processing"). When `parseStatus` leaves `pending` and `contentId` is non-null → call `/content`. On `failed` → show `parseError` and offer Refresh / Open original. (Sync clients simply see the updated row in their next pull.)
 
+### 5.8 `POST /v1/items/pdf` — upload a PDF
+Body = the raw file bytes (`Content-Type: application/pdf`; `application/octet-stream` is tolerated, the magic bytes decide). `Content-Length` is required. Query: `name` (original file name, required; trimmed, control characters removed, truncated to 255 chars keeping a trailing `.pdf`), `tag` (repeatable), `source` (`ItemSource`, default `api`; web sends `web`, Android `share`).
+- Errors: `411 length_required` (no/invalid `Content-Length`), `413 payload_too_large` (> 50 MiB: checked on the header before reading and again while streaming), `415 unsupported_media_type` (other content type, or no `%PDF-` within the first 1024 bytes), `400 invalid_request` (missing `name`, bad `tag`/`source`, body shorter/longer than `Content-Length`), `409 storage_full` (sum of live PDF `fileSize` + this file > 2 GiB), `401`.
+- Flow: the body is streamed to R2 `private/{userId}/{contentId}/document.pdf` (`contentType application/pdf`) while its SHA-256 is computed (never buffered), then one DO call `addPdf` decides in a single transaction: (1) a live item with the same url hash exists: it is re-added like `item.add` `onDuplicate:"readd"` (tags unioned, `savedAt` bumped, back to `unread`) and returned with `created:false`; (2) quota exceeded: `storage_full`; (3) else a new item is inserted exactly like `item.add` plus `kind:"pdf"`, `fileName`, `fileSize`, `contentId`, `contentPrivate:true`, `siteName:"PDF"`, provisional title = file name without `.pdf`, `parseStatus:"pending"`, and a `ParseJob` with `pdf` is enqueued (§9; over the parse budget the sweep sends it later). The uploaded R2 object is deleted on every outcome except "created" (duplicate, quota, error).
+- `202 {"item": Item, "created": boolean}` (`CreateItemResponse`).
+- `item.add` ops never create PDFs; all other ops (status, favorite, tags, title, progress, delete) work unchanged on PDF items. `item.delete` removes the private content dir, i.e. the file.
+
+### `GET /pdf/:sha256` (app host)
+`/pdf/{sha256hex}` is the item URL of an uploaded PDF, made a working "open original" link: with a session (cookie or bearer) and a live PDF item of that hash: `302` to its signed `document.pdf` URL (§10); no session: `302 /app/`; unknown or malformed hash, or not owned: `404`. `Cache-Control: private, no-store`. `/pdf/*` reaches the Worker before static assets (`run_worker_first`).
+
 ### 5.2 `GET /v1/items` — list / search / lookup
 Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`), `tag`, `q`, `sort` (`newest`*default*|`oldest`|`shortest`|`longest`), `domain`, `url`, `cursor`, `limit` (1–100, default 30).
 
@@ -174,7 +188,7 @@ Response `200 {"item": Item}` (after applying). `404` unknown/deleted; `400 inva
 Op `item.delete`. `204` (no body). `404` if unknown or already deleted.
 
 ### 5.6 `POST /v1/items/:id/refresh`
-Op `item.refresh` (sets `parseStatus:"pending"`, bumps `parse_gen`, enqueues `ParseJob{userId,itemId,url,force:true,parseGen}`; the URL is refetched publicly — previously captured HTML is not reused). `202 {"item": Item}`. `404`.
+Op `item.refresh` (for an item of `kind:"pdf"` see §9: extraction is re-run from the stored file and the URL is never fetched; otherwise sets `parseStatus:"pending"`, bumps `parse_gen`, enqueues `ParseJob{userId,itemId,url,force:true,parseGen}`; the URL is refetched publicly — previously captured HTML is not reused). `202 {"item": Item}`. `404`.
 
 ### 5.7 `GET /v1/items/:id/content`
 `200 ContentUrlsResponse`:
@@ -182,8 +196,10 @@ Op `item.refresh` (sets `parseStatus:"pending"`, bumps `parse_gen`, enqueues `Pa
 {"articleUrl":"https://c.sroka.app/s/1760486400/Zm9v…/p/0192f3c4-…/article.html",
  "baseUrl":"https://c.sroka.app/s/1760486400/Zm9v…/p/0192f3c4-…/",
  "packageUrl":"https://c.sroka.app/s/1760486400/Zm9v…/p/0192f3c4-…/package.zip",
+ "documentUrl":null,
  "expiresAt":1760486400000}
 ```
+`documentUrl` is the signed `…/document.pdf` for items of `kind:"pdf"` (their `articleUrl`/`packageUrl` keep the shape but 404), `null` for articles.
 Scope `p` when `contentPrivate=false`, `u.{userId}` otherwise. `409 {"error":"not_parsed"}` when `contentId` is null (pending/failed). `404` unknown/deleted.
 Web reader (D7): `fetch(articleUrl)` → text → `<iframe sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" srcdoc>` (never `allow-same-origin`) with injected, in `<head>`:
 - `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {CONTENT_ORIGIN} data:; style-src 'unsafe-inline'; script-src 'nonce-{nonce}'">` — `{CONTENT_ORIGIN}` must be explicit: the srcdoc document has an opaque origin, so `'self'` would block every image.
@@ -305,9 +321,10 @@ All tag lookups use `name_key = tagKey(name)` (never SQLite `NOCASE`, which fold
 
 ## 9. Parse pipeline interface (api ↔ parser)
 
-- Queue `sroka-parse` message = `ParseJob` (parse.ts): `{userId, itemId, url, rawKey?, force?, parseGen}`. Producer: `env.PARSE_QUEUE.send(job)` / `sendBatch`.
+- Queue `sroka-parse` message = `ParseJob` (parse.ts): `{userId, itemId, url, rawKey?, force?, pdf?: {contentId}, parseGen}`. Producer: `env.PARSE_QUEUE.send(job)` / `sendBatch`.
 - **Generations:** the DO increments `items.parse_gen` on every enqueue (new `item.add`, failed-duplicate re-add, html save, `item.refresh`) and sets `parse_status=pending`; jobs come from the DO (`applyOps` → `parseJobs`, or DO RPC `requestParse(itemId, {rawKey?, force?}) → ParseJob | null` used by the html save path). `markParsed` returns `{ok:false}` and changes nothing when `result.parseGen !== items.parse_gen` (a newer job is in flight or finished) **or the item is no longer `pending`** (a result for this gen was already applied: duplicate delivery, or a DLQ `failed` after a committed success). The alarm sweep re-sends stuck `pending` jobs **with the same gen** (it does not bump `parse_gen`, so a still-queued original stays valid). The parser calls DO RPC `parseWanted(itemId, parseGen) → boolean` before fetching and again before writing R2, and drops the job when it is false.
 - **Parse budget (per user):** jobs returned by `applyOps` / `requestParse` pass a DO token bucket (1000 burst, refilled 1000/hour). Over-budget jobs are not returned; their items stay `pending` (marked for the sweep, `parse_requested_at = 0`) and the DO alarm sends them within the budget every ~10 min. `item.refresh` on an item already `pending` for < 10 min is an applied no-op (no new job).
+- **PDF jobs (decisions D12):** a job with `pdf` belongs to an uploaded PDF whose original is already at `private/{userId}/{pdf.contentId}/document.pdf`; the parser only extracts metadata/text from it and never fetches `url`. Jobs come from the upload (§5.8), `item.refresh` (`{…, force:true, pdf}`; an applied no-op for a pdf item without content id; the 10-minute refresh coalescing applies) and the stale-pending sweep, which re-derives `pdf` from `kind` + `content_id`. `markParsed` for a pdf item: ok/partial are accepted only with `contentId === items.content_id` and `contentPrivate:true` (else `{ok:false}`), update metadata (a parsed title replaces the stored one only when non-null; a user title still wins) and never delete the content dir (same content id = no content change); a `failed` result records only `parse_status`/`parse_error`, so the item stays readable.
 - **R2 cleanup:** `item.delete` deletes the item's captured HTML (`parse_raw_key`) and its private content dir; a parse request without the stored raw key (refresh) deletes the raw capture; `markParsed` deletes the item's previous private content dir when the content changes. The parser deletes the private dir it wrote when `markParsed` returns `ok:false`. A destroyed library (account deletion) is tombstoned: every RPC refuses to recreate it (`markParsed`/`parseWanted` → false), and the parser's weekly cron deletes `private/`, `raw/`, `uploads/` prefixes of user ids no longer in D1.
 - **Content references / GC (shared `content/{id}/`, decisions D6):**
   - Invariant: content referenced by a live item (`content_id = id AND content_private = 0 AND deleted_at IS NULL`) is never deleted. A `failed` re-parse keeps the old content referenced; tombstoned items reference nothing (no undelete exists; re-saving a URL creates a new item, which attaches again).
@@ -338,7 +355,8 @@ URL: `{CONTENT_ORIGIN}/s/{exp}/{sig}/{scope}/{contentId}/{file}`
 - Build with `buildContentUrls` / `buildContentUrl`; verify with `verifyContentPath(secret, pathname)` → `{ok, r2Key, isPrivate, …}`. Pass `new URL(req.url).pathname` **unmodified**; never `decodeURIComponent` it first (`%2F` would become a separator and enable traversal — encoded forms are rejected as malformed).
 
 Route (content host only): `GET`/`HEAD` only (else `405`). Malformed → `403 forbidden message:malformed`; bad signature → `403 bad_signature`; expired → `403 expired`; R2 miss → `404`. Success headers:
-- `Content-Type` by extension: `.html` `text/html; charset=utf-8`, `.txt` `text/plain; charset=utf-8`, `.webp` `image/webp`, `.zip` `application/zip`, `.json` `application/json`, else R2 `httpMetadata.contentType` or `application/octet-stream`.
+- `Content-Type` by extension: `.html` `text/html; charset=utf-8`, `.txt` `text/plain; charset=utf-8`, `.webp` `image/webp`, `.zip` `application/zip`, `.json` `application/json`, `.pdf` `application/pdf`, else R2 `httpMetadata.contentType` or `application/octet-stream`.
+- `.pdf` additionally: `Content-Type: application/pdf`, `Content-Disposition: inline; filename="document.pdf"`, and the CSP is `default-src 'none'; object-src 'none'; frame-ancestors 'none'` instead of the HTML CSP (no `sandbox`, which would stop Chrome's built-in PDF viewer when the signed URL is opened directly: "Open in new tab", `/pdf/:sha256`). **Needs a Chrome check**; if Chrome still refuses to render, loosen only as far as needed and update this line (the content host has no cookies and serves the file inert under `nosniff`). The web reader does not depend on it (blob URL).
 - `Access-Control-Allow-Origin`: the request `Origin` if it equals `APP_ORIGIN` or is in `DEV_ORIGINS`, else omitted; always `Vary: Origin`. `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox`.
 - Public: `Cache-Control: public, max-age=86400, immutable`. Private: `Cache-Control: private, no-store`.
 - `ETag` from R2; honour `If-None-Match` (304) where cheap. `Content-Length` set.
@@ -400,6 +418,7 @@ Direct download (no job in this build). All live items, newest first, streamed o
 | search `q` | ≤200 chars |
 | `html` in save | 5 MiB (body 6 MiB) |
 | import file | 20 MiB, 50 000 rows |
+| PDF upload | 50 MiB per file; 2 GiB total `fileSize` of live PDF items per user; file name 255 chars |
 | clock skew clamp | now + 5 min |
 | tombstone retention | 180 days |
 | applied_ops retention | 30 days |
@@ -416,9 +435,9 @@ Rate limits (clients must handle `429` with backoff: `Retry-After` on `/v1`, `X-
   - `applied_ops(device_id TEXT, op_id TEXT, applied_at INTEGER, alias TEXT, PRIMARY KEY(device_id, op_id))`, pruned after 30 days.
   - `item_aliases(client_id TEXT PRIMARY KEY, target_id TEXT NOT NULL)` — never pruned (one small row per duplicate add); deleted with the library.
   - `tag_renames(from_key TEXT PRIMARY KEY, to_tag_id TEXT NOT NULL, at INTEGER NOT NULL)` — purged with tombstones (180 days).
-  - `items_fts` regular FTS5 (§8.5). `meta` keys `seq`, `tombstone_horizon`. Migrations: append-only steps, version in a one-row `_schema(id=1, version)` table (DO SQLite rejects `PRAGMA user_version` with SQLITE_AUTH). Schema v2 adds `items.tombstoned_at`, `tags.tombstoned_at`, `tag_renames.recorded_at` (server time; used for 180-day purging — `deleted_at` stays the client stamp for LWW/stale-op checks) and `items.parse_requested_at`, `items.parse_raw_key` (stale-pending sweep). Schema v3 adds `content_ref_outbox(content_id TEXT PRIMARY KEY, gen INTEGER NOT NULL)` and index `items_content` (§9 "Content references / GC").
+  - `items_fts` regular FTS5 (§8.5). `meta` keys `seq`, `tombstone_horizon`. Migrations: append-only steps, version in a one-row `_schema(id=1, version)` table (DO SQLite rejects `PRAGMA user_version` with SQLITE_AUTH). Schema v2 adds `items.tombstoned_at`, `tags.tombstoned_at`, `tag_renames.recorded_at` (server time; used for 180-day purging — `deleted_at` stays the client stamp for LWW/stale-op checks) and `items.parse_requested_at`, `items.parse_raw_key` (stale-pending sweep). Schema v4 adds `items.kind TEXT NOT NULL DEFAULT 'article'`, `items.file_name`, `items.file_size` (+ partial index `items_pdf`). Schema v3 adds `content_ref_outbox(content_id TEXT PRIMARY KEY, gen INTEGER NOT NULL)` and index `items_content` (§9 "Content references / GC").
 - **D1** `jobs` = design §7.2 plus `format TEXT`, `skipped INTEGER NOT NULL DEFAULT 0`. `content` = design §7.2 plus `cacheable INTEGER NOT NULL DEFAULT 1`, `last_used_at INTEGER NOT NULL` (ms; GC grace start), `gc_at INTEGER` (GC in progress); `ref_count` is a cache of COUNT(`content_refs`). `content_refs(content_id, user_id, at, PRIMARY KEY(content_id, user_id))` (index on `user_id`), `gc_state(k PRIMARY KEY, v)` (migration 0002). Migration 0003: `parse_attempts(id PK (UUIDv7), created_at ms, user_hash (sha256(userId) hex prefix 16), item_id, domain, url (canonical; NULL for captured/private), status, error_code, error_detail (≤300), method, fallback_outcome, http_status, text_chars, word_count, images, duration_ms, render_ms, attempt, parser_version, rule_applied 0/1)` with indexes `(created_at)`, `(domain, created_at)`, `(status, created_at)`; `render_budget(key PK, count, expires_at)` (index `expires_at`; keys `u:{userHash}:{utcDay}`, `g:{utcDay}`), same fixed-window pattern as `auth_throttle`.
-- DO public RPC surface used by others: `applyOps(deviceId, ops: Op[]) → {response: PushResponse, parseJobs: ParseJob[]}`, `requestParse(itemId, {rawKey?, force?}) → ParseJob | null`, `pull(cursor, limit) → {ok:true, data: PullResponse} | {ok:false, error:"resync_required"}` (wrapped so the 410 case crosses RPC without throwing; lead image URLs signed in the DO with env secrets), `markParsed(itemId, ParseResult) → {ok}`, `destroy()` (deletes the alarm, then `deleteAll()`, then the user's D1 `content_refs`). Maintenance RPCs: `reemitContentRefs() → {refs, pending}` (GC backfill, §9), `scheduleParseSweep()` (called by the API when a queue send fails 3×; moves the alarm ~31 min out) and `sweepStalePending(now?)` (the alarm re-enqueues items `pending` > 30 min with a bumped `parseGen`, reusing the saved raw key). List/get/tags/suggestions/`stats()` (for `/v1/me`)/export helpers are internal to `workers/api`.
+- DO public RPC surface used by others: `applyOps(deviceId, ops: Op[]) → {response: PushResponse, parseJobs: ParseJob[]}`, `requestParse(itemId, {rawKey?, force?}) → ParseJob | null`, `pull(cursor, limit) → {ok:true, data: PullResponse} | {ok:false, error:"resync_required"}` (wrapped so the 410 case crosses RPC without throwing; lead image URLs signed in the DO with env secrets), `markParsed(itemId, ParseResult) → {ok}`, `addPdf(deviceId, {itemId,url,title,fileName,fileSize,contentId,tags,source,at}) → {ok:true,item,created,parseJobs} | {ok:false,error}` (PDF upload commit, §5.8), `destroy()` (deletes the alarm, then `deleteAll()`, then the user's D1 `content_refs`). Maintenance RPCs: `reemitContentRefs() → {refs, pending}` (GC backfill, §9), `scheduleParseSweep()` (called by the API when a queue send fails 3×; moves the alarm ~31 min out) and `sweepStalePending(now?)` (the alarm re-enqueues items `pending` > 30 min with a bumped `parseGen`, reusing the saved raw key). List/get/tags/suggestions/`stats()` (for `/v1/me`)/export helpers are internal to `workers/api`.
 
 ## 16. Admin (D10)
 

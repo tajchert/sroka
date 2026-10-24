@@ -36,8 +36,11 @@ export function csvRow(i: ExportItem): string {
   );
 }
 
-export function exportJsonItem(i: ExportItem): ExportJson["items"][number] {
+export function exportJsonItem(i: ExportItem): ExportJson["items"][number] & Pick<ExportItem, "kind" | "fileName" | "fileSize"> {
   return {
+    kind: i.kind,
+    fileName: i.fileName,
+    fileSize: i.fileSize,
     url: i.url,
     title: i.title,
     status: i.status,

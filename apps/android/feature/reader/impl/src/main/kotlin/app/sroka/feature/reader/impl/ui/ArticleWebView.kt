@@ -59,6 +59,8 @@ internal fun ArticleWebView(
     onProgress: (ProgressReport) -> Unit,
     onLinkClick: (String) -> Unit,
     onRendererGone: () -> Unit,
+    /** Vertical scroll delta in px (positive = content moved up, i.e. the user scrolled down). */
+    onScrollDelta: (Float) -> Unit = {},
     scrollToTopSignal: Int = 0,
     /** `ReaderHtml.headerScript(..)` for the current header, or empty; pushed without reloading the page. */
     headerScript: String = "",
@@ -68,6 +70,7 @@ internal fun ArticleWebView(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOnLink by rememberUpdatedState(onLinkClick)
+    val currentOnScrollDelta by rememberUpdatedState(onScrollDelta)
     val currentOnRendererGone by rememberUpdatedState(onRendererGone)
     val state = remember { WebState() }
     val webViewRef = remember { arrayOfNulls<WebView>(1) }
@@ -98,7 +101,9 @@ internal fun ArticleWebView(
                 webViewRef[0] = this
                 setBackgroundColor(theme.backgroundArgb)
                 configure()
-                isNestedScrollingEnabled = true // drives the collapsing app bar through Compose interop
+                setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                    currentOnScrollDelta((scrollY - oldScrollY).toFloat())
+                }
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                         assetLoader.shouldInterceptRequest(request.url)

@@ -36,10 +36,11 @@ class ReaderViewModelTest {
     private val library = FakeLibraryRepository()
     private val content = FakeContentStore()
     private val sync = FakeSyncStatusRepository()
+    private val syncController = app.sroka.core.testing.fake.FakeSyncController()
     private var clock = 10_000L
 
     private fun vm(): ReaderViewModel {
-        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository(), sync, CoroutineScope(dispatcher))
+        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository(), sync, syncController, CoroutineScope(dispatcher))
         vm.nowMillis = { clock }
         return vm
     }
@@ -284,6 +285,21 @@ class ReaderViewModelTest {
         setParse(ParseStatus.OK)
         assertEquals(false, vm.refreshing.value)
         assertEquals(listOf<ReaderEvent>(ReaderEvent.RefreshSettled(ParseStatus.OK)), events)
+    }
+
+    @Test
+    fun refreshRequestsSyncPeriodicallyUntilSettled() = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        vm.collectEvents(mutableListOf(), backgroundScope)
+        vm.refresh()
+        assertEquals(0, syncController.syncRequests)
+        dispatcher.scheduler.advanceTimeBy(8_100)
+        assertEquals(2, syncController.syncRequests)
+        setParse(ParseStatus.OK)
+        dispatcher.scheduler.advanceTimeBy(20_000)
+        assertEquals(2, syncController.syncRequests)
     }
 
     @Test

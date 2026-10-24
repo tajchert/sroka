@@ -117,8 +117,8 @@ fun LibraryListRoute(
     val resources = LocalResources.current
     var pulled by rememberSaveable { mutableStateOf(false) }
     var showAdd by rememberSaveable { mutableStateOf(false) }
-    var editTagsFor by remember { mutableStateOf<String?>(null) }
-    var confirmDeleteFor by remember { mutableStateOf<String?>(null) }
+    var editTagsFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
+    var confirmDeleteFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -246,35 +246,34 @@ fun LibraryListRoute(
             onDismiss = viewModel::dismissActions,
             onToggleFavorite = { viewModel.toggleFavorite(item.id, item.isFavorite) },
             onToggleArchive = { viewModel.toggleArchive(item.id, item.status) },
-            onEditTags = { editTagsFor = item.id },
+            // A second sheet/dialog replaces the actions sheet instead of stacking under it.
+            onEditTags = { editTagsFor = item; viewModel.dismissActions() },
             onRefresh = { viewModel.refresh(item.id) },
-            onDelete = { confirmDeleteFor = item.id },
+            onDelete = { confirmDeleteFor = item; viewModel.dismissActions() },
         )
-        if (editTagsFor == item.id) {
-            EditTagsSheet(
-                initialTags = item.tags,
-                suggestions = recentTags,
-                onSave = {
-                    viewModel.setTags(item.id, it)
-                    editTagsFor = null
-                    viewModel.dismissActions()
-                },
-                onDismiss = { editTagsFor = null },
-            )
-        }
-        if (confirmDeleteFor == item.id) {
-            ConfirmDialog(
-                title = stringResource(R.string.feature_library_delete_title),
-                body = stringResource(R.string.feature_library_delete_body),
-                confirmLabel = stringResource(R.string.feature_library_action_delete),
-                onConfirm = {
-                    viewModel.delete(item.id)
-                    confirmDeleteFor = null
-                    viewModel.dismissActions()
-                },
-                onDismiss = { confirmDeleteFor = null },
-            )
-        }
+    }
+    editTagsFor?.let { item ->
+        EditTagsSheet(
+            initialTags = item.tags,
+            suggestions = recentTags,
+            onSave = {
+                viewModel.setTags(item.id, it)
+                editTagsFor = null
+            },
+            onDismiss = { editTagsFor = null },
+        )
+    }
+    confirmDeleteFor?.let { item ->
+        ConfirmDialog(
+            title = stringResource(R.string.feature_library_delete_title),
+            body = stringResource(R.string.feature_library_delete_body),
+            confirmLabel = stringResource(R.string.feature_library_action_delete),
+            onConfirm = {
+                viewModel.delete(item.id)
+                confirmDeleteFor = null
+            },
+            onDismiss = { confirmDeleteFor = null },
+        )
     }
     if (showAdd) {
         AddUrlDialog(onSubmit = viewModel::addLink, onDismiss = { showAdd = false })

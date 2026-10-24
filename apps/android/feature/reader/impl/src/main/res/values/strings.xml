@@ -28,7 +28,7 @@
     <string name="feature_reader_refresh_failed">Couldn\u2019t refresh the article</string>
     <string name="feature_reader_continued">Continued from where you left off</string>
     <string name="feature_reader_start_over">Start over</string>
-    <string name="feature_reader_min_read_prefix">%1$d min read \u00b7 </string>
+    <string name="feature_reader_min_read_prefix">"%1$d min read \u00b7 "</string>
     <string name="feature_reader_partial_warning">Only part of this page was saved</string>
     <string name="feature_reader_downloading">Downloading article…</string>
     <string name="feature_reader_not_downloaded_offline_title">Not saved for offline reading</string>

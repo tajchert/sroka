@@ -14,6 +14,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.sroka.core.data.sync.SyncWork
+import app.sroka.core.domain.SyncController
+import app.sroka.core.model.JobStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -32,6 +34,7 @@ class ImportProgressWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val tracker: ImportTracker,
     private val store: ImportJobStore,
+    private val syncController: SyncController,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
@@ -48,6 +51,8 @@ class ImportProgressWorker @AssistedInject constructor(
                 if (job.status.isFinished) {
                     ImportNotifications.cancelProgress(applicationContext)
                     ImportNotifications.showResult(applicationContext, job)
+                    // Imported links exist on the server now: pull them instead of waiting for a later sync.
+                    if (job.status == JobStatus.DONE) syncController.requestSync()
                 } else {
                     ImportNotifications.updateProgress(applicationContext, job)
                 }

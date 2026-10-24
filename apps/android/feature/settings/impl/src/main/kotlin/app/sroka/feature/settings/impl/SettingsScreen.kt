@@ -45,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -384,8 +385,13 @@ private fun DeleteAccountDialog(email: String?, onConfirm: () -> Unit, onDismiss
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = isDeleteConfirmed(typed, email)) {
-                Text(stringResource(R.string.feature_settings_delete_confirm), color = MaterialTheme.colorScheme.error)
+            val error = MaterialTheme.colorScheme.error
+            TextButton(
+                onClick = onConfirm,
+                enabled = isDeleteConfirmed(typed, email),
+                colors = ButtonDefaults.textButtonColors(contentColor = error, disabledContentColor = error.copy(alpha = 0.38f)),
+            ) {
+                Text(stringResource(R.string.feature_settings_delete_confirm))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.feature_settings_cancel)) } },

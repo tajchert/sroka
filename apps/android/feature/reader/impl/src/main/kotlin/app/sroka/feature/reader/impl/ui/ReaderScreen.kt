@@ -61,7 +61,6 @@ import app.sroka.core.model.ParseStatus
 import app.sroka.feature.reader.impl.ReaderEvent
 import app.sroka.feature.reader.impl.ReaderHeader
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -174,7 +173,6 @@ internal fun ReaderScreen(
     item?.parseStatus?.takeIf { it != ParseStatus.PENDING }?.let { settledPartial[0] = it == ParseStatus.PARTIAL }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             Column {
@@ -302,6 +300,11 @@ internal fun ReaderScreen(
                         theme = theme,
                         textScale = prefs.readerTextScale,
                         onProgress = viewModel::onProgress,
+                        onScrollDelta = { dy ->
+                            // enterAlways: scrolling down hides the bar, scrolling up shows it.
+                            val st = scrollBehavior.state
+                            if (st.heightOffsetLimit > -1e6f) st.heightOffset = (st.heightOffset - dy).coerceIn(st.heightOffsetLimit, 0f)
+                        },
                         onLinkClick = { openExternalLink(context, it) },
                         onRendererGone = { rendererGone = true },
                         scrollToTopSignal = scrollTopSignal,

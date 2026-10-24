@@ -57,7 +57,7 @@ internal fun selectStatusCard(status: SyncStatus, needsSignIn: Boolean): StatusC
         needsSignIn -> StatusCard.SignIn
         phase is SyncPhase.Resyncing -> StatusCard.Resync(phase.fraction)
         phase is SyncPhase.Offline -> StatusCard.Offline(status.pendingOps)
-        phase is SyncPhase.Downloading -> StatusCard.Downloading(phase.done, phase.total)
+        phase is SyncPhase.Downloading && phase.total > 0 && phase.done < phase.total -> StatusCard.Downloading(phase.done, phase.total)
         else -> null
     }
 }

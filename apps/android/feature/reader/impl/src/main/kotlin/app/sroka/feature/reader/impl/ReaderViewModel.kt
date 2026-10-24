@@ -8,6 +8,7 @@ import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.domain.SettingsRepository
+import app.sroka.core.domain.SyncController
 import app.sroka.core.domain.SyncStatusRepository
 import app.sroka.core.domain.TagRepository
 import app.sroka.core.model.Item
@@ -85,6 +86,7 @@ class ReaderViewModel @AssistedInject constructor(
     private val settings: SettingsRepository,
     tagRepository: TagRepository,
     syncStatus: SyncStatusRepository,
+    private val syncController: SyncController,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -315,7 +317,13 @@ class ReaderViewModel @AssistedInject constructor(
         refreshPhase.value = if (alreadyPending) RefreshPhase.PENDING else RefreshPhase.REQUESTED
         refreshTimeout?.cancel()
         refreshTimeout = viewModelScope.launch {
-            delay(REFRESH_TIMEOUT_MS)
+            // The server re-parses in seconds but the app only learns through a pull: poll until settled.
+            var waited = 0L
+            while (waited < REFRESH_TIMEOUT_MS) {
+                delay(REFRESH_POLL_MS)
+                waited += REFRESH_POLL_MS
+                syncController.requestSync()
+            }
             refreshPhase.value = RefreshPhase.NONE // gave up waiting; no result to announce
         }
         viewModelScope.launch { library.refresh(itemId) }
@@ -356,6 +364,7 @@ class ReaderViewModel @AssistedInject constructor(
         const val SAVE_INTERVAL_MS = 2_000L
         const val RECENT_TAGS = 8
         const val REFRESH_TIMEOUT_MS = 90_000L
+        const val REFRESH_POLL_MS = 4_000L
         const val RESUME_THRESHOLD = 0.02f
     }
 }

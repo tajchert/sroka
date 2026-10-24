@@ -1,7 +1,9 @@
 package app.sroka.core.designsystem.component
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,6 +19,9 @@ fun SrokaMark(modifier: Modifier = Modifier, size: Dp = 64.dp) {
     Image(
         painter = painterResource(R.drawable.ic_sroka_mark),
         contentDescription = null,
-        modifier = modifier.size(size).clip(CircleShape),
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
     )
 }

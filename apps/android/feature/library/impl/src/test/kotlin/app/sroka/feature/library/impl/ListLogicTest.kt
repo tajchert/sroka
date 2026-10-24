@@ -51,6 +51,8 @@ class ListLogicTest {
         assertEquals(StatusCard.Resync(0.5f), card(SyncPhase.Resyncing(0.5f)))
         assertEquals(StatusCard.Offline(3), card(SyncPhase.Offline, pending = 3))
         assertEquals(StatusCard.Downloading(3, 12), card(SyncPhase.Downloading(3, 12, null)))
+        assertEquals(null, card(SyncPhase.Downloading(0, 0, null)))
+        assertEquals(null, card(SyncPhase.Downloading(12, 12, null)))
         assertNull(card(SyncPhase.Idle))
         assertNull(card(SyncPhase.Syncing))
         assertEquals(StatusCard.SignIn, card(SyncPhase.Offline, signIn = true))

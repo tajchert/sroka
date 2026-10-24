@@ -101,6 +101,16 @@ class PdfReaderTest {
     }
 
     @Test
+    fun rapidPageChangesAreEachPersistedWithoutThrottle() = runTest(dispatcher) {
+        content.pdfFiles.value = mapOf(id to file)
+        val vm = vm().also { it.collect(backgroundScope) }
+        vm.onPdfPage(page = 1, pageCount = 7)
+        vm.onPdfPage(page = 5, pageCount = 7)
+        assertEquals(5, library.items.value.single().progressAnchor)
+        assertEquals(6f / 7f, library.items.value.single().progress, 0.0001f)
+    }
+
+    @Test
     fun savedAnchorIsTheRestorePoint() = runTest(dispatcher) {
         library.items.value = listOf(item.copy(progress = 0.5f, progressAnchor = 4))
         content.pdfFiles.value = mapOf(id to file)

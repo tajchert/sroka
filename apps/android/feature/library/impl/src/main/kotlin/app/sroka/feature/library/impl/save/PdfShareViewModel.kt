@@ -21,6 +21,12 @@ sealed interface PdfShareState {
     /** [count] files were accepted and upload in the background. */
     data class Queued(val count: Int) : PdfShareState
 
+    /** The server answered for every queued file and at least one was already in the library. */
+    data class Duplicate(val count: Int) : PdfShareState
+
+    /** The server answered for every queued file; all are new. */
+    data class Saved(val count: Int) : PdfShareState
+
     /** Every file was rejected on the device; [error] is the first reason. */
     data class Failed(val error: PdfUploadError) : PdfShareState
 
@@ -60,6 +66,20 @@ class PdfShareViewModel @Inject constructor(
             } else {
                 PdfShareState.Queued(result.size - failed.size)
             }
+            val ids = result.filter { it.state !is PdfUploadState.Failed }.map { it.id }.toSet()
+            if (ids.isNotEmpty()) watchOutcome(ids)
         }
+    }
+
+    /** Moves Queued to Saved / Duplicate once every accepted upload has finished on the server. */
+    private suspend fun watchOutcome(ids: Set<String>) {
+        val done = uploader.uploads.first { list ->
+            val mine = list.filter { it.id in ids }
+            mine.size == ids.size && mine.none { it.isActive }
+        }.filter { it.id in ids }
+        val finished = done.filter { it.state is PdfUploadState.Done }
+        if (finished.isEmpty()) return
+        val dup = finished.count { (it.state as PdfUploadState.Done).duplicate }
+        _state.value = if (dup > 0) PdfShareState.Duplicate(dup) else PdfShareState.Saved(finished.size)
     }
 }

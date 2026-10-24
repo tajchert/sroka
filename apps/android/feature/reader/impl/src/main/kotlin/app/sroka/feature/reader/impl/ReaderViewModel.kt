@@ -251,7 +251,15 @@ class ReaderViewModel @AssistedInject constructor(
     fun onPdfPage(page: Int, pageCount: Int) {
         if (pageCount <= 0) return
         val index = page.coerceIn(0, pageCount - 1)
-        onProgress(ProgressReport(pdfProgress(index, pageCount), index))
+        if (!ready) return
+        // Page changes are discrete and rare: write at once (no 2 s throttle), so a force-stop right after a scroll keeps the page.
+        val report = ProgressReport(pdfProgress(index, pageCount), index)
+        if (report == reported) return
+        reported = report
+        _progress.value = report.progress
+        unsaved = false
+        lastSavedAt = nowMillis()
+        viewModelScope.launch { library.setProgress(itemId, report.progress, report.anchor) }
     }
 
     private suspend fun kotlinx.coroutines.flow.FlowCollector<ReaderUiState>.emitReady(html: String) {

@@ -22,9 +22,9 @@ export interface AttemptReport {
 
 export async function reportParse(env: ParserEnv, r: AttemptReport): Promise<void> {
   const { job, result, stats } = r;
-  const domain = displayDomain(job.url) || "unknown";
-  const source = r.source ?? (job.rawKey ? "capture" : job.force ? "refresh" : "fetch");
-  const method = stats.method ?? (job.rawKey ? "capture" : "fetch");
+  const domain = job.pdf ? "pdf" : displayDomain(job.url) || "unknown";
+  const source = r.source ?? (job.pdf ? "pdf" : job.rawKey ? "capture" : job.force ? "refresh" : "fetch");
+  const method = stats.method ?? (job.pdf ? "pdf" : job.rawKey ? "capture" : "fetch");
   const fallbackOutcome = stats.fallbackOutcome ?? "none";
   const ruleApplied = !!stats.ruleApplied;
   const level = result.status === "failed" ? "warn" : "info";
@@ -57,7 +57,7 @@ export async function reportParse(env: ParserEnv, r: AttemptReport): Promise<voi
   });
 
   let url: string | null = null;
-  if (!job.rawKey && !result.contentPrivate) {
+  if (!job.rawKey && !job.pdf && !result.contentPrivate) {
     try {
       url = normalizeUrl(job.url);
     } catch {

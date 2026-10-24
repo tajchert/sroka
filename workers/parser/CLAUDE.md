@@ -16,6 +16,11 @@ Runs `@sroka/extractor`, writes R2 (`CONTENT`), D1 `content` cache rows (`DB`), 
 - Tests stub `globalThis.fetch` and override `IMAGES`/`LIBRARY` (and `BROWSER`/`METRICS` mocks in `test/render-rules.test.ts`; KV rules use the real miniflare `CONFIG`) in env; `vitest.config.ts` sets `BROWSER_RENDER_ENABLED=false` by default; `vitest.config.ts` pre-bundles sanitize-html/postcss (CJS) for workerd.
   `test/d1.ts` applies the real `../api/migrations`; `test/content-gc.test.ts` runs refs + GC end to end against the real LibraryDO.
 
+## PDF jobs (`ParseJob.pdf`, spec docs/superpowers/specs/2026-10-24-pdf-upload-design.md)
+`src/pdf.ts` (unpdf 1.9.1, pinned; runs in workerd) + `src/pdf-text.ts` (pure helpers). Reads `private/{userId}/{contentId}/document.pdf`, caps 300 pages / 2 MB text, writes `text.txt`,
+answers `ok` (+ `pdf_no_text|pdf_encrypted|pdf_extract_failed`); missing object = `failed pdf_missing`; R2 read errors retry. Never fetches the URL, no `content` row,
+`parse_attempts.method='pdf'`, url NULL. On `markParsed` ok:false only `text.txt` is deleted (never `document.pdf`). Tests: `test/pdf*.test.ts` (fixture builder `test/pdf-fixture.ts`).
+
 ## Shared-content GC (api.md §9 "Content references / GC", decisions D6)
 LibraryDOs report public content references to D1 `content_refs` (outbox, at-least-once). The cron deletes `content` rows +
 `content/{id}/` with no refs and `last_used_at` older than 30 days (≤200 rows / ~20k R2 objects per run, `gc summary` log line).

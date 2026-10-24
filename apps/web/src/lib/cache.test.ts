@@ -41,3 +41,18 @@ describe("cache helpers", () => {
     expect(ids(unread)).toEqual([]);
   });
 });
+
+describe("promoteItem", () => {
+  it("moves an existing item to the top and caches it", async () => {
+    const { promoteItem } = await import("./cache.ts");
+    const { QueryClient } = await import("@tanstack/react-query");
+    const qc = new QueryClient();
+    const mk = (id: string) => ({ ...placeholderItem("https://x.test/" + id), id });
+    const params = { state: "unread", sort: "newest" } as const;
+    qc.setQueryData(["items", params], { pageParams: [undefined], pages: [{ items: [mk("a"), mk("b")], nextCursor: null }] });
+    promoteItem(qc, mk("b"));
+    const d = qc.getQueryData<{ pages: { items: { id: string }[] }[] }>(["items", params])!;
+    expect(d.pages[0]!.items.map((i) => i.id)).toEqual(["b", "a"]);
+    expect(qc.getQueryData(["item", "b"])).toBeTruthy();
+  });
+});

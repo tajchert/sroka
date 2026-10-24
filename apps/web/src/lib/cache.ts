@@ -99,7 +99,19 @@ export function placeholderItem(url: string): Item {
     archivedAt: null,
     lastReadAt: null,
     source: "web",
+    kind: "article",
+    fileName: null,
+    fileSize: null,
     tags: [],
     seq: 0,
   };
+}
+
+/** Put an uploaded item at the top of the lists it belongs in (re-added duplicates move up). */
+export function promoteItem(qc: QueryClient, item: Item): void {
+  for (const [key, data] of qc.getQueriesData<ItemsData>({ queryKey: ["items"] })) {
+    if (data) qc.setQueryData<ItemsData>(key, mapPages(data, (items) => items.filter((i) => i.id !== item.id)));
+  }
+  prependItem(qc, item);
+  qc.setQueryData(["item", item.id], item);
 }

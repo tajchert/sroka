@@ -5,7 +5,7 @@ import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
 import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
 
-export const itemTitle = (i: Item) => i.title || i.siteName || hostOf(i.canonicalUrl || i.url);
+export const itemTitle = (i: Item) => i.title || i.fileName || i.siteName || hostOf(i.canonicalUrl || i.url);
 export function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");

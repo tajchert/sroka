@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block" rel="stylesheet">
+<style>body{margin:0;background:#ebe9e4;font-family:Outfit,Helvetica,sans-serif;color:#15171c}a{color:#1e6f8f}a:hover{color:#15171c}</style>
+</helmet>
+<div style="padding:56px 56px 16px;display:flex;flex-direction:column;gap:12px;max-width:920px">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="width:52px;height:52px;border-radius:50%;overflow:hidden;flex:none"><svg viewBox="0 0 100 100" width="52" height="52" style="display:block"><rect width="100" height="100" fill="#ffffff"></rect><path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c"></path><polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"></polygon><polygon points="69,27 83,33 69,39" fill="#f2c84b"></polygon><circle cx="58" cy="32" r="4" fill="#ffffff"></circle></svg></div>
+    <div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">Sroka for Android · Material 3</div>
+  </div>
+  <div style="font-size:48px;font-weight:800;letter-spacing:-.02em">Android app</div>
+  <div style="font-size:17px;line-height:1.5;color:#5d5f66;text-wrap:pretty">Built from Material 3 components: top app bars, search bar, list items, navigation bar and rail, FAB, chips, sheets, menus, dialogs, switches and progress indicators. They're themed with Sroka's dark palette (blue primary, yellow tertiary) and Outfit mapped onto the M3 type scale. Custom components appear only where M3 has nothing that fits.</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:13px;align-items:center">
+    <span style="padding:3px 10px;border-radius:6px;background:#dcdad4;color:#3a3c42">M3 component</span>
+    <span style="padding:2px 10px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Custom component</span>
+    <span style="background:#f2c84b;color:#15171c;font-weight:600;padding:3px 10px;border-radius:999px">New on Android</span>
+  </div>
+</div>
+
+<section style="padding:40px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">1 · Sign in</div><div style="font-size:34px;font-weight:800">Emailed one-time code</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="01 Sign in" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="flex:1;padding:64px 24px 0;display:flex;flex-direction:column;gap:32px">
+          <div style="width:64px;height:64px;border-radius:50%;overflow:hidden"><svg viewBox="0 0 100 100" width="64" height="64" style="display:block"><rect width="100" height="100" fill="#ffffff"></rect><path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c"></path><polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"></polygon><polygon points="69,27 83,33 69,39" fill="#f2c84b"></polygon><circle cx="58" cy="32" r="4" fill="#ffffff"></circle></svg></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:32px;font-weight:600;letter-spacing:-.01em;line-height:1.2">Sign in to Sroka</div>
+            <div style="font-size:16px;line-height:1.5;color:#a5a8ae">We’ll email you a 6-digit code. No password needed.</div>
+          </div>
+          <div style="position:relative;height:56px;box-sizing:border-box;border-radius:4px;border:2px solid #7cc0da;padding:0 14px;display:flex;align-items:center;font-size:16px">
+            <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#15171c;font-size:12px;color:#7cc0da">Email</div>
+            mtajchert@gmail.com<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
+          </div>
+          <div style="height:48px;border-radius:24px;background:#7cc0da;color:#06323f;font-size:15px;font-weight:500;display:flex;align-items:center;justify-content:center">Send code</div>
+          <div style="flex:1"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:12px 24px 16px;border-top:1px solid #2c3038">
+          <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">dns</span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:16px">Server</span><span style="font-size:14px;color:#a5a8ae">sroka.app</span></div>
+          <span style="font-size:14px;font-weight:500;color:#7cc0da">Change</span>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">01</div><div style="font-size:18px;font-weight:600">Email</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">The server picker sits at the bottom so self-hosters can switch before signing in.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined text field</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Filled button</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List item</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="02 Code" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;padding:0 4px;flex:none"><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div></div>
+        <div style="padding:8px 24px 0;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:28px;font-weight:600;line-height:1.2">Check your inbox</div>
+            <div style="font-size:16px;line-height:1.5;color:#a5a8ae">Enter the code sent to <span style="color:#f1efe9;font-weight:500">mtajchert@gmail.com</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">
+            <sc-for list="{{ otp }}" as="b" hint-placeholder-count="6">
+              <div style="height:56px;box-sizing:border-box;border-radius:12px;border:{{ b.border }};background:{{ b.bg }};display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500">{{ b.d }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px;margin-left:-12px">
+            <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Resend code</div>
+            <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Use another email</div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="background:#1f2228;padding:8px 6px 4px">
+          <div style="display:flex;justify-content:center;padding:4px 0 10px"><div style="height:32px;padding:0 14px;border-radius:8px;background:#2f333b;display:flex;align-items:center;gap:8px;font-size:14px"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#a5a8ae">mail</span>From Gmail: <b style="font-weight:600;letter-spacing:.1em">482915</b></div></div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+            <sc-for list="{{ keys }}" as="k" hint-placeholder-count="12">
+              <div style="height:48px;border-radius:24px;background:{{ k.bg }};display:flex;align-items:center;justify-content:center;font-size:22px">{{ k.k }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none;background:#1f2228"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">02</div><div style="font-size:18px;font-weight:600">Code</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">One-time-code autofill offers the code from the keyboard. Sign-in runs on the sixth digit, so there's no button to press.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">OTP input</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Text buttons</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Autofill (system)</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">2 · Library &amp; sync</div><div style="font-size:34px;font-weight:800">Stored on the phone, synced when it can</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="03 My List" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="margin:8px 16px;height:56px;border-radius:28px;background:#262a31;display:flex;align-items:center;gap:16px;padding:0 12px 0 16px;flex:none">
+          <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">search</span>
+          <span style="flex:1;font-size:16px;color:#a5a8ae">Search My List</span>
+          <div style="width:32px;height:32px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">M</div>
+        </div>
+        <div style="margin:4px 16px 8px;background:#1b1e23;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;flex:none">
+          <div style="display:flex;align-items:center;gap:12px;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#7cc0da">download</span><span style="flex:1">Downloading for offline</span><span style="color:#a5a8ae;font-weight:400">18 of 24</span></div>
+          <div style="display:flex;gap:4px;height:4px"><div style="width:75%;background:#7cc0da;border-radius:2px"></div><div style="flex:1;background:#1d3a47;border-radius:2px;position:relative"><div style="position:absolute;right:0;top:0;width:4px;height:4px;border-radius:2px;background:#7cc0da"></div></div></div>
+        </div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ lib }}" as="it" hint-placeholder-count="5">
+            <div style="position:relative;background:{{ it.under }}">
+              <sc-if value="{{ it.swiping }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;right:20px;top:0;bottom:0;display:flex;align-items:center;gap:8px;color:#06323f;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">archive</span>Archive</div></sc-if>
+              <div style="display:flex;gap:16px;padding:12px 16px;background:#15171c;transform:translateX({{ it.tx }});position:relative">
+                <div style="width:56px;height:56px;border-radius:8px;flex:none;background:{{ it.thumbBg }};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#7cc0da">{{ it.letter }}</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:16px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ it.title }}</div>
+                  <div style="font-size:14px;color:#a5a8ae">{{ it.sub }}</div>
+                  <sc-if value="{{ it.hasStatus }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:{{ it.sColor }};margin-top:2px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;font-variation-settings:'FILL' 1">{{ it.sIcon }}</span>{{ it.status }}</div></sc-if>
+                </div>
+                <sc-if value="{{ it.fav }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#f2c84b;font-variation-settings:'FILL' 1">star</span></sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;right:16px;bottom:120px;height:56px;padding:0 20px 0 16px;border-radius:16px;background:#1e6f8f;color:#f6f5f1;display:flex;align-items:center;gap:12px;font-size:16px;font-weight:500;box-shadow:0 4px 10px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.3)"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">add</span>Save link</div>
+        <div style="height:80px;background:#1f2228;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding-top:12px;box-sizing:border-box;flex:none">
+          <sc-for list="{{ navList }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:64px;height:32px;border-radius:16px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ n.color }};font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></div><div style="font-size:12px;font-weight:{{ n.weight }};color:{{ n.color }}">{{ n.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none;background:#1f2228"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">03</div><div style="font-size:18px;font-weight:600">My List</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">The download card sits above the list and collapses when it finishes. Swipe a row to archive it (the third row is mid-swipe). The avatar opens Settings.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Search bar</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List items</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Swipe to dismiss</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Extended FAB</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Navigation bar</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Download card</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="04 Offline queue" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_off</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi_off</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="margin:8px 16px;height:56px;border-radius:28px;background:#262a31;display:flex;align-items:center;gap:16px;padding:0 12px 0 16px;flex:none">
+          <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">search</span>
+          <span style="flex:1;font-size:16px;color:#a5a8ae">Search My List</span>
+          <div style="width:32px;height:32px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">M</div>
+        </div>
+        <div style="margin:4px 16px 8px;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:16px;background:#2a2619;color:#e8cf86;font-size:14px;flex:none">
+          <span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1">cloud_off</span>
+          <span style="flex:1">Offline. 3 changes will sync later.</span>
+        </div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ off }}" as="it" hint-placeholder-count="5">
+            <div style="display:flex;gap:16px;padding:12px 16px">
+              <div style="width:56px;height:56px;border-radius:8px;flex:none;background:{{ it.thumbBg }};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#7cc0da">{{ it.letter }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ it.title }}</div>
+                <div style="font-size:14px;color:#a5a8ae">{{ it.sub }}</div>
+                <sc-if value="{{ it.hasStatus }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:{{ it.sColor }};margin-top:2px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;font-variation-settings:'FILL' 1">{{ it.sIcon }}</span>{{ it.status }}</div></sc-if>
+              </div>
+              <sc-if value="{{ it.fav }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#f2c84b;font-variation-settings:'FILL' 1">star</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;left:12px;right:12px;bottom:116px;min-height:48px;background:#f1efe9;color:#2a2e35;border-radius:4px;padding:0 8px 0 16px;display:flex;align-items:center;gap:8px;font-size:14px;box-shadow:0 4px 10px rgba(0,0,0,.35)"><span style="flex:1">Archived. Syncs when you’re online.</span><span style="color:#1e6f8f;font-weight:500;padding:10px 12px">Undo</span></div>
+        <div style="height:80px;background:#1f2228;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding-top:12px;box-sizing:border-box;flex:none">
+          <sc-for list="{{ navList }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:64px;height:32px;border-radius:16px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ n.color }};font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></div><div style="font-size:12px;font-weight:{{ n.weight }};color:{{ n.color }}">{{ n.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none;background:#1f2228"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">04</div><div style="font-size:18px;font-weight:600">Offline, changes queued</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Everything still works offline. Rows with a pending change show a yellow "waiting" line that clears once the change reaches the server.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Snackbar with action</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List items</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Offline status card</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="05 Full resync" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="margin:8px 16px;height:56px;border-radius:28px;background:#262a31;display:flex;align-items:center;gap:16px;padding:0 12px 0 16px;flex:none">
+          <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">search</span>
+          <span style="flex:1;font-size:16px;color:#a5a8ae">Search My List</span>
+          <div style="width:32px;height:32px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">M</div>
+        </div>
+        <div style="margin:4px 16px 8px;background:#1e6f8f;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;flex:none;color:#f6f5f1">
+          <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">sync</span><div style="font-size:16px;font-weight:500;flex:1">Catching up</div><span style="font-size:14px">52%</span></div>
+          <div style="font-size:14px;line-height:1.45;color:#e4eef2;text-wrap:pretty">It’s been a while, so Sroka is re-syncing your whole library. You can keep reading, and nothing you change will be lost.</div>
+          <div style="display:flex;gap:4px;height:4px"><div style="width:52%;background:#f2c84b;border-radius:2px"></div><div style="flex:1;background:rgba(246,245,241,.25);border-radius:2px;position:relative"><div style="position:absolute;right:0;top:0;width:4px;height:4px;border-radius:2px;background:#f2c84b"></div></div></div>
+        </div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ resync }}" as="it" hint-placeholder-count="4">
+            <div style="display:flex;gap:16px;padding:12px 16px">
+              <div style="width:56px;height:56px;border-radius:8px;flex:none;background:{{ it.thumbBg }};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#7cc0da">{{ it.letter }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ it.title }}</div>
+                <div style="font-size:14px;color:#a5a8ae">{{ it.sub }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:80px;background:#1f2228;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding-top:12px;box-sizing:border-box;flex:none">
+          <sc-for list="{{ navList }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:64px;height:32px;border-radius:16px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ n.color }};font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></div><div style="font-size:12px;font-weight:{{ n.weight }};color:{{ n.color }}">{{ n.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none;background:#1f2228"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">05</div><div style="font-size:18px;font-weight:600">Full resync</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Appears only when the phone falls too far behind the server. Routine pulls stay silent, apart from the standard pull-to-refresh indicator.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Resync card</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Linear progress</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Pull to refresh</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="06 Search" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#1f2228;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:72px;display:flex;align-items:center;gap:4px;padding:0 4px;flex:none;border-bottom:1px solid #3a3f48">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div>
+          <div style="flex:1;font-size:16px;display:flex;align-items:center">fire escape<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">close</span></div>
+        </div>
+        <div style="display:flex;gap:8px;padding:12px 16px;flex:none">
+          <sc-for list="{{ searchChips }}" as="c" hint-placeholder-count="3">
+            <div style="height:32px;padding:0 12px 0 {{ c.pl }};border-radius:8px;box-sizing:border-box;border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }};font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px"><sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">check</span></sc-if>{{ c.t }}</div>
+          </sc-for>
+        </div>
+        <div style="padding:4px 16px 4px;font-size:14px;font-weight:500;color:#7cc0da;flex:none">3 results, searched on this phone</div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ results }}" as="r" hint-placeholder-count="3">
+            <div style="padding:12px 16px;display:flex;gap:16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae;flex:none">{{ r.icon }}</span>
+              <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                <div style="font-size:16px;font-weight:500;line-height:1.35">{{ r.title }}</div>
+                <div style="font-size:12px;color:#a5a8ae">{{ r.domain }} · {{ r.where }}</div>
+                <div style="font-size:14px;line-height:1.5;color:#a5a8ae">{{ r.pre }}<span style="background:#3a3220;color:#f2c84b;border-radius:3px;padding:0 2px">{{ r.m }}</span>{{ r.post }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">06</div><div style="font-size:18px;font-weight:600">Full-text search</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">The search bar expands into a full-screen search view. Body matches show a highlighted snippet, and search works offline.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Search view</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Filter chips</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List items</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Match highlight</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">3 · Saving</div><div style="font-size:34px;font-weight:800">From Android’s share sheet</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="07 Shared, saved" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#f6f5f1;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;flex:none"></div>
+        <div style="margin:4px 12px;height:44px;border-radius:22px;background:#e3e1dc;flex:none"></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+          <div style="height:22px;width:80%;background:#d6d3cc;border-radius:4px"></div>
+          <div style="height:160px;border-radius:10px;background:repeating-linear-gradient(135deg,#e3e1dc 0 6px,#dad7d0 6px 12px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8d8a83">browser page</div>
+          <div style="height:10px;background:#e3e1dc;border-radius:3px"></div><div style="height:10px;width:90%;background:#e3e1dc;border-radius:3px"></div>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.32)"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#1b1e23;border-radius:28px 28px 0 0;display:flex;flex-direction:column">
+          <div style="height:36px;display:flex;align-items:center;justify-content:center"><div style="width:32px;height:4px;border-radius:2px;background:#6b7079"></div></div>
+          <div style="padding:0 24px 8px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="width:40px;height:40px;border-radius:50%;background:#1e6f8f;display:flex;align-items:center;justify-content:center;flex:none"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#f6f5f1">check</span></div>
+              <div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:22px;font-weight:500">Saved to Sroka</div><div style="font-size:14px;color:#a5a8ae">Downloading for offline…</div></div>
+            </div>
+            <div style="border:1px solid #3a3f48;border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center">
+              <div style="width:56px;height:56px;border-radius:8px;background:repeating-linear-gradient(135deg,#1d3a47 0 6px,#22485a 6px 12px);flex:none"></div>
+              <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><div style="font-size:16px;font-weight:500;line-height:1.3">The slow art of reading on the internet</div><div style="font-size:14px;color:#a5a8ae">longreads.example · 9 min</div></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="height:32px;padding:0 16px 0 8px;border-radius:8px;border:1px solid #6b7079;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#7cc0da">new_label</span>Add tags</div>
+              <div style="height:32px;padding:0 16px 0 8px;border-radius:8px;border:1px solid #6b7079;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#7cc0da">star</span>Favourite</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+              <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Open Sroka</div>
+              <div style="height:40px;padding:0 24px;border-radius:20px;background:#7cc0da;color:#06323f;display:flex;align-items:center;font-size:14px;font-weight:500">Done</div>
+            </div>
+          </div>
+          <div style="height:24px;display:flex;align-items:center;justify-content:center"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">07</div><div style="font-size:18px;font-weight:600">Saved</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">A translucent share target opens a bottom sheet over the app you shared from, so you never leave that app. It closes itself after 4 s if you don't touch it.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Modal bottom sheet</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined card</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Assist chips</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Text + filled button</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="08 Already in Sroka" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#f6f5f1;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;flex:none"></div>
+        <div style="margin:4px 12px;height:44px;border-radius:22px;background:#e3e1dc;flex:none"></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+          <div style="height:22px;width:70%;background:#d6d3cc;border-radius:4px"></div>
+          <div style="height:160px;border-radius:10px;background:repeating-linear-gradient(135deg,#e3e1dc 0 6px,#dad7d0 6px 12px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8d8a83">browser page</div>
+          <div style="height:10px;background:#e3e1dc;border-radius:3px"></div><div style="height:10px;width:85%;background:#e3e1dc;border-radius:3px"></div>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.32)"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#1b1e23;border-radius:28px 28px 0 0;display:flex;flex-direction:column">
+          <div style="height:36px;display:flex;align-items:center;justify-content:center"><div style="width:32px;height:4px;border-radius:2px;background:#6b7079"></div></div>
+          <div style="padding:0 24px 8px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="width:40px;height:40px;border-radius:50%;background:#2f333b;display:flex;align-items:center;justify-content:center;flex:none"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#f1efe9;font-variation-settings:'FILL' 1">bookmark_added</span></div>
+              <div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:22px;font-weight:500">Already in Sroka</div><div style="font-size:14px;color:#a5a8ae">Saved 12 Oct · in My List</div></div>
+            </div>
+            <div style="border:1px solid #3a3f48;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="width:56px;height:56px;border-radius:8px;background:repeating-linear-gradient(135deg,#2a2e35 0 6px,#30343c 6px 12px);flex:none"></div>
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><div style="font-size:16px;font-weight:500;line-height:1.3">Whatever Happened to Fire Escapes?</div><div style="font-size:14px;color:#a5a8ae">42% read · 6 min left</div></div>
+              </div>
+              <div style="display:flex;gap:4px;height:4px"><div style="width:42%;background:#f2c84b;border-radius:2px"></div><div style="flex:1;background:#2f333b;border-radius:2px"></div></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+              <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Close</div>
+              <div style="height:40px;padding:0 24px;border-radius:20px;background:#7cc0da;color:#06323f;display:flex;align-items:center;font-size:14px;font-weight:500">Continue reading</div>
+            </div>
+          </div>
+          <div style="height:24px;display:flex;align-items:center;justify-content:center"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">08</div><div style="font-size:18px;font-weight:600">Already in Sroka</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Uses a neutral icon instead of blue, because nothing new was saved. It offers to pick up where you stopped.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Modal bottom sheet</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined card</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Read progress</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">4 · Reading</div><div style="font-size:34px;font-weight:800">Reader, with progress synced between devices</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="09 Reader" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;padding:0 4px;flex:none">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div>
+          <div style="flex:1"></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">star</span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">archive</span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">more_vert</span></div>
+        </div>
+        <div style="height:3px;background:#262a31;flex:none"><div style="width:42%;height:100%;background:#f2c84b"></div></div>
+        <div style="flex:1;overflow:hidden;padding:20px 24px 0;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:14px;font-weight:500;color:#7cc0da">practical.engineering</div>
+          <div style="font-size:28px;font-weight:600;line-height:1.2">Whatever Happened to Fire Escapes?</div>
+          <div style="font-size:14px;color:#a5a8ae">11 min read · 42%</div>
+          <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">…which is why the stairs outside became the cheap, visible answer. Bolting iron to a facade was faster than rebuilding a stair core, and for a few decades every city tried it.</div>
+          <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">The trouble showed up in maintenance. Ironwork that nobody uses for years rusts quietly, and the first real test is often the worst possible moment to find out.</div>
+          <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">Modern codes moved the escape route back inside.</div>
+        </div>
+        <div style="position:absolute;left:12px;right:12px;bottom:36px;min-height:48px;background:#f1efe9;color:#2a2e35;border-radius:4px;padding:0 8px 0 16px;display:flex;align-items:center;gap:8px;font-size:14px;box-shadow:0 4px 10px rgba(0,0,0,.35)"><span style="flex:1">Continued from where you left off on web</span><span style="color:#1e6f8f;font-weight:500;padding:10px 12px">Start over</span></div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">09</div><div style="font-size:18px;font-weight:600">Reader</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">A yellow progress line runs under the app bar. Opening the article on another device jumps to the synced position, with a snackbar action to start over. The app bar hides as you scroll.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Top app bar</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Icon buttons</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Snackbar</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Reading progress line</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="10 Reader menu" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;padding:0 4px;flex:none">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div>
+          <div style="flex:1"></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">star</span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">archive</span></div>
+          <div style="width:48px;height:48px;border-radius:50%;background:#2f333b;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">more_vert</span></div>
+        </div>
+        <div style="height:3px;background:#262a31;flex:none"><div style="width:8%;height:100%;background:#f2c84b"></div></div>
+        <div style="flex:1;overflow:hidden;padding:20px 24px 0;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:14px;font-weight:500;color:#7cc0da">nber.org</div>
+          <div style="font-size:28px;font-weight:600;line-height:1.2">Meetings</div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#e8cf86"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">warning</span>Only part of this page was saved</div>
+          <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">Founded in 1920, the NBER is a private, non-profit, non-partisan organization dedicated to conducting economic research…</div>
+        </div>
+        <div style="position:absolute;top:104px;right:8px;width:216px;background:#1f2228;border-radius:4px;padding:8px 0;box-shadow:0 4px 12px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3)">
+          <sc-for list="{{ menu }}" as="m" hint-placeholder-count="6">
+            <sc-if value="{{ m.divider }}" hint-placeholder-val="{{ false }}"><div style="height:1px;background:#3a3f48;margin:8px 0"></div></sc-if>
+            <div style="height:48px;display:flex;align-items:center;gap:12px;padding:0 12px;background:{{ m.bg }}">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ m.iconColor }}">{{ m.icon }}</span>
+              <div style="font-size:14px;font-weight:500;color:{{ m.color }}">{{ m.t }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">10</div><div style="font-size:18px;font-weight:600">Overflow · Refresh</div><span style="background:#f2c84b;color:#15171c;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px">New on Android</span></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">“Refresh article” re-fetches and re-parses the page, which matters most for Partial saves like this one. While it runs, a linear progress bar sits under the app bar and a snackbar confirms the result. It's disabled when offline.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Menu</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Divider</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Snackbar</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">5 · Organising</div><div style="font-size:34px;font-weight:800">Archive, favourites and tags</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="11 Edit tags" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;flex:none"></div>
+        <div style="padding:84px 24px 0;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:14px;color:#7cc0da">longreads.example</div>
+          <div style="font-size:28px;font-weight:600;line-height:1.2">The slow art of reading on the internet</div>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.4)"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#1b1e23;border-radius:28px 28px 0 0;display:flex;flex-direction:column">
+          <div style="height:36px;display:flex;align-items:center;justify-content:center"><div style="width:32px;height:4px;border-radius:2px;background:#6b7079"></div></div>
+          <div style="padding:0 24px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="font-size:22px;font-weight:500">Tags</div>
+            <div style="position:relative;min-height:56px;box-sizing:border-box;border-radius:4px;border:2px solid #7cc0da;padding:10px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+              <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#1b1e23;font-size:12px;color:#7cc0da">Add a tag</div>
+              <sc-for list="{{ draft }}" as="d" hint-placeholder-count="2">
+                <div style="height:32px;box-sizing:border-box;padding:0 8px 0 12px;border-radius:8px;background:#1d3a47;color:#9fd0e3;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500">{{ d }}<span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">close</span></div>
+              </sc-for>
+              <span style="font-size:16px;display:flex;align-items:center">wee<span style="width:2px;height:20px;background:#7cc0da;margin-left:1px"></span></span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <div style="height:32px;padding:0 16px 0 8px;border-radius:8px;border:1px solid #6b7079;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1;color:#7cc0da">add</span>Create “wee”</div>
+              <div style="height:32px;padding:0 16px;border-radius:8px;border:1px solid #6b7079;display:flex;align-items:center;font-size:14px;font-weight:500;color:#c8cacf">weekend</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Cancel</div>
+              <div style="height:40px;padding:0 24px;border-radius:20px;background:#7cc0da;color:#06323f;display:flex;align-items:center;font-size:14px;font-weight:500">Save</div>
+            </div>
+          </div>
+          <div style="background:#1f2228;padding:8px 4px 0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:center;gap:24px;font-size:15px;color:#c8cacf;padding:4px 0 2px"><span>weekend</span><span style="color:#4a4f58">|</span><span>week</span><span style="color:#4a4f58">|</span><span>weekly</span></div>
+            <div style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px">
+              <sc-for list="{{ qwerty }}" as="k" hint-placeholder-count="26">
+                <div style="height:44px;border-radius:6px;background:#2f333b;display:flex;align-items:center;justify-content:center;font-size:18px;color:#e4e2dc">{{ k }}</div>
+              </sc-for>
+            </div>
+            <div style="height:24px;display:flex;align-items:center;justify-content:center"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">11</div><div style="font-size:18px;font-weight:600">Edit tags</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Input chips sit inside the text field, with suggestions underneath. Favourite and archive are icon buttons in the reader, or a swipe on the list.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Modal bottom sheet</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Input chips</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Suggestion chips</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined text field</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="12 Tags" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;flex:none">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">search</span></div>
+          <div style="width:32px;height:32px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:4px">M</div>
+        </div>
+        <div style="padding:8px 16px 16px;font-size:32px;font-weight:500;flex:none">Tags</div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ tagList }}" as="t" hint-placeholder-count="6">
+            <div style="height:56px;display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">label</span>
+              <div style="flex:1;font-size:16px">{{ t.t }}</div>
+              <div style="font-size:12px;font-weight:500;color:#a5a8ae">{{ t.n }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:80px;background:#1f2228;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding-top:12px;box-sizing:border-box;flex:none">
+          <sc-for list="{{ navTags }}" as="n" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:64px;height:32px;border-radius:16px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ n.color }};font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></div><div style="font-size:12px;font-weight:{{ n.weight }};color:{{ n.color }}">{{ n.label }}</div></div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none;background:#1f2228"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">12</div><div style="font-size:18px;font-weight:600">Tag list</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Each tag shows its article count. Tap to open a filtered list; long-press to rename or delete.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Large top app bar</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List items</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Navigation bar</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 8px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">6 · Settings &amp; your data</div><div style="font-size:34px;font-weight:800">Settings, import and export</div></div>
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <div data-screen-label="13 Settings" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;gap:4px;padding:0 4px;flex:none"><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div><div style="font-size:22px">Settings</div></div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ settings }}" as="r" hint-placeholder-count="8">
+            <sc-if value="{{ r.header }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 16px 4px 56px;font-size:14px;font-weight:500;color:#7cc0da">{{ r.header }}</div></sc-if>
+            <div style="min-height:{{ r.h }};display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ r.iconColor }}">{{ r.icon }}</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:16px;color:{{ r.color }}">{{ r.t }}</div><sc-if value="{{ r.sub }}" hint-placeholder-val="{{ true }}"><div style="font-size:14px;color:#a5a8ae">{{ r.sub }}</div></sc-if></div>
+              <sc-if value="{{ r.isNew }}" hint-placeholder-val="{{ false }}"><span style="background:#f2c84b;color:#15171c;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px">NEW</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">13</div><div style="font-size:18px;font-weight:600">Settings</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Laid out like the Pixel Settings app. Theme and text size open single-choice dialogs. Import is the last item under Library, since it's rarely used. (The NEW badges are annotations, not shipped UI.)</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Top app bar</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List items</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Section headers</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="14 Delete account" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;gap:4px;padding:0 4px;flex:none"><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div><div style="font-size:22px">Settings</div></div>
+        <div style="flex:1;overflow:hidden">
+          <sc-for list="{{ settings }}" as="r" hint-placeholder-count="8">
+            <sc-if value="{{ r.header }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 16px 4px 56px;font-size:14px;font-weight:500;color:#7cc0da">{{ r.header }}</div></sc-if>
+            <div style="min-height:{{ r.h }};display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ r.iconColor }}">{{ r.icon }}</span>
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:16px;color:{{ r.color }}">{{ r.t }}</div><sc-if value="{{ r.sub }}" hint-placeholder-val="{{ true }}"><div style="font-size:14px;color:#a5a8ae">{{ r.sub }}</div></sc-if></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:0 24px">
+          <div style="background:#262a31;border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box">
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#f08f7f;align-self:center">delete_forever</span>
+            <div style="font-size:24px;text-align:center">Delete your account?</div>
+            <div style="font-size:14px;line-height:1.5;color:#a5a8ae;text-wrap:pretty">This permanently deletes your library, tags and reading progress on every device. Export first if you want a copy.</div>
+            <div style="position:relative;height:56px;box-sizing:border-box;border-radius:4px;border:2px solid #7cc0da;padding:0 14px;display:flex;align-items:center;font-size:16px;margin-top:6px">
+              <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#262a31;font-size:12px;color:#7cc0da">Type your email to confirm</div>mtajchert@gmail<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px">
+              <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Cancel</div>
+              <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#f08f7f;opacity:.38">Delete</div>
+            </div>
+          </div>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">14</div><div style="font-size:18px;font-weight:600">Delete account</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Delete stays disabled until the typed email matches. Sign out uses a plain two-button dialog.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Basic dialog with icon</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined text field</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="15 Import" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;gap:4px;padding:0 4px;flex:none"><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div><div style="font-size:22px">Import</div></div>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <div style="font-size:14px;line-height:1.5;color:#a5a8ae;padding:0 24px 8px;text-wrap:pretty">Bring links over from another app. The server fetches each article, and they appear in My List as they're ready.</div>
+          <div style="padding:16px 16px 8px;font-size:14px;font-weight:500;color:#7cc0da">Source</div>
+          <sc-for list="{{ sources }}" as="s" hint-placeholder-count="4">
+            <div style="height:56px;display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <div style="width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:2px solid {{ s.ring }};display:flex;align-items:center;justify-content:center;flex:none;margin:0 2px"><div style="width:10px;height:10px;border-radius:50%;background:{{ s.dot }}"></div></div>
+              <div style="font-size:16px">{{ s.t }}</div>
+            </div>
+          </sc-for>
+          <div style="margin:12px 16px 0;border:1px solid #3a3f48;border-radius:12px;padding:12px 8px 12px 16px;display:flex;align-items:center;gap:16px">
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">folder_zip</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:16px">pocket-export.zip</div><div style="font-size:14px;color:#a5a8ae">2.1 MB · 3,180 links</div></div>
+            <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Change</div>
+          </div>
+          <div style="margin:12px 16px 0;background:#1b1e23;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:500"><span>Importing…</span><span style="color:#a5a8ae;font-weight:400">1,204 of 3,180</span></div>
+            <div style="display:flex;gap:4px;height:4px"><div style="width:38%;background:#7cc0da;border-radius:2px"></div><div style="flex:1;background:#1d3a47;border-radius:2px;position:relative"><div style="position:absolute;right:0;top:0;width:4px;height:4px;border-radius:2px;background:#7cc0da"></div></div></div>
+            <div style="font-size:14px;line-height:1.45;color:#a5a8ae">You can leave this screen. Progress continues in a notification.</div>
+          </div>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">15</div><div style="font-size:18px;font-weight:600">Import</div><span style="background:#f2c84b;color:#15171c;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px">New on Android</span></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Pick a source, choose the file with the system picker, and upload. Progress moves to a notification (/v1/imports).</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Radio list items</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined card</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Linear progress</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">System file picker</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="16 Export" style="display:flex;flex-direction:column;gap:16px;width:374px">
+      <div style="width:360px;height:780px;border-radius:40px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:flex;flex-direction:column;position:relative;color:#f1efe9">
+        <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 26px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+        <div style="height:64px;display:flex;align-items:center;gap:4px;padding:0 4px;flex:none"><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">arrow_back</span></div><div style="font-size:22px">Export</div></div>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <div style="padding:8px 16px 8px;font-size:14px;font-weight:500;color:#7cc0da">Format</div>
+          <sc-for list="{{ formats }}" as="s" hint-placeholder-count="3">
+            <div style="height:72px;display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <div style="width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:2px solid {{ s.ring }};display:flex;align-items:center;justify-content:center;flex:none;margin:0 2px"><div style="width:10px;height:10px;border-radius:50%;background:{{ s.dot }}"></div></div>
+              <div style="display:flex;flex-direction:column;gap:2px"><div style="font-size:16px">{{ s.t }}</div><div style="font-size:14px;color:#a5a8ae">{{ s.sub }}</div></div>
+            </div>
+          </sc-for>
+          <div style="padding:16px 16px 8px;font-size:14px;font-weight:500;color:#7cc0da">Include</div>
+          <sc-for list="{{ switches }}" as="w" hint-placeholder-count="2">
+            <div style="height:72px;display:flex;align-items:center;gap:16px;padding:0 24px 0 16px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px"><div style="font-size:16px">{{ w.t }}</div><div style="font-size:14px;color:#a5a8ae">{{ w.sub }}</div></div>
+              <div style="width:52px;height:32px;border-radius:16px;box-sizing:border-box;background:{{ w.track }};border:2px solid {{ w.border }};position:relative;flex:none"><div style="position:absolute;top:50%;left:{{ w.left }};width:{{ w.size }};height:{{ w.size }};transform:translateY(-50%);border-radius:50%;background:{{ w.thumb }};display:flex;align-items:center;justify-content:center"><sc-if value="{{ w.on }}" hint-placeholder-val="{{ true }}"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1;color:#7cc0da">check</span></sc-if></div></div>
+            </div>
+          </sc-for>
+          <div style="flex:1"></div>
+          <div style="margin:0 16px 16px;background:#1b1e23;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:16px">
+              <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#7cc0da;font-variation-settings:'FILL' 1">check_circle</span>
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><div style="font-size:16px">sroka-2026-10-23.zip</div><div style="font-size:14px;color:#a5a8ae">Ready · 48 MB · 2,310 articles</div></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <div style="height:40px;padding:0 16px 0 12px;border-radius:20px;border:1px solid #6b7079;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#7cc0da"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">share</span>Share</div>
+              <div style="height:40px;padding:0 24px 0 16px;border-radius:20px;background:#7cc0da;color:#06323f;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:18px;line-height:1">download</span>Save</div>
+            </div>
+          </div>
+        </div>
+        <div style="height:24px;display:flex;align-items:center;justify-content:center;flex:none"><div style="width:108px;height:4px;border-radius:2px;background:#f1efe9;opacity:.5"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">16</div><div style="font-size:18px;font-weight:600">Export</div><span style="background:#f2c84b;color:#15171c;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px">New on Android</span></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">The server builds the file (/v1/exports). When it's ready, Save opens the system "Save as" picker and Share opens the share sheet.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Radio list items</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Switches</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Filled card</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Outlined + filled buttons</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:56px 56px 80px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5d5f66">7 · Wide screens</div><div style="font-size:34px;font-weight:800">List–detail on foldables and tablets</div></div>
+  <div data-screen-label="17 Two-pane" style="display:flex;flex-direction:column;gap:16px;max-width:1114px">
+    <div style="width:1100px;height:720px;border-radius:32px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#15171c;overflow:hidden;display:grid;grid-template-columns:96px 360px 24px minmax(0,1fr);color:#f1efe9">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:44px 0 24px">
+        <div style="width:56px;height:56px;border-radius:16px;background:#1e6f8f;color:#f6f5f1;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.35);margin-bottom:28px"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">add</span></div>
+        <sc-for list="{{ navList }}" as="n" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:8px"><div style="width:56px;height:32px;border-radius:16px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:{{ n.color }};font-variation-settings:'FILL' {{ n.fill }}">{{ n.icon }}</span></div><div style="font-size:12px;font-weight:{{ n.weight }};color:{{ n.color }}">{{ n.label }}</div></div>
+        </sc-for>
+        <div style="flex:1"></div>
+        <div style="width:36px;height:36px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center">M</div>
+      </div>
+      <div style="display:flex;flex-direction:column;min-width:0;overflow:hidden;padding-top:24px">
+        <div style="margin:8px 0 12px;height:56px;border-radius:28px;background:#262a31;display:flex;align-items:center;gap:16px;padding:0 16px;color:#a5a8ae;font-size:16px"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">search</span>Search My List</div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ wide }}" as="it" hint-placeholder-count="6">
+            <div style="display:flex;gap:16px;padding:12px 16px;border-radius:16px;background:{{ it.bg }}">
+              <div style="width:56px;height:56px;border-radius:8px;flex:none;background:{{ it.thumbBg }};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:#7cc0da">{{ it.letter }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:16px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:{{ it.titleColor }}">{{ it.title }}</div>
+                <div style="font-size:14px;color:#a5a8ae">{{ it.sub }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center"><div style="width:4px;height:48px;border-radius:2px;background:#6b7079"></div></div>
+      <div style="margin:24px 24px 24px 0;background:#1b1e23;border-radius:24px;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+        <div style="height:64px;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;flex:none">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">star</span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">archive</span></div>
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">more_vert</span></div>
+        </div>
+        <div style="height:3px;background:#262a31;flex:none"><div style="width:42%;height:100%;background:#f2c84b"></div></div>
+        <div style="flex:1;overflow:hidden;padding:28px 48px 0;display:flex;flex-direction:column;gap:16px;max-width:640px">
+          <div style="font-size:14px;font-weight:500;color:#7cc0da">practical.engineering</div>
+          <div style="font-size:36px;font-weight:600;line-height:1.15">Whatever Happened to Fire Escapes?</div>
+          <div style="font-size:14px;color:#a5a8ae">11 min read · 42%</div>
+          <div style="height:200px;border-radius:12px;background:repeating-linear-gradient(135deg,#1d3a47 0 6px,#22485a 6px 12px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#9fd0e3">article image</div>
+          <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">…which is why the stairs outside became the cheap, visible answer. Bolting iron to a facade was faster than rebuilding a stair core, and for a few decades every city tried it.</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">17</div><div style="font-size:18px;font-weight:600">Unfolded / tablet</div></div>
+      <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty;max-width:640px">Uses the canonical list–detail layout. The bottom bar becomes a navigation rail and the FAB moves into the rail. Drag the pane handle to resize; folding the device keeps you in the reader.</div>
+      <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Navigation rail + FAB</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">List–detail scaffold</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Pane drag handle</span></div></sc-if>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start;padding-top:24px">
+
+    <div data-screen-label="18 Tabletop" style="display:flex;flex-direction:column;gap:16px;width:654px">
+      <div style="width:640px;display:flex;flex-direction:column;filter:drop-shadow(0 30px 40px rgba(21,23,28,.3))">
+        <div style="height:400px;border-radius:32px 32px 6px 6px;border:7px solid #0a0b0d;border-bottom-width:3px;background:#15171c;overflow:hidden;display:flex;flex-direction:column;color:#f1efe9;transform:perspective(1400px) rotateX(14deg);transform-origin:bottom center">
+          <div style="height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:14px;font-weight:500;flex:none"><span>9:41</span><div style="display:flex;gap:4px"><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">signal_cellular_alt</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">wifi</span><span style="font-family:'Material Symbols Rounded';font-size:16px;line-height:1">battery_full</span></div></div>
+          <div style="height:3px;background:#262a31;flex:none"><div style="width:42%;height:100%;background:#f2c84b"></div></div>
+          <div style="flex:1;overflow:hidden;padding:24px 64px 0;display:flex;flex-direction:column;gap:14px">
+            <div style="font-size:14px;font-weight:500;color:#7cc0da">practical.engineering · Whatever Happened to Fire Escapes?</div>
+            <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">…which is why the stairs outside became the cheap, visible answer. Bolting iron to a facade was faster than rebuilding a stair core, and for a few decades every city tried it.</div>
+            <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">The trouble showed up in maintenance. Ironwork that nobody uses for years rusts quietly, and the first real test is often the worst possible moment to find out.</div>
+            <div style="font-size:{{ readerSize }};line-height:1.62;color:#d9d7d1">Modern codes moved the escape route back inside, into enclosed, pressurised stairwells.</div>
+          </div>
+        </div>
+        <div style="height:10px;margin:0 10px;background:linear-gradient(#0a0b0d,#2a2c30 50%,#0a0b0d);border-radius:3px"></div>
+        <div style="height:330px;border-radius:6px 6px 32px 32px;border:7px solid #0a0b0d;border-top-width:3px;background:#1f2228;overflow:hidden;display:flex;flex-direction:column;color:#f1efe9;padding:24px 32px 0;box-sizing:border-box;gap:22px">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;font-size:14px;color:#a5a8ae"><span style="color:#f1efe9;font-weight:500">42% read</span><span>6 min left</span></div>
+            <div style="display:flex;align-items:center;gap:6px;height:44px">
+              <div style="width:42%;height:16px;border-radius:8px 2px 2px 8px;background:#7cc0da"></div>
+              <div style="width:4px;height:44px;border-radius:2px;background:#7cc0da;flex:none"></div>
+              <div style="flex:1;height:16px;border-radius:2px 8px 8px 2px;background:#1d3a47;position:relative"><div style="position:absolute;right:6px;top:6px;width:4px;height:4px;border-radius:2px;background:#7cc0da"></div></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:4px;background:#262a31;border-radius:24px;padding:4px">
+              <div style="width:44px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500">A−</div>
+              <div style="font-size:14px;color:#a5a8ae;padding:0 6px">{{ readerSize }}</div>
+              <div style="width:44px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:500">A+</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="width:48px;height:48px;border-radius:50%;background:#262a31;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">star</span></div>
+              <div style="width:48px;height:48px;border-radius:50%;background:#262a31;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">archive</span></div>
+              <div style="width:48px;height:48px;border-radius:50%;background:#262a31;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1">label</span></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;background:#262a31;border-radius:16px;padding:12px 12px 12px 16px">
+            <div style="width:48px;height:48px;border-radius:8px;background:repeating-linear-gradient(135deg,#2a2e35 0 6px,#30343c 6px 12px);flex:none"></div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><div style="font-size:12px;font-weight:500;color:#7cc0da">Up next in My List</div><div style="font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The slow art of reading on the internet</div></div>
+            <div style="height:40px;padding:0 16px;border-radius:20px;background:#1d3a47;color:#9fd0e3;display:flex;align-items:center;font-size:14px;font-weight:500">Read</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">18</div><div style="font-size:18px;font-weight:600">Tabletop posture</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">Half-fold the phone on a table and the reader splits at the hinge: text above, controls below for one-thumb use. Drag the slider to scrub through the article, which also updates the synced position. Opening the phone flat restores the normal reader.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Posture detection</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Slider</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Filled icon buttons</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Tonal button</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Text size stepper</span></div></sc-if>
+      </div>
+    </div>
+
+    <div data-screen-label="19 Split-screen drop" style="display:flex;flex-direction:column;gap:16px;width:774px">
+      <div style="width:760px;height:700px;border-radius:32px;border:7px solid #0a0b0d;box-shadow:0 30px 60px rgba(21,23,28,.3);background:#0a0b0d;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr);position:relative">
+        <div style="background:#f6f5f1;display:flex;flex-direction:column;border-radius:0 12px 12px 0;overflow:hidden">
+          <div style="height:36px;flex:none;display:flex;align-items:center;padding:0 24px;font-size:14px;font-weight:500;color:#15171c">9:41</div>
+          <div style="margin:4px 12px;height:44px;border-radius:22px;background:#e3e1dc;flex:none;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#5d5f66">news.example/reading-list</div>
+          <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="height:22px;width:70%;background:#d6d3cc;border-radius:4px"></div>
+            <div style="height:10px;background:#e3e1dc;border-radius:3px"></div><div style="height:10px;width:85%;background:#e3e1dc;border-radius:3px"></div>
+            <div style="font-size:15px;line-height:1.5;color:#3a3c42">Further reading: <span style="color:#1e6f8f;text-decoration:underline;background:#d4e6ee;border-radius:3px;padding:0 2px">The quiet history of the bookmark</span> and <span style="color:#1e6f8f;text-decoration:underline">Cities that remember</span>.</div>
+            <div style="height:10px;background:#e3e1dc;border-radius:3px"></div><div style="height:10px;width:60%;background:#e3e1dc;border-radius:3px"></div>
+            <div style="height:150px;border-radius:10px;background:repeating-linear-gradient(135deg,#e3e1dc 0 6px,#dad7d0 6px 12px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8d8a83">browser page</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center"><div style="width:4px;height:48px;border-radius:2px;background:#6b7079"></div></div>
+        <div style="background:#15171c;color:#f1efe9;display:flex;flex-direction:column;border-radius:12px 0 0 12px;overflow:hidden">
+          <div style="height:36px;flex:none"></div>
+          <div style="margin:8px 16px;height:56px;border-radius:28px;background:#262a31;display:flex;align-items:center;gap:16px;padding:0 12px 0 16px;flex:none">
+            <span style="font-family:'Material Symbols Rounded';font-size:24px;line-height:1;color:#a5a8ae">search</span>
+            <span style="flex:1;font-size:16px;color:#a5a8ae">Search My List</span>
+            <div style="width:32px;height:32px;border-radius:50%;background:#1d3a47;color:#9fd0e3;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">M</div>
+          </div>
+          <div style="margin:4px 16px 8px;height:96px;border-radius:16px;border:2px dashed #7cc0da;background:#1d3a47;display:flex;align-items:center;justify-content:center;gap:12px;color:#9fd0e3;font-size:16px;font-weight:500;flex:none"><span style="font-family:'Material Symbols Rounded';font-size:28px;line-height:1">add_link</span>Drop to save</div>
+          <div style="flex:1;overflow:hidden;opacity:.5">
+            <sc-for list="{{ resync }}" as="it" hint-placeholder-count="4">
+              <div style="display:flex;gap:16px;padding:12px 16px">
+                <div style="width:56px;height:56px;border-radius:8px;flex:none;background:{{ it.thumbBg }};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#7cc0da">{{ it.letter }}</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="font-size:16px;font-weight:500;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ it.title }}</div>
+                  <div style="font-size:14px;color:#a5a8ae">{{ it.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position:absolute;left:300px;top:196px;display:flex;align-items:center;gap:10px;height:44px;padding:0 16px 0 12px;border-radius:12px;background:#f1efe9;color:#15171c;font-size:14px;font-weight:500;box-shadow:0 12px 28px rgba(0,0,0,.45);transform:rotate(-2deg)"><span style="font-family:'Material Symbols Rounded';font-size:20px;line-height:1;color:#1e6f8f">link</span>nautil.us/the-quiet-history…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="background:#15171c;color:#f6f5f1;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px">19</div><div style="font-size:18px;font-weight:600">Split screen · drag to save</div></div>
+        <div style="font-size:14px;line-height:1.45;color:#5d5f66;text-wrap:pretty">With Sroka next to a browser on the inner display, long-press a link and drag it across. A drop target appears at the top of the list, and dropping saves the link and shows the usual "Saved" snackbar. Links that are already saved get the "Already in Sroka" message instead.</div>
+        <sc-if value="{{ showSpecs }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px"><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Multi-window</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">System drag and drop</span><span style="padding:2px 8px;border-radius:6px;background:#dcdad4;color:#3a3c42">Search bar</span><span style="padding:1px 8px;border-radius:6px;border:1px dashed #8d8a83;color:#3a3c42">Drop target</span></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showSpecs&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Annotations&quot;},&quot;readerSize&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:17,&quot;min&quot;:14,&quot;max&quot;:22,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Reader&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const st = (a, b) => `repeating-linear-gradient(135deg,${a} 0 6px,${b} 6px 12px)`;
+    const stripes = [st('#1d3a47', '#22485a'), st('#2a2e35', '#30343c'), st('#2a2619', '#332d1c'), st('#23272e', '#2a2e35')];
+    const S = { off: ['offline_pin', 'Available offline', '#7cc0da'], dl: ['downloading', 'Downloading…', '#7cc0da'], partial: ['warning', 'Partial save', '#e8cf86'] };
+    const I = (title, domain, min, thumb, x) => {
+      const o = { title, domain, sub: domain + (min ? ' · ' + min + ' min' : ''), thumbBg: typeof thumb === 'number' ? stripes[thumb] : '#23272e', letter: typeof thumb === 'number' ? '' : thumb, fav: false, status: null, tx: '0px', under: 'transparent', swiping: false, bg: 'transparent', titleColor: '#f1efe9', ...(x || {}) };
+      const s = typeof o.status === 'string' ? S[o.status] : o.status;
+      return { ...o, hasStatus: !!s, sIcon: s ? s[0] : '', status: s ? s[1] : '', sColor: s ? s[2] : '' };
+    };
+    const lib = [
+      I('Whatever Happened to Fire Escapes?', 'practical.engineering', 11, 0, { status: 'off' }),
+      I('The slow art of reading on the internet', 'longreads.example', 9, 1, { fav: true, status: 'off' }),
+      I('What Shall I Teach My Son?', 'stevekrouse.com', 4, 'S', { tx: '-128px', under: '#7cc0da', swiping: true }),
+      I('Things to know if you get cancer (2026 Edition)', 'jjmaxwell4.com', 3, 2, { status: 'dl' }),
+      I('Meetings', 'nber.org', 1, 'N', { status: 'partial' }),
+      I('The Darker Side of Growing Old', 'medium.com', 5, 3, { status: 'off' })
+    ];
+    const wait = l => ['schedule', l, '#e8cf86'];
+    const off = [
+      I('nautil.us/the-quiet-history-of-the-bookmark', 'nautil.us', 0, 'N', { status: wait('Save waiting to sync') }),
+      I(lib[0].title, lib[0].domain, 11, 0, { status: wait('Tag change waiting') }),
+      I(lib[1].title, lib[1].domain, 9, 1, { fav: true, status: wait('Favourite waiting') }),
+      I(lib[5].title, lib[5].domain, 5, 3, { status: 'off' }),
+      I('10 AI Tools Everyone Will Be Using in Six Months', 'medium.com', 7, 0, { status: 'off' })
+    ];
+    const NAV = [['My List', 'bookmarks'], ['Favourites', 'star'], ['Archive', 'archive'], ['Tags', 'label']];
+    const nav = a => NAV.map(([label, icon], i) => ({ label, icon, fill: i === a ? 1 : 0, bg: i === a ? '#1d3a47' : 'transparent', color: i === a ? '#9fd0e3' : '#a5a8ae', weight: i === a ? 600 : 500 }));
+    const radio = (arr, sel) => arr.map(([t, sub], i) => ({ t, sub, ring: i === sel ? '#7cc0da' : '#a5a8ae', dot: i === sel ? '#7cc0da' : 'transparent' }));
+    const sw = (t, sub, on) => ({ t, sub, on, track: on ? '#7cc0da' : '#2f333b', border: on ? '#7cc0da' : '#6b7079', thumb: on ? '#06323f' : '#6b7079', size: on ? '24px' : '16px', left: on ? '24px' : '6px' });
+    const code = '4829';
+    const setRow = (header, icon, t, sub, x) => ({ header, icon, t, sub, h: sub ? '64px' : '56px', color: '#f1efe9', iconColor: '#a5a8ae', isNew: false, ...(x || {}) });
+    return {
+      showSpecs: this.props.showSpecs ?? true,
+      readerSize: (this.props.readerSize ?? 17) + 'px',
+      otp: [0, 1, 2, 3, 4, 5].map(i => ({ d: code[i] || '', border: i === 4 ? '2px solid #7cc0da' : '1px solid ' + (code[i] ? '#a5a8ae' : '#6b7079'), bg: i === 4 ? '#1f2228' : 'transparent' })),
+      keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => ({ k, bg: k ? '#2f333b' : 'transparent' })),
+      qwerty: 'qwertyuiopasdfghjklzxcvbnm'.split(''),
+      draft: ['essays', 'longform'],
+      lib, off,
+      resync: lib.filter(x => !x.swiping).slice(0, 5),
+      wide: lib.filter(x => !x.swiping).map((x, i) => ({ ...x, bg: i === 0 ? '#1d3a47' : 'transparent', titleColor: i === 0 ? '#e4f2f8' : '#f1efe9' })),
+      navList: nav(0), navTags: nav(3),
+      searchChips: ['All', 'Archive', 'Favourites'].map((t, i) => ({ t, on: i === 0, pl: i === 0 ? '8px' : '12px', bg: i ? 'transparent' : '#1d3a47', color: i ? '#c8cacf' : '#9fd0e3', border: i ? '#6b7079' : '#1d3a47' })),
+      results: [
+        { icon: 'article', title: 'Whatever Happened to Fire Escapes?', domain: 'practical.engineering', where: 'Title and text', pre: '…people need another way out. The ', m: 'fire escape', post: ' was the original answer, bolted to the outside…' },
+        { icon: 'article', title: 'The Darker Side of Growing Old', domain: 'medium.com', where: 'In text', pre: '…my grandmother’s flat had a rusted ', m: 'fire escape', post: ' where she grew tomatoes every summer…' },
+        { icon: 'archive', title: 'Cities that remember', domain: 'placesjournal.org', where: 'Archive · in text', pre: '…in July the ', m: 'fire escape', post: ' became a balcony, a stage, a bedroom…' }
+      ],
+      menu: [
+        ['Edit tags', 'label'], ['Share link', 'share'], ['Open in browser', 'open_in_new'], ['Refresh article', 'refresh', 'new'], ['Text size', 'format_size'], ['Delete', 'delete', 'danger']
+      ].map(([t, icon, k]) => ({ t, icon, divider: k === 'danger', bg: k === 'new' ? '#2f333b' : 'transparent', color: k === 'danger' ? '#f08f7f' : '#f1efe9', iconColor: k === 'danger' ? '#f08f7f' : '#a5a8ae' })),
+      tagList: [['engineering', 12], ['essays', 9], ['longform', 7], ['health', 4], ['cities', 3], ['weekend', 2], ['research', 1]].map(([t, n]) => ({ t, n })),
+      settings: [
+        setRow('Reading', 'dark_mode', 'Theme', 'Dark'),
+        setRow('', 'format_size', 'Text size', 'Default · 17 sp'),
+        setRow('Library', 'download_for_offline', 'Offline downloads', 'Wi-Fi only · 312 MB used'),
+        setRow('', 'dns', 'Server', 'sroka.app'),
+        setRow('', 'upload_file', 'Export library', 'HTML, CSV or JSON', { isNew: true }),
+        setRow('', 'move_to_inbox', 'Import', 'From Pocket and others', { isNew: true }),
+        setRow('Account', 'logout', 'Sign out', 'mtajchert@gmail.com'),
+        setRow('', 'delete_forever', 'Delete account', '', { color: '#f08f7f', iconColor: '#f08f7f' })
+      ],
+      sources: radio([['Pocket'], ['Instapaper'], ['Browser bookmarks (HTML)'], ['CSV or list of URLs']], 0),
+      formats: radio([['HTML', 'Bookmarks file most apps can import'], ['CSV', 'Links, tags and dates in a spreadsheet'], ['JSON', 'Everything, including article text']], 2),
+      switches: [sw('Archive', '1,862 archived articles', true), sw('Article text', 'Larger file, readable without Sroka', false)]
+    };
+  }
+}
+</script>
+</body>
+</html>

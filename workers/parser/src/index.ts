@@ -3,6 +3,7 @@ import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJ
 import { reportParse } from "./attempts.ts";
 import { deletePrefix, runWeeklyGc } from "./gc.ts";
 import type { ParserEnv } from "./env.ts";
+import { TEXT_FILE } from "./pdf-text.ts";
 import { defaultDeps, failedResult, processJob, type Deps, type JobStats } from "./process.ts";
 
 export { processJob } from "./process.ts";
@@ -61,7 +62,11 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     const ack = await lib.markParsed(job.itemId, result);
     if (!ack?.ok && result.contentPrivate && result.contentId) {
       // Rejected (stale, duplicate, item deleted, account wiped): this private dir is referenced by nothing.
-      await deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId)).catch((e) =>
+      // PDF jobs: the dir holds the user's original (document.pdf) — only drop the text.txt this job wrote.
+      const cleanup = job.pdf
+        ? env.CONTENT.delete(r2Keys.contentDir(result.contentId, job.userId) + TEXT_FILE)
+        : deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId));
+      await cleanup.catch((e) =>
         log.warnException("private content cleanup failed", e, { event: "private_cleanup_failed" }),
       );
     }

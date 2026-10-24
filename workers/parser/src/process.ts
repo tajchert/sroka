@@ -19,6 +19,7 @@ import {
 } from "@sroka/extractor";
 import { displayDomain, hashId, log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
+import { processPdfJob } from "./pdf.ts";
 import { renderEnabled, renderPage, takeRenderBudget } from "./render.ts";
 import { loadSiteRule, stripParams } from "./site-rules.ts";
 
@@ -44,7 +45,7 @@ export const defaultDeps: Deps = {
 };
 
 /** `api`: a site JSON API (X / Twitter posts) instead of the page. */
-export type ParseMethod = "fetch" | "render" | "capture" | "cache" | "api";
+export type ParseMethod = "fetch" | "render" | "capture" | "cache" | "api" | "pdf";
 export type FallbackOutcome = "none" | "ok" | "partial" | "failed" | "budget" | "disabled";
 
 /** Out-param of processJob for the per-job log / metric / parse_attempts row (all optional). */
@@ -245,6 +246,9 @@ export async function processJob(
   stillWanted?: () => Promise<boolean>,
   stats: JobStats = {},
 ): Promise<ParseResult | null> {
+  if (job.pdf) {
+    return processPdfJob(env, job, stillWanted, stats);
+  }
   const isPrivate = !!job.rawKey;
   stats.method = isPrivate ? "capture" : "fetch";
   stats.fallbackOutcome = "none";

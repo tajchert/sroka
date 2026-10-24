@@ -45,6 +45,21 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun resultCountIsTotalForQueryAndScope() = runTest {
+        val vm = SearchViewModel(library)
+        backgroundScope.launch { vm.resultCount.collect {} }
+        runCurrent()
+        assertNull(vm.resultCount.value)
+        vm.onQueryChange("fire")
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(1, vm.resultCount.value)
+        vm.onScopeChange(SearchScope.ARCHIVE)
+        runCurrent()
+        assertEquals(0, vm.resultCount.value)
+    }
+
+    @Test
     fun scopeChangeSearchesImmediatelyAndInitialScopeFollowsTab() = runTest {
         val vm = SearchViewModel(library)
         vm.initScope(LibraryTab.ARCHIVE)

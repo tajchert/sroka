@@ -94,6 +94,8 @@
     <string name="feature_settings_import_job_zip">The ZIP file is too large or could not be opened.</string>
     <string name="feature_settings_import_job_missing_url">The file has no URL column. Check that you picked the right source.</string>
     <string name="feature_settings_import_job_no_csv">The ZIP file does not contain a CSV file.</string>
+    <string name="feature_settings_import_job_lost">The server lost track of this import. Try importing the file again.</string>
+    <string name="feature_settings_import_dismiss">Dismiss</string>
     <string name="feature_settings_import_job_generic">The server could not import this file.</string>
 
     <!-- Export -->

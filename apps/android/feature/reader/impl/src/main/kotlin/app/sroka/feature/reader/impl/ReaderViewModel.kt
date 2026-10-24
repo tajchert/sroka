@@ -310,7 +310,9 @@ class ReaderViewModel @AssistedInject constructor(
     /** Re-fetches the article. No-op while offline or when a refresh is already running. */
     fun refresh() {
         if (offline.value || refreshPhase.value != RefreshPhase.NONE) return
-        refreshPhase.value = RefreshPhase.REQUESTED
+        // Already PENDING: no status change will be observed to move us on, so start in the PENDING phase.
+        val alreadyPending = (latestItem ?: item.value)?.parseStatus == ParseStatus.PENDING
+        refreshPhase.value = if (alreadyPending) RefreshPhase.PENDING else RefreshPhase.REQUESTED
         refreshTimeout?.cancel()
         refreshTimeout = viewModelScope.launch {
             delay(REFRESH_TIMEOUT_MS)

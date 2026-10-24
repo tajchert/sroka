@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.common.di.Dispatcher
 import app.sroka.core.common.di.SrokaDispatchers
 import app.sroka.core.datastore.SessionStore
@@ -20,6 +21,9 @@ import app.sroka.core.network.ApiResult
 import app.sroka.core.network.SrokaApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -37,24 +41,36 @@ internal class DataTransferRepositoryImpl @Inject constructor(
     private val scheduler: ImportScheduler,
     private val sessionStore: SessionStore,
     @Dispatcher(SrokaDispatchers.IO) private val io: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : DataTransferRepository {
 
     private val resolver: ContentResolver get() = context.contentResolver
 
     override fun activeImport(): Flow<ImportJob?> = store.observe()
 
+    override fun resumeTracking(jobId: String) = scheduler.enqueue(jobId)
+
     override suspend fun dismissImport() = store.clear()
 
     override fun fileInfo(uri: String): PickedFile? = runCatching { queryInfo(Uri.parse(uri)) }.getOrNull()
 
-    override suspend fun startImport(uri: String, format: ImportFormat): ImportStartResult {
+    /** Runs in the application scope: leaving the screen stops the wait, not the upload or storing the job. */
+    override suspend fun startImport(uri: String, format: ImportFormat): ImportStartResult =
+        appScope.async { doStartImport(uri, format) }.await()
+
+    private suspend fun doStartImport(uri: String, format: ImportFormat): ImportStartResult {
         val parsed = Uri.parse(uri)
         val info = fileInfo(uri)
         val max = DataTransferRepository.MAX_IMPORT_BYTES
         if ((info?.sizeBytes ?: 0L) > max) return failed(ImportError.TOO_LARGE)
 
         val name = info?.name ?: "import"
-        val temp = File(File(context.cacheDir, "imports").apply { mkdirs() }, "${UUID.randomUUID()}-${safeName(name)}")
+        val importsDir = File(context.cacheDir, "imports")
+        withContext(io) {
+            importsDir.listFiles()?.forEach { it.delete() }
+            importsDir.mkdirs()
+        }
+        val temp = File(importsDir, "${UUID.randomUUID()}-${safeName(name)}")
         try {
             val copied = withContext(io) { copyLimited(parsed, temp, max) }
             when {
@@ -86,7 +102,7 @@ internal class DataTransferRepositoryImpl @Inject constructor(
                 )
             }
         } finally {
-            withContext(io) { temp.delete() }
+            withContext(NonCancellable + io) { temp.delete() }
         }
     }
 

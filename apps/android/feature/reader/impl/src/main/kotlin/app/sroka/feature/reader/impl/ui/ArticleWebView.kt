@@ -37,6 +37,9 @@ private class WebState {
     var theme: EffectiveTheme? = null
     var scale: Float = 0f
     var topSignal: Int = 0
+    var header: String = ""
+    var appliedHeader: String = ""
+    var pageReady: Boolean = false
 }
 
 /**
@@ -57,6 +60,8 @@ internal fun ArticleWebView(
     onLinkClick: (String) -> Unit,
     onRendererGone: () -> Unit,
     scrollToTopSignal: Int = 0,
+    /** `ReaderHtml.headerScript(..)` for the current header, or empty; pushed without reloading the page. */
+    headerScript: String = "",
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -111,14 +116,26 @@ internal fun ArticleWebView(
                         return true
                     }
 
+                    override fun onPageFinished(view: WebView, url: String?) {
+                        // A header change that raced the page load is applied once the script exists.
+                        state.pageReady = true
+                        if (state.header.isNotEmpty() && state.header != state.appliedHeader) {
+                            state.appliedHeader = state.header
+                            view.evaluateJavascript(state.header, null)
+                        }
+                    }
+
                     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) = Unit
                 }
                 installBridge { currentOnProgress(it) }
             }
         },
         update = { view ->
+            state.header = headerScript
             if (state.loadedHtml != html) {
                 state.loadedHtml = html
+                state.appliedHeader = headerScript // the wrapped document carries the header it was built with
+                state.pageReady = false
                 state.theme = theme
                 state.scale = textScale
                 view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
@@ -126,6 +143,10 @@ internal fun ArticleWebView(
                 state.theme = theme
                 state.scale = textScale
                 view.evaluateJavascript(ReaderHtml.appearanceScript(theme, textScale), null)
+            }
+            if (headerScript.isNotEmpty() && headerScript != state.appliedHeader && state.pageReady) {
+                state.appliedHeader = headerScript
+                view.evaluateJavascript(headerScript, null)
             }
             if (state.topSignal != scrollToTopSignal) {
                 state.topSignal = scrollToTopSignal

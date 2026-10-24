@@ -105,6 +105,34 @@ object ReaderHtml {
     fun appearanceScript(theme: EffectiveTheme, textScale: Float): String =
         "window.__srokaSetAppearance&&window.__srokaSetAppearance('${theme.cssName}',${scaleText(textScale)});"
 
+    /**
+     * JS that updates the header in place (no document reload). The values travel as one JSON document
+     * inside a JS string literal and are written with `textContent` on the page side.
+     */
+    fun headerScript(h: ReaderHeader): String {
+        val json = "{\"site\":${jsonString(h.site)},\"title\":${jsonString(h.title)}," +
+            "\"metaPrefix\":${jsonString(h.metaPrefix)},\"warn\":${h.partialWarning?.let(::jsonString) ?: "null"}}"
+        return "window.__srokaSetHeader&&window.__srokaSetHeader(${jsonString(json)});"
+    }
+
+    /** A quoted string valid as both a JSON and a JS literal, safe to embed in script or HTML. */
+    internal fun jsonString(s: String): String {
+        val sb = StringBuilder("\"")
+        for (c in s) {
+            when {
+                c == '"' -> sb.append("\\\"")
+                c == '\\' -> sb.append("\\\\")
+                c == '\n' -> sb.append("\\n")
+                c == '\r' -> sb.append("\\r")
+                c == '\t' -> sb.append("\\t")
+                c.code < 0x20 || c == '<' || c == '>' || c == '&' || c == '\u2028' || c == '\u2029' ->
+                    sb.append("\\u").append(String.format(java.util.Locale.ROOT, "%04x", c.code))
+                else -> sb.append(c)
+            }
+        }
+        return sb.append('"').toString()
+    }
+
     private inline fun replaceMatch(src: String, regex: Regex, transform: (String) -> String): String {
         val m = regex.find(src) ?: return src
         return src.replaceRange(m.range, transform(m.value))
@@ -150,6 +178,11 @@ addEventListener("scroll",function(){clearTimeout(timer);timer=setTimeout(report
 ["touchstart","wheel","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("load",function(){restore();setTimeout(restore,300)});
 window.__srokaSetAppearance=function(theme,scale){var a=firstVisible();root.setAttribute("data-theme",theme);root.style.setProperty("--scale",scale);if(a!==null)toAnchor(a)};
+window.__srokaSetHeader=function(raw){var h;try{h=JSON.parse(raw)}catch(e){return}var head=document.querySelector(".sk-head");var old=document.getElementById("sk-pct");var pct=old?old.textContent:"0%";if(!head){head=document.createElement("header");head.className="sk-head";document.body.insertBefore(head,document.body.firstChild)}
+while(head.firstChild)head.removeChild(head.firstChild);
+function div(c,t){var d=document.createElement("div");d.className=c;if(t!==undefined)d.textContent=t;head.appendChild(d);return d}
+div("sk-site",h.site);div("sk-title",h.title);var m=div("sk-meta",h.metaPrefix);var sp=document.createElement("span");sp.id="sk-pct";sp.textContent=pct;m.appendChild(sp);
+if(h.warn){var w=div("sk-warn");var ns="http://www.w3.org/2000/svg",sv=document.createElementNS(ns,"svg");sv.setAttribute("viewBox","0 0 24 24");sv.setAttribute("width","18");sv.setAttribute("height","18");sv.setAttribute("fill","currentColor");sv.setAttribute("aria-hidden","true");var pa=document.createElementNS(ns,"path");pa.setAttribute("d","M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");sv.appendChild(pa);var t=document.createElement("span");t.textContent=h.warn;w.appendChild(sv);w.appendChild(t)}};
 window.__srokaScrollToId=function(id){var el=document.getElementById(id);if(el)el.scrollIntoView()};
 })();
 """.trimIndent()

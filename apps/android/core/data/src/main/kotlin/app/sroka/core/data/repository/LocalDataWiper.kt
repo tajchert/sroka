@@ -31,6 +31,7 @@ internal class LocalDataWiper @Inject constructor(
     private val db: SrokaDatabase,
     private val importJobs: app.sroka.core.data.transfer.ImportJobStore,
     private val paths: ContentPaths,
+    @ApplicationContext private val context: Context,
     @Dispatcher(SrokaDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
     suspend fun wipe() {
@@ -39,11 +40,20 @@ internal class LocalDataWiper @Inject constructor(
         syncController.resetPeriodic()
         engine.exclusive {
             maintenanceDao.wipeAll()
-            withContext(io) { paths.deleteAll() }
+            withContext(io) {
+                paths.deleteAll()
+                deleteTransferCaches(context.cacheDir)
+            }
             // DELETE never shrinks the file: reclaim the article text the FTS index held.
             runCatching { db.vacuum() }
         }
     }
+}
+
+/** Export and import temp files hold the user's whole library; they must not outlive the account. */
+internal fun deleteTransferCaches(cacheDir: java.io.File) {
+    java.io.File(cacheDir, "exports").deleteRecursively()
+    java.io.File(cacheDir, "imports").deleteRecursively()
 }
 
 /**

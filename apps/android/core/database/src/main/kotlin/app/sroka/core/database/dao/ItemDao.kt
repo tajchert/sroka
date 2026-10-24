@@ -175,6 +175,16 @@ interface ItemDao {
     @Query("$SEARCH_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_NEWEST")
     fun searchFavorites(match: String): PagingSource<Int, SearchRow>
 
+    /** Total FTS hits per scope (same match and scope filter as the search queries, no paging). */
+    @Query("SELECT COUNT(*) FROM items_fts JOIN items i ON i.fts_rowid = items_fts.rowid WHERE $MATCH")
+    fun searchCountAll(match: String): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM items_fts JOIN items i ON i.fts_rowid = items_fts.rowid WHERE $MATCH AND i.status = 'ARCHIVED'")
+    fun searchCountArchived(match: String): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM items_fts JOIN items i ON i.fts_rowid = items_fts.rowid WHERE $MATCH AND i.is_favorite = 1")
+    fun searchCountFavorites(match: String): Flow<Int>
+
     // ---- Single item / counts / tags ---------------------------------------------------------
 
     @Query("$DETAIL_SELECT WHERE i.id = :id")

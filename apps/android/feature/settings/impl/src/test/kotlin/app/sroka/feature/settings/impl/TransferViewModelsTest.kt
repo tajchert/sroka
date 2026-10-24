@@ -61,6 +61,16 @@ class TransferViewModelsTest {
     }
 
     @Test
+    fun unfinishedJobReEnqueuesTrackingOnce() = runTest {
+        repo.setJob(testImportJob(id = "j7", status = JobStatus.RUNNING))
+        importVm()
+        repo.setJob(testImportJob(id = "j7", status = JobStatus.RUNNING, done = 3))
+        assertEquals(listOf("j7"), repo.resumed)
+        repo.setJob(testImportJob(id = "j7", status = JobStatus.DONE))
+        assertEquals(listOf("j7"), repo.resumed)
+    }
+
+    @Test
     fun tooLargeIsCheckedBeforeUploading() = runTest {
         repo.files["content://big"] = PickedFile("big.csv", DataTransferRepository.MAX_IMPORT_BYTES + 1)
         val vm = importVm()

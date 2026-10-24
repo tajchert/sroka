@@ -272,6 +272,21 @@ class ReaderViewModelTest {
     @Test fun refreshSettlesFailed() = refreshCycle(ParseStatus.FAILED)
 
     @Test
+    fun refreshOnAlreadyPendingItemSettles() = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        val events = mutableListOf<ReaderEvent>()
+        vm.collectEvents(events, backgroundScope)
+        setParse(ParseStatus.PENDING)
+        vm.refresh()
+        assertEquals(true, vm.refreshing.value)
+        setParse(ParseStatus.OK)
+        assertEquals(false, vm.refreshing.value)
+        assertEquals(listOf<ReaderEvent>(ReaderEvent.RefreshSettled(ParseStatus.OK)), events)
+    }
+
+    @Test
     fun refreshIsIgnoredOffline() = runTest(dispatcher) {
         seed()
         content.html.value = mapOf(id to "<p>Hi</p>")

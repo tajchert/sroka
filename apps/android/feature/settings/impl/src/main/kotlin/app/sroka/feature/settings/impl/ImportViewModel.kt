@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -65,6 +67,16 @@ class ImportViewModel @Inject constructor(
     )
 
     private val local = MutableStateFlow(Local())
+
+    init {
+        // A job that is not finished but has no poll worker (signed-out/gave up) would stay locked forever.
+        viewModelScope.launch {
+            transfer.activeImport()
+                .mapNotNull { job -> job?.takeIf { !it.status.isFinished }?.id }
+                .distinctUntilChanged()
+                .collect { transfer.resumeTracking(it) }
+        }
+    }
 
     val state: StateFlow<ImportUiState> = combine(local, transfer.activeImport()) { l, job ->
         ImportUiState(l.source, l.fileName, l.sizeBytes, l.error, l.uploading, job)

@@ -74,10 +74,12 @@ fun SearchRoute(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val scope by viewModel.scope.collectAsStateWithLifecycle()
     val results = viewModel.results.collectAsLazyPagingItems()
+    val resultCount by viewModel.resultCount.collectAsStateWithLifecycle()
     SearchScreen(
         query = query,
         scope = scope,
         results = results,
+        resultCount = resultCount,
         onQueryChange = viewModel::onQueryChange,
         onScopeChange = viewModel::onScopeChange,
         onOpenItem = onOpenItem,
@@ -90,6 +92,7 @@ internal fun SearchScreen(
     query: String,
     scope: SearchScope,
     results: LazyPagingItems<SearchResult>,
+    resultCount: Int?,
     onQueryChange: (String) -> Unit,
     onScopeChange: (SearchScope) -> Unit,
     onOpenItem: (String) -> Unit,
@@ -146,8 +149,8 @@ internal fun SearchScreen(
                     Message(R.string.feature_library_empty_search_title, R.string.feature_library_empty_search_body)
                 else -> {
                     Text(
-                        if (loaded) {
-                            pluralStringResource(R.plurals.feature_library_search_results, results.itemCount, results.itemCount)
+                        if (loaded && resultCount != null) {
+                            pluralStringResource(R.plurals.feature_library_search_results, resultCount, resultCount)
                         } else {
                             stringResource(R.string.feature_library_search_results_loading)
                         },

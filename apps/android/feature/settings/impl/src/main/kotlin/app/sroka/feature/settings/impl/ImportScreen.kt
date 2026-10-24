@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,7 +44,11 @@ import app.sroka.core.domain.ImportError
 import app.sroka.core.model.ImportJob
 import app.sroka.core.model.JobStatus
 import app.sroka.core.ui.rememberWithNotificationPermission
+import kotlinx.coroutines.delay
 import java.text.NumberFormat
+
+private const val STALE_JOB_MS = 10 * 60 * 1000L
+private const val STALE_CHECK_MS = 30_000L
 
 @Composable
 fun ImportRoute(onBack: () -> Unit, viewModel: ImportViewModel = hiltViewModel()) {
@@ -75,6 +80,13 @@ fun ImportScreen(
     val pick = { picker.launch(importMimeTypes(state.source)) }
     val startImport = rememberWithNotificationPermission(onImport)
     val job = state.job
+    val stale by produceState(false, job) {
+        while (true) {
+            value = job != null && !job.status.isFinished && job.updatedAt > 0 &&
+                System.currentTimeMillis() - job.updatedAt > STALE_JOB_MS
+            delay(STALE_CHECK_MS)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -134,7 +146,7 @@ fun ImportScreen(
                 }
             }
 
-            if (job != null) JobCard(job, onDone)
+            if (job != null) JobCard(job, stale, onDone)
         }
     }
 }
@@ -186,7 +198,7 @@ private fun FileCard(state: ImportUiState, context: android.content.Context, onC
 }
 
 @Composable
-private fun JobCard(job: ImportJob, onDone: () -> Unit) {
+private fun JobCard(job: ImportJob, stale: Boolean, onDone: () -> Unit) {
     val numbers = NumberFormat.getIntegerInstance()
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -229,6 +241,13 @@ private fun JobCard(job: ImportJob, onDone: () -> Unit) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (stale) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = onDone) {
+                                Text(stringResource(R.string.feature_settings_import_dismiss))
+                            }
+                        }
+                    }
                 }
                 JobStatus.DONE -> {
                     val imported = (job.done - job.skipped).coerceAtLeast(0)
@@ -296,6 +315,7 @@ internal fun ImportError.messageRes() = when (this) {
 
 /** Server job error codes (api.md §11.1) to copy; unknown codes get the generic message. */
 internal fun jobErrorRes(code: String?) = when (code) {
+    "lost" -> R.string.feature_settings_import_job_lost
     "too_many_rows" -> R.string.feature_settings_import_job_too_many
     "zip_too_large", "bad_zip" -> R.string.feature_settings_import_job_zip
     "missing_url_column" -> R.string.feature_settings_import_job_missing_url

@@ -76,6 +76,8 @@ class MainActivity : ComponentActivity() {
     private fun takeOpenItemId(intent: Intent?): String? {
         val id = intent?.getStringExtra(EXTRA_OPEN_ITEM_ID)?.takeIf { it.isNotBlank() }
         intent?.removeExtra(EXTRA_OPEN_ITEM_ID)
+        // Relaunched from Recents: the extra is a replay of an old share deep link, not a new request.
+        if (intent != null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return null
         return id
     }
 }

@@ -3,7 +3,9 @@ package app.sroka.core.data
 import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
+import app.sroka.core.data.repository.deleteTransferCaches
 import app.sroka.core.data.transfer.DataTransferRepositoryImpl
+import app.sroka.core.data.transfer.ImportTracker
 import app.sroka.core.data.transfer.ImportJobStore
 import app.sroka.core.data.transfer.ImportScheduler
 import app.sroka.core.data.transfer.PollEnd
@@ -80,7 +82,7 @@ class DataTransferTest {
             override suspend fun baseUrl() = server.url("/").toString().trimEnd('/')
         }
         val api = SrokaApiFactory.create(provider, NetworkConfig("Sroka-Android/test"))
-        repo = DataTransferRepositoryImpl(context, api, store, ImportScheduler { scheduled += it }, sessionStore, Dispatchers.IO)
+        repo = DataTransferRepositoryImpl(context, api, store, ImportScheduler { scheduled += it }, sessionStore, Dispatchers.IO, scope)
         File(context.cacheDir, "imports").deleteRecursively()
         File(context.cacheDir, "exports").deleteRecursively()
     }
@@ -227,5 +229,47 @@ class DataTransferTest {
     fun pollLoopGivesUpAfterConsecutiveErrorsAndStops() = runTest {
         assertEquals(PollEnd.TOO_MANY_ERRORS, pollUntilFinished(1, 3, { PollOutcome.Transient }, {}))
         assertEquals(PollEnd.STOPPED, pollUntilFinished(1, 3, { PollOutcome.Stop }, {}))
+    }
+
+    @Test
+    fun trackerMarksJobFailedWhenServerForgotIt() = runTest {
+        val api = SrokaApiFactory.create(
+            object : SessionProvider {
+                override suspend fun token() = "tok"
+                override suspend fun deviceId() = "and_test"
+                override suspend fun baseUrl() = server.url("/").toString().trimEnd('/')
+            },
+            NetworkConfig("Sroka-Android/test"),
+        )
+        val tracker = ImportTracker(api, store, sessionStore)
+        store.set(testImportJob(id = "j9", status = JobStatus.RUNNING))
+        json("""{"error":"not_found"}""", 404)
+        val outcome = tracker.refresh("j9") as PollOutcome.Updated
+        assertEquals(JobStatus.FAILED, outcome.job.status)
+        assertEquals(ImportTracker.ERROR_LOST, outcome.job.error)
+        assertEquals(JobStatus.FAILED, store.current()?.status)
+        // 401 leaves the stored job untouched.
+        store.set(testImportJob(id = "j9", status = JobStatus.RUNNING))
+        json("""{"error":"unauthorized"}""", 401)
+        assertEquals(PollOutcome.Stop, tracker.refresh("j9"))
+        assertEquals(JobStatus.RUNNING, store.current()?.status)
+    }
+
+    @Test
+    fun staleImportFilesAreClearedAtStart() = runTest {
+        val dir = File(context.cacheDir, "imports").apply { mkdirs() }
+        File(dir, "stale.csv").writeText("old")
+        json(jobBody, 202)
+        repo.startImport(source(), ImportFormat.POCKET_CSV)
+        assertTrue(leftovers().isEmpty())
+    }
+
+    @Test
+    fun wipeDeletesExportAndImportCaches() {
+        File(context.cacheDir, "exports").apply { mkdirs() }.also { File(it, "a.csv").writeText("x") }
+        File(context.cacheDir, "imports").apply { mkdirs() }.also { File(it, "b.csv").writeText("x") }
+        deleteTransferCaches(context.cacheDir)
+        assertFalse(File(context.cacheDir, "exports").exists())
+        assertFalse(File(context.cacheDir, "imports").exists())
     }
 }

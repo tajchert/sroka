@@ -17,6 +17,7 @@ import app.sroka.core.data.sync.SyncWork
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -60,6 +61,8 @@ class ImportProgressWorker @AssistedInject constructor(
     private suspend fun foreground() {
         try {
             setForeground(getForegroundInfo())
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: IllegalStateException) {
             // ForegroundServiceStartNotAllowedException is an IllegalStateException.
         }

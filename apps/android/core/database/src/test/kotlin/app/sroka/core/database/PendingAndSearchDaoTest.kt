@@ -5,6 +5,7 @@ import app.sroka.core.database.entity.PendingOpEntity
 import app.sroka.core.database.entity.SearchRow
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.PendingChange
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -75,6 +76,18 @@ class PendingAndSearchDaoTest : DatabaseTestBase() {
         assertEquals(listOf("u", "a", "f", "af"), search("topic").map { it.row.id })
         assertEquals(listOf("a", "af"), search("topic", "archive").map { it.row.id })
         assertEquals(listOf("f", "af"), search("topic", "fav").map { it.row.id })
+    }
+
+    @Test fun searchCountMatchesScopes() = runBlocking {
+        dao.upsertItem(item("u", title = "Topic unread", savedAt = 4))
+        dao.upsertItem(item("a", title = "Topic archived", status = ItemStatus.ARCHIVED, archivedAt = 1, savedAt = 3))
+        dao.upsertItem(item("f", title = "Topic fav", favorite = true, savedAt = 2))
+        dao.upsertItem(item("af", title = "Topic both", status = ItemStatus.ARCHIVED, archivedAt = 1, favorite = true, savedAt = 1))
+        dao.upsertItem(item("n", title = "Other", savedAt = 0))
+        val match = FtsQuery.build("topic")!!
+        assertEquals(4, dao.searchCountAll(match).first())
+        assertEquals(2, dao.searchCountArchived(match).first())
+        assertEquals(2, dao.searchCountFavorites(match).first())
     }
 
     @Test fun searchRowCarriesPendingChange() = runBlocking {

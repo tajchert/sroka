@@ -92,4 +92,14 @@ class SaveSheetTest {
         dispatcher.scheduler.runCurrent()
         assertFalse(vm.autoDismissed.value)
     }
+
+    @Test
+    fun interactionBeforeSaveFinishesStillPreventsAutoDismiss() {
+        val vm = vm()
+        vm.onInteraction()
+        vm.start("https://example.com/x", null)
+        dispatcher.scheduler.advanceTimeBy(10_000)
+        dispatcher.scheduler.runCurrent()
+        assertFalse(vm.autoDismissed.value)
+    }
 }

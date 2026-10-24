@@ -14,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
 
 /** Full-screen search over the local FTS index (R8). Works offline. */
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -59,6 +62,21 @@ class SearchViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { (q, s) -> if (q.isEmpty()) flowOf(PagingData.empty()) else library.search(q, s) }
         .cachedIn(viewModelScope)
+
+    /** Total hits for the current query and scope; null while unknown (blank query or not counted yet). */
+    val resultCount: StateFlow<Int?> = combine(
+        _query.debounce { if (it.isBlank()) 0L else DEBOUNCE_MS }.map { it.trim() }.distinctUntilChanged(),
+        _scope,
+    ) { q, s -> q to s }
+        .distinctUntilChanged()
+        .flatMapLatest { (q, s) ->
+            if (q.isEmpty()) {
+                flowOf(null)
+            } else {
+                library.searchCount(q, s).map<Int, Int?> { it }.onStart { emit(null) }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     companion object {
         const val DEBOUNCE_MS = 250L

@@ -73,8 +73,10 @@ class SaveSheetViewModel @Inject constructor(
 
     private var timer: Job? = null
     private var started = false
+    private var interacted = false
 
     private fun armTimer() {
+        if (interacted) return
         timer?.cancel()
         timer = viewModelScope.launch {
             delay(AUTO_DISMISS_MS)
@@ -84,6 +86,7 @@ class SaveSheetViewModel @Inject constructor(
 
     /** Any touch on the sheet cancels the auto-dismiss for good. */
     fun onInteraction() {
+        interacted = true
         timer?.cancel()
         timer = null
     }

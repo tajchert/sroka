@@ -117,6 +117,23 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
         }
     }
 
+    override fun searchCount(query: String, scope: SearchScope): Flow<Int> {
+        val terms = query.lowercase().split(' ').filter { it.isNotBlank() }
+        return items.map { all ->
+            if (terms.isEmpty()) {
+                0
+            } else {
+                all.filter {
+                    when (scope) {
+                        SearchScope.ALL -> true
+                        SearchScope.ARCHIVE -> it.status == ItemStatus.ARCHIVED
+                        SearchScope.FAVORITES -> it.isFavorite
+                    }
+                }.count { searchResultOf(it, terms) != null }
+            }
+        }
+    }
+
     private fun searchResultOf(item: Item, terms: List<String>): SearchResult? {
         val title = item.displayTitle.lowercase()
         val excerpt = item.excerpt.orEmpty()

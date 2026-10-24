@@ -27,6 +27,9 @@ interface LibraryRepository {
      */
     fun search(query: String, scope: SearchScope): Flow<PagingData<SearchResult>>
 
+    /** Total number of hits [search] would return for [query] in [scope] (0 for a blank / symbol-only query). */
+    fun searchCount(query: String, scope: SearchScope): Flow<Int>
+
     /** One item with full detail, or null once it no longer exists locally. */
     fun observeItem(id: String): Flow<Item?>
 

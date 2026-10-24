@@ -262,19 +262,20 @@ internal fun ReaderScreen(
                     val headerSite = headerItem?.let { it.siteName?.takeIf(String::isNotBlank) ?: it.domain }
                     val headerTitle = headerItem?.displayTitle
                     val headerPartial = settledPartial[0]
-                    val wrapped = remember(s.html, s.baseUrl, headerSite, headerTitle, msgMinRead, headerPartial) {
+                    val header = if (headerSite != null && headerTitle != null) {
+                        ReaderHeader(
+                            site = headerSite,
+                            title = headerTitle,
+                            metaPrefix = msgMinRead,
+                            progress = 0f, // only the wrapped document shows progress; see the copy below
+                            partialWarning = if (headerPartial) msgPartial else null,
+                        )
+                    } else {
+                        null
+                    }
+                    // Keyed on the article only: header changes are pushed into the live page by script.
+                    val wrapped = remember(s.html, s.baseUrl) {
                         val restore = viewModel.restorePoint()
-                        val header = if (headerSite != null && headerTitle != null) {
-                            ReaderHeader(
-                                site = headerSite,
-                                title = headerTitle,
-                                metaPrefix = msgMinRead,
-                                progress = restore.progress,
-                                partialWarning = if (headerPartial) msgPartial else null,
-                            )
-                        } else {
-                            null
-                        }
                         ReaderHtml.wrap(
                             articleHtml = s.html,
                             baseUrl = s.baseUrl,
@@ -282,7 +283,7 @@ internal fun ReaderScreen(
                             textScale = prefs.readerTextScale,
                             startAnchor = restore.anchor,
                             startProgress = restore.progress,
-                            header = header,
+                            header = header?.copy(progress = restore.progress),
                         )
                     }
                     var rendererGone by remember(s.html) { mutableStateOf(false) }
@@ -304,6 +305,7 @@ internal fun ReaderScreen(
                         onLinkClick = { openExternalLink(context, it) },
                         onRendererGone = { rendererGone = true },
                         scrollToTopSignal = scrollTopSignal,
+                        headerScript = header?.let(ReaderHtml::headerScript).orEmpty(),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

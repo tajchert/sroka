@@ -65,6 +65,15 @@ internal class LibraryRepositoryImpl @Inject constructor(
         }.flow.map { page -> page.map { it.toSearchResult() } }
     }
 
+    override fun searchCount(query: String, scope: SearchScope): Flow<Int> {
+        val match = FtsQuery.build(query) ?: return flowOf(0)
+        return when (scope) {
+            SearchScope.ALL -> itemDao.searchCountAll(match)
+            SearchScope.ARCHIVE -> itemDao.searchCountArchived(match)
+            SearchScope.FAVORITES -> itemDao.searchCountFavorites(match)
+        }
+    }
+
     override fun observeItem(id: String): Flow<Item?> =
         itemDao.observeItem(id).map { it?.toItem() }.distinctUntilChanged()
 

@@ -2,6 +2,7 @@ package app.sroka.core.data.transfer
 
 import app.sroka.core.datastore.SessionStore
 import app.sroka.core.model.ImportJob
+import app.sroka.core.model.JobStatus
 import app.sroka.core.network.ApiResult
 import app.sroka.core.network.SrokaApi
 import kotlinx.coroutines.delay
@@ -15,7 +16,7 @@ sealed interface PollOutcome {
     /** Connectivity or 5xx: try again later. */
     data object Transient : PollOutcome
 
-    /** Signed out (401) or the job is gone (404): stop polling. */
+    /** Signed out (401) or no stored job to poll: stop polling. */
     data object Stop : PollOutcome
 }
 
@@ -40,10 +41,20 @@ class ImportTracker @Inject internal constructor(
                     sessionStore.markExpired()
                     PollOutcome.Stop
                 }
-                404 -> PollOutcome.Stop
+                404 -> {
+                    // The server no longer knows the job: record a terminal state so the UI is never stuck.
+                    val lost = known.copy(status = JobStatus.FAILED, error = ERROR_LOST)
+                    store.update(lost)
+                    PollOutcome.Updated(lost)
+                }
                 else -> PollOutcome.Transient
             }
         }
+    }
+
+    companion object {
+        /** Error code stored when the server reports the job as gone (404). */
+        const val ERROR_LOST = "lost"
     }
 }
 

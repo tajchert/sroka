@@ -12,6 +12,7 @@
 | T6 settings + import + export | done | Settings 13, delete dialog 14, Import 15, Export 16; gate (settings test+lint, :app:assembleDebug) passes. |
 | Review + gate | todo | |
 | Integration | done | Share deep link (MainActivity.pendingOpenItemId -> SrokaApp openItemId -> ReaderKey on top; consumed after use; test OpenReaderTest). Shared tag sheet `EditTagsSheet` + `tagSuggestions` in core:ui `tags/TagEditorSheet.kt` (strings `core_ui_tags_*`, `core_ui_cancel/save`), reader dialog deleted. Deprecations fixed (Article, Label, OpenInNew); left: `databaseEnabled` in ArticleWebView, `createComposeRule` v2 in tests. Removed `feature_library_share_already`. |
+| Review fixes | done | Import lifecycle (404 -> FAILED "lost", Import screen re-enqueues poll worker + Dismiss after 10 min, upload in app scope, temp cleanup), wipe deletes exports/imports caches, exact search count, reader PENDING refresh + in-place header update, no Recents deep-link replay, share-sheet interaction flag. |
 
 ## Notes from tasks
 

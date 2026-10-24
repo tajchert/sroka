@@ -37,6 +37,12 @@ class FakeDataTransferRepository : DataTransferRepository {
 
     override fun activeImport(): Flow<ImportJob?> = active
 
+    val resumed = mutableListOf<String>()
+
+    override fun resumeTracking(jobId: String) {
+        resumed += jobId
+    }
+
     override suspend fun dismissImport() {
         dismissCount++
         active.value = null

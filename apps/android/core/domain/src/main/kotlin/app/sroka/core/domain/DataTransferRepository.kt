@@ -49,6 +49,9 @@ interface DataTransferRepository {
     /** The last started import, kept up to date by the progress worker; null when none (or dismissed). */
     fun activeImport(): Flow<ImportJob?>
 
+    /** Makes sure progress polling runs for an unfinished job (no-op while a poll worker is already pending/running). */
+    fun resumeTracking(jobId: String)
+
     /** Forget the active job once the UI has shown it finished. */
     suspend fun dismissImport()
 

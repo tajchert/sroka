@@ -93,6 +93,22 @@ class ReaderHtmlTest {
         assertTrue(out.contains("T &lt;b&gt;"))
         assertTrue(out.contains("<span id=\"sk-pct\">42%</span>"))
         assertTrue(out.contains("sk-warn"))
-        assertFalse(wrap("<p>x</p>").contains("sk-head\""))
+        assertFalse(wrap("<p>x</p>").contains("<header class"))
+    }
+
+    @Test
+    fun headerScriptPassesEscapedJsonStringLiteral() {
+        val nasty = "A \"quoted\" </script><b>x</b> \\ & line\nbreak"
+        val js = ReaderHtml.headerScript(ReaderHeader(nasty, "T", "5 min read \u00b7 ", 0f, null))
+        assertTrue(js.startsWith("window.__srokaSetHeader&&window.__srokaSetHeader(\""))
+        assertTrue(js.endsWith("\");"))
+        assertFalse(js.contains("</script>"))
+        assertFalse(js.contains("<b>"))
+        assertFalse(js.contains("\n"))
+        assertTrue(ReaderHtml.jsonString(nasty).contains("\\u003c/script\\u003e"))
+        // The page script writes values with textContent only.
+        val page = ReaderHtml.wrap("<p>x</p>", theme = EffectiveTheme.LIGHT, textScale = 1f, startAnchor = null, startProgress = 0f)
+        assertTrue(page.contains("window.__srokaSetHeader=function"))
+        assertFalse(page.contains("innerHTML"))
     }
 }

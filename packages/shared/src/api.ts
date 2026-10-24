@@ -67,7 +67,7 @@ export const CreateItemRequest = z.object({
   title: Title.optional(),
   tags: TagNames.optional(),
   /**
-   * Rendered page HTML (document.documentElement.outerHTML), plain string in the JSON body.
+   * Rendered page HTML (the extension strips scripts/styles/SVG first), a string in the JSON body; the body may be gzipped.
    * ≤ LIMITS.maxHtmlBytes UTF-8 bytes (server → 413 payload_too_large). Presence → private content.
    */
   html: z.string().optional(),

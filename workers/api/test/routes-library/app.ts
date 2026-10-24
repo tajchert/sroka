@@ -36,7 +36,7 @@ export function makeApp() {
     const ctx = createExecutionContext();
     const init: RequestInit = { method, headers: { "x-test-user": user, ...headers } };
     if (body !== undefined) {
-      init.body = typeof body === "string" ? body : JSON.stringify(body);
+      init.body = typeof body === "string" || body instanceof ArrayBuffer ? body : JSON.stringify(body);
       (init.headers as Record<string, string>)["content-type"] = "application/json";
     }
     const res = await app.fetch(new Request(`http://localhost:8787${path}`, init), testEnv, ctx);

@@ -172,6 +172,31 @@ describe("parser queue consumer", () => {
     expect(marked[0]!.result).toMatchObject({ status: "failed", error: "raw_corrupt" });
   });
 
+  const SHORT_CAPTURE = `<!doctype html><html><head><title>Consent</title></head><body><article><h1>Before you continue</h1><p>${para}</p></article></body></html>`;
+  const putCapture = async (page: string) => {
+    const rawKey = r2Keys.raw("u1", ITEM);
+    await base.CONTENT.put(rawKey, await new Response(new Blob([page]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+    return rawKey;
+  };
+
+  it("a short capture falls back to a server fetch and keeps the longer text, still private", async () => {
+    const rawKey = await putCapture(SHORT_CAPTURE);
+    stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    await run([msg(job({ rawKey }))]);
+    const { result } = marked[0]!;
+    expect(fetched).toContain("https://example.com/post");
+    expect(result).toMatchObject({ status: "ok", contentPrivate: true, title: "Test Post" });
+    expect(await base.CONTENT.head(r2Keys.contentDir(result.contentId!, "u1") + "article.html")).not.toBeNull();
+    expect((await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>())!.n).toBe(0);
+  });
+
+  it("a short capture keeps its own text when the server fetch fails or is shorter", async () => {
+    const rawKey = await putCapture(SHORT_CAPTURE);
+    stubWeb({});
+    await run([msg(job({ rawKey }))]);
+    expect(marked[0]!.result).toMatchObject({ status: "partial", contentPrivate: true, title: "Consent" });
+  });
+
   it("a shared-cache hit touches last_used_at (GC grace); the parser no longer counts refs itself", async () => {
     stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
     await run([msg(job())]);

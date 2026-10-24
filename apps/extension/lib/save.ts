@@ -15,13 +15,31 @@ export function isSavableUrl(url: string | undefined): url is string {
   return !!url && /^https?:\/\//i.test(url);
 }
 
+/**
+ * Runs in the page (self-contained, passed to executeScript): the rendered DOM without what the parser never uses
+ * (scripts except JSON-LD, styles, stylesheet/preload links, SVG, templates), typically 60-80% smaller.
+ * Copied into an inert document so nothing in the copy loads or runs.
+ */
+export function pageHtmlForCapture(): string {
+  const root = document.implementation.createHTMLDocument("").importNode(document.documentElement, true);
+  const drop = [
+    'script:not([type="application/ld+json"])',
+    "style",
+    'link[rel~="stylesheet"]',
+    'link[rel~="preload"]',
+    'link[rel~="modulepreload"]',
+    'link[rel~="prefetch"]',
+    "template",
+    "svg",
+  ].join(",");
+  for (const el of Array.from(root.querySelectorAll(drop))) el.remove();
+  return `<!doctype html>${root.outerHTML}`;
+}
+
 /** Capture rendered HTML of a tab; null on restricted pages or when too large. */
 export async function captureHtml(tabId: number): Promise<string | null> {
   try {
-    const [r] = await ext().scripting.executeScript({
-      target: { tabId },
-      func: () => document.documentElement.outerHTML,
-    });
+    const [r] = await ext().scripting.executeScript({ target: { tabId }, func: pageHtmlForCapture });
     const html = r?.result as string | undefined;
     if (!html) return null;
     if (new TextEncoder().encode(html).length > MAX_CAPTURE_BYTES) return null;
@@ -63,8 +81,9 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
 export async function saveTab(tab: { id?: number; url?: string; title?: string }): Promise<SaveResult> {
   if (!isSavableUrl(tab.url)) return { ok: false, queued: false, reason: "unsupported", message: "This page can't be saved." };
   const s = await getSettings();
-  // Send the rendered page when the user opted in, for paywalled pages (the server only gets the logged-out
-  // teaser, while this tab has whatever the user's subscription unlocks), and for sites that block servers (Reddit).
+  // Send the rendered page (default on): the tab has what the user's subscription unlocks and gets past bot walls
+  // that block server fetches. Paywalled pages and Reddit are captured even when the user turned capture off.
+  // The parser falls back to a server fetch when the capture yields little text (api.md §9).
   const page = tab.id != null ? await captureHtml(tab.id) : null;
   const html = page && (s.captureHtml || alwaysCapture(tab.url) || detectPaywall(page)) ? page : null;
   return saveWithFallback({ url: tab.url, title: tab.title?.trim().slice(0, LIMITS.maxTitleLength) || undefined, source: "extension", ...(html ? { html } : {}) });

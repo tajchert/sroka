@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveTab } from "./save.ts";
 import { setSettings } from "./settings.ts";
-import { installChrome, jsonRes } from "./test-chrome.ts";
+import { installChrome, jsonRes, requestJson } from "./test-chrome.ts";
 
 let c: ReturnType<typeof installChrome>;
 let bodies: Record<string, unknown>[];
@@ -13,7 +13,7 @@ beforeEach(async () => {
   vi.restoreAllMocks();
   bodies = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((async (_u: string, init?: RequestInit) => {
-    bodies.push(JSON.parse(String(init?.body)));
+    bodies.push(await requestJson(init));
     return jsonRes(202, { item: { id: "i1" }, created: true });
   }) as never);
   await setSettings({ token: "t", signedOut: false, captureHtml: false });
@@ -42,5 +42,19 @@ describe("saveTab html capture", () => {
     page("<html><body><p>Free</p></body></html>");
     await saveTab(tab);
     expect(bodies[0]).toHaveProperty("html");
+  });
+  it("capture is on by default", async () => {
+    delete c.storage.local.data.captureHtml;
+    page("<html><body><p>Free</p></body></html>");
+    await saveTab(tab);
+    expect(bodies[0]).toHaveProperty("html");
+  });
+  it("sends captured html gzipped", async () => {
+    await setSettings({ captureHtml: true });
+    page("<html><body><p>Free</p></body></html>");
+    await saveTab(tab);
+    const init = vi.mocked(globalThis.fetch).mock.calls[0]![1]!;
+    expect((init.headers as Record<string, string>)["content-encoding"]).toBe("gzip");
+    expect(init.body).toBeInstanceOf(ArrayBuffer);
   });
 });

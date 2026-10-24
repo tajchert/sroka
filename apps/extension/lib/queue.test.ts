@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ALARM, backoffMs, enqueue, MAX_QUEUED_HTML, processQueue, readFailed, readQueue, releaseQueue, removeQueuedUrl } from "./queue.ts";
 import { saveWithFallback } from "./save.ts";
 import { setSettings } from "./settings.ts";
-import { installChrome, jsonRes } from "./test-chrome.ts";
+import { installChrome, jsonRes, requestJson } from "./test-chrome.ts";
 
 let c: ReturnType<typeof installChrome>;
 beforeEach(async () => {
@@ -71,7 +71,7 @@ describe("retry queue", () => {
     await enqueue({ url: "bad" });
     const bodies: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_u, init) => {
-      const b = JSON.parse((init as RequestInit).body as string);
+      const b = await requestJson(init as RequestInit);
       bodies.push(JSON.stringify(b));
       if (b.url === "bad") return jsonRes(400, { error: "invalid_url" });
       return b.html ? jsonRes(413, { error: "payload_too_large" }) : ok();
@@ -105,7 +105,7 @@ describe("saveWithFallback", () => {
       .mockResolvedValueOnce(ok());
     const r = await saveWithFallback({ url: "https://a.com/", html: "<p/>" });
     expect(r.ok).toBe(true);
-    expect(JSON.parse((f.mock.calls[1]![1] as RequestInit).body as string).html).toBeUndefined();
+    expect((await requestJson(f.mock.calls[1]![1] as RequestInit)).html).toBeUndefined();
   });
 });
 

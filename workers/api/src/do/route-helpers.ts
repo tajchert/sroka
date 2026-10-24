@@ -79,3 +79,33 @@ export async function gzipText(text: string): Promise<ArrayBuffer> {
   const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
   return new Response(stream).arrayBuffer();
 }
+
+export const isGzip = (b: Uint8Array): boolean => b.byteLength >= 2 && b[0] === 0x1f && b[1] === 0x8b;
+
+/** Gunzip with an output cap (gzip bombs): the bytes, or "too_large" / "corrupt". */
+export async function gunzipCapped(input: Uint8Array, maxBytes: number): Promise<Uint8Array | "too_large" | "corrupt"> {
+  const reader = new Blob([input]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return "too_large";
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return "corrupt";
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.byteLength;
+  }
+  return out;
+}

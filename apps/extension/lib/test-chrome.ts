@@ -33,3 +33,13 @@ export function installChrome() {
 export function jsonRes(status: number, body: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
 }
+
+/** JSON body of a mocked fetch call; gunzips `Content-Encoding: gzip` bodies. */
+export async function requestJson(init: RequestInit | undefined): Promise<Record<string, unknown>> {
+  const b = init?.body;
+  if (b instanceof ArrayBuffer) {
+    const stream = new Blob([b]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return JSON.parse(await new Response(stream).text());
+  }
+  return JSON.parse(String(b));
+}

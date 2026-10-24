@@ -149,10 +149,11 @@ describe("Browser Run fallback", () => {
     const rawKey = r2Keys.raw("u1", ITEM);
     const gz = await new Response(new Blob([SHORT]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
     await base.CONTENT.put(rawKey, gz);
+    routes[URL1] = () => htmlRes("gone", 404); // the plain-fetch fallback for short captures fails too
     await run(msg(job({ rawKey })));
     expect(quickAction).not.toHaveBeenCalled();
     expect(marked[0]).toMatchObject({ status: "partial", contentPrivate: true });
-    expect((await attempts())[0]).toMatchObject({ method: "capture", fallback_outcome: "none", url: null, status: "partial" });
+    expect((await attempts())[0]).toMatchObject({ method: "capture", fallback_outcome: "failed", error_detail: "fetch_http_404", url: null, status: "partial" });
   });
 
   it("over budget: no render, keeps the failure, records budget", async () => {

@@ -32,6 +32,23 @@ describe("POST /v1/items", () => {
     expect(text).toBe(html);
   });
 
+  it("accepts a gzipped body (extension captures) and caps the decompressed size", async () => {
+    const { call, user, env } = makeApp();
+    const gz = (text: string) => new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    const html = "<!doctype html><html><body><p>captured</p></body></html>";
+    const enc = { "content-encoding": "gzip" };
+    const r = await call("POST", "/v1/items", await gz(JSON.stringify({ url: "https://gz.example/x", html })), enc);
+    expect(r.status).toBe(202);
+    const obj = await env.CONTENT.get(`raw/${user}/${r.json.item.id}.html.gz`);
+    expect(await new Response(obj!.body.pipeThrough(new DecompressionStream("gzip"))).text()).toBe(html);
+    // a small body that inflates past the save limit
+    const bomb = await gz(JSON.stringify({ url: "https://gz.example/y", html: "x".repeat(LIMITS.maxSaveBodyBytes + 1) }));
+    expect(bomb.byteLength).toBeLessThan(LIMITS.maxSaveBodyBytes);
+    expect((await call("POST", "/v1/items", bomb, enc)).status).toBe(413);
+    const corrupt = new Uint8Array([0x1f, 0x8b, 8, 0, 1, 2, 3, 4]).buffer;
+    expect((await call("POST", "/v1/items", corrupt, enc)).json).toMatchObject({ error: "invalid_request" });
+  });
+
   it("validates", async () => {
     const { call } = makeApp();
     expect((await call("POST", "/v1/items", { url: "ftp://x" })).json).toEqual({ error: "invalid_url" });

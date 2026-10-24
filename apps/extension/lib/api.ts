@@ -46,6 +46,13 @@ export interface FetchOpts {
   method?: string;
   body?: unknown;
   auth?: boolean;
+  /** Send the JSON body gzip-compressed (`Content-Encoding: gzip`; the save route accepts it). */
+  gzip?: boolean;
+}
+
+async function gzipJson(body: unknown): Promise<ArrayBuffer> {
+  const stream = new Blob([JSON.stringify(body)]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Response(stream).arrayBuffer();
 }
 
 /** Low-level fetch. Handles bearer, network errors and 401 → signed-out marking. */
@@ -53,6 +60,7 @@ export async function rawFetch(path: string, opts: FetchOpts = {}): Promise<Resp
   const s = await getSettings();
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["content-type"] = "application/json";
+  if (opts.body !== undefined && opts.gzip) headers["content-encoding"] = "gzip";
   if (opts.auth !== false) {
     if (!s.token) {
       await setSettings({ signedOut: true });
@@ -67,7 +75,7 @@ export async function rawFetch(path: string, opts: FetchOpts = {}): Promise<Resp
     res = await fetch(s.serverUrl + path, {
       method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
       headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.body === undefined ? undefined : opts.gzip ? await gzipJson(opts.body) : JSON.stringify(opts.body),
     });
   } catch (e) {
     throw new ApiFailure(0, "network", e instanceof Error ? e.message : "network error");
@@ -87,7 +95,8 @@ async function json<T>(path: string, opts?: FetchOpts): Promise<T> {
 
 export type SaveBody = Pick<CreateItemRequest, "url" | "title" | "html" | "source" | "tags">;
 
-export const saveItem = (body: SaveBody) => json<CreateItemResponse>("/v1/items", { method: "POST", body });
+/** Captured pages are sent gzipped (HTML compresses ~5-10x). */
+export const saveItem = (body: SaveBody) => json<CreateItemResponse>("/v1/items", { method: "POST", body, gzip: !!body.html });
 
 /** Badge lookup: returns the saved item for this URL, or null. */
 export async function lookupUrl(url: string): Promise<Item | null> {

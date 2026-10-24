@@ -81,7 +81,7 @@ export function Options() {
           <span>
             Always capture the rendered page
             <span className="hint" style={{ display: "block" }}>
-              Sends the page as you see it, including content behind a login. Saved this way, the article stays private to you. Pages over 5 MB are saved by URL instead.
+              Sends the page as you see it, including content behind a login. Saved this way, the article stays private to you. When off, only the link is sent and Sroka fetches the page itself (paywalled pages and Reddit are still captured). Pages over 5 MB are saved by URL instead.
             </span>
           </span>
         </label>

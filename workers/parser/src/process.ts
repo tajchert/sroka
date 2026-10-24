@@ -328,6 +328,35 @@ export async function processJob(
     if (wall !== "challenge") chosen = safeExtract(html, baseUrl, extractOptions, job.itemId);
     paywalled = !isPrivate && !!chosen && detectPaywall(html);
   }
+  // 2a'. A capture with little text (cookie/consent wall, collapsed or not-yet-loaded content): try a plain server
+  // fetch and keep whichever text is longer. The result stays private either way (no render, no shared cache).
+  if (isPrivate && (!chosen || chosen.text.length < minChars)) {
+    try {
+      const res = await safeFetch(stripParams(job.url, rule?.stripParams), {
+        ...fetchOptions,
+        ...(rule?.userAgent === "browser" ? { userAgent: BROWSER_UA } : {}),
+      });
+      const fhtml = decodeHtml(res.bytes, res.contentType);
+      const fex = detectBotWall(fhtml) === "challenge" ? null : safeExtract(fhtml, res.url, extractOptions, job.itemId);
+      if (!fex) {
+        stats.fallbackOutcome = "failed";
+        stats.errorDetail = "fetch_extract_failed";
+      } else {
+        stats.fallbackOutcome = fex.text.length >= minChars ? "ok" : "partial";
+        if (!chosen || fex.text.length > chosen.text.length) {
+          chosen = fex;
+          baseUrl = res.url;
+          paywalled = detectPaywall(fhtml);
+          stats.method = "fetch";
+          stats.httpStatus = res.status;
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof FetchError)) throw e;
+      stats.fallbackOutcome = "failed";
+      stats.errorDetail = `fetch_${e.code}`;
+    }
+  }
   let trigger: string | null = null;
   if (!isPrivate) {
     if (fetchErr) trigger = fetchErr.code;

@@ -25,7 +25,7 @@ export async function getSettings(): Promise<Settings> {
   const r = (await ext().storage.local.get(["serverUrl", "captureHtml", "token", "email", "signedOut"])) as Partial<Settings>;
   return {
     serverUrl: r.serverUrl || DEFAULT_SERVER,
-    captureHtml: r.captureHtml === true,
+    captureHtml: r.captureHtml !== false, // default on
     token: r.token || null,
     email: r.email || null,
     signedOut: r.signedOut === true || !r.token,

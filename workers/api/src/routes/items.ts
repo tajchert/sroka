@@ -17,7 +17,9 @@ import {
   type LibraryAppEnv,
   apiError,
   enqueueParseJobs,
+  gunzipCapped,
   gzipText,
+  isGzip,
   library,
   readJson,
   restDeviceId,
@@ -31,11 +33,19 @@ export const itemsRoutes = new Hono<LibraryAppEnv>();
 itemsRoutes.post("/", async (c) => {
   const len = Number(c.req.header("content-length") ?? "0");
   if (len > LIMITS.maxSaveBodyBytes) return apiError(c, 413, "payload_too_large");
-  const text = await c.req.text();
-  if (new TextEncoder().encode(text).byteLength > LIMITS.maxSaveBodyBytes) return apiError(c, 413, "payload_too_large");
+  let bytes: Uint8Array = new Uint8Array(await c.req.arrayBuffer());
+  if (bytes.byteLength > LIMITS.maxSaveBodyBytes) return apiError(c, 413, "payload_too_large");
+  // The extension gzips captured pages (Content-Encoding: gzip). Sniff the magic bytes instead of trusting the
+  // header, so a body the edge already decompressed (or a mislabelled one) still works.
+  if (isGzip(bytes)) {
+    const out = await gunzipCapped(bytes, LIMITS.maxSaveBodyBytes);
+    if (out === "too_large") return apiError(c, 413, "payload_too_large");
+    if (out === "corrupt") return apiError(c, 400, "invalid_request", "invalid_gzip");
+    bytes = out;
+  }
   let body: unknown;
   try {
-    body = JSON.parse(text);
+    body = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return apiError(c, 400, "invalid_request", "invalid_json");
   }

@@ -13,6 +13,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sroka.core.designsystem.theme.SrokaTheme
+import android.net.Uri
+import androidx.core.content.IntentCompat
+import app.sroka.feature.library.impl.save.PdfShareHost
 import app.sroka.feature.library.impl.save.SaveSheetHost
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -30,6 +33,7 @@ class ShareActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        val pdfUris = if (isPdfShare(intent)) sharedPdfUris(intent) else null
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -43,6 +47,20 @@ class ShareActivity : ComponentActivity() {
                 onDispose {}
             }
             SrokaTheme(darkTheme = darkTheme) {
+                if (pdfUris != null) {
+                    PdfShareHost(
+                        uris = pdfUris,
+                        onFinish = ::finish,
+                        onSignIn = {
+                            startActivity(
+                                Intent(this, MainActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                            )
+                            finish()
+                        },
+                    )
+                    return@SrokaTheme
+                }
                 SaveSheetHost(
                     sharedText = sharedText,
                     subject = subject,
@@ -66,6 +84,27 @@ class ShareActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/** True when [intent] shares PDF file(s) rather than a link. */
+internal fun isPdfShare(intent: Intent): Boolean =
+    (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE) && intent.type == "application/pdf"
+
+/**
+ * The PDF content URIs of a `SEND` / `SEND_MULTIPLE` intent: `EXTRA_STREAM`, else the ClipData items.
+ * The sender's read grant lasts while the activity lives, and the uploader copies the files in `enqueue`.
+ */
+internal fun sharedPdfUris(intent: Intent): List<Uri> {
+    val fromExtra: List<Uri> = if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+        IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+    } else {
+        listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+    }
+    val uris = fromExtra.ifEmpty {
+        val clip = intent.clipData
+        (0 until (clip?.itemCount ?: 0)).mapNotNull { clip!!.getItemAt(it).uri }
+    }
+    return uris.distinct()
 }
 
 /**

@@ -17,6 +17,12 @@ export const LIMITS = {
   maxHtmlBytes: 5 * 1024 * 1024,
   /** Max request body for POST /v1/items (JSON incl. html). */
   maxSaveBodyBytes: 6 * 1024 * 1024,
+  /** POST /v1/items/pdf body (one PDF file). */
+  maxPdfBytes: 50 * 1024 * 1024,
+  /** Sum of fileSize over a user's live PDF items; an upload beyond it → 409 storage_full. */
+  maxPdfStorageBytes: 2 * 1024 * 1024 * 1024,
+  /** Uploaded file name length (characters); longer names are truncated, keeping the extension. */
+  maxFileNameLength: 255,
   /** Import upload size. */
   maxImportBytes: 20 * 1024 * 1024,
   maxImportItems: 50_000,

@@ -302,7 +302,7 @@ private fun AlreadySaved(item: Item?, onClose: () -> Unit, onContinue: () -> Uni
 }
 
 @Composable
-private fun Header(icon: ImageVector, circle: Color, iconTint: Color, title: String, sub: String?) {
+internal fun Header(icon: ImageVector, circle: Color, iconTint: Color, title: String, sub: String?) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Box(Modifier.size(40.dp).clip(CircleShape).background(circle), contentAlignment = Alignment.Center) {
             Icon(icon, contentDescription = null, tint = iconTint)

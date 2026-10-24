@@ -3,6 +3,7 @@ package app.sroka.core.database.di
 import android.content.Context
 import androidx.room3.Room
 import androidx.sqlite.driver.AndroidSQLiteDriver
+import app.sroka.core.database.ALL_MIGRATIONS
 import app.sroka.core.database.SrokaDatabase
 import dagger.Module
 import dagger.Provides
@@ -21,6 +22,7 @@ internal object DatabaseModule {
     fun providesDatabase(@ApplicationContext context: Context): SrokaDatabase =
         Room.databaseBuilder<SrokaDatabase>(context, SrokaDatabase.FILE_NAME)
             .setDriver(AndroidSQLiteDriver())
+            .addMigrations(*ALL_MIGRATIONS)
             .build()
 
     @Provides fun providesItemDao(db: SrokaDatabase) = db.itemDao()

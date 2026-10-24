@@ -18,5 +18,7 @@ object SrokaApiFactory {
         downloadClient = client.newBuilder().addInterceptor(UserAgentInterceptor(config.userAgent)).build(),
         session = session,
         json = json,
+        uploadClient = client.newBuilder().addInterceptor(HeaderInterceptor(session, config.userAgent))
+            .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS).readTimeout(120, java.util.concurrent.TimeUnit.SECONDS).build(),
     )
 }

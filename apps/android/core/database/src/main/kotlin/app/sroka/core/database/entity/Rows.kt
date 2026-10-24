@@ -3,6 +3,7 @@ package app.sroka.core.database.entity
 import androidx.room3.ColumnInfo
 import androidx.room3.Embedded
 import app.sroka.core.model.Item
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
@@ -33,6 +34,8 @@ data class ItemSummaryRow(
     val tags: String?,
     /** Type of the item's newest non-progress pending op, null if none (R6). */
     @ColumnInfo(name = "pending_type") val pendingType: String? = null,
+    val kind: ItemKind = ItemKind.ARTICLE,
+    @ColumnInfo(name = "file_size") val fileSize: Long? = null,
 ) {
     fun toSummary(): ItemSummary = ItemSummary(
         id = id,
@@ -49,6 +52,8 @@ data class ItemSummaryRow(
         tags = splitTags(tags),
         savedAt = savedAt,
         pendingChange = pendingChangeOf(pendingType),
+        kind = kind,
+        fileSize = fileSize,
     )
 }
 
@@ -96,6 +101,9 @@ data class ItemDetailRow(
         tags = splitTags(tags),
         offline = deriveOffline(item.contentId, fileContentId, fileState),
         thumbnailPath = thumbPath,
+        kind = item.kind,
+        fileName = item.fileName,
+        fileSize = item.fileSize,
     )
 }
 

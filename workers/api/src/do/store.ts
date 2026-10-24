@@ -49,6 +49,26 @@ class Rollback extends Error {
   }
 }
 
+export interface AddPdfInput {
+  deviceId: string;
+  itemId: string;
+  url: string;
+  canonical: string;
+  hash: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  contentId: string;
+  tags: string[];
+  source: string;
+  at: number;
+}
+export type AddPdfResult =
+  | { kind: "created"; id: string; jobs: ParseJob[] }
+  | { kind: "duplicate"; id: string; jobs: ParseJob[] }
+  | { kind: "storage_full" }
+  | { kind: "rejected"; reason: RejectReason };
+
 export interface ApplyResult {
   response: PushResponse;
   parseJobs: ParseJob[];
@@ -129,6 +149,8 @@ export class LibraryStore {
     private readonly storage: DurableObjectStorage,
     /** Resolves the owning user id (for ParseJob.userId). */
     private readonly userId: () => string,
+    /** APP_ORIGIN (for the reserved `/pdf/{sha256}` url space). */
+    private readonly appOrigin: () => string = () => "",
   ) {}
 
   /** Returns and clears the R2 keys (prefixes end in "/") freed by committed ops. */
@@ -283,6 +305,8 @@ export class LibraryStore {
     );
     ctx.touchItem(row.id);
     const job: ParseJob = { userId: this.userId(), itemId: row.id, url: row.url, parseGen: gen };
+    // Uploaded PDF: extraction only, from the stored original (never fetch the URL).
+    if (row.kind === "pdf" && row.content_id) job.pdf = { contentId: row.content_id };
     if (extra.rawKey !== undefined) job.rawKey = extra.rawKey;
     if (extra.force !== undefined) job.force = extra.force;
     return job;
@@ -442,6 +466,8 @@ export class LibraryStore {
         if (row.parse_status === "pending" && row.parse_requested_at !== null && row.parse_requested_at > ctx.now - REFRESH_COALESCE_MS) {
           return null;
         }
+        // A PDF without a content id can't be re-extracted (and has nothing to fetch): applied no-op.
+        if (row.kind === "pdf" && !row.content_id) return null;
         ctx.jobs.push(this.newParseJob(ctx, row, { force: true }));
         return null;
       }
@@ -451,6 +477,15 @@ export class LibraryStore {
       case "tag.delete":
         this.opTagDelete(ctx, op, stamp);
         return null;
+    }
+  }
+
+  private isPdfUrl(canonical: string): boolean {
+    try {
+      const u = new URL(canonical);
+      return u.host === new URL(this.appOrigin()).host && /^\/pdf\/[0-9a-f]{64}$/.test(u.pathname);
+    } catch {
+      return false;
     }
   }
 
@@ -475,6 +510,9 @@ export class LibraryStore {
         this.exec("INSERT INTO item_aliases (client_id, target_id) VALUES (?, ?) ON CONFLICT(client_id) DO NOTHING", op.itemId, dup.id);
       }
     }
+    // `${APP_ORIGIN}/pdf/{sha256}` is the upload dedupe key: no article may claim it (it would block the real upload).
+    // An existing live item (the pdf itself) keeps the normal duplicate re-add above.
+    if (!target && this.isPdfUrl(info.canonical)) throw new Reject("invalid_url");
     const provisionalTitle = op.title && op.title.trim() !== "" ? op.title.trim() : null;
 
     if (target) {
@@ -713,6 +751,7 @@ export class LibraryStore {
         this.exec("UPDATE items SET parse_requested_at = ? WHERE id = ?", now, row.id);
         const job: ParseJob = { userId: uid, itemId: row.id, url: row.url, parseGen: row.parse_gen };
         if (row.parse_raw_key) job.rawKey = row.parse_raw_key;
+        if (row.kind === "pdf" && row.content_id) job.pdf = { contentId: row.content_id };
         return job;
       }),
     );
@@ -743,6 +782,7 @@ export class LibraryStore {
   markParsed(itemId: string, result: ParseResult): { ok: boolean } {
     const row = this.itemRow(itemId);
     if (!row || row.deleted_at !== null || row.parse_gen !== result.parseGen || row.parse_status !== "pending") return { ok: false };
+    if (row.kind === "pdf") return this.markParsedPdf(row, result);
     this.withCtx((ctx) => {
       // The previous private content of this item is superseded (a new private dir, or now public content).
       if (row.content_private === 1 && row.content_id && row.content_id !== result.contentId) {
@@ -776,6 +816,155 @@ export class LibraryStore {
       ctx.touchItem(row.id);
     });
     return { ok: true };
+  }
+
+  /**
+   * Parser result of an uploaded PDF. The original (`document.pdf`) is the item's content and never changes:
+   * an ok/partial result must echo the stored content id and be private, otherwise it is refused. A failed result
+   * only records the status (the item stays readable) and never touches the content dir.
+   */
+  private markParsedPdf(row: ItemRow, result: ParseResult): { ok: boolean } {
+    if (result.status !== "failed" && (result.contentId !== row.content_id || !result.contentPrivate)) return { ok: false };
+    this.withCtx((ctx) => {
+      if (result.status === "failed") {
+        this.exec("UPDATE items SET parse_status = 'failed', parse_error = ? WHERE id = ?", result.error ?? null, row.id);
+      } else {
+        // The file name stays the provisional title unless the PDF carries a real one; a user title always wins.
+        this.exec(
+          `UPDATE items SET title = COALESCE(?, title), excerpt = ?, site_name = 'PDF', author = ?, lang = ?, word_count = ?,
+             reading_minutes = ?, lead_image_key = ?, parse_status = ?, parse_error = ? WHERE id = ?`,
+          result.title,
+          result.excerpt,
+          result.author,
+          result.lang,
+          result.wordCount,
+          result.readingMinutes,
+          result.leadImageKey ?? null,
+          result.status,
+          result.error ?? null,
+          row.id,
+        );
+      }
+      ctx.touchItem(row.id);
+    });
+    return { ok: true };
+  }
+
+  // ---------- PDF upload ----------
+
+  /**
+   * POST /v1/items/pdf commit (one transaction). Duplicate (live item with the same url hash) → re-add semantics of
+   * `item.add` `onDuplicate:"readd"`; else storage quota check; else insert. The caller deletes the just-uploaded
+   * R2 object unless the result is `created`.
+   */
+  addPdf(a: AddPdfInput, now: number = Date.now()): AddPdfResult {
+    try {
+      return this.withCtx((ctx): AddPdfResult => {
+        const stamp: Stamp = { at: clampAt(a.at, now), dev: a.deviceId };
+        const dup = this.first<ItemRow>("SELECT * FROM items WHERE url_hash = ? AND deleted_at IS NULL", a.hash);
+        if (dup) {
+          const savedAt = Math.max(dup.saved_at, stamp.at);
+          if (savedAt !== dup.saved_at) {
+            this.exec("UPDATE items SET saved_at = ? WHERE id = ?", savedAt, dup.id);
+            ctx.touchItem(dup.id);
+          }
+          const clock = parseClock(dup.clock);
+          if (applyLww(clock, "status", stamp)) {
+            this.exec("UPDATE items SET status = 'unread', archived_at = NULL, clock = ? WHERE id = ?", JSON.stringify(clock), dup.id);
+            if (dup.status !== "unread" || dup.archived_at !== null) ctx.touchItem(dup.id);
+          }
+          for (const t of a.tags) this.setPair(ctx, dup.id, t, true, stamp);
+          if (dup.parse_status === "failed") ctx.jobs.push(this.newParseJob(ctx, this.itemRow(dup.id)!));
+          return { kind: "duplicate", id: dup.id, jobs: ctx.jobs };
+        }
+        const used = Number(
+          this.first<{ n: number }>("SELECT COALESCE(SUM(file_size), 0) AS n FROM items WHERE kind = 'pdf' AND deleted_at IS NULL")!.n,
+        );
+        if (used + a.fileSize > LIMITS.maxPdfStorageBytes) return { kind: "storage_full" };
+        const clock: ItemClock = { status: { ...stamp } };
+        const ftsRowid = Number(this.first<{ n: number }>("SELECT COALESCE(MAX(fts_rowid), 0) + 1 AS n FROM items")!.n);
+        this.exec(
+          `INSERT INTO items (id, url, canonical_url, url_hash, domain, title, status, is_favorite, saved_at, source,
+             parse_status, parse_gen, clock, seq, fts_rowid, kind, file_name, file_size, content_id, content_private, site_name)
+           VALUES (?, ?, ?, ?, ?, ?, 'unread', 0, ?, ?, 'pending', 0, ?, 0, ?, 'pdf', ?, ?, ?, 1, 'PDF')`,
+          a.itemId,
+          a.url,
+          a.canonical,
+          a.hash,
+          displayDomain(a.canonical).toLowerCase(),
+          a.title,
+          stamp.at,
+          a.source,
+          JSON.stringify(clock),
+          ftsRowid,
+          a.fileName,
+          a.fileSize,
+          a.contentId,
+        );
+        ctx.touchItem(a.itemId);
+        for (const t of a.tags) this.setPair(ctx, a.itemId, t, true, stamp);
+        ctx.jobs.push(this.newParseJob(ctx, this.itemRow(a.itemId)!));
+        this.exec("DELETE FROM pdf_uploads WHERE content_id = ?", a.contentId);
+        return { kind: "created", id: a.itemId, jobs: ctx.jobs };
+      }, now).value;
+    } catch (e) {
+      if (e instanceof Reject) return { kind: "rejected", reason: e.reason };
+      throw e;
+    }
+  }
+
+  /**
+   * The duplicate's stored original is gone: point the existing item at the freshly uploaded copy (one transaction:
+   * seq bump, parse_gen + pdf job to re-extract). `expectContentId` guards against a concurrent change. Returns null
+   * when the item is not a live item with that content id any more (the caller then deletes the new copy).
+   */
+  repointPdf(
+    a: { itemId: string; expectContentId: string | null; contentId: string; fileName: string; fileSize: number },
+    now: number = Date.now(),
+  ): { jobs: ParseJob[] } | null {
+    const res = this.withCtx((ctx) => {
+      const row = this.itemRow(a.itemId);
+      if (!row || row.deleted_at !== null || row.content_id !== a.expectContentId) return null;
+      this.exec(
+        `UPDATE items SET kind = 'pdf', content_id = ?, content_private = 1, file_name = ?, file_size = ?, site_name = 'PDF'
+         WHERE id = ?`,
+        a.contentId,
+        a.fileName,
+        a.fileSize,
+        row.id,
+      );
+      if (row.content_id) {
+        if (row.content_private === 1) ctx.cleanup.push(r2Keys.contentDir(row.content_id, this.userId()));
+        else this.markRefDirty(row.content_id);
+      }
+      ctx.jobs.push(this.newParseJob(ctx, this.itemRow(row.id)!));
+      this.exec("DELETE FROM pdf_uploads WHERE content_id = ?", a.contentId);
+      return true;
+    }, now);
+    return res.value === null ? null : { jobs: res.ctx.jobs };
+  }
+
+  // ---------- PDF upload reservations ----------
+
+  reservePdfUpload(contentId: string, now: number): void {
+    this.exec("INSERT INTO pdf_uploads (content_id, at) VALUES (?, ?) ON CONFLICT(content_id) DO NOTHING", contentId, now);
+  }
+
+  /** Reservations older than `cutoff` that no live item references: the caller deletes their R2 dirs, then calls dropPdfReservations. */
+  staleOrphanReservations(cutoff: number, limit: number): { stale: string[]; orphans: string[] } {
+    const stale = this.all<{ c: string; live: number }>(
+      `SELECT u.content_id AS c, EXISTS (SELECT 1 FROM items i WHERE i.content_id = u.content_id AND i.deleted_at IS NULL) AS live
+       FROM pdf_uploads u WHERE u.at < ? ORDER BY u.at LIMIT ?`,
+      cutoff,
+      limit,
+    );
+    return { stale: stale.map((r) => r.c), orphans: stale.filter((r) => Number(r.live) === 0).map((r) => r.c) };
+  }
+
+  dropPdfReservations(ids: readonly string[]): void {
+    this.txn(() => {
+      for (const id of ids) this.exec("DELETE FROM pdf_uploads WHERE content_id = ?", id);
+    });
   }
 
   // ---------- shared-content references (outbox → D1 content_refs, api.md §9) ----------

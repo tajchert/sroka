@@ -12,6 +12,7 @@ import { syncRoutes } from "./routes/sync.ts";
 import { importsRoutes } from "./routes/imports.ts";
 import { clientErrorRoutes } from "./routes/client-errors.ts";
 import { exportsRoutes } from "./routes/exports.ts";
+import { pdfLinkRoutes } from "./routes/pdf-link.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { onError, requestLogger } from "./middleware/logging.ts";
 
@@ -48,6 +49,8 @@ app.route("/v1/sync", syncRoutes);
 app.route("/v1/imports", importsRoutes);
 app.route("/v1/exports", exportsRoutes);
 app.route("/v1/admin", adminRoutes);
+
+app.route("/pdf", pdfLinkRoutes);
 
 app.onError(onError);
 

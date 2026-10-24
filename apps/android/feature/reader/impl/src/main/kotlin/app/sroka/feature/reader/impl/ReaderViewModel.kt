@@ -6,12 +6,14 @@ import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.domain.ContentStore
 import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.LibraryRepository
+import app.sroka.core.domain.PdfFileResult
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.domain.SyncController
 import app.sroka.core.domain.SyncStatusRepository
 import app.sroka.core.domain.TagRepository
 import app.sroka.core.model.Item
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
@@ -49,6 +51,9 @@ sealed interface ReaderUiState {
 
     /** [html] is the raw downloaded article.html; the screen wraps it with theme + restore point. */
     data class Ready(val html: String, val baseUrl: String) : ReaderUiState
+
+    /** A PDF item whose document is on disk at [file]; shown by the native viewer. */
+    data class PdfReady(val file: java.io.File) : ReaderUiState
 
     /** Fetching the article package now. */
     data object Downloading : ReaderUiState
@@ -104,6 +109,7 @@ class ReaderViewModel @AssistedInject constructor(
         val parse: ParseStatus,
         val hasContent: Boolean,
         val offline: OfflineState,
+        val pdf: Boolean = false,
     )
 
     private val retry = MutableStateFlow(0)
@@ -179,7 +185,13 @@ class ReaderViewModel @AssistedInject constructor(
         if (item == null) {
             SourceKey(true, ParseStatus.PENDING, false, offline)
         } else {
-            SourceKey(false, item.parseStatus, item.contentId != null, offline)
+            // A PDF's state does not depend on parse/offline changes (the download itself flips them):
+            // keep its key stable so the in-flight download is never cancelled by its own progress.
+            if (item.kind == ItemKind.PDF) {
+                SourceKey(false, ParseStatus.OK, true, OfflineState.AVAILABLE_REMOTE, pdf = true)
+            } else {
+                SourceKey(false, item.parseStatus, item.contentId != null, offline)
+            }
         }
     }
         .distinctUntilChanged()
@@ -191,6 +203,7 @@ class ReaderViewModel @AssistedInject constructor(
         ready = false
         when {
             key.missing -> emit(ReaderUiState.Missing)
+            key.pdf -> emitAll(pdf())
             key.offline == OfflineState.DOWNLOADED -> {
                 val html = content.articleHtml(itemId)
                 if (html != null) emitReady(html) else emitAll(download(key, attempt))
@@ -206,6 +219,47 @@ class ReaderViewModel @AssistedInject constructor(
             // for the in-flight one (then confirms it) and recovers if that one never finishes.
             else -> emitAll(download(key, attempt))
         }
+    }
+
+    /** Local file first; otherwise download it ([ReaderUiState.Downloading] meanwhile). */
+    private fun pdf(): Flow<ReaderUiState> = flow {
+        content.pdfFile(itemId)?.let { return@flow emitPdf(it) }
+        emit(ReaderUiState.Downloading)
+        when (val r = content.ensurePdfFile(itemId)) {
+            is PdfFileResult.Ready -> emitPdf(r.file)
+            PdfFileResult.NotReady -> emit(ReaderUiState.ParsePending)
+            is PdfFileResult.Failed -> emit(
+                ReaderUiState.NotDownloaded(
+                    when (r.reason) {
+                        RemoteFailure.NETWORK -> NotDownloadedReason.OFFLINE
+                        RemoteFailure.UNAUTHORIZED -> NotDownloadedReason.SIGN_IN
+                        else -> NotDownloadedReason.ERROR
+                    },
+                ),
+            )
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<ReaderUiState>.emitPdf(file: java.io.File) {
+        ready = true
+        reported = null
+        _progress.value = latestItem?.progress ?: 0f
+        emit(ReaderUiState.PdfReady(file))
+    }
+
+    /** The PDF viewer's current page (0-based): progress is `(page + 1) / pageCount`, the anchor is the page index. */
+    fun onPdfPage(page: Int, pageCount: Int) {
+        if (pageCount <= 0) return
+        val index = page.coerceIn(0, pageCount - 1)
+        if (!ready) return
+        // Page changes are discrete and rare: write at once (no 2 s throttle), so a force-stop right after a scroll keeps the page.
+        val report = ProgressReport(pdfProgress(index, pageCount), index)
+        if (report == reported) return
+        reported = report
+        _progress.value = report.progress
+        unsaved = false
+        lastSavedAt = nowMillis()
+        viewModelScope.launch { library.setProgress(itemId, report.progress, report.anchor) }
     }
 
     private suspend fun kotlinx.coroutines.flow.FlowCollector<ReaderUiState>.emitReady(html: String) {
@@ -381,3 +435,7 @@ class ReaderViewModel @AssistedInject constructor(
         const val RESUME_THRESHOLD = 0.02f
     }
 }
+
+/** Reading progress of a PDF at 0-based [page] of [pageCount]: the last page reads 1.0. */
+internal fun pdfProgress(page: Int, pageCount: Int): Float =
+    if (pageCount <= 0) 0f else ((page + 1).toFloat() / pageCount).coerceIn(0f, 1f)

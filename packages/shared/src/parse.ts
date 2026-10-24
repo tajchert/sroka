@@ -12,6 +12,12 @@ export const ParseJobSchema = z.object({
   url: z.string().min(1),
   /** R2 key of captured HTML (`raw/{userId}/{itemId}.html.gz`, gzip). Present → private content. */
   rawKey: z.string().optional(),
+  /**
+   * Uploaded PDF (item kind "pdf"): the original is already stored at
+   * `r2Keys.contentDir(pdf.contentId, userId) + PDF_FILE`. The parser only extracts metadata/text from it
+   * (never fetches `url`) and answers with `contentId = pdf.contentId`, `contentPrivate: true`.
+   */
+  pdf: z.object({ contentId: z.uuid() }).optional(),
   /** Skip the shared cache (item.refresh). */
   force: z.boolean().optional(),
   /**
@@ -79,6 +85,9 @@ export const PackageManifest = z.object({
 export type PackageManifest = z.infer<typeof PackageManifest>;
 
 /** R2 key helpers (design §7.3 / decisions D6–D7). */
+/** File name of an uploaded PDF's original inside its (private) content dir. */
+export const PDF_FILE = "document.pdf";
+
 export const r2Keys = {
   contentDir: (contentId: string, privateUserId?: string | null) =>
     privateUserId ? `private/${privateUserId}/${contentId}/` : `content/${contentId}/`,

@@ -21,11 +21,20 @@ import app.sroka.feature.library.impl.list.DropState
 import app.sroka.feature.library.impl.list.LibraryListContent
 import app.sroka.feature.library.impl.list.LibraryListUiState
 import app.sroka.feature.library.impl.list.ListScope
+import app.sroka.feature.library.impl.list.UploadCard
+import app.sroka.core.model.ItemSummary
+import app.sroka.core.model.PdfUploadError
 import app.sroka.feature.library.impl.search.SearchContent
 import com.android.tools.screenshot.PreviewTest
 
 @Composable
-private fun ListFixture(darkTheme: Boolean, twoPane: Boolean, dropState: DropState = DropState.Idle) {
+private fun ListFixture(
+    darkTheme: Boolean,
+    twoPane: Boolean,
+    dropState: DropState = DropState.Idle,
+    items: List<ItemSummary> = sampleItems,
+    uploadCards: List<UploadCard> = emptyList(),
+) {
     SrokaTheme(darkTheme = darkTheme) {
         LibraryListContent(
             scope = ListScope.Tab(LibraryTab.MY_LIST),
@@ -35,9 +44,9 @@ private fun ListFixture(darkTheme: Boolean, twoPane: Boolean, dropState: DropSta
             onRefresh = {},
             isEmpty = false,
             listState = rememberLazyListState(),
-            itemCount = { sampleItems.size },
-            itemAt = { sampleItems.getOrNull(it) },
-            itemKey = { sampleItems[it].id },
+            itemCount = { items.size },
+            itemAt = { items.getOrNull(it) },
+            itemKey = { items[it].id },
             itemContentType = { "item" },
             onSortChange = {},
             onOpenSearch = {},
@@ -52,6 +61,7 @@ private fun ListFixture(darkTheme: Boolean, twoPane: Boolean, dropState: DropSta
             twoPane = twoPane,
             navRailShown = twoPane,
             dropState = dropState,
+            uploadCards = uploadCards,
         )
     }
 }
@@ -76,6 +86,33 @@ fun LibraryListDropTarget() = ListFixture(darkTheme = true, twoPane = false, dro
 @FoldablePreviews
 @Composable
 fun LibraryListDropTargetHovered() = ListFixture(darkTheme = true, twoPane = false, dropState = DropState.Hovered)
+
+/** PDF rows: icon tile instead of the lead image, "PDF \u00b7 2.4 MB" subtitle. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListPdfRows() = ListFixture(darkTheme = false, twoPane = false, items = samplePdfItems)
+
+/** "Uploading 2 PDFs" card above the list. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListUploading() = ListFixture(
+    darkTheme = false, twoPane = false, items = samplePdfItems,
+    uploadCards = listOf(UploadCard.Uploading(count = 2, fraction = 0.42f)),
+)
+
+/** An upload still sending next to a failed one (typed message, retry/dismiss). */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListUploadFailed() = ListFixture(
+    darkTheme = true, twoPane = false, items = samplePdfItems,
+    uploadCards = listOf(
+        UploadCard.Uploading(count = 1, fraction = null),
+        UploadCard.Failed("scan-final.pdf", PdfUploadError.NETWORK, more = 1),
+    ),
+)
 
 /** The 360dp list pane of the unfolded layout: rounded rows, the second one selected. */
 @PreviewTest

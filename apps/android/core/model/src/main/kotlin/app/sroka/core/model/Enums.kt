@@ -3,6 +3,17 @@ package app.sroka.core.model
 /** Wire `status` (api.md §4.1). */
 enum class ItemStatus { UNREAD, ARCHIVED }
 
+/** Wire `kind` (PDF upload spec). Unknown future values decode as [ARTICLE]. */
+enum class ItemKind {
+    ARTICLE,
+    PDF,
+    ;
+
+    companion object {
+        fun fromWire(value: String?): ItemKind = if (value == "pdf") PDF else ARTICLE
+    }
+}
+
 /** Wire `parseStatus` (api.md §4.1). */
 enum class ParseStatus { PENDING, OK, PARTIAL, FAILED }
 

@@ -11,6 +11,17 @@ class ContentPaths(filesDir: File, cacheDir: File) {
     val thumbs: File = File(filesDir, "thumbs")
     val downloads: File = File(cacheDir, "dl")
 
+    /** Temp copies of PDFs waiting to be uploaded. Not touched by [deleteAll] (pending uploads survive "Remove downloads"). */
+    val pdfUploads: File = File(filesDir, "pdf-uploads")
+
+    /** Original of a PDF item: `articles/{itemId}/document.pdf` (cleaned up with the item like a package). */
+    fun pdfFile(itemId: String) = File(articleDir(itemId), PDF_FILE)
+
+    /** Download target of a PDF before it is validated and moved to [pdfFile]. */
+    fun pdfTemp(itemId: String) = File(articles, "${safe(itemId)}$TMP_SUFFIX")
+
+    fun pdfUploadFile(uploadId: String) = File(pdfUploads, "${safe(uploadId)}.pdf")
+
     fun articleDir(itemId: String) = File(articles, safe(itemId))
 
     fun thumb(itemId: String) = File(thumbs, "${safe(itemId)}.webp")
@@ -61,6 +72,7 @@ class ContentPaths(filesDir: File, cacheDir: File) {
         /** Item ids come from the server and become path components: only `[A-Za-z0-9_-]{1,64}`. */
         fun isSafeId(id: String): Boolean = SAFE_ID.matches(id)
 
+        const val PDF_FILE = "document.pdf"
         const val TMP_SUFFIX = ".tmp"
         const val OLD_SUFFIX = ".old"
     }

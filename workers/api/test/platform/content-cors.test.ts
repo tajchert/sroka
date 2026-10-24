@@ -80,3 +80,20 @@ describe("API CORS", () => {
     expect(res.headers.get("access-control-expose-headers")).toContain("X-Retry-After");
   });
 });
+
+describe("pdf content", () => {
+  it("serves .pdf with application/pdf, inline disposition and a CSP without sandbox", async () => {
+    await testEnv.CONTENT.put(`private/u1/${CID}/document.pdf`, "%PDF-1.4 hi");
+    const res = await call(await url("u.u1", "document.pdf"), { headers: { origin: APP } }, CONTENT);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    expect(res.headers.get("content-disposition")).toBe('inline; filename="document.pdf"');
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(res.headers.get("access-control-allow-origin")).toBe(APP);
+    const csp = res.headers.get("content-security-policy")!;
+    expect(csp).not.toContain("sandbox");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+  });
+});

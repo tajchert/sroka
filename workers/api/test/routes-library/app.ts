@@ -8,7 +8,7 @@ import { syncRoutes } from "../../src/routes/sync.ts";
 import { tagsRoutes } from "../../src/routes/tags.ts";
 
 /** Test app: fake auth middleware (userId from `x-test-user`) + the library sub-apps, fake PARSE_QUEUE. */
-export function makeApp() {
+export function makeApp(envOverride: Partial<Env> = {}) {
   const sent: ParseJob[] = [];
   const queue = {
     async send(body: ParseJob) {
@@ -18,7 +18,7 @@ export function makeApp() {
       for (const m of msgs) sent.push(m.body);
     },
   };
-  const testEnv = { ...(env as unknown as Env), PARSE_QUEUE: queue as unknown as Env["PARSE_QUEUE"] };
+  const testEnv = { ...(env as unknown as Env), PARSE_QUEUE: queue as unknown as Env["PARSE_QUEUE"], ...envOverride };
   const app = new Hono<{ Bindings: Env; Variables: { userId: string } }>();
   app.use("/v1/*", async (c, next) => {
     const u = c.req.header("x-test-user");
@@ -45,5 +45,23 @@ export function makeApp() {
     const text = await res.text();
     return { status: res.status, json: text ? (JSON.parse(text) as any) : null };
   }
-  return { call, sent, user, env: testEnv };
+  /** Raw-body request (PDF upload); the caller sets content-length/content-type. */
+  async function raw(method: string, path: string, body: Uint8Array | null, headers: Record<string, string> = {}) {
+    const ctx = createExecutionContext();
+    const res = await app.fetch(
+      new Request(`http://localhost:8787${path}`, { method, headers: { "x-test-user": user, ...headers }, body }),
+      testEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      // non-JSON error body (unhandled exception → 500)
+    }
+    return { status: res.status, json };
+  }
+  return { call, raw, sent, user, env: testEnv };
 }

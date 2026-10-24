@@ -11,7 +11,8 @@ SELECT i.id AS id, i.title AS title, i.url AS url, substr(i.excerpt, 1, 200) AS 
   (SELECT group_concat(name, char(31)) FROM
      (SELECT name FROM item_tags WHERE item_id = i.id ORDER BY name_key)) AS tags,
   (SELECT po.type FROM pending_ops po WHERE po.item_id = i.id AND po.type != 'item.setProgress'
-     ORDER BY po.local_seq DESC LIMIT 1) AS pending_type
+     ORDER BY po.local_seq DESC LIMIT 1) AS pending_type,
+  i.kind AS kind, i.file_size AS file_size
 """
 
 internal const val LIST_FROM = """

@@ -145,6 +145,7 @@ internal class ContentStoreTest : DataTestBase() {
         }
         override suspend fun createImport(source: File, fileName: String, mimeType: String, format: app.sroka.core.model.ImportFormat) = error("unused")
         override suspend fun getImport(id: String) = error("unused")
+        override suspend fun uploadPdf(file: File, fileName: String, tags: List<String>, source: String, onProgress: (Long, Long) -> Unit) = error("unused")
         override suspend fun export(format: app.sroka.core.model.ExportFormat, dest: File) = error("unused")
         override suspend fun sendOtp(email: String) = error("unused")
         override suspend fun signIn(email: String, otp: String) = error("unused")

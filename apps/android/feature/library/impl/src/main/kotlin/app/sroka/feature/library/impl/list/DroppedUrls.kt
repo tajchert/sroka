@@ -4,10 +4,18 @@ import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.extractFirstUrl
 
 /** MIME types the list accepts as a drag payload (R15.1). */
-internal val DROP_MIME_TYPES = setOf("text/plain", "text/uri-list", "text/html")
+internal val DROP_MIME_TYPES = setOf("text/plain", "text/uri-list", "text/html", PDF_MIME)
+
+internal const val PDF_MIME = "application/pdf"
 
 /** One dragged `ClipData.Item`, reduced to plain strings so the extraction is testable on the JVM. */
-internal data class DroppedItem(val text: String? = null, val uri: String? = null, val html: String? = null)
+internal data class DroppedItem(
+    val text: String? = null,
+    val uri: String? = null,
+    val html: String? = null,
+    /** A `content://` or `file://` URI (a dragged document); never an http link. */
+    val documentUri: String? = null,
+)
 
 private val hrefRegex = Regex("""href\s*=\s*(?:"([^"]*)"|'([^']*)')""", RegexOption.IGNORE_CASE)
 
@@ -36,3 +44,10 @@ private fun fromText(text: String?): List<String> {
     if (lines.size > 1 && lines.all { UrlNormalizer.isHttpUrl(it) }) return lines
     return listOfNotNull(extractFirstUrl(text))
 }
+
+/**
+ * Document URIs of a drag payload that is a PDF ([clipIsPdf]: the clip advertises `application/pdf`),
+ * in order and without duplicates. http(s) links are not documents.
+ */
+internal fun extractDroppedPdfUris(items: List<DroppedItem>, clipIsPdf: Boolean): List<String> =
+    if (!clipIsPdf) emptyList() else items.mapNotNull { it.documentUri?.takeIf(String::isNotBlank) }.distinct()

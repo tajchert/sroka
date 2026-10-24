@@ -10,6 +10,10 @@ export type ParseStatus = z.infer<typeof ParseStatus>;
 export const ItemStatus = z.enum(["unread", "archived"]);
 export type ItemStatus = z.infer<typeof ItemStatus>;
 
+/** What the item is: a web article (parsed into the reader) or an uploaded PDF (stored as the original file). */
+export const ItemKind = z.enum(["article", "pdf"]);
+export type ItemKind = z.infer<typeof ItemKind>;
+
 export const ItemSource = z.enum(["share", "extension", "web", "import", "email", "api"]);
 export type ItemSource = z.infer<typeof ItemSource>;
 
@@ -82,6 +86,12 @@ export const Item = z.object({
   source: ItemSource.nullable(),
   /** Tag names (present pairs only), sorted case-insensitively. */
   tags: z.array(z.string()),
+  /** "pdf" = uploaded file (POST /v1/items/pdf); its original is `document.pdf` in the private content dir. */
+  kind: ItemKind,
+  /** Original file name of an uploaded PDF (e.g. "paper.pdf"), else null. */
+  fileName: z.string().nullable(),
+  /** Size in bytes of an uploaded PDF, else null. */
+  fileSize: z.number().int().nonnegative().nullable(),
   /** Last change seq (sync). */
   seq: z.number().int().nonnegative(),
 });

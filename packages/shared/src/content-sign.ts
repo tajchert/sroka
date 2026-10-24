@@ -102,13 +102,14 @@ export async function buildContentUrl(input: ContentDirInput & { file: string })
 
 /** All URLs for GET /v1/items/:id/content. */
 export async function buildContentUrls(
-  input: ContentDirInput,
-): Promise<{ articleUrl: string; baseUrl: string; packageUrl: string; expiresAt: number }> {
+  input: ContentDirInput & { pdf?: boolean },
+): Promise<{ articleUrl: string; baseUrl: string; packageUrl: string; documentUrl: string | null; expiresAt: number }> {
   const { baseUrl, exp } = await buildContentBaseUrl(input);
   return {
     articleUrl: `${baseUrl}article.html`,
     baseUrl,
     packageUrl: `${baseUrl}package.zip`,
+    documentUrl: input.pdf ? `${baseUrl}document.pdf` : null,
     expiresAt: exp * 1000,
   };
 }

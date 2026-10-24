@@ -41,6 +41,11 @@ class FakeContentStore(
         return result
     }
 
+    /** Local PDF files by item id (`kind == PDF`) (set by tests/previews). */
+    val pdfFiles = MutableStateFlow<Map<String, File>>(emptyMap())
+
+    override suspend fun pdfFile(itemId: String): File? = pdfFiles.value[itemId]?.takeIf { it.isFile }
+
     override suspend fun storageUsageBytes(): Long = usageBytes
 
     override suspend fun clearDownloads() {

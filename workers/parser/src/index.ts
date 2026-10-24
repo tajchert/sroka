@@ -59,8 +59,10 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     }
     await reportParse(env, { job, result, stats, durationMs: Date.now() - t0, attempt: msg.attempts });
     const ack = await lib.markParsed(job.itemId, result);
-    if (!ack?.ok && result.contentPrivate && result.contentId) {
+    if (!ack?.ok && result.contentPrivate && result.contentId && !job.pdf) {
       // Rejected (stale, duplicate, item deleted, account wiped): this private dir is referenced by nothing.
+      // PDF jobs never delete anything here: every job of the item writes the same text.txt key in the same dir
+      // as the user's document.pdf, so a stale/duplicate delivery could remove the accepted result's text.
       await deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId)).catch((e) =>
         log.warnException("private content cleanup failed", e, { event: "private_cleanup_failed" }),
       );

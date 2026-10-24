@@ -2,6 +2,7 @@ package app.sroka.core.data.sync
 
 import app.sroka.core.data.ops.statusFromWire
 import app.sroka.core.database.entity.ItemEntity
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.UrlNormalizer
@@ -35,6 +36,9 @@ internal fun ItemDto.toEntity(existing: ItemEntity?): ItemEntity = ItemEntity(
     serverSeq = seq,
     ftsRowId = existing?.ftsRowId ?: 0,
     resyncMark = 0,
+    kind = ItemKind.fromWire(kind),
+    fileName = fileName,
+    fileSize = fileSize,
 )
 
 /** Unknown future values: readable content counts as OK, otherwise PENDING. */

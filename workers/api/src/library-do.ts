@@ -1,4 +1,4 @@
-import { log } from "@sroka/shared";
+import { log, r2Keys } from "@sroka/shared";
 import { DurableObject } from "cloudflare:workers";
 import {
   type Item,
@@ -25,6 +25,21 @@ export type { ApplyResult, TagWithCount } from "./do/store.ts";
 
 export type PullResult = { ok: true; data: PullResponse } | { ok: false; error: "resync_required" };
 export type ListItemsResult = { ok: true; items: Item[]; nextCursor: string | null } | { ok: false; error: "bad_cursor" };
+export type AddPdfRequest = {
+  itemId: string;
+  /** `${APP_ORIGIN}/pdf/{sha256hex}` — the dedupe key. */
+  url: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  contentId: string;
+  tags: string[];
+  source: string;
+  at: number;
+};
+export type AddPdfResult =
+  | { ok: true; item: Item; created: boolean; parseJobs: ParseJob[] }
+  | { ok: false; error: "storage_full" | "invalid_url" | "invalid_request"; message?: string };
 export interface RestResult extends ApplyResult {
   /** The (alias-resolved) item after applying, or null if unknown/deleted. */
   item: Item | null;
@@ -47,6 +62,8 @@ const DEFERRED_SWEEP_MS = 10 * 60 * 1000;
 const DESTROYED_TABLE = "_destroyed";
 /** Content-ref outbox entries per D1 batch, and the alarm delay after a failed flush. */
 const REF_BATCH = 50;
+/** A PDF upload reservation older than this without a referencing item is reclaimed by the alarm. */
+const PDF_RESERVATION_MS = 60 * 60 * 1000;
 const REF_RETRY_MS = 10 * 60 * 1000;
 
 export class LibraryDestroyedError extends Error {
@@ -69,7 +86,7 @@ export class LibraryDO extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.store = new LibraryStore(ctx.storage, () => this.userId());
+    this.store = new LibraryStore(ctx.storage, () => this.userId(), () => this.env.APP_ORIGIN);
     void ctx.blockConcurrencyWhile(async () => {
       if (!this.isDestroyed()) this.ensureSchema();
     });
@@ -260,6 +277,77 @@ export class LibraryDO extends DurableObject<Env> {
   /** Sync push / single mutation path. Returns the PushResponse and parse jobs for the caller to enqueue. */
   async applyOps(deviceId: string, ops: readonly unknown[]): Promise<ApplyResult> {
     return this.apply(deviceId, ops);
+  }
+
+  /**
+   * POST /v1/items/pdf commit: the file is already in R2 at private/{userId}/{contentId}/document.pdf. One transaction:
+   * duplicate → re-add (created:false), quota exceeded → storage_full, else a new pdf item + its parse job. The
+   * route deletes the uploaded object on every outcome except `created: true`.
+   */
+  async addPdf(deviceId: string, req: AddPdfRequest): Promise<AddPdfResult> {
+    this.ensureSchema();
+    let canonical: string;
+    try {
+      canonical = normalizeUrl(req.url);
+    } catch {
+      return { ok: false, error: "invalid_url" };
+    }
+    const hash = await urlHash(canonical);
+    // Synchronous from here on (no interleaving with other requests).
+    const r = this.store.addPdf({ ...req, deviceId, canonical, hash });
+    if (r.kind === "storage_full") return { ok: false, error: "storage_full" };
+    if (r.kind === "rejected") return { ok: false, error: "invalid_request", message: r.reason };
+    await this.ensureAlarm();
+    const parseJobs = await this.budgetJobs(r.jobs);
+    await this.flushCleanup();
+    const item = await this.signOne(this.store.getItem(r.id));
+    if (!item) throw new Error("addPdf: item vanished");
+    return { ok: true, item, created: r.kind === "created", parseJobs };
+  }
+
+  /** Reserves a content id before the route writes its R2 object; the alarm reclaims objects never committed (api.md §9). */
+  async reservePdfUpload(contentId: string): Promise<void> {
+    this.ensureSchema();
+    this.store.reservePdfUpload(contentId, Date.now());
+    await this.scheduleSweepIn(PDF_RESERVATION_MS + 60_000);
+  }
+
+  /**
+   * Duplicate upload whose stored original is gone: points the existing item at the new copy (see store.repointPdf).
+   * `ok:false` = the item changed meanwhile; the route then deletes the new copy.
+   */
+  async repointPdf(
+    deviceId: string,
+    req: { itemId: string; expectContentId: string | null; contentId: string; fileName: string; fileSize: number },
+  ): Promise<{ ok: true; item: Item; parseJobs: ParseJob[] } | { ok: false }> {
+    void deviceId;
+    this.ensureSchema();
+    const r = this.store.repointPdf(req);
+    if (!r) return { ok: false };
+    await this.ensureAlarm();
+    const parseJobs = await this.budgetJobs(r.jobs);
+    await this.flushCleanup();
+    await this.flushRefsIfPending();
+    const item = await this.signOne(this.store.getItem(req.itemId));
+    if (!item) throw new Error("repointPdf: item vanished");
+    return { ok: true, item, parseJobs };
+  }
+
+  /** Alarm: deletes R2 dirs of upload reservations older than 1 hour that no live item references, then the rows. */
+  async sweepPdfUploads(now: number = Date.now()): Promise<number> {
+    this.ensureSchema();
+    const { stale, orphans } = this.store.staleOrphanReservations(now - PDF_RESERVATION_MS, 100);
+    const done: string[] = stale.filter((id) => !orphans.includes(id));
+    for (const id of orphans) {
+      try {
+        await deletePrefix(this.env.CONTENT, r2Keys.contentDir(id, this.userId()));
+        done.push(id);
+      } catch (e) {
+        log.exception("pdf reservation sweep failed", e, { event: "pdf_reservation_sweep_failed" });
+      }
+    }
+    this.store.dropPdfReservations(done);
+    return orphans.length;
   }
 
   /** Bumps parse_gen and returns the job to enqueue (html save path), or null if the item is unknown/deleted. */
@@ -467,6 +555,11 @@ export class LibraryDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
     await this.flushRefsIfPending(); // retries failed content-ref flushes (errors are swallowed)
     const t0 = Date.now();
+    try {
+      await this.sweepPdfUploads();
+    } catch (e) {
+      log.exception("pdf upload sweep failed", e, { event: "pdf_reservation_sweep_failed" });
+    }
     const resent = await this.sweepStalePending();
     log.info("LibraryDO alarm sweep", { event: "do_alarm_sweep", resent, durationMs: Date.now() - t0 });
   }

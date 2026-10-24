@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="exports" path="exports/" />
+    <!-- Offline PDFs (articles/{id}/document.pdf): "Open with another app" in the reader. -->
+    <files-path name="articles" path="articles/" />
 </paths>

@@ -55,6 +55,7 @@ ICONS = [
     ("OpenInFull", "open_in_full", 0, False),
     ("OpenInNew", "open_in_new", 0, True),
     ("Palette", "palette", 0, False),
+    ("PictureAsPdf", "picture_as_pdf", 0, False),
     ("Refresh", "refresh", 0, False),
     ("Schedule", "schedule", 0, False),
     ("ScheduleFilled", "schedule", 1, False),

@@ -117,7 +117,7 @@
 
     <!-- Add dialog -->
     <string name="feature_library_add">Add</string>
-    <string name="feature_library_add_title">Add link</string>
+    <string name="feature_library_add_title">Add link or PDF</string>
     <string name="feature_library_add_label">Link</string>
     <string name="feature_library_add_invalid">Enter a valid web address</string>
     <string name="feature_library_cancel">Cancel</string>
@@ -184,4 +184,37 @@
         <item quantity="one">Saved %d link</item>
         <item quantity="other">Saved %d links</item>
     </plurals>
+
+    <!-- PDF upload -->
+    <string name="feature_library_add_pdf">Choose PDF file</string>
+    <string name="feature_library_row_pdf">PDF</string>
+    <string name="feature_library_row_pdf_meta">PDF \u00b7 %1$s</string>
+    <string name="feature_library_row_pdf_icon">PDF document</string>
+    <plurals name="feature_library_uploading_pdfs">
+        <item quantity="one">Uploading %d PDF</item>
+        <item quantity="other">Uploading %d PDFs</item>
+    </plurals>
+    <string name="feature_library_uploading_cancel">Cancel upload</string>
+    <string name="feature_library_upload_failed_title">PDF not added</string>
+    <string name="feature_library_upload_failed_file">%1$s: %2$s</string>
+    <string name="feature_library_upload_failed_more">%1$s (+%2$d more)</string>
+    <string name="feature_library_upload_retry">Retry</string>
+    <string name="feature_library_upload_dismiss">Dismiss</string>
+    <string name="feature_library_upload_err_too_large">Too large. PDFs can be up to 50 MB.</string>
+    <string name="feature_library_upload_err_not_pdf">Not a PDF file.</string>
+    <string name="feature_library_upload_err_storage_full">Storage is full.</string>
+    <string name="feature_library_upload_err_network">No connection. Check your network.</string>
+    <string name="feature_library_upload_err_unknown">Something went wrong. Try again later.</string>
+    <string name="feature_library_upload_err_auth">Sign in again to upload.</string>
+    <plurals name="feature_library_snack_pdf_queued">
+        <item quantity="one">Uploading PDF</item>
+        <item quantity="other">Uploading %d PDFs</item>
+    </plurals>
+    <string name="feature_library_snack_pdf_done">PDF added to Sroka</string>
+    <string name="feature_library_snack_pdf_duplicate">Already in Sroka</string>
+    <string name="feature_library_snack_pdf_failed">Couldn\u2019t add PDF. %1$s</string>
+    <string name="feature_library_share_pdf_uploading">Adding PDF to Sroka</string>
+    <string name="feature_library_share_pdf_uploading_sub">It uploads in the background.</string>
+    <string name="feature_library_share_pdf_none">No PDF to add</string>
+    <string name="feature_library_share_pdf_failed">Couldn\u2019t add PDF</string>
 </resources>

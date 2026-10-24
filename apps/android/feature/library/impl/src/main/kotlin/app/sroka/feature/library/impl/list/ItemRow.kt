@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.sroka.core.designsystem.theme.srokaColors
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
@@ -127,7 +128,20 @@ internal fun ItemRow(
 private fun Thumbnail(item: ItemSummary) {
     val shape = RoundedCornerShape(8.dp)
     val path = item.thumbnailPath
-    if (path != null) {
+    if (item.kind == ItemKind.PDF) {
+        // PDFs have no lead image: an icon tile instead.
+        Box(
+            Modifier.size(56.dp).clip(shape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                SrokaIcons.PictureAsPdf,
+                contentDescription = stringResource(R.string.feature_library_row_pdf_icon),
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    } else if (path != null) {
         AsyncImage(
             model = File(path),
             contentDescription = null,
@@ -150,6 +164,9 @@ private fun Thumbnail(item: ItemSummary) {
 
 @Composable
 private fun metaText(item: ItemSummary): String = when {
+    item.kind == ItemKind.PDF ->
+        item.fileSize?.let { stringResource(R.string.feature_library_row_pdf_meta, formatFileSize(it)) }
+            ?: stringResource(R.string.feature_library_row_pdf)
     item.parseStatus == ParseStatus.PENDING -> "${item.domain} · ${stringResource(R.string.feature_library_row_processing)}"
     item.parseStatus == ParseStatus.FAILED -> "${item.domain} · ${stringResource(R.string.feature_library_row_parse_failed)}"
     item.readingMinutes != null ->

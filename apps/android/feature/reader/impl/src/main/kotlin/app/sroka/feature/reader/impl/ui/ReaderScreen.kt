@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.sroka.core.designsystem.theme.srokaColors
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ParseStatus
 import app.sroka.feature.reader.impl.ReaderEvent
 import app.sroka.feature.reader.impl.ReaderHeader
@@ -118,10 +119,11 @@ internal fun ReaderScreen(
     val layout = rememberReaderLayout()
     // Hinge bounds are window coordinates: convert into this container's space once it is laid out.
     var container by remember { mutableStateOf<IntArray?>(null) }
-    val tabletop = (layout as? ReaderLayout.Tabletop)?.let { t ->
+    val isPdf = item?.kind == ItemKind.PDF
+    val tabletop = (layout as? ReaderLayout.Tabletop)?.takeUnless { isPdf }?.let { t ->
         container?.let { c -> localSplit(t.hingeTopPx, t.hingeBottomPx, c[0], c[1]) }
     }
-    val tabletopRequested = layout is ReaderLayout.Tabletop
+    val tabletopRequested = layout is ReaderLayout.Tabletop && !isPdf
     var scrubRequest by remember { mutableStateOf<ScrubRequest?>(null) }
     var scrollTopSignal by remember { mutableStateOf(0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -252,17 +254,27 @@ internal fun ReaderScreen(
                                     ReaderMenuItem(R.string.feature_reader_edit_tags, SrokaIcons.Label) {
                                         menuOpen = false; showTags = true
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_share, SrokaIcons.Share) {
-                                        menuOpen = false; shareUrl(context, current.url)
-                                    }
-                                    ReaderMenuItem(R.string.feature_reader_open_browser, SrokaIcons.OpenInNew) {
-                                        menuOpen = false; openExternalLink(context, current.url)
-                                    }
-                                    ReaderMenuItem(R.string.feature_reader_refresh, SrokaIcons.Refresh, enabled = !offline) {
-                                        menuOpen = false; viewModel.refresh()
-                                    }
-                                    ReaderMenuItem(R.string.feature_reader_text_size, SrokaIcons.FormatSize) {
-                                        menuOpen = false; showAppearance = true
+                                    if (isPdf) {
+                                        val pdf = (state as? ReaderUiState.PdfReady)?.file
+                                        ReaderMenuItem(R.string.feature_reader_share_pdf, SrokaIcons.Share, enabled = pdf != null) {
+                                            menuOpen = false; pdf?.let { sharePdf(context, it, current.displayTitle) }
+                                        }
+                                        ReaderMenuItem(R.string.feature_reader_open_with, SrokaIcons.OpenInNew, enabled = pdf != null) {
+                                            menuOpen = false; pdf?.let { openPdfExternally(context, it) }
+                                        }
+                                    } else {
+                                        ReaderMenuItem(R.string.feature_reader_share, SrokaIcons.Share) {
+                                            menuOpen = false; shareUrl(context, current.url)
+                                        }
+                                        ReaderMenuItem(R.string.feature_reader_open_browser, SrokaIcons.OpenInNew) {
+                                            menuOpen = false; openExternalLink(context, current.url)
+                                        }
+                                        ReaderMenuItem(R.string.feature_reader_refresh, SrokaIcons.Refresh, enabled = !offline) {
+                                            menuOpen = false; viewModel.refresh()
+                                        }
+                                        ReaderMenuItem(R.string.feature_reader_text_size, SrokaIcons.FormatSize) {
+                                            menuOpen = false; showAppearance = true
+                                        }
                                     }
                                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                                     ReaderMenuItem(
@@ -373,10 +385,20 @@ internal fun ReaderScreen(
                         },
                     )
                 }
+                is ReaderUiState.PdfReady -> PdfViewer(
+                    file = s.file,
+                    initialPage = viewModel.restorePoint().anchor ?: 0,
+                    onPage = viewModel::onPdfPage,
+                    onUnreadable = {
+                        Button(onClick = { openPdfExternally(context, s.file) }) {
+                            Text(stringResource(R.string.feature_reader_open_with))
+                        }
+                    },
+                )
                 ReaderUiState.Loading, ReaderUiState.Missing -> Unit
                 ReaderUiState.Downloading -> Centered {
                     CircularProgressIndicator()
-                    Text(stringResource(R.string.feature_reader_downloading))
+                    Text(stringResource(if (isPdf) R.string.feature_reader_downloading_pdf else R.string.feature_reader_downloading))
                 }
                 is ReaderUiState.NotDownloaded -> Centered {
                     Text(
@@ -395,7 +417,7 @@ internal fun ReaderScreen(
                         textAlign = TextAlign.Center,
                     )
                     Button(onClick = viewModel::retryDownload) { Text(stringResource(R.string.feature_reader_try_again)) }
-                    OriginalButton(originalUrl) { openExternalLink(context, it) }
+                    if (!isPdf) OriginalButton(originalUrl) { openExternalLink(context, it) }
                 }
                 ReaderUiState.ParsePending -> Centered {
                     Text(
@@ -550,4 +572,30 @@ private fun shareUrl(context: Context, url: String) {
         putExtra(Intent.EXTRA_TEXT, url)
     }
     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+/** Authority of the FileProvider declared in the app manifest (`${applicationId}.exports`). */
+private fun pdfUri(context: Context, file: java.io.File) =
+    androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".exports", file)
+
+private fun sharePdf(context: Context, file: java.io.File, title: String) {
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, pdfUri(context, file))
+        putExtra(Intent.EXTRA_TITLE, title)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+private fun openPdfExternally(context: Context, file: java.io.File) {
+    val view = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(pdfUri(context, file), "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(view, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: android.content.ActivityNotFoundException) {
+        // No PDF viewer installed; nothing more to offer.
+    }
 }

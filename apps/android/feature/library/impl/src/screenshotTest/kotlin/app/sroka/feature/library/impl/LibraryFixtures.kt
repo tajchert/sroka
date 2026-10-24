@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl
 
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.MatchIn
@@ -21,6 +22,8 @@ private fun summary(
     offline: OfflineState = OfflineState.AVAILABLE_REMOTE,
     pending: PendingChange? = null,
     status: ItemStatus = ItemStatus.UNREAD,
+    kind: ItemKind = ItemKind.ARTICLE,
+    fileSize: Long? = null,
 ) = ItemSummary(
     id = id,
     displayTitle = title,
@@ -36,6 +39,8 @@ private fun summary(
     tags = emptyList(),
     savedAt = SavedAt,
     pendingChange = pending,
+    kind = kind,
+    fileSize = fileSize,
 )
 
 /** One row per status line (R6), plus a favourite and an ordinary row. */
@@ -48,6 +53,14 @@ internal val sampleItems: List<ItemSummary> = listOf(
     summary("i6", "A page that only half parsed", "partial.example.com", 6, parse = ParseStatus.PARTIAL),
     summary("i7", "Downloading this one right now", "fetching.example.com", 11, offline = OfflineState.DOWNLOADING),
     summary("i8", "Available offline on this device", "saved.example.com", 8, offline = OfflineState.DOWNLOADED),
+)
+
+/** Library rows with PDFs: one downloaded, one waiting for its first sync. */
+internal val samplePdfItems: List<ItemSummary> = listOf(
+    summary("p1", "Attention Is All You Need", "PDF", null, offline = OfflineState.DOWNLOADED, kind = ItemKind.PDF, fileSize = 2_411_724),
+    summary("p2", "Tax return 2025.pdf", "PDF", null, kind = ItemKind.PDF, fileSize = 840_000, favorite = true),
+    sampleItems[0],
+    sampleItems[1],
 )
 
 internal val sampleSearchResults: List<SearchResult> = listOf(

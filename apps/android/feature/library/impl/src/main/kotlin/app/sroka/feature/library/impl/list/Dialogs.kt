@@ -1,6 +1,10 @@
 package app.sroka.feature.library.impl.list
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +34,7 @@ import kotlinx.coroutines.launch
 internal fun AddUrlDialog(
     onSubmit: suspend (String) -> Boolean,
     onDismiss: () -> Unit,
+    onChoosePdf: (() -> Unit)? = null,
 ) {
     var value by rememberSaveable { mutableStateOf("") }
     var invalid by rememberSaveable { mutableStateOf(false) }
@@ -57,6 +62,7 @@ internal fun AddUrlDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.feature_library_add_title)) },
         text = {
+          Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(
                 value = value,
                 onValueChange = {
@@ -74,6 +80,18 @@ internal fun AddUrlDialog(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { submit() }),
             )
+            if (onChoosePdf != null) {
+                androidx.compose.material3.OutlinedButton(onClick = onChoosePdf) {
+                    androidx.compose.material3.Icon(
+                        app.sroka.core.designsystem.icon.SrokaIcons.UploadFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.feature_library_add_pdf))
+                }
+            }
+          }
         },
         confirmButton = {
             TextButton(onClick = ::submit, enabled = value.isNotBlank()) {

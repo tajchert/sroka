@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import app.sroka.core.domain.AuthRepository
+import android.net.Uri
 import app.sroka.core.domain.LibraryRepository
+import app.sroka.core.domain.PdfUploader
 import app.sroka.core.domain.SaveSource
 import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.domain.SyncController
@@ -18,6 +20,9 @@ import app.sroka.core.model.ItemQuery
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.LibraryTab
+import app.sroka.core.model.PdfUpload
+import app.sroka.core.model.PdfUploadError
+import app.sroka.core.model.PdfUploadState
 import app.sroka.core.model.SaveResult
 import app.sroka.core.model.SessionState
 import app.sroka.core.model.SortOrder
@@ -43,6 +48,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -77,6 +83,15 @@ sealed interface ListEvent {
 
     /** The dropped link was already saved: "Already in Sroka" with Open. */
     data class DropAlready(val itemId: String) : ListEvent
+
+    /** [count] PDFs were accepted for upload. */
+    data class PdfQueued(val count: Int) : ListEvent
+
+    /** A PDF upload finished; [duplicate] = the file was already in Sroka. */
+    data class PdfDone(val duplicate: Boolean, val itemId: String?) : ListEvent
+
+    /** A PDF upload failed permanently with a typed [error]. */
+    data class PdfFailed(val error: PdfUploadError) : ListEvent
 }
 
 /** Snackbar text for archive/unarchive; offline adds "Syncs when you're online" (R6). */
@@ -107,6 +122,7 @@ class LibraryListViewModel @Inject constructor(
     syncStatus: SyncStatusRepository,
     auth: AuthRepository,
     private val settings: SettingsRepository,
+    private val uploader: PdfUploader,
 ) : ViewModel() {
 
     private val scope = MutableStateFlow<ListScope?>(null)
@@ -161,6 +177,42 @@ class LibraryListViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val events: Flow<ListEvent> = eventChannel.receiveAsFlow()
+
+    /** PDF uploads, oldest first (drives the "Uploading N PDFs" cards). */
+    val uploads: StateFlow<List<PdfUpload>> = uploader.uploads
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val announced = mutableSetOf<String>()
+
+    /**
+     * Snackbar events for uploads that finished or failed. Cold: collected by the visible screen only.
+     * Finished entries are forgotten once announced, except while a failure is still on screen.
+     */
+    val uploadEvents: Flow<ListEvent> = uploader.uploads.transform { list ->
+        list.forEach { upload ->
+            if (upload.isActive || !announced.add(upload.id)) return@forEach
+            when (val st = upload.state) {
+                is PdfUploadState.Done -> emit(ListEvent.PdfDone(st.duplicate, st.itemId))
+                is PdfUploadState.Failed -> emit(ListEvent.PdfFailed(st.error))
+                else -> Unit
+            }
+        }
+        if (list.any { it.state is PdfUploadState.Done } && list.none { it.state is PdfUploadState.Failed }) {
+            uploader.clearFinished()
+        }
+    }
+
+    /** Copies the picked/dropped PDFs into app storage and queues their upload. */
+    fun addPdfs(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            val queued = uploader.enqueue(uris).count { it.state !is PdfUploadState.Failed }
+            if (queued > 0) eventChannel.send(ListEvent.PdfQueued(queued))
+        }
+    }
+
+    /** Forgets failed uploads (the card's Dismiss). */
+    fun dismissUploadFailures() = uploader.clearFinished()
 
     /** Results of user-initiated fetches; collected only by the visible screen. */
     val fetchEvents: Flow<SyncEvent> = syncStatus.events

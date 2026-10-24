@@ -38,6 +38,8 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.Snapshot
@@ -238,6 +240,7 @@ private val PaneGutter = 24.dp
 /** Divider anchors (R13): min 300dp per pane, list 360dp, 50 %. */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 private val PaneAnchors = listOf(
+    PaneExpansionAnchor.Offset.fromStart(0.dp), // COLLAPSED_INDEX: full-width reading (R14.3)
     PaneExpansionAnchor.Offset.fromStart(300.dp),
     PaneExpansionAnchor.Offset.fromStart(360.dp),
     PaneExpansionAnchor.Proportion(0.5f),
@@ -259,7 +262,23 @@ private fun SrokaNavDisplay(
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
     // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
     // Snap points for the divider: each pane keeps at least 300dp, the list can sit at 360dp or 50 %.
-    val expansionState = rememberPaneExpansionState(anchors = PaneAnchors)
+    // R14.3: the anchor index at rest and the last non-collapsed one are saved here so rotation keeps both.
+    var anchorIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var listIndex by rememberSaveable { mutableIntStateOf(DEFAULT_LIST_INDEX) }
+    val expansionState = rememberPaneExpansionState(anchors = PaneAnchors, initialAnchoredIndex = anchorIndex)
+    LaunchedEffect(expansionState) {
+        snapshotFlow { PaneAnchors.indexOf(expansionState.currentAnchor) }.collect {
+            anchorIndex = it
+            listIndex = rememberedIndex(it, listIndex)
+        }
+    }
+    val scope = rememberCoroutineScope()
+    val expanded = twoPane && anchorIndex == COLLAPSED_INDEX
+    val restoreList: () -> Unit = {
+        scope.launch { expansionState.animateTo(PaneAnchors[restoreIndex(listIndex, PaneAnchors.size)]) }
+    }
+    // Without an open article there is nothing to read full width: bring the list back.
+    LaunchedEffect(detailItemId, twoPane) { if (detailItemId == null && anchorIndex == COLLAPSED_INDEX) restoreList() }
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(
         backNavigationBehavior = BackNavigationBehavior.PopLatest,
         directive = directive,
@@ -304,7 +323,15 @@ private fun SrokaNavDisplay(
                 addLinkRequested = addLinkRequested,
                 onAddLinkHandled = onAddLinkHandled,
             )
-            readerEntries(onBack = goBack, onArchived = onArchived, detailPaneActive = detailItemId != null)
+            readerEntries(
+                onBack = goBack,
+                onArchived = onArchived,
+                detailPaneActive = detailItemId != null,
+                isExpanded = expanded,
+                onToggleExpanded = {
+                    if (expanded) restoreList() else scope.launch { expansionState.animateTo(PaneAnchors[COLLAPSED_INDEX]) }
+                },
+            )
             settingsEntries(
                 onBack = goBack,
                 onOpenImport = { backStack.add(ImportKey) },

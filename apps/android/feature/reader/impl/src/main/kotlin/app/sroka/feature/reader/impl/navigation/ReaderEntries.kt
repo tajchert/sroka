@@ -22,6 +22,7 @@ import java.io.File
  * @param onBack leave the reader (also after delete)
  * @param onArchived the open item was archived: pop and show an undo snackbar (unarchive via
  *   LibraryRepository.setStatus). Defaults to [onBack] with no undo.
+ * @param isExpanded / onToggleExpanded R14.3: the list pane is collapsed; the app bar button toggles it
  * @param detailPaneActive true while the reader sits next to the list (two-pane, R13): it is drawn in
  *   the rounded detail card without a back arrow. When false it is full screen (phone, folded).
  */
@@ -30,6 +31,8 @@ fun EntryProviderScope<NavKey>.readerEntries(
     onBack: () -> Unit,
     onArchived: (itemId: String) -> Unit = { onBack() },
     detailPaneActive: Boolean = false,
+    isExpanded: Boolean = false,
+    onToggleExpanded: (() -> Unit)? = null,
 ) {
     entry<ReaderKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
         val viewModel = hiltViewModel<ReaderViewModel, ReaderViewModel.Factory>(
@@ -45,6 +48,8 @@ fun EntryProviderScope<NavKey>.readerEntries(
                 itemId = key.itemId,
                 detailPane = detailPaneActive,
                 paneWidthDp = paneWidthDp,
+                isExpanded = isExpanded,
+                onToggleExpanded = onToggleExpanded,
             )
         }
         if (detailPaneActive) {

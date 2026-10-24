@@ -75,11 +75,20 @@ class SettingsScreenTest {
     fun deleteAccountRequiresTypedWord() {
         show()
         tap("Delete account")
-        compose.onNodeWithText("Delete forever").assertIsNotEnabled()
-        compose.onNodeWithText("Type DELETE to confirm").performTextInput("DELETE")
-        compose.onNodeWithText("Delete forever").assertIsEnabled().performClick()
+        compose.onNode(hasText("Delete") and hasClickAction() and hasAnyAncestor(isDialog())).assertIsNotEnabled()
+        compose.onNodeWithText("Type your email to confirm").performTextInput(" ME@x.io ")
+        compose.onNode(hasText("Delete") and hasClickAction() and hasAnyAncestor(isDialog())).assertIsEnabled().performClick()
         compose.waitForIdle()
         assertEquals(1, account.deleteCount)
+    }
+
+    @Test
+    fun rowsShowSupportingText() {
+        show()
+        compose.onNodeWithText("Wi-Fi only", substring = true).assertExists()
+        compose.onNodeWithText("CSV or JSON").assertExists()
+        compose.onNodeWithText("From Pocket and others").assertExists()
+        compose.onNodeWithText("Default · 17 sp").assertExists()
     }
 
     @Test
@@ -87,8 +96,8 @@ class SettingsScreenTest {
         account.result = DeleteAccountResult.Failed(RemoteFailure.NETWORK)
         show()
         tap("Delete account")
-        compose.onNodeWithText("Type DELETE to confirm").performTextInput("DELETE")
-        compose.onNodeWithText("Delete forever").performClick()
+        compose.onNodeWithText("Type your email to confirm").performTextInput(" ME@x.io ")
+        compose.onNode(hasText("Delete") and hasClickAction() and hasAnyAncestor(isDialog())).performClick()
         compose.onNodeWithText("Could not delete the account", substring = true).assertIsDisplayed()
         assertEquals(SessionState.SignedIn("me@x.io"), auth.sessionFlow.value)
     }
@@ -96,7 +105,8 @@ class SettingsScreenTest {
     @Test
     fun policyDownloadAllAndRemoveDownloads() {
         show()
-        tap("Manual only")
+        tap("Offline downloads")
+        compose.onNodeWithText("Manual only").performClick()
         assertEquals(DownloadPolicy.MANUAL, settings.preferencesFlow.value.downloadPolicy)
         tap("Remove downloaded articles")
         compose.onNodeWithText("Articles stay in your list", substring = true).assertIsDisplayed()

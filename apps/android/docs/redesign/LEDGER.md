@@ -9,7 +9,7 @@
 | T3 library list + search + nav | todo | |
 | T4 share sheet + tags | todo | |
 | T5 reader | todo | |
-| T6 settings + import + export | todo | |
+| T6 settings + import + export | done | Settings 13, delete dialog 14, Import 15, Export 16; gate (settings test+lint, :app:assembleDebug) passes. |
 | Review + gate | todo | |
 
 ## Notes from tasks
@@ -30,3 +30,4 @@
 - Active job is stored in the user-preferences DataStore (key `active_import`, `ImportJobStore`); `LocalDataWiper` clears it on sign-out/delete. Worker `ImportProgressWorker` (unique name `sroka-import-<jobId>`, tagged `sroka`); polling logic is `pollUntilFinished` + `ImportTracker`.
 - Notification channel "Imports"; texts in `core/data/.../values/strings_transfer.xml`. `ic_stat_sroka.xml` copied from core:designsystem (c652171) into `core/data/res/drawable` (no module dependency); `SyncNotifications` switched to it too. If the glyph changes in designsystem, copy it again.
 - Notes for T6: the UI should request POST_NOTIFICATIONS itself (core:ui `NotificationPermission`); the worker keeps polling without it. Gradle config cache held a stale JDK path in this worktree; I ran with `--no-configuration-cache`.
+- T6: `ImportKey`/`ExportKey` in settings api; `settingsEntries(onBack, onOpenImport, onOpenExport)` (SrokaNavHost call updated). Added FileProvider `${applicationId}.exports` + `res/xml/export_file_paths.xml` (cache-path `exports/`) in :app. Reader text-size "steps" did not exist (reader uses a slider), so Settings defines steps 0.8..1.6 in `SettingsLogic.kt` (base 17 sp). Dynamic-colour switch removed from the UI only; `SettingsRepository.setDynamicColor` left in place. Export ready card shows size only (no article count). Import DONE "imported" = done - skipped.

@@ -87,8 +87,6 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settings.setThemeMode(mode) }
 
-    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settings.setDynamicColor(enabled) }
-
     fun setReaderTheme(theme: ReaderTheme) = viewModelScope.launch { settings.setReaderTheme(theme) }
 
     fun setReaderTextScale(scale: Float) = viewModelScope.launch { settings.setReaderTextScale(scale) }

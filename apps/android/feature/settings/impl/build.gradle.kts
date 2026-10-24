@@ -64,6 +64,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
 
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.bundles.navigation3)

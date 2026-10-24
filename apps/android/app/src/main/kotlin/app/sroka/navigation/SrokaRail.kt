@@ -119,12 +119,16 @@ fun RailAvatar(letter: String, onClick: () -> Unit, modifier: Modifier = Modifie
 /** The 4x48dp pane drag handle drawn in the gutter between list and detail (R13). */
 @Composable
 fun PaneDividerHandle(modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .width(4.dp)
-            .height(48.dp)
-            .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp)),
-    )
+    // The outer box is the (invisible) touch target the drag modifier is applied to; the pill is
+    // drawn inside it so a minimum-size modifier cannot stretch the visible handle.
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .width(4.dp)
+                .height(48.dp)
+                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp)),
+        )
+    }
 }
 
 /** Rail width from the mock (R13). */

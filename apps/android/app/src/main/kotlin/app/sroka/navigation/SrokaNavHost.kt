@@ -26,7 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.PaneExpansionAnchor
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.rememberPaneExpansionState
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
@@ -230,6 +232,15 @@ private fun NavigationSuiteType.isRail(): Boolean = this != NavigationSuiteType.
 /** Gutter between list and detail; hosts the drag handle. */
 private val PaneGutter = 24.dp
 
+/** Divider anchors (R13): min 300dp per pane, list 360dp, 50 %. */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+private val PaneAnchors = listOf(
+    PaneExpansionAnchor.Offset.fromStart(300.dp),
+    PaneExpansionAnchor.Offset.fromStart(360.dp),
+    PaneExpansionAnchor.Proportion(0.5f),
+    PaneExpansionAnchor.Offset.fromEnd(300.dp),
+)
+
 /** FAB height (56dp) plus its two 16dp margins. */
 private val FabClearance = 88.dp
 
@@ -247,9 +258,12 @@ private fun SrokaNavDisplay(
 ) {
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
     // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
+    // Snap points for the divider: each pane keeps at least 300dp, the list can sit at 360dp or 50 %.
+    val expansionState = rememberPaneExpansionState(anchors = PaneAnchors)
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(
         backNavigationBehavior = BackNavigationBehavior.PopLatest,
         directive = directive,
+        paneExpansionState = expansionState,
         // Dragging this handle in the gutter resizes the panes (PaneExpansionState).
         paneExpansionDragHandle = { state ->
             val interactionSource = remember { MutableInteractionSource() }

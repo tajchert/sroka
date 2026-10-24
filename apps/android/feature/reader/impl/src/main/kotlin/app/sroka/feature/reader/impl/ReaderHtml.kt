@@ -33,13 +33,25 @@ data class ReaderHeader(
 
 /**
  * Styling for an article shown in the two-pane detail card (R13): the page background matches the
- * card ([backgroundArgb]), the title is larger and the column is capped at 640dp with 48dp padding.
+ * card ([backgroundArgb]) and the column is capped at 640dp. A [narrow] pane (< [WIDE_PANE_DP]) keeps
+ * the phone values (24dp padding, 28px title); a wide one gets 48dp padding and a 36px title.
+ * Use [forWidth] to derive [narrow] from the measured pane width.
  */
-data class ReaderPaneStyle(val backgroundArgb: Int) {
+data class ReaderPaneStyle(val backgroundArgb: Int, val narrow: Boolean = false) {
     internal fun css(): String {
         val hex = String.format(java.util.Locale.ROOT, "#%06x", backgroundArgb and 0xFFFFFF)
-        return "html[data-theme]{--bg:$hex}.sk-title{font-size:36px;font-weight:600;line-height:1.15}" +
-            "body{margin:0;max-width:640px;padding-left:48px;padding-right:48px}"
+        val title = if (narrow) 28 else 36
+        val pad = if (narrow) 24 else 48
+        return "html[data-theme]{--bg:$hex}.sk-title{font-size:${title}px;font-weight:600;line-height:1.15}" +
+            "body{margin:0;max-width:640px;padding-left:${pad}px;padding-right:${pad}px}"
+    }
+
+    companion object {
+        /** Panes narrower than this (dp) use the phone paddings and title size. */
+        const val WIDE_PANE_DP = 480
+
+        fun forWidth(backgroundArgb: Int, paneWidthDp: Int): ReaderPaneStyle =
+            ReaderPaneStyle(backgroundArgb, narrow = paneWidthDp < WIDE_PANE_DP)
     }
 }
 

@@ -537,6 +537,9 @@ private fun SwipeableRow(
             coroutineScope.launch { state.reset() }
         },
         backgroundContent = {
+            // Only while swiping: the primary-coloured action bar would otherwise bleed through the
+            // anti-aliased rounded corners of a transparent two-pane row.
+            if (state.dismissDirection == SwipeToDismissBoxValue.Settled) return@SwipeToDismissBox
             val label = stringResource(if (unarchive) R.string.feature_library_swipe_unarchive else R.string.feature_library_swipe_archive)
             Row(
                 Modifier
@@ -555,6 +558,10 @@ private fun SwipeableRow(
             }
         },
     ) {
-        ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset)
+        // A transparent (two-pane) row needs an opaque base while it slides over the action bar.
+        val swiping = state.dismissDirection != SwipeToDismissBoxValue.Settled
+        Box(if (swiping) Modifier.background(MaterialTheme.colorScheme.background) else Modifier) {
+            ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset)
+        }
     }
 }

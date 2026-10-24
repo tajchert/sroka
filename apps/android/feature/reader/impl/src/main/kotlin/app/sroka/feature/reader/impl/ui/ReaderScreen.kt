@@ -101,6 +101,7 @@ internal fun ReaderScreen(
     onArchived: (itemId: String) -> Unit,
     itemId: String,
     detailPane: Boolean = false,
+    paneWidthDp: Int = Int.MAX_VALUE,
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -293,7 +294,7 @@ internal fun ReaderScreen(
                         null
                     }
                     // Keyed on the article only: header changes are pushed into the live page by script.
-                    val pane = if (detailPane) ReaderPaneStyle(cardArgb) else null
+                    val pane = if (detailPane) ReaderPaneStyle.forWidth(cardArgb, paneWidthDp) else null
                     val wrapped = remember(s.html, s.baseUrl, pane) {
                         val restore = viewModel.restorePoint()
                         ReaderHtml.wrap(

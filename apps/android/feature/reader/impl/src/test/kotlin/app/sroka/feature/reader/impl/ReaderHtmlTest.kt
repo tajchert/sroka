@@ -122,6 +122,21 @@ class ReaderPaneStyleTest {
         )
         org.junit.Assert.assertTrue(out.contains("html[data-theme]{--bg:#1b1e23}"))
         org.junit.Assert.assertTrue(out.contains("max-width:640px"))
+        org.junit.Assert.assertTrue(out.contains("font-size:36px"))
+        org.junit.Assert.assertTrue(out.contains("padding-left:48px"))
+    }
+
+    @Test
+    fun narrowPaneKeepsPhoneTitleAndPadding() {
+        assertEquals(ReaderPaneStyle(0xFF000000.toInt(), narrow = true), ReaderPaneStyle.forWidth(0xFF000000.toInt(), 479))
+        assertEquals(ReaderPaneStyle(0xFF000000.toInt(), narrow = false), ReaderPaneStyle.forWidth(0xFF000000.toInt(), 480))
+        val out = ReaderHtml.wrap(
+            "<p>Hello</p>", "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f,
+            "abc123", pane = ReaderPaneStyle.forWidth(0xFF1B1E23.toInt(), 350),
+        )
+        org.junit.Assert.assertTrue(out.contains("font-size:28px"))
+        org.junit.Assert.assertTrue(out.contains("padding-left:24px"))
+        org.junit.Assert.assertFalse(out.contains("font-size:36px"))
     }
 
     @Test

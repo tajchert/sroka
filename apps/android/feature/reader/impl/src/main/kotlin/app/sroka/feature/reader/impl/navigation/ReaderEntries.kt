@@ -7,6 +7,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import app.sroka.core.designsystem.component.DetailPaneCard
 import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.feature.reader.impl.ReaderViewModel
@@ -33,7 +36,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
             key = key.itemId,
             creationCallback = { factory -> factory.create(key.itemId) },
         )
-        val screen = @Composable {
+        val screen = @Composable { paneWidthDp: Int -> 
             ReaderScreen(
                 viewModel = viewModel,
                 articlesDir = File(LocalContext.current.filesDir, "articles"),
@@ -41,8 +44,13 @@ fun EntryProviderScope<NavKey>.readerEntries(
                 onArchived = onArchived,
                 itemId = key.itemId,
                 detailPane = detailPaneActive,
+                paneWidthDp = paneWidthDp,
             )
         }
-        if (detailPaneActive) DetailPaneCard { screen() } else screen()
+        if (detailPaneActive) {
+            DetailPaneCard { BoxWithConstraints(Modifier.fillMaxSize()) { screen(maxWidth.value.toInt()) } }
+        } else {
+            screen(Int.MAX_VALUE)
+        }
     }
 }

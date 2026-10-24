@@ -82,7 +82,14 @@ internal fun ItemRow(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = if (rounded) RoundedCornerShape(16.dp) else RectangleShape,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = when {
+            selected -> MaterialTheme.colorScheme.primaryContainer
+            rounded -> Color.Transparent // two-pane list: only the open row has a card
+            else -> MaterialTheme.colorScheme.surface
+        },
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = null,
     ) {
         Row(
             Modifier

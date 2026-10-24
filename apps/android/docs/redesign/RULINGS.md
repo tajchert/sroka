@@ -205,3 +205,58 @@ is visible.
   two-pane mode (rail + list with a selected row + detail placeholder card — the WebView can't render in layoutlib, so
   use the placeholder or a stub detail). Dark theme for the shell, light+dark for one list case. Generate references
   with `update<Variant>ScreenshotTest`, then run `validate<Variant>ScreenshotTest`.
+
+## R14 Foldables round 2 (2026-10-24) — no mock; follow the design language of screens 03–17
+Common: decide from the window (two-pane = the pane directive allows 2 partitions), Nav3 scene metadata is the only
+layout switch, phone/folded layout unchanged. Each task adds `@FoldablePreviews` screenshot cases for what it
+changes and updates references **only in the modules it owns**; the integration step regenerates/validates all.
+- **R14.1 Search in the list pane (T9):** `SearchKey` becomes a list-pane entry (same `listPaneMetadata()` as
+  LibraryKey) so on two-pane the rail stays, results fill the left pane and opening a result shows the reader on the
+  right; the result row of the open article is highlighted like list rows (R13). The rail's current tab while
+  search is on top = the tab search was opened from. Phone: unchanged (full screen, no bar).
+- **R14.2 Empty detail pane (T9):** replace "Select an article to read" with: centred `SrokaMark`-style outline
+  illustration (use the `bookmarks` Rounded icon at 48dp in onSurfaceVariant if no art), title "Pick something to
+  read" (titleMedium), body "Your saved articles open here." (bodyMedium, onSurfaceVariant), and when the current
+  list has an unread item a tonal button "Read next: <title>" (1 line, ellipsized) that opens the newest unread item
+  of My List. Inside the existing `DetailPaneCard`.
+- **R14.3 Full-width reading (T10):** in the reader app bar, only while in a detail pane, an icon button
+  `open_in_full` "Expand article" / `close_fullscreen` "Show list" before the star. Expand = list pane collapsed to
+  0 (add a 0dp-from-start anchor to the pane expansion anchors; animate to it); Show list = animate back to the
+  previous anchor (default 360dp). Dragging the divider to the far left also collapses. When collapsed the rail
+  stays; the reader column stays ≤ 640dp centred with wide margins. State lives in the app (hoisted
+  `PaneExpansionState`), passed to the reader as `isExpanded` + `onToggleExpanded`. Survives rotation (saveable).
+- **R14.4 Settings as two panes (T11):** `SettingsKey` = list pane with its own detail placeholder (settings icon
+  + "Choose a setting"); `ImportKey`, `ExportKey` = detail panes. In two-pane, Theme / Reader theme / Text size /
+  Offline downloads / Server open as detail-pane pages (single-choice lists in the pane, same options as the
+  dialogs) instead of dialogs — new keys `SettingsChoiceKey(kind)`; on phone they stay dialogs. The selected row is
+  highlighted (primaryContainer, 16dp rounded, like R13). Detail pages have no back arrow in two-pane. Sign out /
+  Delete account stay dialogs.
+- **R14.5 Tags (T9):** `TagsKey` = list pane; `TagItemsKey` = detail pane (no back arrow in two-pane, title in its
+  top bar), so on two-pane the tag list is left and that tag's articles right. Opening an article from a tag's list
+  shows the reader in the detail pane (it covers the tag's list; Back returns to it). Highlight the selected tag
+  row. On phone unchanged.
+- **R14.6 Sign-in wide (T12):** on widths ≥ 600dp centre the form at max 400dp; on landscape with height < 480dp
+  put mark + headline + body on the left and the form on the right (two columns). Content scrolls when the
+  keyboard is up (both steps); OTP boxes and the primary action stay visible above the IME (`imePadding`).
+- **R14.7 Sheets & dialogs (T13):** share sheet, tag sheet, item actions sheet, add-link dialog: max width 640dp
+  (sheets) / 560dp (dialogs), centred. Verify M3 defaults; only add `sheetMaxWidth`/`widthIn` where not already capped.
+- **R14.8 Snackbars (T13):** on two-pane, app-level snackbars (archive from the reader, refresh results) appear at
+  the bottom of the **list pane** (start-aligned, list pane width), not centred across both panes; reader-local
+  snackbars ("Continued from…", refresh result) stay inside the detail card. Phone unchanged.
+- **R14.9 Hinge (integration):** verify on the emulator that in book posture the pane split avoids the hinge
+  (directive's hinge policy); fix only if broken.
+- **R14.10 Short screens (T12):** cover display landscape + inner landscape: sign-in per R14.6; reader app bar
+  hides on scroll (already); list status cards don't push the list off-screen (cards ≤ 1 line + progress).
+- **R14.11 Splash (T12):** dark-theme splash shows the 6a mark on its white circle tile (the launcher foreground
+  alone vanishes on black). Use `windowSplashScreenAnimatedIcon` = a drawable with the white tile (reuse
+  `scripts/make-icons.mjs` geometry; add a generated `splash_icon.xml` there if simplest, then rerun only if `sharp`
+  isn't needed for vectors) and `windowSplashScreenBackground` = surface colour per theme.
+
+| Task | Model | Owns |
+|---|---|---|
+| T9 library panes (R14.1, .2, .5) | Sonnet | `feature/library/**`, library parts of `app/.../navigation/SrokaNavHost.kt` (entries wiring, current-tab logic) |
+| T10 full-width reading (R14.3) | Sonnet | `feature/reader/**`, pane-expansion parts of `SrokaNavHost.kt` |
+| T11 settings two-pane (R14.4) | Sonnet | `feature/settings/**`, settings entries wiring in `SrokaNavHost.kt` |
+| T12 sign-in, short screens, splash (R14.6, .10, .11) | Haiku | `feature/auth/**`, `app/src/main/res/**` (splash), `scripts/make-icons.mjs` |
+| T13 sheets & snackbars (R14.7, .8) | Sonnet | `core/ui/**` tag sheet, `feature/library/impl/.../save/**`, the app-level `SnackbarHost` in `SrokaNavHost.kt`; for the list's add-link dialog / actions sheet in `feature/library/impl/.../list/**` make the smallest possible edit (T9 is editing nearby) |
+`SrokaNavHost.kt` is shared: keep edits small, additive, in your own section.

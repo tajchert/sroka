@@ -151,6 +151,28 @@ describe("parser queue consumer", () => {
     expect((await base.DB.prepare("SELECT COUNT(*) AS n FROM content").first<{ n: number }>())!.n).toBe(0);
   });
 
+  it("reads X / Twitter posts from the JSON API (short post = ok, never the page or a render; captures too)", async () => {
+    const fx = {
+      code: 200,
+      status: { type: "status", id: "77", url: "https://x.com/ann/status/77", author: { screen_name: "ann", name: "Ann" }, raw_text: { text: "Short post.", facets: [] }, created_timestamp: 1792806105, likes: 3, media: {} },
+      thread: [],
+    };
+    const api = () => new Response(JSON.stringify(fx), { headers: { "content-type": "application/json" } });
+    stubWeb({ "https://api.fxtwitter.com/2/thread/77": api });
+    await run([msg(job({ url: "https://x.com/ann/status/77" }))]);
+    expect(marked[0]!.result).toMatchObject({ status: "ok", title: "Short post.", siteName: "X", author: "Ann (@ann)", contentPrivate: false });
+    expect(fetched).toEqual(["https://api.fxtwitter.com/2/thread/77"]);
+    const art = await (await base.CONTENT.get(r2Keys.contentDir(marked[0]!.result.contentId!) + "article.html"))!.text();
+    expect(art).toContain("<p>Short post.</p>");
+
+    marked = [];
+    const rawKey = r2Keys.raw("u1", ITEM);
+    const gz = await new Response(new Blob([PAGE]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    await base.CONTENT.put(rawKey, gz);
+    await run([msg(job({ url: "https://x.com/ann/status/77", rawKey }))]);
+    expect(marked[0]!.result).toMatchObject({ status: "ok", title: "Short post.", contentPrivate: true });
+  });
+
   it("decodes captured raw HTML as UTF-8 even if the page declares a legacy charset", async () => {
     const page = PAGE.replace("<title>", '<meta charset="iso-8859-2"><title>').replace("Test Post</h1>", "zolc \u017c\u00f3\u0142\u0107</h1>").replace(para.repeat(10), para.repeat(10) + " \u017c\u00f3\u0142\u0107 ");
     const rawKey = r2Keys.raw("u1", ITEM);

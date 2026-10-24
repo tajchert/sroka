@@ -639,10 +639,10 @@ export function renderTweets(tweets: Tweet[], focusId: string): Extracted | null
   const count = end - start + 1;
   const stats = [
     count > 1 ? `Thread · ${plural(count, "post")}` : null,
-    main.replies !== null ? plural(main.replies, "reply", "replies") : null,
-    main.reposts !== null ? plural(main.reposts, "repost") : null,
-    main.likes !== null ? plural(main.likes, "like") : null,
-    main.views !== null ? plural(main.views, "view") : null,
+    main.replies ? plural(main.replies, "reply", "replies") : null,
+    main.reposts ? plural(main.reposts, "repost") : null,
+    main.likes ? plural(main.likes, "like") : null,
+    main.views ? plural(main.views, "view") : null,
   ].filter(Boolean);
   parts.push(`<hr>\n<p><small>${stats.map((s) => esc(s!)).join(" · ")}${stats.length ? " · " : ""}<a href="${esc(main.url)}">View on X</a></small></p>`);
 

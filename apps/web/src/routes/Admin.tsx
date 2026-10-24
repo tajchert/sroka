@@ -224,7 +224,7 @@ function Attempts({ sp, go }: { sp: URLSearchParams; go: Go }) {
       >
         <input className="input !w-56" placeholder="Domain" aria-label="Domain" value={domainInput} onChange={(e) => setDomainInput(e.target.value)} />
         {sel("status", "Status", ["ok", "partial", "failed"])}
-        {sel("method", "Method", ["fetch", "render", "capture", "cache"])}
+        {sel("method", "Method", ["fetch", "render", "capture", "cache", "api"])}
         {sel("fallback", "Fallback", ["none", "ok", "partial", "failed", "budget", "disabled"])}
         <button className="btn" type="submit">Apply</button>
         {q.isFetching && <span className="spinner" aria-label="Loading" />}

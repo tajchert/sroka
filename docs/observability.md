@@ -17,7 +17,7 @@ Never logged: OTPs (except the `ENVIRONMENT=development` console line used by lo
 ### Log events (field `event`)
 
 API: `http_request` (api/auth routes always; assets, SPA, `/v1/health` and the content host only if status >= 500 or >= 1.5 s), `unhandled_error`, `client_error`, `otp_send_failed`, `account_delete` (`step`: start / library_destroyed / d1_deleted), `account_r2_wipe_failed`, `import_failed`, `import_upload_failed`, `import_workflow_create_failed`, `queue_send_failed`, `sweep_schedule_failed`, `sync_rejected` (count `byReason`), `do_op_failed`, `do_alarm_sweep`, `do_r2_cleanup_failed`, `config_read_failed`, `stats_failed`.
-Parser: `parse` (domain, status, error, errorDetail, source capture|refresh|fetch|dlq, method fetch|render|capture|cache, fallbackOutcome none|ok|partial|failed|budget|disabled, ruleApplied, durationMs, renderMs, textChars, httpStatus, bytes, images, cacheHit, parserVersion, attempts), `render` (Browser Run call: domain, trigger, ok, ms), `render_failed` (warn), `render_budget_failed`, `site_rule_invalid` (warn: KV rule ignored), `site_rule_lookup_failed`, `parse_attempt_insert_failed`, `parse_retry` (warn), `dlq` (warn), `mark_parsed_failed`, `dlq_mark_failed`, `gc_sweep` (incl. `parseAnalytics` purge counts), `gc_throttle_cleanup_failed`, `cache_lookup_failed`, `build_content_failed`.
+Parser: `parse` (domain, status, error, errorDetail, source capture|refresh|fetch|dlq, method fetch|render|capture|cache|api, fallbackOutcome none|ok|partial|failed|budget|disabled, ruleApplied, durationMs, renderMs, textChars, httpStatus, bytes, images, cacheHit, parserVersion, attempts), `render` (Browser Run call: domain, trigger, ok, ms), `render_failed` (warn), `render_budget_failed`, `site_rule_invalid` (warn: KV rule ignored), `site_rule_lookup_failed`, `parse_attempt_insert_failed`, `parse_retry` (warn), `dlq` (warn), `mark_parsed_failed`, `dlq_mark_failed`, `gc_sweep` (incl. `parseAnalytics` purge counts), `gc_throttle_cleanup_failed`, `cache_lookup_failed`, `build_content_failed`.
 Common fields: `level`, `msg`, `event`, `requestId` (= `cf-ray`, also in the `x-request-id` response header and in the 500 body), `userHash` (SHA-256 prefix of the user id), `route` (pattern, no ids), `colo`.
 
 ### Analytics Engine layout
@@ -26,7 +26,7 @@ Common fields: `level`, `msg`, `event`, `requestId` (= `cf-ray`, also in the `x-
 
 | event | blob2.. | double1.. | index |
 |---|---|---|---|
-| `parse` | blob2 domain, blob3 status (ok/partial/failed), blob4 error code, blob5 source (fetch/refresh/capture/dlq), blob6 cache (hit/miss), blob7 method (fetch/render/capture/cache), blob8 fallbackOutcome (none/ok/partial/failed/budget/disabled), blob9 ruleApplied (1/0) | double1 durationMs, double2 bytes, double3 images, double4 renderMs, double5 textChars, double6 attempt | domain |
+| `parse` | blob2 domain, blob3 status (ok/partial/failed), blob4 error code, blob5 source (fetch/refresh/capture/dlq), blob6 cache (hit/miss), blob7 method (fetch/render/capture/cache/api), blob8 fallbackOutcome (none/ok/partial/failed/budget/disabled), blob9 ruleApplied (1/0) | double1 durationMs, double2 bytes, double3 images, double4 renderMs, double5 textChars, double6 attempt | domain |
 | `save` | source, result (ok / reject reason) | | `save` |
 | `sync_push` | ok / rejected | ops, applied, rejected | `sync_push` |
 | `otp_send` | otp type, ok / failed | | `otp_send` |

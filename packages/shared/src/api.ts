@@ -276,7 +276,7 @@ export function decodeListCursor(s: string): ListCursor | null {
 // ---------- admin (D10): /v1/admin/* ----------
 
 export const AdminParseStatus = z.enum(["ok", "partial", "failed"]);
-export const AdminParseMethod = z.enum(["fetch", "render", "capture", "cache"]);
+export const AdminParseMethod = z.enum(["fetch", "render", "capture", "cache", "api"]);
 export const AdminFallbackOutcome = z.enum(["none", "ok", "partial", "failed", "budget", "disabled"]);
 
 export const AdminSummaryQuery = z.object({ days: z.coerce.number().int().min(1).max(30).default(7) });

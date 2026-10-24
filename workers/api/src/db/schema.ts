@@ -97,7 +97,7 @@ export const parseAttempts = sqliteTable(
     status: text("status").notNull(), // ok|partial|failed
     errorCode: text("error_code"),
     errorDetail: text("error_detail"),
-    method: text("method").notNull(), // fetch|render|capture|cache
+    method: text("method").notNull(), // fetch|render|capture|cache|api
     fallbackOutcome: text("fallback_outcome").notNull(), // none|ok|partial|failed|budget|disabled
     httpStatus: integer("http_status"),
     textChars: integer("text_chars"),

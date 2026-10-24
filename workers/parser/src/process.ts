@@ -6,6 +6,7 @@ import {
   detectBotWall,
   detectPaywall,
   extractArticle,
+  extractTweet,
   FetchError,
   PARTIAL_BELOW_CHARS,
   type BotWall,
@@ -14,6 +15,7 @@ import {
   type ImageTransform,
   type SafeFetchOptions,
   safeFetch,
+  tweetRef,
 } from "@sroka/extractor";
 import { displayDomain, hashId, log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
@@ -41,7 +43,8 @@ export const defaultDeps: Deps = {
   newId: () => uuidv7(),
 };
 
-export type ParseMethod = "fetch" | "render" | "capture" | "cache";
+/** `api`: a site JSON API (X / Twitter posts) instead of the page. */
+export type ParseMethod = "fetch" | "render" | "capture" | "cache" | "api";
 export type FallbackOutcome = "none" | "ok" | "partial" | "failed" | "budget" | "disabled";
 
 /** Out-param of processJob for the per-job log / metric / parse_attempts row (all optional). */
@@ -279,12 +282,22 @@ export async function processJob(
   const fetchOptions: SafeFetchOptions = { fetch: deps.fetch, ownHosts: ownHosts(env) };
   const pageUrl = isPrivate ? job.url : stripParams(job.url, rule?.stripParams);
 
+  // 0. X / Twitter posts: the JSON APIs beat both the JS-app page and a capture of it (captures too: a post the API
+  // returns is public). A post is complete however short it is, so it is never `partial` and never rendered.
+  const apiArticle = tweetRef(job.url) ? await extractTweet(job.url, fetchOptions) : null;
+  if (apiArticle) {
+    stats.method = "api";
+    extractOptions.minTextChars = 1;
+  }
+
   // 1. obtain HTML (captured raw HTML, or a plain fetch). Bot-wall statuses are kept for the render fallback.
   let html: string | null = null;
   let baseUrl = job.url;
   let fetchErr: FetchError | null = null;
   try {
-    if (job.rawKey) {
+    if (apiArticle) {
+      // nothing to fetch
+    } else if (job.rawKey) {
       let obj: R2ObjectBody | null;
       try {
         obj = await env.CONTENT.get(job.rawKey);
@@ -323,14 +336,15 @@ export async function processJob(
   let chosen: Extracted | null = null;
   // A logged-out page of a paywalled article only has the teaser (never checked for captures: the user had access).
   let paywalled = false;
-  if (html !== null) {
+  if (apiArticle) chosen = apiArticle;
+  else if (html !== null) {
     wall = isPrivate ? null : detectBotWall(html);
     if (wall !== "challenge") chosen = safeExtract(html, baseUrl, extractOptions, job.itemId);
     paywalled = !isPrivate && !!chosen && detectPaywall(html);
   }
   // 2a'. A capture with little text (cookie/consent wall, collapsed or not-yet-loaded content): try a plain server
   // fetch and keep whichever text is longer. The result stays private either way (no render, no shared cache).
-  if (isPrivate && (!chosen || chosen.text.length < minChars)) {
+  if (isPrivate && !apiArticle && (!chosen || chosen.text.length < minChars)) {
     try {
       const res = await safeFetch(stripParams(job.url, rule?.stripParams), {
         ...fetchOptions,
@@ -358,7 +372,7 @@ export async function processJob(
     }
   }
   let trigger: string | null = null;
-  if (!isPrivate) {
+  if (!isPrivate && !apiArticle) {
     if (fetchErr) trigger = fetchErr.code;
     else if (wall === "challenge") trigger = "challenge";
     else if (!chosen) trigger = wall ?? "extract_failed";

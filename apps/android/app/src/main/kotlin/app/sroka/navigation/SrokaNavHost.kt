@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -212,12 +213,14 @@ fun SrokaApp(
                 )
                 // App-level snackbar for results that outlive a screen (archive from the reader).
                 // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
+                val placement = snackbarPlacement(twoPane, railShown, hasFab = current != null)
                 SnackbarHost(
                     hostState = snackbarHostState,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (placement.startAligned) Alignment.BottomStart else Alignment.BottomCenter)
+                        .then(placement.width?.let { Modifier.widthIn(max = it) } ?: Modifier)
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(bottom = if (current != null && !railShown) FabClearance else 0.dp),
+                        .padding(bottom = placement.bottomClearance),
                 )
             }
         }
@@ -240,9 +243,6 @@ private val PaneAnchors = listOf(
     PaneExpansionAnchor.Proportion(0.5f),
     PaneExpansionAnchor.Offset.fromEnd(300.dp),
 )
-
-/** FAB height (56dp) plus its two 16dp margins. */
-private val FabClearance = 88.dp
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable

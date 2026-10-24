@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -18,6 +20,7 @@ import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -41,6 +44,7 @@ import app.sroka.R
 import app.sroka.core.model.SessionState
 import app.sroka.feature.auth.api.AuthKey
 import app.sroka.feature.auth.impl.navigation.authEntries
+import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
 import app.sroka.feature.library.impl.navigation.libraryEntries
 import app.sroka.feature.reader.api.ReaderKey
@@ -111,6 +115,14 @@ fun SrokaApp(
         ?: if (twoPane && top is ReaderKey) TopLevelDestination.of(backStack.getOrNull(backStack.size - 2)) else null
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
 
+    val itemColors = NavigationSuiteDefaults.itemColors(
+        navigationBarItemColors = NavigationBarItemDefaults.colors(
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
+    )
+
     NavigationSuiteScaffold(
         modifier = modifier,
         layoutType = if (current != null) adaptiveType else NavigationSuiteType.None,
@@ -127,6 +139,7 @@ fun SrokaApp(
                         )
                     },
                     label = { Text(stringResource(destination.label)) },
+                    colors = itemColors,
                 )
             }
         },
@@ -193,6 +206,8 @@ private fun SrokaNavDisplay(
                 },
                 // From the Expired banner: sign in on top of the library; success pops it.
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
+                onOpenSearch = { tab -> backStack.add(SearchKey(tab)) },
+                onCloseSearch = goBack,
             )
             readerEntries(onBack = goBack, onArchived = onArchived)
             settingsEntries(onBack = goBack)

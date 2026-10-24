@@ -2,8 +2,47 @@
 <resources>
     <string name="feature_library_my_list">My List</string>
     <string name="feature_library_archive">Archive</string>
-    <string name="feature_library_favorites">Favorites</string>
+    <string name="feature_library_favorites">Favourites</string>
     <string name="feature_library_tags">Tags</string>
+
+    <!-- T3: search bar, cards, row status, FAB, search view -->
+    <string name="feature_library_search_bar_my_list">Search My List</string>
+    <string name="feature_library_search_bar_favorites">Search Favourites</string>
+    <string name="feature_library_search_bar_archive">Search Archive</string>
+    <string name="feature_library_save_link">Save link</string>
+    <string name="feature_library_card_downloading">Downloading for offline</string>
+    <string name="feature_library_card_downloading_count">%1$d of %2$d</string>
+    <plurals name="feature_library_card_offline_changes">
+        <item quantity="one">Offline. %d change will sync later.</item>
+        <item quantity="other">Offline. %d changes will sync later.</item>
+    </plurals>
+    <string name="feature_library_card_offline_none">Offline. Showing saved articles.</string>
+    <string name="feature_library_card_resync_title">Catching up</string>
+    <string name="feature_library_card_resync_percent">%1$d%%</string>
+    <string name="feature_library_card_resync_body">It\u2019s been a while, so Sroka is re-syncing your whole library. You can keep reading, and nothing you change will be lost.</string>
+    <string name="feature_library_status_save_waiting">Save waiting to sync</string>
+    <string name="feature_library_status_tags_waiting">Tag change waiting</string>
+    <string name="feature_library_status_favorite_waiting">Favourite waiting</string>
+    <string name="feature_library_status_change_waiting">Change waiting to sync</string>
+    <string name="feature_library_status_partial">Partial save</string>
+    <string name="feature_library_status_row_downloading">Downloading\u2026</string>
+    <string name="feature_library_snack_archived_offline">Archived. Syncs when you\u2019re online.</string>
+    <string name="feature_library_snack_unarchived_offline">Moved to My List. Syncs when you\u2019re online.</string>
+    <string name="feature_library_search_chip_all">All</string>
+    <string name="feature_library_search_chip_archive">Archive</string>
+    <string name="feature_library_search_chip_favorites">Favourites</string>
+    <string name="feature_library_search_idle">Search the articles saved on this phone</string>
+    <string name="feature_library_search_results_loading">Results, searched on this phone</string>
+    <plurals name="feature_library_search_results">
+        <item quantity="one">%d result, searched on this phone</item>
+        <item quantity="other">%d results, searched on this phone</item>
+    </plurals>
+    <string name="feature_library_search_where_both">Title and text</string>
+    <string name="feature_library_search_where_title">In title</string>
+    <string name="feature_library_search_where_text">In text</string>
+    <string name="feature_library_search_where_archive_both">Archive \u00b7 title and text</string>
+    <string name="feature_library_search_where_archive_title">Archive \u00b7 in title</string>
+    <string name="feature_library_search_where_archive_text">Archive \u00b7 in text</string>
 
     <!-- Top bar -->
     <string name="feature_library_search">Search</string>
@@ -45,8 +84,8 @@
     <string name="feature_library_empty_my_list_body">Share any link to Sroka to save it</string>
     <string name="feature_library_empty_archive_title">Archive is empty</string>
     <string name="feature_library_empty_archive_body">Articles you finish or archive show up here</string>
-    <string name="feature_library_empty_favorites_title">No favorites</string>
-    <string name="feature_library_empty_favorites_body">Swipe an article right or use its menu to favorite it</string>
+    <string name="feature_library_empty_favorites_title">No favourites</string>
+    <string name="feature_library_empty_favorites_body">Long-press an article and choose Add to favourites</string>
     <string name="feature_library_empty_tag_title">No articles with this tag</string>
     <string name="feature_library_empty_search_title">No results</string>
     <string name="feature_library_empty_search_body">Try different words</string>
@@ -58,18 +97,18 @@
     <string name="feature_library_row_processing">Processing…</string>
     <string name="feature_library_row_parse_failed">Couldn\'t read this page</string>
     <string name="feature_library_row_available_offline">Available offline</string>
-    <string name="feature_library_row_favorite">Favorite</string>
+    <string name="feature_library_row_favorite">Favourite</string>
     <string name="feature_library_swipe_archive">Archive</string>
-    <string name="feature_library_swipe_unarchive">Move to My List</string>
-    <string name="feature_library_swipe_favorite">Favorite</string>
-    <string name="feature_library_swipe_unfavorite">Remove favorite</string>
+    <string name="feature_library_swipe_unarchive">Unarchive</string>
+    <string name="feature_library_swipe_favorite">Favourite</string>
+    <string name="feature_library_swipe_unfavorite">Remove favourite</string>
 
     <!-- Snackbars -->
     <string name="feature_library_undo">Undo</string>
     <string name="feature_library_snack_archived">Archived</string>
     <string name="feature_library_snack_unarchived">Moved to My List</string>
-    <string name="feature_library_snack_favorited">Added to favorites</string>
-    <string name="feature_library_snack_unfavorited">Removed from favorites</string>
+    <string name="feature_library_snack_favorited">Added to favourites</string>
+    <string name="feature_library_snack_unfavorited">Removed from favourites</string>
     <string name="feature_library_snack_deleted">Article deleted</string>
     <string name="feature_library_snack_saved">Saved</string>
     <string name="feature_library_snack_already_saved">Already saved. Moved to My List.</string>
@@ -84,8 +123,8 @@
     <string name="feature_library_save">Save</string>
 
     <!-- Item actions -->
-    <string name="feature_library_action_favorite">Add to favorites</string>
-    <string name="feature_library_action_unfavorite">Remove from favorites</string>
+    <string name="feature_library_action_favorite">Add to favourites</string>
+    <string name="feature_library_action_unfavorite">Remove from favourites</string>
     <string name="feature_library_action_archive">Archive</string>
     <string name="feature_library_action_unarchive">Move to My List</string>
     <string name="feature_library_action_edit_tags">Edit tags</string>

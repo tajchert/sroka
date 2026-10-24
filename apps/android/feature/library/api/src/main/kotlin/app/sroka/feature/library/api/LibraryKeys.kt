@@ -15,3 +15,7 @@ data object TagsKey : NavKey
 /** Items carrying the tag [name] (any status). */
 @Serializable
 data class TagItemsKey(val name: String) : NavKey
+
+/** Full-screen search; [tab] picks the initial filter chip (Archive/Favourites tabs preselect theirs). */
+@Serializable
+data class SearchKey(val tab: LibraryTab = LibraryTab.MY_LIST) : NavKey

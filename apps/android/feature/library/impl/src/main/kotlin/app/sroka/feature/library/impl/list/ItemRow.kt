@@ -1,21 +1,23 @@
 package app.sroka.feature.library.impl.list
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.rounded.Downloading
+import androidx.compose.material.icons.rounded.OfflinePin
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,18 +25,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.sroka.core.designsystem.theme.srokaColors
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.PendingChange
 import app.sroka.feature.library.impl.R
 import coil3.compose.AsyncImage
 import java.io.File
 
-/** One list row (DECISIONS A11): title, `domain · N min`, up to two tags, right thumbnail, progress line. */
+/** The optional status line of a row (R6), most urgent first. */
+internal enum class RowStatus {
+    SAVE_WAITING,
+    TAGS_WAITING,
+    FAVORITE_WAITING,
+    CHANGE_WAITING,
+    PARTIAL,
+    DOWNLOADING,
+    OFFLINE,
+}
+
+/** Pending local change, else partial parse, else downloading/queued, else downloaded, else none. */
+internal fun rowStatus(item: ItemSummary): RowStatus? = when {
+    item.pendingChange == PendingChange.SAVE -> RowStatus.SAVE_WAITING
+    item.pendingChange == PendingChange.TAGS -> RowStatus.TAGS_WAITING
+    item.pendingChange == PendingChange.FAVORITE -> RowStatus.FAVORITE_WAITING
+    item.pendingChange != null -> RowStatus.CHANGE_WAITING
+    item.parseStatus == ParseStatus.PARTIAL -> RowStatus.PARTIAL
+    item.offline == OfflineState.DOWNLOADING || item.offline == OfflineState.QUEUED -> RowStatus.DOWNLOADING
+    item.offline == OfflineState.DOWNLOADED -> RowStatus.OFFLINE
+    else -> null
+}
+
+/** One list row (R6): thumbnail, title, `domain · N min`, status line, trailing star when favourite. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemRow(
@@ -44,97 +73,95 @@ internal fun ItemRow(
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        item.displayTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    MetaLine(item)
-                    if (item.tags.isNotEmpty()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            item.tags.take(MAX_ROW_TAGS).forEach { TagLabel(it) }
-                        }
-                    }
-                }
-                item.thumbnailPath?.let { path ->
-                    AsyncImage(
-                        model = File(path),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
-                    )
-                }
-            }
-            if (item.progress > 0f && item.progress < 1f) {
-                LinearProgressIndicator(
-                    progress = { item.progress },
-                    modifier = Modifier.fillMaxWidth().height(2.dp),
-                    gapSize = 0.dp,
-                    drawStopIndicator = {},
+        Row(
+            Modifier
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Thumbnail(item)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    item.displayTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            } else {
-                Box(Modifier.height(2.dp))
+                Text(
+                    metaText(item),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                rowStatus(item)?.let { StatusLine(it) }
+            }
+            if (item.isFavorite) {
+                Icon(
+                    Icons.Rounded.Star,
+                    contentDescription = stringResource(R.string.feature_library_row_favorite),
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MetaLine(item: ItemSummary) {
-    val text = when {
-        item.parseStatus == ParseStatus.PENDING -> "${item.domain} · ${stringResource(R.string.feature_library_row_processing)}"
-        item.parseStatus == ParseStatus.FAILED -> "${item.domain} · ${stringResource(R.string.feature_library_row_parse_failed)}"
-        item.readingMinutes != null ->
-            stringResource(R.string.feature_library_row_meta_minutes, item.domain, item.readingMinutes!!)
-        else -> item.domain
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
+private fun Thumbnail(item: ItemSummary) {
+    val shape = RoundedCornerShape(8.dp)
+    val path = item.thumbnailPath
+    if (path != null) {
+        AsyncImage(
+            model = File(path),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(56.dp).clip(shape),
         )
-        if (item.offline == OfflineState.DOWNLOADED) {
-            Icon(
-                Icons.Filled.DownloadDone,
-                contentDescription = stringResource(R.string.feature_library_row_available_offline),
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        if (item.isFavorite) {
-            Icon(
-                Icons.Filled.Star,
-                contentDescription = stringResource(R.string.feature_library_row_favorite),
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.tertiary,
+    } else {
+        Box(
+            Modifier.size(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                item.domain.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
 }
 
 @Composable
-private fun TagLabel(name: String) {
-    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
-        Text(
-            name,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-    }
+private fun metaText(item: ItemSummary): String = when {
+    item.parseStatus == ParseStatus.PENDING -> "${item.domain} · ${stringResource(R.string.feature_library_row_processing)}"
+    item.parseStatus == ParseStatus.FAILED -> "${item.domain} · ${stringResource(R.string.feature_library_row_parse_failed)}"
+    item.readingMinutes != null ->
+        stringResource(R.string.feature_library_row_meta_minutes, item.domain, item.readingMinutes!!)
+    else -> item.domain
 }
 
-private const val MAX_ROW_TAGS = 2
+@Composable
+private fun StatusLine(status: RowStatus) {
+    val warning = MaterialTheme.srokaColors.warning
+    val primary = MaterialTheme.colorScheme.primary
+    val (icon: ImageVector, label: Int, color: Color) = when (status) {
+        RowStatus.SAVE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_save_waiting, warning)
+        RowStatus.TAGS_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_tags_waiting, warning)
+        RowStatus.FAVORITE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_favorite_waiting, warning)
+        RowStatus.CHANGE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_change_waiting, warning)
+        RowStatus.PARTIAL -> Triple(Icons.Rounded.Warning, R.string.feature_library_status_partial, warning)
+        RowStatus.DOWNLOADING -> Triple(Icons.Rounded.Downloading, R.string.feature_library_status_row_downloading, primary)
+        RowStatus.OFFLINE -> Triple(Icons.Rounded.OfflinePin, R.string.feature_library_row_available_offline, primary)
+    }
+    Row(
+        Modifier.padding(top = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = color)
+        Text(stringResource(label), style = MaterialTheme.typography.labelMedium, color = color)
+    }
+}

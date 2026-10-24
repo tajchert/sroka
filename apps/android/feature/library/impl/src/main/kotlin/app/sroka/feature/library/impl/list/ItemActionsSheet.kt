@@ -9,15 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.outlined.OpenInBrowser
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.automirrored.rounded.Label
+import androidx.compose.material.icons.rounded.OpenInBrowser
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Unarchive
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -57,25 +57,25 @@ internal fun ItemActionsSheet(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
             ActionRow(
-                if (item.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                if (item.isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                 stringResource(if (item.isFavorite) R.string.feature_library_action_unfavorite else R.string.feature_library_action_favorite),
             ) { onToggleFavorite(); onDismiss() }
             val archived = item.status == ItemStatus.ARCHIVED
             ActionRow(
-                if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                if (archived) Icons.Rounded.Unarchive else Icons.Rounded.Archive,
                 stringResource(if (archived) R.string.feature_library_action_unarchive else R.string.feature_library_action_archive),
             ) { onToggleArchive(); onDismiss() }
-            ActionRow(Icons.AutoMirrored.Outlined.Label, stringResource(R.string.feature_library_action_edit_tags)) { onEditTags() }
-            ActionRow(Icons.Outlined.Share, stringResource(R.string.feature_library_action_share)) {
+            ActionRow(Icons.AutoMirrored.Rounded.Label, stringResource(R.string.feature_library_action_edit_tags)) { onEditTags() }
+            ActionRow(Icons.Rounded.Share, stringResource(R.string.feature_library_action_share)) {
                 shareLink(context, item.url)
                 onDismiss()
             }
-            ActionRow(Icons.Outlined.OpenInBrowser, stringResource(R.string.feature_library_action_open_original)) {
+            ActionRow(Icons.Rounded.OpenInBrowser, stringResource(R.string.feature_library_action_open_original)) {
                 openOriginal(context, item.url)
                 onDismiss()
             }
-            ActionRow(Icons.Outlined.Refresh, stringResource(R.string.feature_library_action_refresh)) { onRefresh(); onDismiss() }
-            ActionRow(Icons.Outlined.Delete, stringResource(R.string.feature_library_action_delete), destructive = true) { onDelete() }
+            ActionRow(Icons.Rounded.Refresh, stringResource(R.string.feature_library_action_refresh)) { onRefresh(); onDismiss() }
+            ActionRow(Icons.Rounded.Delete, stringResource(R.string.feature_library_action_delete), destructive = true) { onDelete() }
         }
     }
 }

@@ -260,3 +260,42 @@ changes and updates references **only in the modules it owns**; the integration 
 | T12 sign-in, short screens, splash (R14.6, .10, .11) | Haiku | `feature/auth/**`, `app/src/main/res/**` (splash), `scripts/make-icons.mjs` |
 | T13 sheets & snackbars (R14.7, .8) | Sonnet | `core/ui/**` tag sheet, `feature/library/impl/.../save/**`, the app-level `SnackbarHost` in `SrokaNavHost.kt`; for the list's add-link dialog / actions sheet in `feature/library/impl/.../list/**` make the smallest possible edit (T9 is editing nearby) |
 `SrokaNavHost.kt` is shared: keep edits small, additive, in your own section.
+
+## R15 Screens 19 (drag to save) and 18 (tabletop), added 2026-10-24
+Mock: `docs/redesign/sroka-android.dc.html` lines 742–783 (19) and 694–740 (18). Icons only via `SrokaIcons`
+(core:designsystem, `scripts/gen-icons.py`).
+- **R15.1 Drag to save (screen 19, T14):** any window size (phone split screen, cover screen, unfolded, tablet,
+  desktop window) — no device checks. The library list (My List / Favourites / Archive tabs, and tag lists) is a
+  Compose `Modifier.dragAndDropTarget` accepting `text/plain`, `text/uri-list`, `text/html` (ClipData items:
+  text, or a `content://`/`http(s)` URI → use its string; `text/html` → first `href`). Reuse the existing URL
+  extraction (`UrlNormalizer.extractFirstUrl`) and the save path the share sheet uses (`LibraryRepository.save` +
+  duplicate lookup), local-first, works offline.
+  - While a compatible drag is in progress anywhere over the window (`onStarted` with an accepted MIME type), show
+    the drop target as the first item above the list: 96dp tall, 16dp radius, 2dp dashed `primary` border,
+    `primaryContainer` fill, `add_link` icon (28dp) + "Drop to save" (titleMedium, onPrimaryContainer); the list
+    below dims to 50 % alpha. When the drag enters the target (`onEntered`) the fill brightens (primary at 24 %
+    over the container) — the whole list area is the drop zone, the card is the visual.
+  - On drop: save, then snackbar "Saved to Sroka" (with action "Undo" → delete the new item) or, if the URL is
+    already saved, "Already in Sroka" with action "Open" (opens the reader). No URL in the payload → snackbar
+    "Couldn't find a link to save". Multiple items in ClipData → save each URL, snackbar "Saved N links".
+  - Content URIs from other apps need `ActivityCompat.requestDragAndDropPermissions(activity, event)` before reading;
+    only text payloads are required — if a URI isn't http(s), ignore it.
+  - Strings in library strings.xml (British copy). Content description on the target. A11y: announce
+    "Drop to save" when shown (`liveRegion`).
+  - Tests: pure function `extractDroppedUrls(clipItems): List<String>` (JVM); ViewModel save/duplicate/undo with fakes.
+    Screenshot: `@FoldablePreviews` + phone of the list with the drop target visible (idle and hovered).
+- **R15.2 Tabletop (screen 18, T15):** when the reader is open and the device is half-opened with a
+  **horizontal** hinge (`WindowLayoutInfo` `FoldingFeature` state HALF_OPENED, orientation HORIZONTAL — use
+  `androidx.window` `WindowInfoTracker`, already transitively present via adaptive), split the reader at the hinge:
+  top = article (WebView, no app bar, 3dp progress line at its top, 64dp side padding, title line
+  "site · title" in primary labelLarge), bottom = controls on surfaceContainer (24/32dp padding, 22dp gaps):
+  1. "42% read" (onSurface, medium) left, "6 min left" right; a scrubber: M3 `Slider` restyled — 16dp track,
+     primary active / primaryContainer inactive, 4×44dp thumb bar — dragging scrolls the article and updates the
+     synced progress (same path as reading progress).
+  2. Row: text-size stepper (surfaceContainerHigh pill: "A−" button, current size "17 px", "A+") on the left;
+     right: three 48dp filled tonal circular icon buttons star / archive / label (tags sheet).
+  3. "Up next in My List" card (surfaceContainerHigh, 16dp): 48dp thumb, label "Up next in My List" (primary,
+     labelMedium), title (1 line), tonal "Read" button → opens the next unread item in the same posture.
+  Flat (opened) → normal reader; folded → phone reader. Works whether or not the list pane is visible (tabletop
+  shows only the reader, full width). Tests: posture → layout decision as a pure function; screenshot of the
+  tabletop layout at 841×673 with a stub article.

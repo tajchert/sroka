@@ -1,4 +1,4 @@
-import type { Item, ItemSource, ItemStatus, ParseStatus } from "@sroka/shared";
+import type { Item, ItemKind, ItemSource, ItemStatus, ParseStatus } from "@sroka/shared";
 import { tagKey } from "@sroka/shared";
 
 export type ItemRow = {
@@ -38,6 +38,10 @@ export type ItemRow = {
   /** v2: server time of the last parse request (stuck-pending sweep). */
   parse_requested_at: number | null;
   parse_raw_key: string | null;
+  /** v4: 'article' | 'pdf'. */
+  kind: string;
+  file_name: string | null;
+  file_size: number | null;
 };
 
 export type TagRow = {
@@ -93,5 +97,8 @@ export function rowToItemData(r: ItemRow, tags: string[]): ItemData {
     source: r.source as ItemSource | null,
     tags: sortTagNames(tags),
     seq: r.seq,
+    kind: r.kind as ItemKind,
+    fileName: r.file_name,
+    fileSize: r.file_size,
   };
 }

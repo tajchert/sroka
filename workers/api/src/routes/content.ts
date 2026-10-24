@@ -8,7 +8,11 @@ const TYPES: Record<string, string> = {
   webp: "image/webp",
   zip: "application/zip",
   json: "application/json",
+  pdf: "application/pdf",
 };
+
+/** CSP of `.pdf` responses: no `sandbox` (it stops Chrome's PDF viewer). Final value pending a Chrome check. */
+export const PDF_CSP = "default-src 'none'; object-src 'none'; frame-ancestors 'none'";
 
 function baseHeaders(env: Env, req: Request): Headers {
   const h = new Headers();
@@ -53,6 +57,12 @@ export async function handleContent(req: Request, env: Env): Promise<Response> {
   const h = baseHeaders(env, req);
   const ext = v.file.split(".").pop()?.toLowerCase() ?? "";
   h.set("Content-Type", TYPES[ext] ?? obj.httpMetadata?.contentType ?? "application/octet-stream");
+  if (ext === "pdf") {
+    // PDFs are shown by the browser's viewer when the signed URL is opened directly, which the HTML CSP's `sandbox`
+    // would block. The content host is cookieless and serves the file as an inert application/pdf (nosniff).
+    h.set("Content-Disposition", 'inline; filename="document.pdf"');
+    h.set("Content-Security-Policy", PDF_CSP);
+  }
   h.set("Cache-Control", v.isPrivate ? "private, no-store" : "public, max-age=86400, immutable");
   h.set("ETag", obj.httpEtag);
 

@@ -45,5 +45,17 @@ export function makeApp() {
     const text = await res.text();
     return { status: res.status, json: text ? (JSON.parse(text) as any) : null };
   }
-  return { call, sent, user, env: testEnv };
+  /** Raw-body request (PDF upload); the caller sets content-length/content-type. */
+  async function raw(method: string, path: string, body: Uint8Array | null, headers: Record<string, string> = {}) {
+    const ctx = createExecutionContext();
+    const res = await app.fetch(
+      new Request(`http://localhost:8787${path}`, { method, headers: { "x-test-user": user, ...headers }, body }),
+      testEnv,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    const text = await res.text();
+    return { status: res.status, json: text ? (JSON.parse(text) as any) : null };
+  }
+  return { call, raw, sent, user, env: testEnv };
 }

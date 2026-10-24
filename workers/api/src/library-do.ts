@@ -25,6 +25,21 @@ export type { ApplyResult, TagWithCount } from "./do/store.ts";
 
 export type PullResult = { ok: true; data: PullResponse } | { ok: false; error: "resync_required" };
 export type ListItemsResult = { ok: true; items: Item[]; nextCursor: string | null } | { ok: false; error: "bad_cursor" };
+export type AddPdfRequest = {
+  itemId: string;
+  /** `${APP_ORIGIN}/pdf/{sha256hex}` — the dedupe key. */
+  url: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  contentId: string;
+  tags: string[];
+  source: string;
+  at: number;
+};
+export type AddPdfResult =
+  | { ok: true; item: Item; created: boolean; parseJobs: ParseJob[] }
+  | { ok: false; error: "storage_full" | "invalid_url" | "invalid_request"; message?: string };
 export interface RestResult extends ApplyResult {
   /** The (alias-resolved) item after applying, or null if unknown/deleted. */
   item: Item | null;
@@ -260,6 +275,32 @@ export class LibraryDO extends DurableObject<Env> {
   /** Sync push / single mutation path. Returns the PushResponse and parse jobs for the caller to enqueue. */
   async applyOps(deviceId: string, ops: readonly unknown[]): Promise<ApplyResult> {
     return this.apply(deviceId, ops);
+  }
+
+  /**
+   * POST /v1/items/pdf commit: the file is already in R2 at private/{userId}/{contentId}/document.pdf. One transaction:
+   * duplicate → re-add (created:false), quota exceeded → storage_full, else a new pdf item + its parse job. The
+   * route deletes the uploaded object on every outcome except `created: true`.
+   */
+  async addPdf(deviceId: string, req: AddPdfRequest): Promise<AddPdfResult> {
+    this.ensureSchema();
+    let canonical: string;
+    try {
+      canonical = normalizeUrl(req.url);
+    } catch {
+      return { ok: false, error: "invalid_url" };
+    }
+    const hash = await urlHash(canonical);
+    // Synchronous from here on (no interleaving with other requests).
+    const r = this.store.addPdf({ ...req, deviceId, canonical, hash });
+    if (r.kind === "storage_full") return { ok: false, error: "storage_full" };
+    if (r.kind === "rejected") return { ok: false, error: "invalid_request", message: r.reason };
+    await this.ensureAlarm();
+    const parseJobs = await this.budgetJobs(r.jobs);
+    await this.flushCleanup();
+    const item = await this.signOne(this.store.getItem(r.id));
+    if (!item) throw new Error("addPdf: item vanished");
+    return { ok: true, item, created: r.kind === "created", parseJobs };
   }
 
   /** Bumps parse_gen and returns the job to enqueue (html save path), or null if the item is unknown/deleted. */

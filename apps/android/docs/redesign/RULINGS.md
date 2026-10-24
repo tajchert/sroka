@@ -299,3 +299,14 @@ Mock: `docs/redesign/sroka-android.dc.html` lines 742–783 (19) and 694–740 (
   Flat (opened) → normal reader; folded → phone reader. Works whether or not the list pane is visible (tabletop
   shows only the reader, full width). Tests: posture → layout decision as a pure function; screenshot of the
   tabletop layout at 841×673 with a stub article.
+
+## R16 Adjustments after R15 (user feedback 2026-10-24)
+- **R16.1 Tags search = My List search:** replace the Tags screen's large-app-bar search action (in-place tag filter)
+  with the same search pill as My List at the top ("Search Tags" hint, sort icon omitted, avatar → Settings, avatar
+  hidden when the rail shows), and tapping it opens the same full search (SearchKey, list pane on two-pane, R14.1)
+  with results across all articles — tag names are already in the FTS index, so searching a tag name finds its
+  articles. The "Tags" large title stays below the pill.
+- **R16.2 Detail card top aligned with the search pill:** in two-pane, the top edge of `DetailPaneCard` (reader,
+  tag articles, settings detail, placeholders) must line up exactly with the top edge of the list pane's search
+  pill: both = status-bar inset + 8dp. Today the card sits a few dp lower (24dp top margin). Keep 24dp end/bottom.
+  Apply to every pane using the card; add a screenshot assertion by regenerating shell references.

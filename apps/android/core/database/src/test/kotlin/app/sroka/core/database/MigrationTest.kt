@@ -35,8 +35,10 @@ class MigrationTest {
         return Json.parseToJsonElement(file.readText()).jsonObject["database"]!!.jsonObject
     }
 
-    private fun createV1(file: File) = runBlocking {
-        val db = schema(1)
+    private fun createV1(file: File) = createAt(file, 1)
+
+    private fun createAt(file: File, version: Int) = runBlocking {
+        val db = schema(version)
         val driver = AndroidSQLiteDriver()
         val connection = driver.open(file.absolutePath)
         try {
@@ -51,11 +53,12 @@ class MigrationTest {
             }
             db["setupQueries"]!!.jsonArray.forEach { statements += it.jsonPrimitive.content }
             statements.forEach { connection.execSQL(it) }
-            connection.execSQL("PRAGMA user_version = 1")
+            connection.execSQL("PRAGMA user_version = $version")
             connection.execSQL(
                 "INSERT INTO items (id, url, canonical_url, content_private, parse_status, status, is_favorite, progress, saved_at, fts_rowid, title) " +
                     "VALUES ('old', 'https://example.com/a', 'https://example.com/a', 0, 'OK', 'UNREAD', 0, 0, 5, 1, 'Old article')",
             )
+            connection.execSQL("INSERT INTO sync_state (id, cursor, full_resync) VALUES (1, 207, 0)")
         } finally {
             connection.close()
         }
@@ -74,6 +77,39 @@ class MigrationTest {
             assertEquals(ItemKind.ARTICLE, detail.kind)
             assertNull(detail.fileName)
             assertNull(detail.fileSize)
+        } finally {
+            db.close()
+            file.delete()
+        }
+    }
+
+    /** Rows pulled by a v1 app lack `kind`; the upgrade must re-pull everything so PDF items become PDFs. */
+    @Test fun migrationToV2RestartsSyncFromCursorZero() = runBlocking {
+        val file = context.getDatabasePath("migration-cursor-test.db").apply { parentFile?.mkdirs(); delete() }
+        createV1(file)
+        val db = Room.databaseBuilder<SrokaDatabase>(context, file.absolutePath)
+            .setDriver(AndroidSQLiteDriver())
+            .addMigrations(*ALL_MIGRATIONS)
+            .build()
+        try {
+            assertEquals(0L, db.syncStateDao().get().cursor)
+        } finally {
+            db.close()
+            file.delete()
+        }
+    }
+
+    /** 1.1.0 shipped v2 without the cursor reset; v3 repeats it for devices already on v2. */
+    @Test fun migrationV2ToV3RestartsSyncFromCursorZero() = runBlocking {
+        val file = context.getDatabasePath("migration-v3-test.db").apply { parentFile?.mkdirs(); delete() }
+        createAt(file, 2)
+        val db = Room.databaseBuilder<SrokaDatabase>(context, file.absolutePath)
+            .setDriver(AndroidSQLiteDriver())
+            .addMigrations(*ALL_MIGRATIONS)
+            .build()
+        try {
+            assertEquals(0L, db.syncStateDao().get().cursor)
+            assertEquals("Old article", db.itemDao().getItem("old")!!.title)
         } finally {
             db.close()
             file.delete()

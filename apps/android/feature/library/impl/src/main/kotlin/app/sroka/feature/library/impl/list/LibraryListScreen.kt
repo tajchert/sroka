@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.list
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,17 +22,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Label
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.rounded.Inbox
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.Unarchive
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -314,7 +304,7 @@ fun LibraryListContent(
                     navigationIcon = {
                         if (onBack != null) {
                             IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.feature_library_back))
+                                Icon(SrokaIcons.ArrowBack, contentDescription = stringResource(R.string.feature_library_back))
                             }
                         }
                     },
@@ -332,7 +322,7 @@ fun LibraryListContent(
                     shape = RoundedCornerShape(16.dp),
                     containerColor = brand.brand,
                     contentColor = brand.onBrand,
-                    icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                    icon = { Icon(SrokaIcons.Add, contentDescription = null) },
                     text = { Text(stringResource(R.string.feature_library_save_link)) },
                 )
             }
@@ -433,7 +423,7 @@ private fun SearchPill(
             Modifier.padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(SrokaIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 hint,
                 style = MaterialTheme.typography.bodyLarge,
@@ -478,7 +468,7 @@ private fun SortMenu(sort: SortOrder, onSortChange: (SortOrder) -> Unit) {
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(
-                Icons.AutoMirrored.Rounded.Sort,
+                SrokaIcons.Sort,
                 contentDescription = stringResource(R.string.feature_library_sort),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -509,12 +499,12 @@ private fun SortOrder.label(): Int = when (this) {
 private fun EmptyContent(scope: ListScope) {
     data class Content(val icon: ImageVector, val title: Int, val body: Int?)
     val content = when {
-        scope is ListScope.Tag -> Content(Icons.AutoMirrored.Rounded.Label, R.string.feature_library_empty_tag_title, null)
+        scope is ListScope.Tag -> Content(SrokaIcons.Label, R.string.feature_library_empty_tag_title, null)
         scope is ListScope.Tab && scope.tab == LibraryTab.ARCHIVE ->
-            Content(Icons.Rounded.Archive, R.string.feature_library_empty_archive_title, R.string.feature_library_empty_archive_body)
+            Content(SrokaIcons.Archive, R.string.feature_library_empty_archive_title, R.string.feature_library_empty_archive_body)
         scope is ListScope.Tab && scope.tab == LibraryTab.FAVORITES ->
-            Content(Icons.Rounded.StarBorder, R.string.feature_library_empty_favorites_title, R.string.feature_library_empty_favorites_body)
-        else -> Content(Icons.Rounded.Inbox, R.string.feature_library_empty_my_list_title, R.string.feature_library_empty_my_list_body)
+            Content(SrokaIcons.Star, R.string.feature_library_empty_favorites_title, R.string.feature_library_empty_favorites_body)
+        else -> Content(SrokaIcons.Inbox, R.string.feature_library_empty_my_list_title, R.string.feature_library_empty_my_list_body)
     }
     // Scrollable so pull-to-refresh also works on an empty list.
     LazyColumn(Modifier.fillMaxSize()) {
@@ -622,7 +612,7 @@ private fun SwipeableRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    if (unarchive) Icons.Rounded.Unarchive else Icons.Rounded.Archive,
+                    if (unarchive) SrokaIcons.Unarchive else SrokaIcons.Archive,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
                 )

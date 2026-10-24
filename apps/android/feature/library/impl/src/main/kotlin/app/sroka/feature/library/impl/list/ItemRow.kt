@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.list
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -11,12 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Downloading
-import androidx.compose.material.icons.rounded.OfflinePin
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -118,7 +113,7 @@ internal fun ItemRow(
             }
             if (item.isFavorite) {
                 Icon(
-                    Icons.Rounded.Star,
+                    SrokaIcons.StarFilled,
                     contentDescription = stringResource(R.string.feature_library_row_favorite),
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.tertiary,
@@ -167,13 +162,13 @@ private fun StatusLine(status: RowStatus) {
     val warning = MaterialTheme.srokaColors.warning
     val primary = MaterialTheme.colorScheme.primary
     val (icon: ImageVector, label: Int, color: Color) = when (status) {
-        RowStatus.SAVE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_save_waiting, warning)
-        RowStatus.TAGS_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_tags_waiting, warning)
-        RowStatus.FAVORITE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_favorite_waiting, warning)
-        RowStatus.CHANGE_WAITING -> Triple(Icons.Rounded.Schedule, R.string.feature_library_status_change_waiting, warning)
-        RowStatus.PARTIAL -> Triple(Icons.Rounded.Warning, R.string.feature_library_status_partial, warning)
-        RowStatus.DOWNLOADING -> Triple(Icons.Rounded.Downloading, R.string.feature_library_status_row_downloading, primary)
-        RowStatus.OFFLINE -> Triple(Icons.Rounded.OfflinePin, R.string.feature_library_row_available_offline, primary)
+        RowStatus.SAVE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_save_waiting, warning)
+        RowStatus.TAGS_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_tags_waiting, warning)
+        RowStatus.FAVORITE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_favorite_waiting, warning)
+        RowStatus.CHANGE_WAITING -> Triple(SrokaIcons.Schedule, R.string.feature_library_status_change_waiting, warning)
+        RowStatus.PARTIAL -> Triple(SrokaIcons.Warning, R.string.feature_library_status_partial, warning)
+        RowStatus.DOWNLOADING -> Triple(SrokaIcons.Downloading, R.string.feature_library_status_row_downloading, primary)
+        RowStatus.OFFLINE -> Triple(SrokaIcons.OfflinePin, R.string.feature_library_row_available_offline, primary)
     }
     Row(
         Modifier.padding(top = 2.dp),

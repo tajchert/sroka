@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -15,11 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -150,7 +146,7 @@ fun ExportScreen(
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(SrokaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(ready.fileName, style = MaterialTheme.typography.bodyLarge)
                                 Text(
@@ -165,11 +161,11 @@ fun ExportScreen(
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                             OutlinedButton(onClick = { shareExport(context, ready, state.format) }) {
-                                Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(SrokaIcons.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Text(stringResource(R.string.feature_settings_export_share), Modifier.padding(start = 8.dp))
                             }
                             Button(onClick = { saver.launch(ready.fileName) }) {
-                                Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(SrokaIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Text(stringResource(R.string.feature_settings_export_save), Modifier.padding(start = 8.dp))
                             }
                         }

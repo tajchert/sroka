@@ -1,5 +1,6 @@
 package app.sroka.core.ui.tags
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,9 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -139,7 +137,7 @@ fun TagEditor(
                         shape = RoundedCornerShape(8.dp),
                         trailingIcon = {
                             Icon(
-                                Icons.Rounded.Close,
+                                SrokaIcons.Close,
                                 contentDescription = stringResource(R.string.core_ui_tags_remove, tag),
                             )
                         },
@@ -185,7 +183,7 @@ fun TagEditor(
                             onDraftChange("")
                         },
                         label = { Text(stringResource(R.string.core_ui_tags_create, name)) },
-                        leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        leadingIcon = { Icon(SrokaIcons.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         shape = RoundedCornerShape(8.dp),
                     )
                 }

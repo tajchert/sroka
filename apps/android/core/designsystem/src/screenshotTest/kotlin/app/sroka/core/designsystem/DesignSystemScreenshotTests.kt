@@ -1,13 +1,12 @@
 package app.sroka.core.designsystem
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -97,7 +96,7 @@ fun EmptyAndErrorStatesScreenshotTest() {
     ThemedSurface {
         Column {
             SrokaEmptyState(
-                icon = Icons.Outlined.Inbox,
+                icon = SrokaIcons.Inbox,
                 title = "Nothing here",
                 description = "Create the first item to get started.",
                 actionLabel = "Create item",

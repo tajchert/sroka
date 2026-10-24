@@ -1,7 +1,6 @@
 package app.sroka.core.designsystem.component
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -58,7 +57,7 @@ fun SrokaTopAppBar(
     title: String,
     modifier: Modifier = Modifier,
     onNavigationClick: (() -> Unit)? = null,
-    navigationIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
+    navigationIcon: ImageVector = SrokaIcons.ArrowBack,
     navigationIconContentDescription: String = stringResource(R.string.navigate_back),
     actions: @Composable () -> Unit = {},
 ) {

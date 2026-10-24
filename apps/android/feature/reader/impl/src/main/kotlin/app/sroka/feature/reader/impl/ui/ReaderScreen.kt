@@ -1,5 +1,6 @@
 package app.sroka.feature.reader.impl.ui
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
@@ -8,21 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.CloseFullscreen
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.FormatSize
-import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -197,7 +183,7 @@ internal fun ReaderScreen(
                     navigationIcon = {
                         if (!detailPane) {
                             IconButton(onClick = leave) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.feature_reader_back))
+                                Icon(SrokaIcons.ArrowBack, stringResource(R.string.feature_reader_back))
                             }
                         }
                     },
@@ -206,7 +192,7 @@ internal fun ReaderScreen(
                         if (detailPane && onToggleExpanded != null) {
                             IconButton(onClick = onToggleExpanded) {
                                 Icon(
-                                    if (isExpanded) Icons.Default.CloseFullscreen else Icons.Default.OpenInFull,
+                                    if (isExpanded) SrokaIcons.CloseFullscreen else SrokaIcons.OpenInFull,
                                     stringResource(
                                         if (isExpanded) R.string.feature_reader_show_list else R.string.feature_reader_expand,
                                     ),
@@ -216,7 +202,7 @@ internal fun ReaderScreen(
                         if (current != null) {
                             IconButton(onClick = viewModel::toggleFavorite) {
                                 Icon(
-                                    if (current.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                    if (current.isFavorite) SrokaIcons.StarFilled else SrokaIcons.Star,
                                     stringResource(
                                         if (current.isFavorite) R.string.feature_reader_unfavorite else R.string.feature_reader_favorite,
                                     ),
@@ -234,34 +220,34 @@ internal fun ReaderScreen(
                                 }
                             }) {
                                 Icon(
-                                    if (archived) Icons.Default.Unarchive else Icons.Default.Archive,
+                                    if (archived) SrokaIcons.Unarchive else SrokaIcons.Archive,
                                     stringResource(if (archived) R.string.feature_reader_unarchive else R.string.feature_reader_archive),
                                 )
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, stringResource(R.string.feature_reader_more))
+                                    Icon(SrokaIcons.MoreVert, stringResource(R.string.feature_reader_more))
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                    ReaderMenuItem(R.string.feature_reader_edit_tags, Icons.AutoMirrored.Outlined.Label) {
+                                    ReaderMenuItem(R.string.feature_reader_edit_tags, SrokaIcons.Label) {
                                         menuOpen = false; showTags = true
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_share, Icons.Outlined.Share) {
+                                    ReaderMenuItem(R.string.feature_reader_share, SrokaIcons.Share) {
                                         menuOpen = false; shareUrl(context, current.url)
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_open_browser, Icons.AutoMirrored.Outlined.OpenInNew) {
+                                    ReaderMenuItem(R.string.feature_reader_open_browser, SrokaIcons.OpenInNew) {
                                         menuOpen = false; openExternalLink(context, current.url)
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_refresh, Icons.Outlined.Refresh, enabled = !offline) {
+                                    ReaderMenuItem(R.string.feature_reader_refresh, SrokaIcons.Refresh, enabled = !offline) {
                                         menuOpen = false; viewModel.refresh()
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_text_size, Icons.Outlined.FormatSize) {
+                                    ReaderMenuItem(R.string.feature_reader_text_size, SrokaIcons.FormatSize) {
                                         menuOpen = false; showAppearance = true
                                     }
                                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                                     ReaderMenuItem(
                                         R.string.feature_reader_delete,
-                                        Icons.Outlined.Delete,
+                                        SrokaIcons.Delete,
                                         tint = MaterialTheme.colorScheme.error,
                                     ) { menuOpen = false; showDelete = true }
                                 }

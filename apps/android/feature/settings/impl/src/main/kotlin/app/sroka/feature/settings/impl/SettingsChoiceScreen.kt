@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -8,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -82,7 +81,7 @@ fun SettingsDetailPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                Icons.Rounded.Settings,
+                SrokaIcons.Settings,
                 contentDescription = null,
                 modifier = Modifier.padding(bottom = 0.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -1,5 +1,6 @@
 package app.sroka.navigation
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -11,8 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -96,7 +95,7 @@ fun SaveLinkButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         shadowElevation = 6.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.nav_save_link))
+            Icon(SrokaIcons.Add, contentDescription = stringResource(R.string.nav_save_link))
         }
     }
 }

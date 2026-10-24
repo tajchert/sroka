@@ -1,5 +1,6 @@
 package app.sroka.feature.auth.impl
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,9 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -161,7 +159,7 @@ private fun EmailStep(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 leadingContent = {
                     Icon(
-                        Icons.Rounded.Dns,
+                        SrokaIcons.Dns,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -242,7 +240,7 @@ private fun CodeStep(
                 navigationIcon = {
                     IconButton(onClick = onChangeEmail) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            SrokaIcons.ArrowBack,
                             contentDescription = stringResource(R.string.feature_auth_back),
                         )
                     }

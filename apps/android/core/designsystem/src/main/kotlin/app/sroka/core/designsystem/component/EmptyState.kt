@@ -1,5 +1,6 @@
 package app.sroka.core.designsystem.component
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,7 +43,7 @@ import app.sroka.core.designsystem.theme.SrokaTheme
  * ```kotlin
  * if (items.isEmpty()) {
  *     SrokaEmptyState(
- *         icon = Icons.Outlined.CheckCircle,
+ *         icon = SrokaIcons.CheckCircle,
  *         title = "Nothing saved yet",
  *         description = "Share any link to Sroka to save it",
  *         actionLabel = "Add link",
@@ -170,7 +169,7 @@ fun SrokaErrorState(
 private fun SrokaEmptyStatePreview() {
     SrokaTheme {
         SrokaEmptyState(
-            icon = Icons.Outlined.Inbox,
+            icon = SrokaIcons.Inbox,
             title = "Nothing saved yet",
             description = "Share any link to Sroka to save it",
             actionLabel = "Add link",
@@ -184,7 +183,7 @@ private fun SrokaEmptyStatePreview() {
 private fun SrokaEmptyStateMinimalPreview() {
     SrokaTheme {
         SrokaEmptyState(
-            icon = Icons.Outlined.Inbox,
+            icon = SrokaIcons.Inbox,
             title = "No results found",
         )
     }

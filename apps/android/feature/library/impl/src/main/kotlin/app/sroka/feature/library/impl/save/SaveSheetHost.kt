@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.save
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,13 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BookmarkAdded
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.LinkOff
-import androidx.compose.material.icons.rounded.NewLabel
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -154,7 +148,7 @@ fun SaveSheetHost(
                     }
                 }
                 SaveState.NoUrl -> Header(
-                    icon = Icons.Rounded.LinkOff,
+                    icon = SrokaIcons.LinkOff,
                     circle = MaterialTheme.colorScheme.surfaceContainerHighest,
                     iconTint = MaterialTheme.colorScheme.onSurface,
                     title = stringResource(R.string.feature_library_share_no_url),
@@ -162,7 +156,7 @@ fun SaveSheetHost(
                 )
                 SaveState.NeedsSignIn -> {
                     Header(
-                        icon = Icons.Rounded.BookmarkAdded,
+                        icon = SrokaIcons.BookmarkAdded,
                         circle = MaterialTheme.colorScheme.surfaceContainerHighest,
                         iconTint = MaterialTheme.colorScheme.onSurface,
                         title = stringResource(R.string.feature_library_share_sign_in_needed),
@@ -195,7 +189,7 @@ private fun JustSaved(
 ) {
     val downloaded = item?.offline == OfflineState.DOWNLOADED
     Header(
-        icon = Icons.Rounded.Check,
+        icon = SrokaIcons.Check,
         circle = MaterialTheme.srokaColors.brand,
         iconTint = MaterialTheme.srokaColors.onBrand,
         title = stringResource(R.string.feature_library_share_saved),
@@ -224,7 +218,7 @@ private fun JustSaved(
             onClick = onAddTags,
             label = { Text(stringResource(R.string.feature_library_share_add_tags)) },
             leadingIcon = {
-                Icon(Icons.Rounded.NewLabel, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(SrokaIcons.NewLabel, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             },
             shape = RoundedCornerShape(8.dp),
             enabled = item != null,
@@ -236,7 +230,7 @@ private fun JustSaved(
             label = { Text(stringResource(R.string.feature_library_share_favourite)) },
             leadingIcon = {
                 Icon(
-                    if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    if (fav) SrokaIcons.StarFilled else SrokaIcons.Star,
                     contentDescription = null,
                     tint = if (fav) MaterialTheme.srokaColors.progress else MaterialTheme.colorScheme.primary,
                 )
@@ -259,7 +253,7 @@ private fun AlreadySaved(item: Item?, onClose: () -> Unit, onContinue: () -> Uni
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(Instant.ofEpochMilli(it.savedAt).atZone(ZoneId.systemDefault()))
     }.orEmpty()
     Header(
-        icon = Icons.Rounded.BookmarkAdded,
+        icon = SrokaIcons.BookmarkAdded,
         circle = MaterialTheme.colorScheme.surfaceContainerHighest,
         iconTint = MaterialTheme.colorScheme.onSurface,
         title = stringResource(R.string.feature_library_share_already_title),

@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,10 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -165,7 +162,7 @@ private fun FileCard(state: ImportUiState, context: android.content.Context, onC
             val name = state.fileName
             val isZip = name?.endsWith(".zip", ignoreCase = true) == true
             Icon(
-                if (isZip) Icons.Rounded.FolderZip else Icons.Rounded.Description,
+                if (isZip) SrokaIcons.FolderZip else SrokaIcons.Description,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

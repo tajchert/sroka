@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.tags
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,10 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Label
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -148,7 +145,7 @@ fun TagsContent(
                         if (!searching) query = ""
                     }) {
                         Icon(
-                            if (searching) Icons.Rounded.Close else Icons.Rounded.Search,
+                            if (searching) SrokaIcons.Close else SrokaIcons.Search,
                             contentDescription = stringResource(
                                 if (searching) R.string.feature_library_tags_search_close else R.string.feature_library_tags_search,
                             ),
@@ -163,7 +160,7 @@ fun TagsContent(
         when {
             tags == null -> Box(Modifier.padding(padding).fillMaxSize())
             tags.isEmpty() -> SrokaEmptyState(
-                icon = Icons.AutoMirrored.Rounded.Label,
+                icon = SrokaIcons.Label,
                 title = stringResource(R.string.feature_library_empty_tags_title),
                 description = stringResource(R.string.feature_library_empty_tags_body),
                 modifier = Modifier.padding(padding),
@@ -251,7 +248,7 @@ private fun TagRow(tag: TagCount, selected: Boolean, onClick: () -> Unit, onRena
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
         ) {
-            Icon(Icons.AutoMirrored.Rounded.Label, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(SrokaIcons.Label, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 tag.name,
                 style = MaterialTheme.typography.bodyLarge,

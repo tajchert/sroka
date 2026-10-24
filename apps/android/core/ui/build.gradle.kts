@@ -39,7 +39,6 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     implementation(libs.bundles.compose)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
     implementation(libs.coil.compose)
     implementation(libs.androidx.browser)

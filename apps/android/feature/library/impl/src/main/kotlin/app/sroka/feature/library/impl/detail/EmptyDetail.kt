@@ -1,12 +1,11 @@
 package app.sroka.feature.library.impl.detail
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +58,7 @@ fun DetailPlaceholderContent(nextTitle: String?, onReadNext: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {
             Icon(
-                Icons.Rounded.Bookmarks,
+                SrokaIcons.Bookmarks,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

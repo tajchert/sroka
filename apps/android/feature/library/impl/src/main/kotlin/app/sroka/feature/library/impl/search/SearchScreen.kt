@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.search
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,13 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.automirrored.rounded.Article
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -149,7 +143,7 @@ fun SearchContent(
         Column(Modifier.padding(padding).imePadding().fillMaxSize()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.feature_library_close_search))
+                    Icon(SrokaIcons.ArrowBack, contentDescription = stringResource(R.string.feature_library_close_search))
                 }
                 TextField(
                     value = query,
@@ -169,7 +163,7 @@ fun SearchContent(
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
                         Icon(
-                            Icons.Rounded.Close,
+                            SrokaIcons.Close,
                             contentDescription = stringResource(R.string.feature_library_clear_search),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -216,7 +210,7 @@ private fun ScopeChip(value: SearchScope, selected: SearchScope, label: Int, onS
         onClick = { onSelect(value) },
         label = { Text(stringResource(label)) },
         leadingIcon = if (value == selected) {
-            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(0.dp)) }
+            { Icon(SrokaIcons.Check, contentDescription = null, modifier = Modifier.padding(0.dp)) }
         } else {
             null
         },
@@ -235,7 +229,7 @@ private fun Message(title: Int, body: Int?) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(SrokaIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
         if (body != null) {
             Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -258,7 +252,7 @@ private fun ResultRow(result: SearchResult, selected: Boolean, rounded: Boolean,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(
-            if (archived) Icons.Rounded.Archive else Icons.AutoMirrored.Rounded.Article,
+            if (archived) SrokaIcons.Archive else SrokaIcons.Article,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

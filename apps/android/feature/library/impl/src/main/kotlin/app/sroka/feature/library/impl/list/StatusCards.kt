@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.list
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -12,11 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -91,7 +87,7 @@ private fun DownloadingCard(card: StatusCard.Downloading) {
     Surface(CardMargin.fillMaxWidth(), shape = CardShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Rounded.Download, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(SrokaIcons.Download, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(
                     stringResource(R.string.feature_library_card_downloading),
                     style = MaterialTheme.typography.labelLarge,
@@ -120,7 +116,7 @@ private fun OfflineCard(card: StatusCard.Offline) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(Icons.Rounded.CloudOff, null, Modifier.size(20.dp))
+            Icon(SrokaIcons.CloudOff, null, Modifier.size(20.dp))
             Text(
                 if (card.pendingChanges > 0) {
                     pluralStringResource(R.plurals.feature_library_card_offline_changes, card.pendingChanges, card.pendingChanges)
@@ -141,7 +137,7 @@ private fun ResyncCard(card: StatusCard.Resync) {
     Surface(CardMargin.fillMaxWidth(), shape = CardShape, color = colors.brand, contentColor = colors.onBrand) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Rounded.Sync, null, Modifier.size(24.dp))
+                Icon(SrokaIcons.Sync, null, Modifier.size(24.dp))
                 Text(
                     stringResource(R.string.feature_library_card_resync_title),
                     style = MaterialTheme.typography.titleMedium,
@@ -178,7 +174,7 @@ private fun SignInCard(onSignIn: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(Icons.Rounded.Lock, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+            Icon(SrokaIcons.Lock, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
             Text(
                 stringResource(R.string.feature_library_status_sign_in),
                 style = MaterialTheme.typography.bodyMedium,

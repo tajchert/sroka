@@ -141,7 +141,6 @@ dependencies {
     implementation(composeBom)
     implementation(libs.bundles.compose)
     implementation(libs.androidx.compose.material3.navigation.suite)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
 
     // Lifecycle

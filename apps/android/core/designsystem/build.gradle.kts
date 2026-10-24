@@ -54,7 +54,6 @@ dependencies {
 
     // Compose UI
     implementation(libs.bundles.compose)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.bundles.compose.debug)
 
     // Testing

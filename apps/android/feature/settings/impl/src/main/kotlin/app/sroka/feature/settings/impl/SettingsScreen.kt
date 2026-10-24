@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.Context
 import android.text.format.Formatter
 import androidx.compose.foundation.clickable
@@ -18,20 +19,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Logout
-import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.DeleteForever
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.Dns
-import androidx.compose.material.icons.rounded.DownloadForOffline
-import androidx.compose.material.icons.rounded.FormatSize
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MoveToInbox
-import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -184,7 +171,7 @@ fun SettingsScreen(
                 title = { Text(stringResource(R.string.feature_settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.feature_settings_back))
+                        Icon(SrokaIcons.ArrowBack, stringResource(R.string.feature_settings_back))
                     }
                 },
             )
@@ -196,19 +183,19 @@ fun SettingsScreen(
         Column(Modifier.padding(padding).padding(horizontal = if (twoPane) 8.dp else 0.dp).verticalScroll(rememberScrollState())) {
             SectionHeader(R.string.feature_settings_section_reading)
             SettingRow(
-                Icons.Rounded.DarkMode,
+                SrokaIcons.DarkMode,
                 stringResource(R.string.feature_settings_theme),
                 stringResource(prefs.themeMode.labelRes()),
                 selected = selected == SettingsSelection.Theme,
             ) { open(Dialog.Theme, SettingsChoiceKind.Theme) }
             SettingRow(
-                Icons.Rounded.Palette,
+                SrokaIcons.Palette,
                 stringResource(R.string.feature_settings_reader_theme),
                 stringResource(prefs.readerTheme.labelRes()),
                 selected = selected == SettingsSelection.ReaderTheme,
             ) { open(Dialog.ReaderTheme, SettingsChoiceKind.ReaderTheme) }
             SettingRow(
-                Icons.Rounded.FormatSize,
+                SrokaIcons.FormatSize,
                 stringResource(R.string.feature_settings_text_size),
                 textSizeLabel(prefs.readerTextScale),
                 selected = selected == SettingsSelection.TextSize,
@@ -216,7 +203,7 @@ fun SettingsScreen(
 
             SectionHeader(R.string.feature_settings_section_library)
             SettingRow(
-                Icons.Rounded.DownloadForOffline,
+                SrokaIcons.DownloadForOffline,
                 stringResource(R.string.feature_settings_offline),
                 stringResource(
                     R.string.feature_settings_offline_sub,
@@ -226,18 +213,18 @@ fun SettingsScreen(
                 selected = selected == SettingsSelection.Offline,
             ) { open(Dialog.Offline, SettingsChoiceKind.Offline) }
             SettingRow(
-                Icons.Rounded.CloudDownload,
+                SrokaIcons.CloudDownload,
                 stringResource(R.string.feature_settings_download_all),
                 stringResource(R.string.feature_settings_download_all_hint),
                 onClick = downloadAllNow,
             )
             SettingRow(
-                Icons.Rounded.DeleteSweep,
+                SrokaIcons.DeleteSweep,
                 stringResource(R.string.feature_settings_remove_downloads),
                 null,
             ) { dialog = Dialog.RemoveDownloads }
             SettingRow(
-                Icons.Rounded.Dns,
+                SrokaIcons.Dns,
                 stringResource(R.string.feature_settings_server),
                 state.serverUrl,
                 selected = selected == SettingsSelection.Server,
@@ -246,14 +233,14 @@ fun SettingsScreen(
                 open(Dialog.Server, SettingsChoiceKind.Server)
             }
             SettingRow(
-                Icons.Rounded.UploadFile,
+                SrokaIcons.UploadFile,
                 stringResource(R.string.feature_settings_export),
                 stringResource(R.string.feature_settings_export_sub),
                 selected = selected == SettingsSelection.Export,
                 onClick = onOpenExport,
             )
             SettingRow(
-                Icons.Rounded.MoveToInbox,
+                SrokaIcons.MoveToInbox,
                 stringResource(R.string.feature_settings_import),
                 stringResource(R.string.feature_settings_import_sub),
                 selected = selected == SettingsSelection.Import,
@@ -262,13 +249,13 @@ fun SettingsScreen(
 
             SectionHeader(R.string.feature_settings_section_account)
             SettingRow(
-                Icons.AutoMirrored.Rounded.Logout,
+                SrokaIcons.Logout,
                 stringResource(R.string.feature_settings_sign_out),
                 state.email ?: stringResource(R.string.feature_settings_signed_out),
                 enabled = !state.busy,
             ) { dialog = Dialog.SignOut }
             SettingRow(
-                Icons.Rounded.DeleteForever,
+                SrokaIcons.DeleteForever,
                 stringResource(R.string.feature_settings_delete_account),
                 null,
                 color = MaterialTheme.colorScheme.error,
@@ -276,7 +263,7 @@ fun SettingsScreen(
                 trailing = { if (state.busy) CircularProgressIndicator(Modifier.size(24.dp)) },
             ) { dialog = Dialog.DeleteAccount }
             SettingRow(
-                Icons.Rounded.Info,
+                SrokaIcons.Info,
                 stringResource(R.string.feature_settings_version),
                 appVersion(context),
                 onClick = null,
@@ -465,7 +452,7 @@ private fun DeleteAccountDialog(email: String?, onConfirm: () -> Unit, onDismiss
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(Icons.Rounded.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            Icon(SrokaIcons.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
         },
         title = { Text(stringResource(R.string.feature_settings_delete_title)) },
         text = {

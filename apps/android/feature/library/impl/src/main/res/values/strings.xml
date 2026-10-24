@@ -139,7 +139,6 @@
     <string name="feature_library_tags_edit_title">Edit tags</string>
     <string name="feature_library_tags_input_label">New tag</string>
     <string name="feature_library_tags_add">Add tag</string>
-    <string name="feature_library_tags_remove">Remove tag %1$s</string>
     <string name="feature_library_tags_suggestions">Recent tags</string>
     <string name="feature_library_tags_more">Tag options</string>
     <string name="feature_library_tags_rename">Rename</string>
@@ -155,7 +154,6 @@
 
     <!-- Share sheet -->
     <string name="feature_library_share_saved">Saved to Sroka</string>
-    <string name="feature_library_share_already">Already in Sroka. Moved to My List.</string>
     <string name="feature_library_share_no_url">No link found in what you shared</string>
     <string name="feature_library_share_sign_in_needed">Sign in to Sroka to save articles</string>
     <string name="feature_library_share_add_tags">Add tags</string>
@@ -174,9 +172,6 @@
     <string name="feature_library_share_close">Close</string>
     <string name="feature_library_share_continue">Continue reading</string>
     <string name="feature_library_share_thumbnail">Article thumbnail</string>
-    <string name="feature_library_tags_sheet_title">Tags</string>
-    <string name="feature_library_tags_field_label">Add a tag</string>
-    <string name="feature_library_tags_create">Create “%1$s”</string>
     <string name="feature_library_tags_search">Search tags</string>
     <string name="feature_library_tags_search_close">Close search</string>
     <string name="feature_library_tags_no_match">No tags match</string>

@@ -2,4 +2,10 @@
 <resources>
     <!-- Shared Sroka UI strings (ItemRow, OfflineBadge, …) are added by the core:ui owner. -->
     <string name="core_ui_no_browser">No app found to open this link.</string>
+    <string name="core_ui_tags_remove">Remove tag %1$s</string>
+    <string name="core_ui_tags_field_label">Add a tag</string>
+    <string name="core_ui_tags_create">Create “%1$s”</string>
+    <string name="core_ui_tags_sheet_title">Tags</string>
+    <string name="core_ui_cancel">Cancel</string>
+    <string name="core_ui_save">Save</string>
 </resources>

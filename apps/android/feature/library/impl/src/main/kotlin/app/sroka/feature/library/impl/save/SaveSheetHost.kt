@@ -63,7 +63,7 @@ import app.sroka.core.model.Item
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.OfflineState
 import app.sroka.feature.library.impl.R
-import app.sroka.feature.library.impl.list.EditTagsDialog
+import app.sroka.core.ui.tags.EditTagsSheet
 import coil3.compose.AsyncImage
 import java.io.File
 import java.time.Instant
@@ -140,7 +140,7 @@ fun SaveSheetHost(
                         )
                     }
                     if (editing) {
-                        EditTagsDialog(
+                        EditTagsSheet(
                             initialTags = it?.tags.orEmpty(),
                             suggestions = recentTags,
                             onSave = { names ->

@@ -15,7 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.rounded.Article
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
@@ -209,7 +209,7 @@ private fun ResultRow(result: SearchResult, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(
-            if (archived) Icons.Rounded.Archive else Icons.Rounded.Article,
+            if (archived) Icons.Rounded.Archive else Icons.AutoMirrored.Rounded.Article,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

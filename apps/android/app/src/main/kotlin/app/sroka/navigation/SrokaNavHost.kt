@@ -70,6 +70,8 @@ fun SrokaApp(
     session: SessionState,
     onUndoArchive: (itemId: String) -> Unit,
     modifier: Modifier = Modifier,
+    openItemId: String? = null,
+    onOpenItemConsumed: () -> Unit = {},
 ) {
     val signedOut = session is SessionState.SignedOut
     val startKey = if (signedOut) AuthKey else TopLevelDestination.MY_LIST.key
@@ -87,6 +89,14 @@ fun SrokaApp(
                 backStack.replaceAll(*rest.ifEmpty { listOf(TopLevelDestination.MY_LIST.key) }.toTypedArray())
             }
             is SessionState.Expired -> Unit
+        }
+    }
+
+    // Share-sheet deep link: open the article on top of the current stack once signed in.
+    LaunchedEffect(openItemId, session::class) {
+        if (openItemId != null && session !is SessionState.SignedOut) {
+            backStack.openReader(openItemId)
+            onOpenItemConsumed()
         }
     }
 
@@ -192,14 +202,7 @@ private fun SrokaNavDisplay(
             authEntries()
             libraryEntries(
                 // In two-pane mode a new selection replaces the open article instead of stacking.
-                onOpenItem = { itemId ->
-                    val key = ReaderKey(itemId)
-                    when (backStack.lastOrNull()) {
-                        key -> Unit
-                        is ReaderKey -> backStack[backStack.lastIndex] = key
-                        else -> backStack.add(key)
-                    }
-                },
+                onOpenItem = backStack::openReader,
                 onOpenTag = { name -> backStack.add(TagItemsKey(name)) },
                 onOpenSettings = { backStack.add(SettingsKey) },
                 onCloseTag = { key ->
@@ -219,6 +222,16 @@ private fun SrokaNavDisplay(
             )
         },
     )
+}
+
+/** Opens [itemId] in the reader; a reader already on top is replaced rather than stacked. */
+internal fun NavBackStack<NavKey>.openReader(itemId: String) {
+    val key = ReaderKey(itemId)
+    when (lastOrNull()) {
+        key -> Unit
+        is ReaderKey -> this[lastIndex] = key
+        else -> add(key)
+    }
 }
 
 /**

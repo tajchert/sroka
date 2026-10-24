@@ -1,4 +1,4 @@
-package app.sroka.feature.library.impl.list
+package app.sroka.core.ui.tags
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -56,25 +56,25 @@ import app.sroka.core.model.MAX_TAGS_PER_ITEM
 import app.sroka.core.model.MAX_TAG_LENGTH
 import app.sroka.core.model.normalizeTagName
 import app.sroka.core.model.tagKey
-import app.sroka.feature.library.impl.R
+import app.sroka.core.ui.R
 import kotlinx.coroutines.launch
 
 /** Adds [raw] to [tags] (normalized, deduplicated by tag key, capped). Returns [tags] when [raw] is unusable. */
-internal fun addTag(tags: List<String>, raw: String): List<String> {
+fun addTag(tags: List<String>, raw: String): List<String> {
     val name = normalizeTagName(raw).take(MAX_TAG_LENGTH)
     if (name.isEmpty() || tags.any { tagKey(it) == tagKey(name) } || tags.size >= MAX_TAGS_PER_ITEM) return tags
     return tags + name
 }
 
 /** Suggestion chips under the field: an optional "Create" chip, then existing tags that match the typed text. */
-internal data class TagSuggestions(val create: String?, val existing: List<String>)
+data class TagSuggestions(val create: String?, val existing: List<String>)
 
 /**
  * [TagSuggestions.create] is the normalized typed text, only when it is non-empty and neither already
  * chosen in [tags] nor an exact (case-insensitive) match of a [known] tag. [TagSuggestions.existing]
  * are [known] tags not yet chosen whose name contains the typed text (prefix matches first), at most [limit].
  */
-internal fun tagSuggestions(
+fun tagSuggestions(
     draft: String,
     tags: List<String>,
     known: List<String>,
@@ -100,7 +100,7 @@ internal fun tagSuggestions(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun TagEditor(
+fun TagEditor(
     tags: List<String>,
     draft: String,
     suggestions: List<String>,
@@ -140,7 +140,7 @@ internal fun TagEditor(
                         trailingIcon = {
                             Icon(
                                 Icons.Rounded.Close,
-                                contentDescription = stringResource(R.string.feature_library_tags_remove, tag),
+                                contentDescription = stringResource(R.string.core_ui_tags_remove, tag),
                             )
                         },
                         colors = InputChipDefaults.inputChipColors(
@@ -166,7 +166,7 @@ internal fun TagEditor(
                 )
             }
             Text(
-                stringResource(R.string.feature_library_tags_field_label),
+                stringResource(R.string.core_ui_tags_field_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = labelColor,
                 modifier = Modifier
@@ -184,7 +184,7 @@ internal fun TagEditor(
                             onTagsChange(addTag(tags, name))
                             onDraftChange("")
                         },
-                        label = { Text(stringResource(R.string.feature_library_tags_create, name)) },
+                        label = { Text(stringResource(R.string.core_ui_tags_create, name)) },
                         leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         shape = RoundedCornerShape(8.dp),
                     )
@@ -208,11 +208,11 @@ private const val MAX_SUGGESTIONS = 8
 
 /**
  * Edit-tags modal bottom sheet (screen 11): "Tags" title, the [TagEditor], Cancel / Save.
- * Name kept from the old dialog so existing call sites compile; [suggestions] are known tags.
+ * Shared by library and reader. [suggestions] are known tags.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun EditTagsDialog(
+fun EditTagsSheet(
     initialTags: List<String>,
     suggestions: List<String>,
     onSave: (List<String>) -> Unit,
@@ -227,13 +227,13 @@ internal fun EditTagsDialog(
             Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(R.string.feature_library_tags_sheet_title), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.core_ui_tags_sheet_title), style = MaterialTheme.typography.titleLarge)
             TagEditor(tags, draft, suggestions, { tags = it }, { draft = it })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 TextButton(onClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() } }) {
-                    Text(stringResource(R.string.feature_library_cancel))
+                    Text(stringResource(R.string.core_ui_cancel))
                 }
-                Button(onClick = { onSave(addTag(tags, draft)) }) { Text(stringResource(R.string.feature_library_save)) }
+                Button(onClick = { onSave(addTag(tags, draft)) }) { Text(stringResource(R.string.core_ui_save)) }
             }
         }
     }

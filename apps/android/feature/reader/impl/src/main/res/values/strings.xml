@@ -16,10 +16,6 @@
     <string name="feature_reader_delete_title">Delete this article?</string>
     <string name="feature_reader_delete_message">It is removed from your library and from this device.</string>
     <string name="feature_reader_cancel">Cancel</string>
-    <string name="feature_reader_save">Save</string>
-    <string name="feature_reader_add_tag">Add tag</string>
-    <string name="feature_reader_remove_tag">Remove tag %1$s</string>
-    <string name="feature_reader_recent_tags">Recent tags</string>
     <string name="feature_reader_theme">Theme</string>
     <string name="feature_reader_theme_auto">Auto</string>
     <string name="feature_reader_theme_light">Light</string>

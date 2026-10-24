@@ -11,6 +11,7 @@
 | T5 reader | done | Header + partial row inside WebView HTML (system sans, Outfit not loaded in WebView); app bar collapses via WebView nested scroll; refresh state/snackbars + start-over in ReaderViewModel (new SyncStatusRepository ctor param). |
 | T6 settings + import + export | done | Settings 13, delete dialog 14, Import 15, Export 16; gate (settings test+lint, :app:assembleDebug) passes. |
 | Review + gate | todo | |
+| Integration | done | Share deep link (MainActivity.pendingOpenItemId -> SrokaApp openItemId -> ReaderKey on top; consumed after use; test OpenReaderTest). Shared tag sheet `EditTagsSheet` + `tagSuggestions` in core:ui `tags/TagEditorSheet.kt` (strings `core_ui_tags_*`, `core_ui_cancel/save`), reader dialog deleted. Deprecations fixed (Article, Label, OpenInNew); left: `databaseEnabled` in ArticleWebView, `createComposeRule` v2 in tests. Removed `feature_library_share_already`. |
 
 ## Notes from tasks
 

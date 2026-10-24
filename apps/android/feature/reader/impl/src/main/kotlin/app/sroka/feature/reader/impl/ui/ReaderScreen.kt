@@ -16,8 +16,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FormatSize
-import androidx.compose.material.icons.outlined.Label
-import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.filled.Unarchive
@@ -72,6 +72,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.sroka.core.model.ItemStatus
+import app.sroka.core.ui.tags.EditTagsSheet
 import app.sroka.core.ui.openExternalLink
 import app.sroka.feature.reader.impl.NotDownloadedReason
 import app.sroka.feature.reader.impl.R
@@ -216,13 +217,13 @@ internal fun ReaderScreen(
                                     Icon(Icons.Default.MoreVert, stringResource(R.string.feature_reader_more))
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                    ReaderMenuItem(R.string.feature_reader_edit_tags, Icons.Outlined.Label) {
+                                    ReaderMenuItem(R.string.feature_reader_edit_tags, Icons.AutoMirrored.Outlined.Label) {
                                         menuOpen = false; showTags = true
                                     }
                                     ReaderMenuItem(R.string.feature_reader_share, Icons.Outlined.Share) {
                                         menuOpen = false; shareUrl(context, current.url)
                                     }
-                                    ReaderMenuItem(R.string.feature_reader_open_browser, Icons.Outlined.OpenInNew) {
+                                    ReaderMenuItem(R.string.feature_reader_open_browser, Icons.AutoMirrored.Outlined.OpenInNew) {
                                         menuOpen = false; openExternalLink(context, current.url)
                                     }
                                     ReaderMenuItem(R.string.feature_reader_refresh, Icons.Outlined.Refresh, enabled = !offline) {
@@ -356,9 +357,9 @@ internal fun ReaderScreen(
     }
 
     if (showTags) {
-        EditTagsDialog(
-            current = item?.tags.orEmpty(),
-            recent = recentTags,
+        EditTagsSheet(
+            initialTags = item?.tags.orEmpty(),
+            suggestions = recentTags,
             onSave = { viewModel.setTags(it); showTags = false },
             onDismiss = { showTags = false },
         )

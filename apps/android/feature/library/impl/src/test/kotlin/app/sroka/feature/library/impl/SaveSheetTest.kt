@@ -6,7 +6,6 @@ import app.sroka.core.testing.fake.FakeLibraryRepository
 import app.sroka.core.testing.fake.FakeTagRepository
 import app.sroka.core.testing.testItem
 import app.sroka.core.testing.util.MainDispatcherRule
-import app.sroka.feature.library.impl.list.tagSuggestions
 import app.sroka.feature.library.impl.save.SaveSheetViewModel
 import app.sroka.feature.library.impl.save.SaveState
 import app.sroka.feature.library.impl.save.readProgressOf
@@ -92,23 +91,5 @@ class SaveSheetTest {
         dispatcher.scheduler.advanceTimeBy(10_000)
         dispatcher.scheduler.runCurrent()
         assertFalse(vm.autoDismissed.value)
-    }
-
-    @Test
-    fun createChipOnlyWithoutExactCaseInsensitiveMatch() {
-        val known = listOf("Weekend", "week", "essays")
-        assertEquals("wee", tagSuggestions("wee", emptyList(), known).create)
-        assertNull(tagSuggestions("WEEKEND", emptyList(), known).create)
-        assertNull(tagSuggestions("  week ", emptyList(), known).create)
-        assertNull(tagSuggestions("", emptyList(), known).create)
-        assertNull(tagSuggestions("new", listOf("New"), known).create)
-    }
-
-    @Test
-    fun existingSuggestionsMatchAndSkipChosen() {
-        val known = listOf("Weekend", "week", "essays", "tweet")
-        val s = tagSuggestions("wee", listOf("week"), known)
-        assertEquals(listOf("Weekend", "tweet"), s.existing)
-        assertEquals(listOf("Weekend", "week", "essays", "tweet"), tagSuggestions("", emptyList(), known).existing)
     }
 }

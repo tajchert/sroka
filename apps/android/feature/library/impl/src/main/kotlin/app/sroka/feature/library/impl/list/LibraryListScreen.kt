@@ -80,6 +80,7 @@ import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.SyncErrorKind
+import app.sroka.core.ui.tags.EditTagsSheet
 import app.sroka.core.ui.rememberWithNotificationPermission
 import app.sroka.feature.library.impl.R
 import kotlinx.coroutines.launch
@@ -247,7 +248,7 @@ fun LibraryListRoute(
             onDelete = { confirmDeleteFor = item.id },
         )
         if (editTagsFor == item.id) {
-            EditTagsDialog(
+            EditTagsSheet(
                 initialTags = item.tags,
                 suggestions = recentTags,
                 onSave = {

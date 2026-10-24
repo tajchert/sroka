@@ -44,4 +44,12 @@
     <string name="feature_reader_failed_title">Could not read this page</string>
     <string name="feature_reader_failed_message">The page could not be turned into a readable article.</string>
     <string name="feature_reader_failed_reason">Reason: %1$s</string>
+    <string name="feature_reader_tabletop_percent_read">%1$d%% read</string>
+    <string name="feature_reader_tabletop_min_left">%1$d min left</string>
+    <string name="feature_reader_tabletop_scrubber">Reading position</string>
+    <string name="feature_reader_tabletop_text_smaller">Smaller text</string>
+    <string name="feature_reader_tabletop_text_larger">Larger text</string>
+    <string name="feature_reader_tabletop_text_size_px">%1$d px</string>
+    <string name="feature_reader_tabletop_up_next">Up next in My List</string>
+    <string name="feature_reader_tabletop_read">Read</string>
 </resources>

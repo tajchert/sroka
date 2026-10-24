@@ -134,6 +134,12 @@ object ReaderHtml {
      * JS that updates the header in place (no document reload). The values travel as one JSON document
      * inside a JS string literal and are written with `textContent` on the page side.
      */
+    /** Scrolls the article to [fraction] (0..1) of its scrollable height and reports the new position (tabletop scrubber). */
+    fun scrollToFractionScript(fraction: Float): String {
+        val f = if (fraction.isFinite()) fraction.coerceIn(0f, 1f) else 0f
+        return "window.__srokaScrollToFraction&&window.__srokaScrollToFraction(${String.format(java.util.Locale.ROOT, "%.4f", f)});"
+    }
+
     fun headerScript(h: ReaderHeader): String {
         val json = "{\"site\":${jsonString(h.site)},\"title\":${jsonString(h.title)}," +
             "\"metaPrefix\":${jsonString(h.metaPrefix)},\"warn\":${h.partialWarning?.let(::jsonString) ?: "null"}}"
@@ -209,6 +215,7 @@ function div(c,t){var d=document.createElement("div");d.className=c;if(t!==undef
 div("sk-site",h.site);div("sk-title",h.title);var m=div("sk-meta",h.metaPrefix);var sp=document.createElement("span");sp.id="sk-pct";sp.textContent=pct;m.appendChild(sp);
 if(h.warn){var w=div("sk-warn");var ns="http://www.w3.org/2000/svg",sv=document.createElementNS(ns,"svg");sv.setAttribute("viewBox","0 0 24 24");sv.setAttribute("width","18");sv.setAttribute("height","18");sv.setAttribute("fill","currentColor");sv.setAttribute("aria-hidden","true");var pa=document.createElementNS(ns,"path");pa.setAttribute("d","M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z");sv.appendChild(pa);var t=document.createElement("span");t.textContent=h.warn;w.appendChild(sv);w.appendChild(t)}};
 window.__srokaScrollToId=function(id){var el=document.getElementById(id);if(el)el.scrollIntoView()};
+window.__srokaScrollToFraction=function(f){user=true;var s=sc(),max=s.scrollHeight-s.clientHeight;if(max>0)s.scrollTop=Math.min(1,Math.max(0,f))*max;clearTimeout(timer);report()};
 })();
 """.trimIndent()
 

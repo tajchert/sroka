@@ -33,7 +33,11 @@ import app.sroka.feature.reader.impl.ReaderHtml
 import app.sroka.feature.reader.impl.parseProgressMessage
 import java.io.File
 
+/** Ask the page to scroll to [fraction]; a new [seq] makes a new request (tabletop scrubber). */
+internal data class ScrubRequest(val seq: Int, val fraction: Float)
+
 private class WebState {
+    var scrubSeq: Int = 0
     var loadedHtml: String? = null
     var theme: EffectiveTheme? = null
     var scale: Float = 0f
@@ -66,6 +70,7 @@ internal fun ArticleWebView(
     /** Vertical scroll delta in px (positive = content moved up, i.e. the user scrolled down). */
     onScrollDelta: (Float) -> Unit = {},
     scrollToTopSignal: Int = 0,
+    scrubRequest: ScrubRequest? = null,
     /** `ReaderHtml.headerScript(..)` for the current header, or empty; pushed without reloading the page. */
     headerScript: String = "",
     /** Overrides the WebView background (the detail card colour in two-pane mode). */
@@ -169,6 +174,10 @@ internal fun ArticleWebView(
                 state.topSignal = scrollToTopSignal
                 view.scrollTo(0, 0)
                 view.evaluateJavascript("window.scrollTo(0,0);", null)
+            }
+            if (scrubRequest != null && scrubRequest.seq != state.scrubSeq) {
+                state.scrubSeq = scrubRequest.seq
+                if (state.pageReady) view.evaluateJavascript(ReaderHtml.scrollToFractionScript(scrubRequest.fraction), null)
             }
             view.setBackgroundColor(backgroundArgb)
         },

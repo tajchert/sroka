@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
  * )
  * ```
  */
+// Mock: chips/thumbnails 8dp (small), outlined cards 12dp (medium), cards/FAB 16dp (large),
+// sheets and dialogs 28dp (extraLarge). Search bar uses a full pill (CircleShape).
 val SrokaShapes = Shapes(
     // Extra small - for very small components like chips
     extraSmall = RoundedCornerShape(4.dp),

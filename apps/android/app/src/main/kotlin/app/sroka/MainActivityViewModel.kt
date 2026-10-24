@@ -64,6 +64,6 @@ fun MainActivityUiState.shouldUseDarkTheme(isSystemInDarkTheme: Boolean): Boolea
     }
 }
 
-/** Dynamic color per preferences; loading uses the stable app palette. */
-fun MainActivityUiState.shouldUseDynamicColor(): Boolean =
-    this is MainActivityUiState.Success && preferences.dynamicColor
+/** Dynamic colour was dropped (redesign R2); always false. Kept for existing call sites (ShareActivity). */
+@Suppress("UnusedReceiverParameter")
+fun MainActivityUiState.shouldUseDynamicColor(): Boolean = false

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- White circle tile -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,50m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0" />
+    <!-- Body -->
+    <path
+        android:fillColor="#15171C"
+        android:pathData="M30,20 H62 Q70,20 70,28 V82 L50,77 L30,82 Z" />
+    <!-- Band -->
+    <path
+        android:fillColor="#1E6F8F"
+        android:pathData="M30,56 L70,46 L70,58 L30,68 Z" />
+    <!-- Beak -->
+    <path
+        android:fillColor="#F2C84B"
+        android:pathData="M69,27 L83,33 L69,39 Z" />
+    <!-- Eye -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,32m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+</vector>

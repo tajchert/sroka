@@ -1,134 +1,109 @@
 package app.sroka.core.designsystem.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 
-/**
- * Light color scheme for the app.
- *
- * Brand fallback (no dynamic color): white surfaces, black text, teal accent.
- */
 private val LightColorScheme = lightColorScheme(
-    primary = Brand40,
+    primary = BrandBlue,
     onPrimary = Paper,
-    primaryContainer = Brand90,
-    onPrimaryContainer = Brand10,
-    secondary = Teal40,
-    onSecondary = Gray99,
-    secondaryContainer = Teal90,
-    onSecondaryContainer = Teal10,
-    tertiary = Orange40,
-    onTertiary = Gray99,
-    tertiaryContainer = Orange90,
-    onTertiaryContainer = Orange10,
-    error = Red40,
-    onError = Gray99,
-    errorContainer = Red90,
-    onErrorContainer = Red10,
+    primaryContainer = LightPrimaryContainer,
+    onPrimaryContainer = LightOnPrimaryContainer,
+    secondary = BrandBlue,
+    onSecondary = Paper,
+    secondaryContainer = LightPrimaryContainer,
+    onSecondaryContainer = LightOnPrimaryContainer,
+    tertiary = LightTertiary,
+    onTertiary = Paper,
+    tertiaryContainer = LightTertiaryContainer,
+    onTertiaryContainer = LightOnTertiaryContainer,
+    error = LightError,
+    onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
     background = Paper,
     onBackground = Ink,
     surface = Paper,
     onSurface = Ink,
-    surfaceVariant = GrayVariant90,
-    onSurfaceVariant = GrayVariant30,
-    outline = GrayVariant50,
-    outlineVariant = GrayVariant80,
+    surfaceVariant = LightSurfaceHigh,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    surfaceTint = BrandBlue,
+    inverseSurface = LightInverseSurface,
+    inverseOnSurface = LightInverseOnSurface,
+    inversePrimary = DarkPrimary,
+    outline = LightOutline,
+    outlineVariant = LightOutlineVariant,
+    scrim = Color.Black,
+    surfaceBright = Paper,
+    surfaceDim = LightSurfaceContainer,
+    surfaceContainerLowest = LightSurfaceLowest,
+    surfaceContainerLow = LightSurfaceLow,
+    surfaceContainer = LightSurfaceContainer,
+    surfaceContainerHigh = LightSurfaceHigh,
+    surfaceContainerHighest = LightSurfaceHighest,
 )
 
-/**
- * Dark color scheme for the app.
- *
- * Uses lighter tones of the color palette for better contrast.
- */
 private val DarkColorScheme = darkColorScheme(
-    primary = Brand80,
-    onPrimary = Brand20,
-    primaryContainer = Brand30,
-    onPrimaryContainer = Brand90,
-    secondary = Teal80,
-    onSecondary = Teal20,
-    secondaryContainer = Teal30,
-    onSecondaryContainer = Teal90,
-    tertiary = Orange80,
-    onTertiary = Orange20,
-    tertiaryContainer = Orange30,
-    onTertiaryContainer = Orange90,
-    error = Red80,
-    onError = Red20,
-    errorContainer = Red30,
-    onErrorContainer = Red90,
-    background = Ink,
-    onBackground = Gray90,
-    surface = Ink,
-    onSurface = Gray90,
-    surfaceVariant = GrayVariant30,
-    onSurfaceVariant = GrayVariant80,
-    outline = GrayVariant60,
-    outlineVariant = GrayVariant30,
+    primary = DarkPrimary,
+    onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
+    secondary = DarkPrimary,
+    onSecondary = DarkOnPrimary,
+    secondaryContainer = DarkPrimaryContainer,
+    onSecondaryContainer = DarkOnPrimaryContainer,
+    tertiary = BrandYellow,
+    onTertiary = DarkBackground,
+    tertiaryContainer = DarkTertiaryContainer,
+    onTertiaryContainer = BrandYellow,
+    error = DarkError,
+    onError = Color(0xFF3B0D07),
+    errorContainer = Color(0xFF5C1F17),
+    onErrorContainer = Color(0xFFFFDAD4),
+    background = DarkBackground,
+    onBackground = DarkOnSurface,
+    surface = DarkBackground,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkSurfaceHigh,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    surfaceTint = DarkPrimary,
+    inverseSurface = DarkOnSurface,
+    inverseOnSurface = DarkInverseOnSurface,
+    inversePrimary = BrandBlue,
+    outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
+    scrim = Color.Black,
+    surfaceBright = DarkSurfaceHighest,
+    surfaceDim = DarkBackground,
+    surfaceContainerLowest = DarkSurfaceLowest,
+    surfaceContainerLow = DarkSurfaceLow,
+    surfaceContainer = DarkSurfaceContainer,
+    surfaceContainerHigh = DarkSurfaceHigh,
+    surfaceContainerHighest = DarkSurfaceHighest,
 )
 
 /**
- * Main theme composable for the Sroka app.
- *
- * ## Why Wrap MaterialTheme?
- *
- * 1. **Centralized Configuration**: Theme settings are in one place
- * 2. **Dynamic Colors Support**: Handles Android 12+ wallpaper-based colors
- * 3. **Consistent Defaults**: All screens use the same theme automatically
- *
- * ## Dynamic Colors
- *
- * On Android 12 (API 31) and above, the theme can use colors extracted
- * from the user's wallpaper. This is enabled by default but can be
- * disabled by setting [dynamicColor] to false.
- *
- * ## Usage
- *
- * ```kotlin
- * setContent {
- *     SrokaTheme {
- *         // Your app content
- *         MyScreen()
- *     }
- * }
- * ```
- *
- * @param darkTheme Whether to use dark theme. Defaults to system setting.
- * @param dynamicColor Whether to use Android 12+ dynamic colors. Defaults to true.
- * @param content The composable content to be themed.
+ * Sroka theme. The brand palette is always used; dynamic colour was dropped (redesign R2), so
+ * [dynamicColor] is accepted for source compatibility and ignored.
  */
 @Composable
 fun SrokaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        // Use dynamic colors on Android 12+ when enabled
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) {
-                dynamicDarkColorScheme(context)
-            } else {
-                dynamicLightColorScheme(context)
-            }
-        }
-        // Fall back to our custom color schemes
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    CompositionLocalProvider(
+        LocalSrokaColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors,
+    ) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            typography = SrokaTypography,
+            shapes = SrokaShapes,
+            content = content,
+        )
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = SrokaTypography,
-        shapes = SrokaShapes,
-        content = content,
-    )
 }

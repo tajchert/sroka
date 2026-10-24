@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="70"
+    android:viewportHeight="70">
+    <!-- Viewport 70x70 framing the glyph (x 30..83, y 20..82), shifted by (-18,-14). -->
+    <group
+        android:translateX="-21.5"
+        android:translateY="-16">
+        <!-- Body minus band minus eye -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M30,20 H62 Q70,20 70,28 V82 L50,77 L30,82 Z M30,56 L70,46 L70,58 L30,68 Z M58,28 a4,4 0,1 1,0 8 a4,4 0,1 1,0 -8 Z" />
+        <!-- Beak -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M69,27 L83,33 L69,39 Z" />
+    </group>
+</vector>

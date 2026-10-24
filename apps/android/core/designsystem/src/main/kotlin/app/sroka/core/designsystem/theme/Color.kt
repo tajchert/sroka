@@ -3,75 +3,49 @@ package app.sroka.core.designsystem.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Color palette for the Sroka app design system.
- *
- * ## Color Naming Convention
- *
- * Colors are named with format: `{ColorFamily}{Shade}`
- * - ColorFamily: Brand, Teal, Orange, etc.
- * - Shade: 10 (lightest) to 90 (darkest) in steps of 10
- *
- * This follows Material 3 conventions and makes it easy to
- * create balanced light/dark color schemes.
- *
- * ## Usage
- *
- * These colors should NOT be used directly in composables.
- * Instead, use the semantic colors from MaterialTheme.colorScheme:
- *
- * ```kotlin
- * // DON'T do this:
- * Text(color = Brand40)
- *
- * // DO this:
- * Text(color = MaterialTheme.colorScheme.primary)
- * ```
+ * Sroka brand palette (redesign R2). Not for direct use in composables: read
+ * `MaterialTheme.colorScheme` / `MaterialTheme.srokaColors` instead.
  */
 
-// Secondary - Teal palette
-internal val Teal10 = Color(0xFF001F26)
-internal val Teal20 = Color(0xFF003640)
-internal val Teal30 = Color(0xFF004E5C)
-internal val Teal40 = Color(0xFF006879)
-internal val Teal80 = Color(0xFF4DD9F0)
-internal val Teal90 = Color(0xFFACEDFF)
+// Dark scheme (the mock)
+internal val DarkBackground = Color(0xFF15171C)
+internal val DarkOnSurface = Color(0xFFF1EFE9)
+internal val DarkOnSurfaceVariant = Color(0xFFA5A8AE)
+internal val DarkSurfaceLowest = Color(0xFF111317)
+internal val DarkSurfaceLow = Color(0xFF1B1E23)
+internal val DarkSurfaceContainer = Color(0xFF1F2228)
+internal val DarkSurfaceHigh = Color(0xFF262A31)
+internal val DarkSurfaceHighest = Color(0xFF2F333B)
+internal val DarkPrimary = Color(0xFF7CC0DA)
+internal val DarkOnPrimary = Color(0xFF06323F)
+internal val DarkPrimaryContainer = Color(0xFF1D3A47)
+internal val DarkOnPrimaryContainer = Color(0xFF9FD0E3)
+internal val DarkTertiaryContainer = Color(0xFF3A3220)
+internal val DarkError = Color(0xFFF08F7F)
+internal val DarkOutline = Color(0xFF6B7079)
+internal val DarkOutlineVariant = Color(0xFF3A3F48)
+internal val DarkInverseOnSurface = Color(0xFF2A2E35)
 
-// Tertiary - Orange palette
-internal val Orange10 = Color(0xFF2D1600)
-internal val Orange20 = Color(0xFF4A2800)
-internal val Orange30 = Color(0xFF693C00)
-internal val Orange40 = Color(0xFF8A5100)
-internal val Orange80 = Color(0xFFFFB86C)
-internal val Orange90 = Color(0xFFFFDDB8)
+// Shared brand hues
+internal val BrandBlue = Color(0xFF1E6F8F)
+internal val BrandYellow = Color(0xFFF2C84B)
+internal val Paper = Color(0xFFF6F5F1)
+internal val Ink = Color(0xFF15171C)
 
-// Error - Red palette
-internal val Red10 = Color(0xFF410001)
-internal val Red20 = Color(0xFF680003)
-internal val Red30 = Color(0xFF930006)
-internal val Red40 = Color(0xFFBA1B1B)
-internal val Red80 = Color(0xFFFFB4A9)
-internal val Red90 = Color(0xFFFFDAD4)
-
-// Neutral - Gray palette for backgrounds and surfaces
-internal val Gray10 = Color(0xFF1A1C1E)
-internal val Gray20 = Color(0xFF2F3033)
-internal val Gray90 = Color(0xFFE2E2E5)
-internal val Gray95 = Color(0xFFF0F0F3)
-internal val Gray99 = Color(0xFFFCFCFF)
-
-// Neutral Variant - For containers and outlines
-internal val GrayVariant30 = Color(0xFF42474E)
-internal val GrayVariant50 = Color(0xFF72777F)
-internal val GrayVariant60 = Color(0xFF8C9198)
-internal val GrayVariant80 = Color(0xFFC2C7CF)
-internal val GrayVariant90 = Color(0xFFDEE3EB)
-
-// Brand fallback (DECISIONS A2): black/white neutrals + teal accent #1F8A84.
-internal val Brand10 = Color(0xFF00201E)
-internal val Brand20 = Color(0xFF003733)
-internal val Brand30 = Color(0xFF00504B)
-internal val Brand40 = Color(0xFF1F8A84)
-internal val Brand80 = Color(0xFF7DD7CF)
-internal val Brand90 = Color(0xFFB4EFE9)
-internal val Ink = Color(0xFF111414)
-internal val Paper = Color(0xFFFFFFFF)
+// Light scheme (paper background, same hues)
+internal val LightSurfaceLowest = Color(0xFFFFFFFF)
+internal val LightSurfaceLow = Color(0xFFFBFAF7)
+internal val LightSurfaceContainer = Color(0xFFEFEDE7)
+internal val LightSurfaceHigh = Color(0xFFE8E6DF)
+internal val LightSurfaceHighest = Color(0xFFE0DED6)
+internal val LightOnSurfaceVariant = Color(0xFF55595F)
+internal val LightPrimaryContainer = Color(0xFFCDE7F1)
+internal val LightOnPrimaryContainer = Color(0xFF0B3646)
+internal val LightTertiary = Color(0xFF7A5A00)
+internal val LightTertiaryContainer = Color(0xFFF6E7B0)
+internal val LightOnTertiaryContainer = Color(0xFF4A3600)
+internal val LightError = Color(0xFFB3261E)
+internal val LightOutline = Color(0xFF8A8E94)
+internal val LightOutlineVariant = Color(0xFFD3D1C9)
+internal val LightInverseSurface = Color(0xFF2A2E35)
+internal val LightInverseOnSurface = Color(0xFFF1EFE9)

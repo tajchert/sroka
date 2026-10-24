@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
             val state = uiState as? MainActivityUiState.Success
             SrokaTheme(
                 darkTheme = darkTheme,
-                dynamicColor = uiState.shouldUseDynamicColor(),
+                dynamicColor = false,
             ) {
                 if (state != null) SrokaApp(session = state.session, onUndoArchive = viewModel::unarchive)
             }

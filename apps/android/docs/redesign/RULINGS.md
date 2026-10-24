@@ -167,3 +167,41 @@ Progress is tracked in `docs/redesign/LEDGER.md`.
 | T6 settings/import/export | `feature/settings/**`, `app/.../navigation/SrokaNavHost.kt` (entries for Import/Export only) | 504–640 |
 Shared-file rule: `strings.xml` belongs to the module's owner. If two tasks must touch the same file (e.g.
 `SrokaNavHost.kt`), keep the edit minimal and additive.
+
+## R13 Foldables — screen 17 (unfolded list–detail), added 2026-10-24
+Mock: `docs/redesign/sroka-android.dc.html` lines 642–690 (+ `navList`/`wide` data ~829–830). Screens 18 (tabletop)
+and 19 (split-screen drag-and-drop) come later; don't start them. Template practice (`/Users/mtajchert/coding/priv/ai-android-template/docs/ADAPTIVE_LAYOUTS.md`):
+decide from the window (`currentWindowAdaptiveInfoV2`, pane directive), never from device type; list–detail stays
+Navigation 3 `ListDetailSceneStrategy` (back stack = only nav state); no back arrow in the detail pane while the list
+is visible.
+- **Rail (expanded/medium width, i.e. whenever NavigationSuiteScaffold picks a rail):** 96dp rail; at the top the
+  "Save link" FAB (56dp, 16dp corners, `srokaColors.brand`/`onBrand`, `add` icon, content description "Save link")
+  with ~28dp below it; then My List · Favourites · Archive · Tags (56×32 indicator, filled icon when selected); at the
+  bottom the 36dp avatar (first letter of email, primaryContainer) opening Settings. Use the M3 rail header slot
+  (`NavigationRail(header=…)`, or NavigationSuiteScaffold's primary-action slot if the BOM version has one); if
+  NavigationSuiteScaffold can't host header+footer, render a custom rail via `NavigationSuiteScaffoldLayout`.
+  When the rail is shown the list hides its own FAB and the avatar in the search pill (they live in the rail);
+  the FAB opens the same add-link dialog (hoist the trigger so the rail can call it).
+- **List pane:** width 360dp; search pill without avatar; rows as on phone, but the row of the article open in the
+  detail pane is highlighted: 16dp rounded `primaryContainer` background, title `onPrimaryContainer`; rows get 2dp
+  vertical gap and horizontal inset so the highlight is a rounded card.
+- **Pane divider:** a drag handle (4×48dp, `outline`, 2dp radius) in a 24dp gutter between panes; dragging resizes the
+  panes if the material3-adaptive version supports pane expansion with Nav3 scenes (check the API; otherwise draw the
+  handle only and note it in the ledger).
+- **Detail pane:** a rounded card — margin 24dp top/end/bottom, 24dp corners, `surfaceContainerLow` — containing the
+  reader app bar WITHOUT the back arrow (star, archive, overflow), the 3dp progress line, and the article. The
+  WebView page background must match the card (`surfaceContainerLow`) in two-pane mode (pass the colour into the
+  reader CSS). Article column stays ≤ 640dp, with 48dp horizontal padding in the card; title 36sp/600 on wide panes.
+  The empty-detail placeholder uses the same card.
+- **Folding/unfolding** keeps the open article: folding with a reader open shows the reader full-screen (phone
+  layout, with back arrow); unfolding shows list + reader. Verify the scene strategy already does this; fix if not.
+- **Phone / folded cover screen:** unchanged.
+- **Screenshot tests:** add Compose Preview Screenshot Testing (plugin already in `libs.versions.toml`, used by
+  core:designsystem, core:ui, feature:auth:impl) to `feature:library:impl`, `feature:settings:impl` and `app`.
+  New annotation `@FoldablePreviews` in `core/designsystem/.../preview/DevicePreviews.kt`: "Folded" 360×800dp,
+  "Unfolded" 673×841dp, "Unfolded landscape" 841×673dp (pinned dims, no dots in names, apiLevel 36). Cover with
+  stateless content composables + fixed fixtures (no Hilt/ViewModel/Paging from DB): library list (populated, with
+  status lines), search results, settings, import (file picked), export (ready), sign-in, and the app shell in
+  two-pane mode (rail + list with a selected row + detail placeholder card — the WebView can't render in layoutlib, so
+  use the placeholder or a stub detail). Dark theme for the shell, light+dark for one list case. Generate references
+  with `update<Variant>ScreenshotTest`, then run `validate<Variant>ScreenshotTest`.

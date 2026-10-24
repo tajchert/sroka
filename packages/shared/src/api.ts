@@ -129,8 +129,10 @@ export const ContentUrlsResponse = z.object({
   articleUrl: z.string(),
   /** Signed directory URL ending in "/" — use as <base href> (relative img/… resolve against it). */
   baseUrl: z.string(),
-  /** Signed URL of the offline package zip. */
+  /** Signed URL of the offline package zip (articles; for PDFs it does not exist). */
   packageUrl: z.string(),
+  /** Signed URL of the original PDF (`document.pdf`) for items of kind "pdf", else null. */
+  documentUrl: z.string().nullable(),
   /** Epoch ms when the signature expires. */
   expiresAt: z.number().int(),
 });

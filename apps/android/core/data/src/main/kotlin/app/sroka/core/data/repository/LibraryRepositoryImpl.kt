@@ -77,6 +77,9 @@ internal class LibraryRepositoryImpl @Inject constructor(
     override fun observeItem(id: String): Flow<Item?> =
         itemDao.observeItem(id).map { it?.toItem() }.distinctUntilChanged()
 
+    override fun observeNextUnread(): Flow<ItemSummary?> =
+        itemDao.observeNextUnread().map { it?.toSummary() }.distinctUntilChanged()
+
     override fun observeCounts(): Flow<LibraryCounts> =
         itemDao.observeCounts().map { LibraryCounts(it.unread, it.archived, it.favorites) }.distinctUntilChanged()
 

@@ -50,6 +50,8 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -101,6 +103,7 @@ import kotlinx.coroutines.launch
  * @param twoPane the list is the left pane of the list-detail layout: rows are inset as rounded cards
  * @param navRailShown the navigation rail is visible: it hosts the save-link FAB and the avatar, so
  *   the list hides its own
+ * @param detailCard the list is drawn inside the detail pane card (tag articles beside the tag list): transparent bars
  * @param addLinkRequested the rail's FAB was tapped: open the add-link dialog, then call [onAddLinkHandled]
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,6 +120,7 @@ fun LibraryListRoute(
     navRailShown: Boolean = false,
     addLinkRequested: Boolean = false,
     onAddLinkHandled: () -> Unit = {},
+    detailCard: Boolean = false,
     viewModel: LibraryListViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(scope) { viewModel.setScope(scope) }
@@ -214,6 +218,7 @@ fun LibraryListRoute(
         selectedItemId = selectedItemId,
         twoPane = twoPane,
         navRailShown = navRailShown,
+        detailCard = detailCard,
     )
 
     selected?.let { item ->
@@ -286,11 +291,13 @@ fun LibraryListContent(
     selectedItemId: String?,
     twoPane: Boolean,
     navRailShown: Boolean,
+    detailCard: Boolean = false,
 ) {
     val tab = (scope as? ListScope.Tab)?.tab
     val isTopLevel = tab != null
     val fabExpanded = isEmpty || listState.isScrollingUpOrAtTop()
     Scaffold(
+        containerColor = if (detailCard) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             if (tab != null) {
                 SearchPill(
@@ -312,6 +319,7 @@ fun LibraryListContent(
                         }
                     },
                     actions = { SortMenu(state.sort, onSortChange) },
+                    colors = if (detailCard) TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent) else TopAppBarDefaults.topAppBarColors(),
                 )
             }
         },

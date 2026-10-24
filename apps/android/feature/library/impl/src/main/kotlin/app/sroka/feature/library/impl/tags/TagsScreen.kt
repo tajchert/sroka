@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Label
@@ -63,20 +66,74 @@ import kotlinx.coroutines.launch
  * and the avatar (opens Settings via [onOpenSettings]); rows show `label` icon, name and article
  * count. Tap opens the tag's items, long-press offers rename / delete.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagsRoute(
     onOpenTag: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    selectedTag: String? = null,
+    navRailShown: Boolean = false,
     viewModel: TagsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val avatar by viewModel.avatarLetter.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    TagsContent(
+        tags = state.tags,
+        avatar = avatar,
+        selectedTag = selectedTag,
+        navRailShown = navRailShown,
+        onOpenTag = onOpenTag,
+        onOpenSettings = onOpenSettings,
+        onRename = { renaming = it },
+        onDelete = { deleting = it },
+    )
+
+    renaming?.let { name ->
+        RenameTagDialog(
+            name = name,
+            onRename = { to ->
+                scope.launch {
+                    if (viewModel.rename(name, to)) renaming = null
+                }
+            },
+            onDismiss = { renaming = null },
+        )
+    }
+    deleting?.let { name ->
+        ConfirmDialog(
+            title = stringResource(R.string.feature_library_tags_delete_title, name),
+            body = stringResource(R.string.feature_library_tags_delete_body),
+            confirmLabel = stringResource(R.string.feature_library_tags_delete),
+            onConfirm = {
+                viewModel.delete(name)
+                deleting = null
+            },
+            onDismiss = { deleting = null },
+        )
+    }
+}
+
+/**
+ * Stateless Tags list. [selectedTag] is highlighted (two-pane); [navRailShown] hides the avatar,
+ * which the rail hosts.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TagsContent(
+    tags: List<TagCount>?,
+    avatar: String?,
+    selectedTag: String?,
+    navRailShown: Boolean,
+    onOpenTag: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
@@ -97,12 +154,11 @@ fun TagsRoute(
                             ),
                         )
                     }
-                    Avatar(avatar, onOpenSettings)
+                    if (!navRailShown) Avatar(avatar, onOpenSettings)
                 },
             )
         },
     ) { padding ->
-        val tags = state.tags
         val shown = if (query.isBlank()) tags else tags?.filter { tagKey(it.name).contains(tagKey(query)) }
         when {
             tags == null -> Box(Modifier.padding(padding).fillMaxSize())
@@ -139,38 +195,15 @@ fun TagsRoute(
                     items(shown.orEmpty(), key = { it.name }, contentType = { "tag" }) { tag ->
                         TagRow(
                             tag = tag,
+                            selected = tag.name == selectedTag,
                             onClick = { onOpenTag(tag.name) },
-                            onRename = { renaming = tag.name },
-                            onDelete = { deleting = tag.name },
+                            onRename = { onRename(tag.name) },
+                            onDelete = { onDelete(tag.name) },
                         )
                     }
                 }
             }
         }
-    }
-
-    renaming?.let { name ->
-        RenameTagDialog(
-            name = name,
-            onRename = { to ->
-                scope.launch {
-                    if (viewModel.rename(name, to)) renaming = null
-                }
-            },
-            onDismiss = { renaming = null },
-        )
-    }
-    deleting?.let { name ->
-        ConfirmDialog(
-            title = stringResource(R.string.feature_library_tags_delete_title, name),
-            body = stringResource(R.string.feature_library_tags_delete_body),
-            confirmLabel = stringResource(R.string.feature_library_tags_delete),
-            onConfirm = {
-                viewModel.delete(name)
-                deleting = null
-            },
-            onDismiss = { deleting = null },
-        )
     }
 }
 
@@ -195,14 +228,17 @@ private fun Avatar(letter: String?, onClick: () -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TagRow(tag: TagCount, onClick: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun TagRow(tag: TagCount, selected: Boolean, onClick: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     Box {
         Row(
             Modifier
                 .fillMaxWidth()
+                .padding(horizontal = if (selected) 8.dp else 0.dp)
                 .height(56.dp)
+                .clip(if (selected) RoundedCornerShape(16.dp) else RectangleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = {
@@ -211,12 +247,18 @@ private fun TagRow(tag: TagCount, onClick: () -> Unit, onRename: () -> Unit, onD
                     },
                     onLongClickLabel = stringResource(R.string.feature_library_tags_more),
                 )
-                .padding(start = 16.dp, end = 24.dp),
+                .padding(start = if (selected) 8.dp else 16.dp, end = if (selected) 16.dp else 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
         ) {
             Icon(Icons.AutoMirrored.Rounded.Label, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(tag.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1)
+            Text(
+                tag.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else Color.Unspecified,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
             Text(
                 tag.count.toString(),
                 style = MaterialTheme.typography.labelMedium,

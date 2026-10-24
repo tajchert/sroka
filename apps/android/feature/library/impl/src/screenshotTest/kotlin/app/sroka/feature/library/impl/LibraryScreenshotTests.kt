@@ -1,6 +1,9 @@
 package app.sroka.feature.library.impl
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.SnackbarHostState
@@ -12,6 +15,8 @@ import app.sroka.core.designsystem.preview.FoldablePreviews
 import app.sroka.core.designsystem.theme.SrokaTheme
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.SearchScope
+import app.sroka.feature.library.impl.detail.DetailPlaceholderContent
+import app.sroka.feature.library.impl.tags.TagsContent
 import app.sroka.feature.library.impl.list.LibraryListContent
 import app.sroka.feature.library.impl.list.LibraryListUiState
 import app.sroka.feature.library.impl.list.ListScope
@@ -90,5 +95,65 @@ fun SearchResultsWithHighlights() {
             onBack = {},
             focus = null,
         )
+    }
+}
+
+/** Search as the 360dp list pane (R14.1): rounded rows, the open result highlighted. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun SearchTwoPane() {
+    SrokaTheme(darkTheme = false) {
+        androidx.compose.foundation.layout.Box(Modifier.width(360.dp).fillMaxHeight()) {
+            SearchContent(
+                query = "magpie",
+                scope = SearchScope.ALL,
+                loaded = true,
+                itemCount = sampleSearchResults.size,
+                itemAt = { sampleSearchResults.getOrNull(it) },
+                itemKey = { sampleSearchResults[it].summary.id },
+                resultCount = sampleSearchResults.size,
+                onQueryChange = {},
+                onScopeChange = {},
+                onOpenItem = {},
+                onBack = {},
+                focus = null,
+                selectedItemId = "i2",
+                twoPane = true,
+            )
+        }
+    }
+}
+
+/** Empty detail pane (R14.2) with the "Read next" button. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun EmptyDetailPane() {
+    SrokaTheme(darkTheme = false) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            DetailPlaceholderContent(nextTitle = "How a magpie decides what to collect", onReadNext = {})
+        }
+    }
+}
+
+/** Tags list pane (R14.5) with the open tag highlighted. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun TagsTwoPane() {
+    SrokaTheme(darkTheme = true) {
+        androidx.compose.foundation.layout.Box(Modifier.width(360.dp).fillMaxHeight()) {
+            TagsContent(
+                tags = sampleTags,
+                avatar = "M",
+                selectedTag = "nature",
+                navRailShown = true,
+                onOpenTag = {},
+                onOpenSettings = {},
+                onRename = {},
+                onDelete = {},
+            )
+        }
     }
 }

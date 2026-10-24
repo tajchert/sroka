@@ -60,6 +60,7 @@ import app.sroka.feature.auth.api.AuthKey
 import app.sroka.feature.auth.impl.navigation.authEntries
 import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
+import app.sroka.feature.library.api.TagsKey
 import app.sroka.feature.library.impl.navigation.libraryEntries
 import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.feature.reader.impl.navigation.readerEntries
@@ -140,12 +141,12 @@ fun SrokaApp(
     }
     val twoPane = directive.maxHorizontalPartitions > 1
     val top = backStack.lastOrNull()
-    val current = TopLevelDestination.of(top)
-        ?: if (twoPane && top is ReaderKey) TopLevelDestination.of(backStack.getOrNull(backStack.size - 2)) else null
+    val current = currentTab(backStack, twoPane)
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     val layoutType = if (current != null) adaptiveType else NavigationSuiteType.None
     val railShown = layoutType.isRail()
     val detailItemId = detailPaneItemId(backStack, twoPane)
+    val selectedTag = selectedTagName(backStack, twoPane)
     // The rail's "Save link" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
     val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
@@ -210,6 +211,7 @@ fun SrokaApp(
                     onArchived = onArchived,
                     twoPane = twoPane,
                     detailItemId = detailItemId,
+                    selectedTag = selectedTag,
                     railShown = railShown,
                     addLinkRequested = addLinkRequested,
                     onAddLinkHandled = { addLinkRequested = false },
@@ -256,6 +258,7 @@ private fun SrokaNavDisplay(
     onArchived: (itemId: String) -> Unit,
     twoPane: Boolean,
     detailItemId: String?,
+    selectedTag: String?,
     railShown: Boolean,
     addLinkRequested: Boolean,
     onAddLinkHandled: () -> Unit,
@@ -308,7 +311,7 @@ private fun SrokaNavDisplay(
             libraryEntries(
                 // In two-pane mode a new selection replaces the open article instead of stacking.
                 onOpenItem = backStack::openReader,
-                onOpenTag = { name -> backStack.add(TagItemsKey(name)) },
+                onOpenTag = { name -> backStack.openTag(name, twoPane) },
                 onOpenSettings = { backStack.add(SettingsKey) },
                 onCloseTag = { key ->
                     val i = backStack.lastIndexOf(key)
@@ -317,7 +320,11 @@ private fun SrokaNavDisplay(
                 // From the Expired banner: sign in on top of the library; success pops it.
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
                 onOpenSearch = { tab -> backStack.add(SearchKey(tab)) },
-                onCloseSearch = goBack,
+                onCloseSearch = { key ->
+                    val i = backStack.lastIndexOf(key)
+                    if (i > 0) backStack.subList(i, backStack.size).clear()
+                },
+                selectedTag = { selectedTag },
                 selectedItemId = { detailItemId },
                 twoPane = twoPane,
                 navRailShown = railShown,
@@ -352,6 +359,18 @@ internal fun NavBackStack<NavKey>.openSettingsDetail(key: NavKey) {
         is SettingsChoiceKey, ImportKey, ExportKey -> this[lastIndex] = key
         else -> add(key)
     }
+}
+
+/**
+ * Opens the articles of tag [name]. In two-pane mode they replace a tag already open beside the
+ * Tags list (and any reader on top of it); on a phone they stack.
+ */
+internal fun NavBackStack<NavKey>.openTag(name: String, twoPane: Boolean) {
+    if (twoPane) {
+        val tags = indexOfLast { it == TagsKey }
+        if (tags >= 0) subList(tags + 1, size).clear()
+    }
+    add(TagItemsKey(name))
 }
 
 /** Opens [itemId] in the reader; a reader already on top is replaced rather than stacked. */

@@ -187,6 +187,10 @@ interface ItemDao {
 
     // ---- Single item / counts / tags ---------------------------------------------------------
 
+    /** The newest My List (unread) row, or null when the list is empty. */
+    @Query("$ROW_COLUMNS $LIST_FROM WHERE i.status = 'UNREAD' $ORDER_NEWEST LIMIT 1")
+    fun observeNextUnread(): Flow<ItemSummaryRow?>
+
     @Query("$DETAIL_SELECT WHERE i.id = :id")
     fun observeItem(id: String): Flow<ItemDetailRow?>
 

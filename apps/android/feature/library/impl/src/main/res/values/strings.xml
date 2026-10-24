@@ -158,7 +158,9 @@
     <string name="feature_library_share_sign_in_needed">Sign in to Sroka to save articles</string>
     <string name="feature_library_share_add_tags">Add tags</string>
     <string name="feature_library_share_done">Done</string>
-    <string name="feature_library_select_article">Select an article to read</string>
+    <string name="feature_library_empty_detail_title">Pick something to read</string>
+    <string name="feature_library_empty_detail_body">Your saved articles open here.</string>
+    <string name="feature_library_read_next">Read next: %1$s</string>
     <!-- Share sheet and tag sheet (R9) -->
     <string name="feature_library_share_sub_downloading">Downloading for offline…</string>
     <string name="feature_library_share_sub_saved">Saved</string>

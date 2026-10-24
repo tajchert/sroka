@@ -159,6 +159,10 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
         )
     }
 
+    override fun observeNextUnread(): Flow<ItemSummary?> = items.map { list ->
+        list.filter { it.status == ItemStatus.UNREAD }.maxByOrNull { it.savedAt }?.toSummary()
+    }
+
     override fun observeItem(id: String): Flow<Item?> = items.map { list -> list.firstOrNull { it.id == id } }
 
     override fun observeCounts(): Flow<LibraryCounts> = items.map { list ->

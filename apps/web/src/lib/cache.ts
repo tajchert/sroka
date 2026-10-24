@@ -107,11 +107,28 @@ export function placeholderItem(url: string): Item {
   };
 }
 
-/** Put an uploaded item at the top of the lists it belongs in (re-added duplicates move up). */
+/** Whether a fresh/re-added item would appear at the top of a list (newest sort, filters it provably matches). */
+function movesToTop(item: Item, p: ListParams): boolean {
+  if (p.sort !== "newest" || !matchesState(item, p.state)) return false;
+  if (p.q || p.domain) return false; // cannot tell cheaply; replaced in place if present
+  if (p.tag && !item.tags.some((t) => (typeof t === "string" ? t : (t as { name: string }).name) === p.tag)) return false;
+  return true;
+}
+
+/**
+ * Put an uploaded item at the top of the newest-sorted lists it belongs in (re-added duplicates move up);
+ * in any other list where it is already present (search, domain, oldest...) it is replaced in place.
+ */
 export function promoteItem(qc: QueryClient, item: Item): void {
   for (const [key, data] of qc.getQueriesData<ItemsData>({ queryKey: ["items"] })) {
-    if (data) qc.setQueryData<ItemsData>(key, mapPages(data, (items) => items.filter((i) => i.id !== item.id)));
+    if (!data) continue;
+    const p = key[1] as ListParams;
+    if (movesToTop(item, p)) {
+      const [first, ...rest] = mapPages(data, (items) => items.filter((i) => i.id !== item.id)).pages;
+      if (first) qc.setQueryData<ItemsData>(key, { ...data, pages: [{ ...first, items: [item, ...first.items] }, ...rest] });
+    } else {
+      qc.setQueryData<ItemsData>(key, mapPages(data, (items) => items.flatMap((i) => (i.id !== item.id ? [i] : matchesState(item, p.state) ? [item] : []))));
+    }
   }
-  prependItem(qc, item);
   qc.setQueryData(["item", item.id], item);
 }

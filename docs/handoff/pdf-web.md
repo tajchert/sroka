@@ -17,3 +17,8 @@
 - Reader: blob fetch from the signed URL needs CORS (`APP_ORIGIN`) on the content host; iframe rendering in Chrome/Safari/Firefox; `#page=` resume; Download filename; Open in new tab (blob URL).
 - Page progress is not tracked for PDFs on web (browser viewer gives no events); only the 0.01 "started" mark is written.
 - Overlay is shown only on library routes (Library component), not on the reader/settings pages.
+
+## Review fixes
+- `PdfViewer.tsx` `usePdfBlob`/`loadPdfBlob`: "Try again" now re-signs first (awaits `contentQ.refetch()`) and fetches the fresh URL; a 403 on load triggers one automatic re-sign + retry (second 403 = error). The effect still keys on `contentId/attempt/!!documentUrl`, so a re-signed URL never reloads a displayed PDF.
+- `cache.ts` `promoteItem`: moves to top only in newest-sorted lists whose state/tag filter it matches; in all other lists (search, domain, oldest, non-matching tag) it is replaced in place if present, never removed.
+- `uploads.ts`: `RunQueue` (`lib/runQueue.ts`) caps uploads at 2 concurrent; extra files show a "Waiting" row (`state:"queued"`); Retry re-enters the queue. Tests: `runQueue.test.ts`, `uploads.test.tsx`, `PdfViewer.test.tsx`, `cache.test.ts`.

@@ -207,6 +207,7 @@ export default function Library({ state: baseState }: { state: ItemState }) {
               <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate font-medium">{r.name}</span>
                 <span className="flex shrink-0 items-center gap-2 text-ink2">
+                  {r.state === "queued" && "Waiting"}
                   {r.state === "uploading" && `${Math.round((r.loaded / Math.max(1, r.size)) * 100)}%`}
                   {r.state === "processing" && "Saving…"}
                   {r.state === "error" && (

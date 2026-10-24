@@ -55,4 +55,27 @@ describe("promoteItem", () => {
     expect(d.pages[0]!.items.map((i) => i.id)).toEqual(["b", "a"]);
     expect(qc.getQueryData(["item", "b"])).toBeTruthy();
   });
+
+  it("keeps a re-added item in filtered and oldest lists, moving only newest lists it matches", async () => {
+    const { promoteItem } = await import("./cache.ts");
+    const { QueryClient } = await import("@tanstack/react-query");
+    const qc = new QueryClient();
+    const mk = (id: string, tags: string[] = []) => ({ ...placeholderItem("https://x.test/" + id), id, tags }) as Item;
+    const seed = (p: ListParams, ids: string[]) =>
+      qc.setQueryData<ItemsData>(itemsKey(p), { pageParams: [undefined], pages: [{ items: ids.map((i) => mk(i)), nextCursor: null }] });
+    const ids = (p: ListParams) => qc.getQueryData<ItemsData>(itemsKey(p))!.pages.flatMap((pg) => pg.items.map((i) => i.id));
+    const search: ListParams = { state: "unread", sort: "newest", q: "x" };
+    const oldest: ListParams = { state: "unread", sort: "oldest" };
+    const tagHit: ListParams = { state: "unread", sort: "newest", tag: "t" };
+    const tagMiss: ListParams = { state: "unread", sort: "newest", tag: "other" };
+    seed(search, ["a", "b"]);
+    seed(oldest, ["a", "b"]);
+    seed(tagHit, ["a", "b"]);
+    seed(tagMiss, ["a", "b"]);
+    promoteItem(qc, mk("b", ["t"]));
+    expect(ids(search)).toEqual(["a", "b"]);
+    expect(ids(oldest)).toEqual(["a", "b"]);
+    expect(ids(tagHit)).toEqual(["b", "a"]);
+    expect(ids(tagMiss)).toEqual(["a", "b"]);
+  });
 });

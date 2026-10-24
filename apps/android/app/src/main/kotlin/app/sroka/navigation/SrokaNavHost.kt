@@ -339,6 +339,7 @@ private fun SrokaNavDisplay(
             )
             readerEntries(
                 onBack = goBack,
+                onOpenItem = backStack::openReader,
                 onArchived = onArchived,
                 detailPaneActive = { detailPaneItemId(backStack, twoPaneState.value) != null },
                 isExpanded = { expandedState.value },

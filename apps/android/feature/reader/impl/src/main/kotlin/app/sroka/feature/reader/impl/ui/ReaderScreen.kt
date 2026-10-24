@@ -68,6 +68,11 @@ import app.sroka.core.ui.openExternalLink
 import app.sroka.feature.reader.impl.NotDownloadedReason
 import app.sroka.feature.reader.impl.R
 import app.sroka.feature.reader.impl.ReaderHtml
+import app.sroka.feature.reader.impl.ReaderLayout
+import app.sroka.feature.reader.impl.minutesLeft
+import app.sroka.feature.reader.impl.textSizePx
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.platform.LocalDensity
 import app.sroka.feature.reader.impl.ReaderUiState
 import app.sroka.feature.reader.impl.ReaderViewModel
 import app.sroka.feature.reader.impl.resolveTheme
@@ -93,6 +98,7 @@ internal fun ReaderScreen(
     paneWidthDp: Int = Int.MAX_VALUE,
     isExpanded: Boolean = false,
     onToggleExpanded: (() -> Unit)? = null,
+    onOpenItem: (itemId: String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -103,6 +109,10 @@ internal fun ReaderScreen(
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
+    val upNext by viewModel.upNext.collectAsStateWithLifecycle()
+    val layout = rememberReaderLayout()
+    val tabletop = layout as? ReaderLayout.Tabletop
+    var scrubRequest by remember { mutableStateOf<ScrubRequest?>(null) }
     var scrollTopSignal by remember { mutableStateOf(0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
@@ -177,7 +187,7 @@ internal fun ReaderScreen(
         contentWindowInsets = if (detailPane) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
-            Column {
+            if (tabletop == null) Column {
                 TopAppBar(
                     title = {},
                     navigationIcon = {
@@ -272,7 +282,7 @@ internal fun ReaderScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .then(if (tabletop == null) Modifier.padding(padding) else Modifier),
         ) {
             when (val s = state) {
                 is ReaderUiState.Ready -> {
@@ -335,9 +345,16 @@ internal fun ReaderScreen(
                         onLinkClick = { openExternalLink(context, it) },
                         onRendererGone = { rendererGone = true },
                         scrollToTopSignal = scrollTopSignal,
+                        scrubRequest = scrubRequest,
                         headerScript = header?.let(ReaderHtml::headerScript).orEmpty(),
                         backgroundArgb = if (detailPane) cardArgb else theme.backgroundArgb,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = if (tabletop != null) {
+                            val density = LocalDensity.current
+                            val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+                            Modifier.tabletopArticle(statusBar, with(density) { tabletop.hingeTopPx.toDp() })
+                        } else {
+                            Modifier.fillMaxSize()
+                        },
                     )
                 }
                 ReaderUiState.Loading, ReaderUiState.Missing -> Unit
@@ -381,6 +398,45 @@ internal fun ReaderScreen(
                     s.error?.let { Text(stringResource(R.string.feature_reader_failed_reason, it)) }
                     Button(onClick = viewModel::refresh) { Text(stringResource(R.string.feature_reader_try_again)) }
                     OriginalButton(originalUrl) { openExternalLink(context, it) }
+                }
+            }
+            if (tabletop != null && state is ReaderUiState.Ready) {
+                val density = LocalDensity.current
+                val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+                val current = item
+                val site = current?.let { it.siteName?.takeIf(String::isNotBlank) ?: it.domain }.orEmpty()
+                TabletopChrome(
+                    statusBar = statusBar,
+                    hingeBottom = with(density) { tabletop.hingeBottomPx.toDp() },
+                    titleLine = listOf(site, current?.displayTitle.orEmpty()).filter { it.isNotBlank() }.joinToString(" \u00b7 "),
+                    progress = progress,
+                ) {
+                    TabletopControls(
+                        progress = progress,
+                        minutesLeft = minutesLeft(current?.readingMinutes, progress),
+                        textSizePx = textSizePx(prefs.readerTextScale),
+                        isFavorite = current?.isFavorite == true,
+                        isArchived = current?.status == ItemStatus.ARCHIVED,
+                        upNext = upNext?.let { UpNextCard(it.displayTitle) },
+                        onScrub = { f ->
+                            scrubRequest = ScrubRequest((scrubRequest?.seq ?: 0) + 1, f)
+                            viewModel.onScrub(f)
+                        },
+                        onTextSmaller = { viewModel.stepTextScale(-1) },
+                        onTextLarger = { viewModel.stepTextScale(1) },
+                        onFavorite = viewModel::toggleFavorite,
+                        onArchive = {
+                            viewModel.flushProgress()
+                            viewModel.toggleArchive { nowArchived ->
+                                if (nowArchived && !leaving) {
+                                    leaving = true
+                                    onArchived(itemId)
+                                }
+                            }
+                        },
+                        onTags = { showTags = true },
+                        onReadNext = { upNext?.let { viewModel.flushProgress(); onOpenItem(it.id) } },
+                    )
                 }
             }
             if (refreshing) {

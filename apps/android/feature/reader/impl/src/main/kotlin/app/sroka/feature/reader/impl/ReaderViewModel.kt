@@ -13,6 +13,7 @@ import app.sroka.core.domain.SyncStatusRepository
 import app.sroka.core.domain.TagRepository
 import app.sroka.core.model.Item
 import app.sroka.core.model.ItemStatus
+import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.ReaderTheme
@@ -124,6 +125,11 @@ class ReaderViewModel @AssistedInject constructor(
 
     val recentTags: StateFlow<List<String>> = tagRepository.observeRecentTags(RECENT_TAGS)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /** Next unread item other than this one, for the tabletop "Up next in My List" card (R15.2). */
+    val upNext: StateFlow<ItemSummary?> = library.observeNextUnread()
+        .map { next -> next?.takeIf { it.id != itemId } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /** Live reading progress for the indicator (0..1). */
     private val _progress = MutableStateFlow(0f)
@@ -353,6 +359,14 @@ class ReaderViewModel @AssistedInject constructor(
 
     fun setReaderTheme(theme: ReaderTheme) {
         viewModelScope.launch { settings.setReaderTheme(theme) }
+    }
+
+    /** The tabletop scrubber moved to [fraction]: persists it through the normal (debounced) progress path. */
+    fun onScrub(fraction: Float) = onProgress(ProgressReport(scrubFraction(fraction), null))
+
+    /** Tabletop text-size stepper: [direction] -1 / +1 from the current setting. */
+    fun stepTextScale(direction: Int) {
+        viewModelScope.launch { settings.setReaderTextScale(steppedTextScale(preferences.value.readerTextScale, direction)) }
     }
 
     fun setTextScale(scale: Float) {

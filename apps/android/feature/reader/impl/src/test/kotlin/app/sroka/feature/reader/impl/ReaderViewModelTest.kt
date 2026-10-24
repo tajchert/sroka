@@ -8,6 +8,9 @@ import app.sroka.core.model.ParseStatus
 import app.sroka.core.testing.fake.FakeContentStore
 import app.sroka.core.testing.fake.FakeLibraryRepository
 import app.sroka.core.testing.fake.FakeSettingsRepository
+import app.sroka.core.testing.fake.FakeSyncStatusRepository
+import app.sroka.core.model.SyncPhase
+import app.sroka.core.model.SyncStatus
 import app.sroka.core.testing.fake.FakeTagRepository
 import app.sroka.core.testing.testItem
 import app.sroka.core.testing.util.MainDispatcherRule
@@ -32,10 +35,11 @@ class ReaderViewModelTest {
     private val id = "item-1"
     private val library = FakeLibraryRepository()
     private val content = FakeContentStore()
+    private val sync = FakeSyncStatusRepository()
     private var clock = 10_000L
 
     private fun vm(): ReaderViewModel {
-        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository(), CoroutineScope(dispatcher))
+        val vm = ReaderViewModel(id, library, content, FakeSettingsRepository(), FakeTagRepository(), sync, CoroutineScope(dispatcher))
         vm.nowMillis = { clock }
         return vm
     }
@@ -230,5 +234,80 @@ class ReaderViewModelTest {
         assertEquals(0.1f, library.items.value.single().progress)
         vm.onCleared()
         assertEquals(0.7f, library.items.value.single().progress)
+    }
+
+    private fun ReaderViewModel.collectEvents(into: MutableList<ReaderEvent>, scope: CoroutineScope) {
+        events.onEach { into += it }.launchIn(scope)
+        refreshing.onEach { }.launchIn(scope)
+        offline.onEach { }.launchIn(scope)
+    }
+
+    private fun setParse(status: ParseStatus) {
+        library.items.value = library.items.value.map { it.copy(parseStatus = status) }
+    }
+
+    private fun refreshCycle(result: ParseStatus) = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        val events = mutableListOf<ReaderEvent>()
+        vm.collectEvents(events, backgroundScope)
+        assertEquals(false, vm.refreshing.value)
+        vm.refresh() // fake repository sets PENDING
+        assertEquals(true, vm.refreshing.value)
+        assertTrue(events.isEmpty())
+        setParse(result)
+        assertEquals(false, vm.refreshing.value)
+        assertEquals(listOf<ReaderEvent>(ReaderEvent.RefreshSettled(result)), events)
+        // No further events when the status changes without a user refresh.
+        setParse(ParseStatus.PENDING)
+        setParse(result)
+        assertEquals(1, events.size)
+    }
+
+    @Test fun refreshSettlesOk() = refreshCycle(ParseStatus.OK)
+
+    @Test fun refreshSettlesPartial() = refreshCycle(ParseStatus.PARTIAL)
+
+    @Test fun refreshSettlesFailed() = refreshCycle(ParseStatus.FAILED)
+
+    @Test
+    fun refreshIsIgnoredOffline() = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        vm.collectEvents(mutableListOf(), backgroundScope)
+        sync.statusFlow.value = SyncStatus(phase = SyncPhase.Offline)
+        assertEquals(true, vm.offline.value)
+        vm.refresh()
+        assertEquals(false, vm.refreshing.value)
+        assertEquals(ParseStatus.OK, library.items.value.single().parseStatus)
+    }
+
+    @Test
+    fun resumedProgressAnnouncedOnceAndStartOverResets() = runTest(dispatcher) {
+        seed(progress = 0.42f)
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        val events = mutableListOf<ReaderEvent>()
+        vm.collectEvents(events, backgroundScope)
+        vm.onArticleShown()
+        vm.onArticleShown()
+        assertEquals(listOf<ReaderEvent>(ReaderEvent.ResumedFromProgress(0.42f)), events)
+        vm.startOver()
+        assertEquals(0f, vm.progress.value, 0f)
+        assertEquals(0f, library.items.value.single().progress, 0f)
+        assertEquals(0f, vm.restorePoint().progress, 0f)
+    }
+
+    @Test
+    fun nearTopProgressIsNotAnnounced() = runTest(dispatcher) {
+        seed(progress = 0.01f)
+        content.html.value = mapOf(id to "<p>Hi</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        val events = mutableListOf<ReaderEvent>()
+        vm.collectEvents(events, backgroundScope)
+        vm.onArticleShown()
+        assertTrue(events.isEmpty())
     }
 }

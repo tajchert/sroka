@@ -15,6 +15,8 @@ import app.sroka.core.datastore.SessionStore
 import app.sroka.core.domain.ContentStore
 import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.RemoteFailure
+import app.sroka.core.model.ItemKind
+import app.sroka.core.model.MAX_PDF_BYTES
 import app.sroka.core.model.OfflineState
 import app.sroka.core.network.ApiResult
 import app.sroka.core.network.SrokaApi
@@ -112,6 +114,15 @@ class ContentStoreImpl @Inject internal constructor(
 
     override fun articlesDirectory(): File = paths.articles
 
+    override suspend fun pdfFile(itemId: String): File? = withContext(io) {
+        if (!ContentPaths.isSafeId(itemId)) return@withContext null
+        val row = contentFileDao.get(itemId)
+        val item = itemDao.getItem(itemId)
+        val file = paths.pdfFile(itemId)
+        // A row for another content id is stale (the document was replaced on the server).
+        if (item?.kind == ItemKind.PDF && row?.state == ContentState.DOWNLOADED && row.contentId == item.contentId && file.isFile) file else null
+    }
+
     override suspend fun downloadNow(itemId: String): DownloadResult = download(itemId).toDomain()
 
     override suspend fun storageUsageBytes(): Long = withContext(io) { paths.usageBytes() }
@@ -156,7 +167,7 @@ class ContentStoreImpl @Inject internal constructor(
         val (missing, staleThumbs) = withContext(io) {
             val missing = rows.filter {
                 it.state == ContentState.DOWNLOADED &&
-                    (!ContentPaths.isSafeId(it.itemId) || !File(paths.articleDir(it.itemId), PackageInstaller.ARTICLE).isFile)
+                    (!ContentPaths.isSafeId(it.itemId) || !hasLocalContent(it.itemId))
             }
             val missingIds = missing.mapTo(HashSet()) { it.itemId }
             missing to rows.filter { it.itemId !in missingIds && it.thumbPath != null && it.thumbPath.let { path -> !File(path).isFile } }
@@ -169,6 +180,9 @@ class ContentStoreImpl @Inject internal constructor(
         }
         withContext(io) { missing.filter { ContentPaths.isSafeId(it.itemId) }.forEach { paths.deleteItemFiles(it.itemId) } }
     }
+
+    private fun hasLocalContent(itemId: String): Boolean =
+        File(paths.articleDir(itemId), PackageInstaller.ARTICLE).isFile || paths.pdfFile(itemId).isFile
 
     /** Downloads (or confirms) the current package of [itemId]. Safe to call concurrently. */
     internal suspend fun download(itemId: String): DownloadOutcome {
@@ -193,6 +207,7 @@ class ContentStoreImpl @Inject internal constructor(
         val item = itemDao.getItem(itemId) ?: return DownloadOutcome.Failed(RemoteFailure.SERVER)
         val contentId = item.contentId ?: return DownloadOutcome.NotReady
         val previous = contentFileDao.get(itemId)
+        if (item.kind == ItemKind.PDF) return downloadPdfLocked(itemId, contentId, previous, gen)
         if (previous?.state == ContentState.DOWNLOADED && previous.contentId == contentId &&
             File(paths.articleDir(itemId), PackageInstaller.ARTICLE).isFile
         ) {
@@ -261,6 +276,147 @@ class ContentStoreImpl @Inject internal constructor(
             }
         }
         return outcome
+    }
+
+    /**
+     * PDF items: `documentUrl` of `/content` -> `articles/{id}.tmp` -> `%PDF-` + size check -> moved to
+     * `articles/{id}/document.pdf` -> row DOWNLOADED. A 401/403/404/410 on the signed URL (expired)
+     * re-fetches the URLs once. No thumbnail, no FTS body.
+     */
+    private suspend fun downloadPdfLocked(itemId: String, contentId: String, previous: ContentFileEntity?, gen: Long): DownloadOutcome {
+        if (previous?.state == ContentState.DOWNLOADED && previous.contentId == contentId && paths.pdfFile(itemId).isFile) {
+            return DownloadOutcome.AlreadyCurrent
+        }
+        if (paths.usableBytes() < minFreeBytes) return DownloadOutcome.StorageFull
+        val sameContent = previous?.contentId == contentId
+        val marked = writeRow(
+            ContentFileEntity(
+                itemId = itemId,
+                contentId = contentId,
+                state = ContentState.DOWNLOADING,
+                bytes = previous?.bytes ?: 0,
+                attempts = if (sameContent) previous.attempts else 0,
+                downloadedAt = previous?.downloadedAt,
+            ),
+            gen,
+        )
+        if (!marked) return DownloadOutcome.NotReady
+        val temp = paths.pdfTemp(itemId)
+        return try {
+            fetchPdf(itemId, contentId, temp, previous, gen)
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                temp.delete()
+                restore(previous, itemId, gen)
+            }
+            throw e
+        } catch (e: Exception) {
+            withContext(NonCancellable) {
+                temp.delete()
+                markFailed(previous, itemId, contentId, "crash", gen)
+            }
+            DownloadOutcome.Failed(RemoteFailure.SERVER)
+        }
+    }
+
+    private suspend fun fetchPdf(itemId: String, contentId: String, temp: File, previous: ContentFileEntity?, gen: Long): DownloadOutcome {
+        var refreshed = false
+        while (true) {
+            val urls = when (val r = api.contentUrls(itemId)) {
+                is ApiResult.Success -> r.value
+                is ApiResult.NetworkError -> {
+                    restore(previous, itemId, gen)
+                    return DownloadOutcome.Failed(RemoteFailure.NETWORK)
+                }
+                is ApiResult.HttpError -> {
+                    if (r.status == 409) {
+                        restore(previous, itemId, gen)
+                        return DownloadOutcome.NotReady
+                    }
+                    if (r.status == 401) {
+                        restore(previous, itemId, gen)
+                        sessionStore.markExpired()
+                        return DownloadOutcome.Failed(RemoteFailure.UNAUTHORIZED)
+                    }
+                    markFailed(previous, itemId, contentId, "http_${r.status}", gen)
+                    return DownloadOutcome.Failed(if (r.status == 429) RemoteFailure.RATE_LIMITED else RemoteFailure.SERVER)
+                }
+            }
+            val documentUrl = urls.documentUrl
+            if (documentUrl == null) {
+                markFailed(previous, itemId, contentId, "no_document_url", gen)
+                return DownloadOutcome.Failed(RemoteFailure.SERVER)
+            }
+            temp.parentFile?.mkdirs()
+            var tooLarge = false
+            when (val d = api.download(documentUrl, temp) { read, _ ->
+                if (read > MAX_PDF_BYTES) {
+                    tooLarge = true
+                    throw IOException("pdf too large")
+                }
+            }) {
+                is ApiResult.Success -> Unit
+                is ApiResult.NetworkError -> {
+                    temp.delete()
+                    if (tooLarge) {
+                        markFailed(previous, itemId, contentId, "too_large", gen)
+                        return DownloadOutcome.Failed(RemoteFailure.SERVER)
+                    }
+                    restore(previous, itemId, gen)
+                    return if (isDiskFull(d.cause)) DownloadOutcome.StorageFull else DownloadOutcome.Failed(RemoteFailure.NETWORK)
+                }
+                is ApiResult.HttpError -> {
+                    temp.delete()
+                    // Signed URL expired or rejected: ask for fresh ones once.
+                    if (!refreshed && d.status in URL_EXPIRED_STATUSES) {
+                        refreshed = true
+                        continue
+                    }
+                    markFailed(previous, itemId, contentId, "http_${d.status}", gen)
+                    return DownloadOutcome.Failed(RemoteFailure.SERVER)
+                }
+            }
+            if (!looksLikePdf(temp)) {
+                temp.delete()
+                markFailed(previous, itemId, contentId, "not_pdf", gen)
+                return DownloadOutcome.Failed(RemoteFailure.SERVER)
+            }
+            val bytes = temp.length()
+            val dest = paths.pdfFile(itemId)
+            val committed = db.tx {
+                if (clearGen.get() != gen || itemDao.getItem(itemId) == null) return@tx false
+                dest.parentFile?.mkdirs()
+                dest.delete()
+                if (!temp.renameTo(dest)) return@tx false
+                contentFileDao.upsert(
+                    ContentFileEntity(
+                        itemId = itemId,
+                        contentId = contentId,
+                        state = ContentState.DOWNLOADED,
+                        bytes = bytes,
+                        attempts = 0,
+                        downloadedAt = clock.now(),
+                    ),
+                )
+                true
+            }
+            if (!committed) {
+                temp.delete()
+                paths.deleteItemFiles(itemId)
+                return DownloadOutcome.NotReady
+            }
+            return DownloadOutcome.Downloaded
+        }
+    }
+
+    private fun looksLikePdf(file: File): Boolean = try {
+        file.inputStream().use { input ->
+            val head = ByteArray(PDF_SNIFF_BYTES)
+            val n = input.read(head)
+            n > 0 && String(head, 0, n, Charsets.ISO_8859_1).contains("%PDF-")
+        }
+    } catch (_: IOException) {
+        false
     }
 
     private suspend fun fetchAndInstall(
@@ -452,6 +608,8 @@ class ContentStoreImpl @Inject internal constructor(
         private const val EVICT_BATCH = 500
         private const val MAX_THUMB_BYTES = 5L * 1024 * 1024
         const val THUMB_MAX_ATTEMPTS = 3
+        private const val PDF_SNIFF_BYTES = 1024
+        private val URL_EXPIRED_STATUSES = setOf(401, 403, 404, 410)
         private const val TAG = "SrokaContent"
     }
 }

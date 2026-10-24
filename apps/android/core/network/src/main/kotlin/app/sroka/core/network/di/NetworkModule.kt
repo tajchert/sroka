@@ -45,6 +45,8 @@ internal object NetworkModule {
             .readTimeout(120, TimeUnit.SECONDS)
             .addInterceptor(UserAgentInterceptor(config.userAgent))
             .build()
-        return OkHttpSrokaApi(api, download, session, json)
+        // Uploads of up to 50 MiB on slow links; the server also hashes the stream before answering.
+        val upload = api.newBuilder().writeTimeout(120, TimeUnit.SECONDS).readTimeout(120, TimeUnit.SECONDS).build()
+        return OkHttpSrokaApi(api, download, session, json, uploadClient = upload)
     }
 }

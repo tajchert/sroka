@@ -33,7 +33,7 @@ import app.sroka.core.database.entity.TagEntity
         SyncStateEntity::class,
         ContentFileEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @DaoReturnTypeConverters(PagingSourceDaoReturnTypeConverter::class)

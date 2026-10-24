@@ -25,6 +25,20 @@ interface SrokaApi {
     /** 409 `not_parsed` when the item has no content yet. */
     suspend fun contentUrls(itemId: String): ApiResult<ContentUrlsDto>
 
+    /**
+     * `POST /v1/items/pdf`: streams [file] (raw bytes, `Content-Type: application/pdf`, known
+     * `Content-Length`) with `name`, repeated `tag` and `source` query parameters. [onProgress] gets
+     * (bytesSent, totalBytes). Error codes in [ApiResult.HttpError.code]: `payload_too_large` (413),
+     * `unsupported_media_type` (415), `storage_full` (409), `invalid_request` (400), `length_required` (411).
+     */
+    suspend fun uploadPdf(
+        file: File,
+        fileName: String,
+        tags: List<String> = emptyList(),
+        source: String = "share",
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
+    ): ApiResult<PdfUploadResponseDto>
+
     suspend fun getItem(itemId: String): ApiResult<ItemDto>
 
     suspend fun me(): ApiResult<MeDto>

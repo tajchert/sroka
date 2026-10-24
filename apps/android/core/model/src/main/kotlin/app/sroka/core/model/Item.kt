@@ -38,6 +38,12 @@ data class Item(
     val thumbnailPath: String?,
     /** Newest un-pushed local change (R6); only filled by list projections. */
     val pendingChange: PendingChange? = null,
+    /** `article` or `pdf`; a PDF item's content is the original file (no reader view). */
+    val kind: ItemKind = ItemKind.ARTICLE,
+    /** Original file name of a PDF item. */
+    val fileName: String? = null,
+    /** Size in bytes of the original PDF file. */
+    val fileSize: Long? = null,
 ) {
     /** Host without a leading `www.`, for display. */
     val domain: String get() = displayDomain(url)
@@ -63,6 +69,8 @@ data class ItemSummary(
     val savedAt: Long,
     /** Newest un-pushed local change to this item, ignoring reading progress (R6). */
     val pendingChange: PendingChange? = null,
+    val kind: ItemKind = ItemKind.ARTICLE,
+    val fileSize: Long? = null,
 )
 
 /** Kind of local change waiting in `pending_ops` (R6). */
@@ -88,4 +96,6 @@ fun Item.toSummary(): ItemSummary = ItemSummary(
     tags = tags,
     savedAt = savedAt,
     pendingChange = pendingChange,
+    kind = kind,
+    fileSize = fileSize,
 )

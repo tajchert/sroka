@@ -32,7 +32,15 @@ data class ItemDto(
     val source: String? = null,
     val tags: List<String> = emptyList(),
     val seq: Long = 0,
+    /** `article` (default, also when absent) or `pdf`; unknown values are treated as article. */
+    val kind: String = "article",
+    val fileName: String? = null,
+    val fileSize: Long? = null,
 )
+
+/** `POST /v1/items/pdf` answer (`202`): the item (new or the existing duplicate) and whether it was created. */
+@Serializable
+data class PdfUploadResponseDto(val item: ItemDto, val created: Boolean = true)
 
 /** api.md §4.2 (`count` only in /v1/tags). */
 @Serializable
@@ -70,6 +78,8 @@ data class ContentUrlsDto(
     val baseUrl: String,
     val packageUrl: String,
     val expiresAt: Long = 0,
+    /** Signed `…/document.pdf` URL for `kind:"pdf"` items; null/absent for articles. */
+    val documentUrl: String? = null,
 )
 
 @Serializable

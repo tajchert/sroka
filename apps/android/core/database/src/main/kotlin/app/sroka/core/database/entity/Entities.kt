@@ -7,6 +7,7 @@ import androidx.room3.Fts4
 import androidx.room3.FtsOptions
 import androidx.room3.Index
 import androidx.room3.PrimaryKey
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ParseStatus
 
@@ -51,6 +52,10 @@ data class ItemEntity(
     @ColumnInfo(name = "fts_rowid") val ftsRowId: Long = 0,
     /** 1 while a full resync is in progress and the row was not (yet) re-pulled (A8.3). */
     @ColumnInfo(name = "resync_mark", defaultValue = "0") val resyncMark: Int = 0,
+    /** Schema v2: `ARTICLE` (default) or `PDF`. */
+    @ColumnInfo(name = "kind", defaultValue = "ARTICLE") val kind: ItemKind = ItemKind.ARTICLE,
+    @ColumnInfo(name = "file_name") val fileName: String? = null,
+    @ColumnInfo(name = "file_size") val fileSize: Long? = null,
 )
 
 /** Tag on an item. `nameKey` = `tagKey(name)` (case-insensitive identity). */

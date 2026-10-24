@@ -26,6 +26,26 @@ interface ContentStore {
     /** Downloads this item's package now (reader "not downloaded yet" path). */
     suspend fun downloadNow(itemId: String): DownloadResult
 
+    /**
+     * The downloaded original of a `kind == PDF` item (`articles/{itemId}/document.pdf`), or null if
+     * it is not (or no longer) on disk. Never touches the network.
+     */
+    suspend fun pdfFile(itemId: String): File?
+
+    /**
+     * Local file for a PDF item, downloading `documentUrl` first when needed (same offline policy
+     * and storage as article packages; the signed URL is re-fetched when it expired).
+     */
+    suspend fun ensurePdfFile(itemId: String): PdfFileResult {
+        pdfFile(itemId)?.let { return PdfFileResult.Ready(it) }
+        return when (val r = downloadNow(itemId)) {
+            DownloadResult.Downloaded ->
+                pdfFile(itemId)?.let { PdfFileResult.Ready(it) } ?: PdfFileResult.Failed(RemoteFailure.SERVER)
+            DownloadResult.NotReady -> PdfFileResult.NotReady
+            is DownloadResult.Failed -> PdfFileResult.Failed(r.reason)
+        }
+    }
+
     /** Bytes used by article packages and thumbnails. */
     suspend fun storageUsageBytes(): Long
 
@@ -45,4 +65,13 @@ sealed interface DownloadResult {
     data object NotReady : DownloadResult
 
     data class Failed(val reason: RemoteFailure) : DownloadResult
+}
+
+sealed interface PdfFileResult {
+    data class Ready(val file: File) : PdfFileResult
+
+    /** The server has no document for this item (yet). */
+    data object NotReady : PdfFileResult
+
+    data class Failed(val reason: RemoteFailure) : PdfFileResult
 }

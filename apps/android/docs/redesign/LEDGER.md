@@ -8,7 +8,7 @@
 | T2 auth | todo | |
 | T3 library list + search + nav | todo | |
 | T4 share sheet + tags | todo | |
-| T5 reader | todo | |
+| T5 reader | done | Header + partial row inside WebView HTML (system sans, Outfit not loaded in WebView); app bar collapses via WebView nested scroll; refresh state/snackbars + start-over in ReaderViewModel (new SyncStatusRepository ctor param). |
 | T6 settings + import + export | todo | |
 | Review + gate | todo | |
 

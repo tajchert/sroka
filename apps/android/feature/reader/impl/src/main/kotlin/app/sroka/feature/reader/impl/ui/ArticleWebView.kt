@@ -36,6 +36,7 @@ private class WebState {
     var loadedHtml: String? = null
     var theme: EffectiveTheme? = null
     var scale: Float = 0f
+    var topSignal: Int = 0
 }
 
 /**
@@ -55,6 +56,7 @@ internal fun ArticleWebView(
     onProgress: (ProgressReport) -> Unit,
     onLinkClick: (String) -> Unit,
     onRendererGone: () -> Unit,
+    scrollToTopSignal: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -91,6 +93,7 @@ internal fun ArticleWebView(
                 webViewRef[0] = this
                 setBackgroundColor(theme.backgroundArgb)
                 configure()
+                isNestedScrollingEnabled = true // drives the collapsing app bar through Compose interop
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                         assetLoader.shouldInterceptRequest(request.url)
@@ -123,6 +126,11 @@ internal fun ArticleWebView(
                 state.theme = theme
                 state.scale = textScale
                 view.evaluateJavascript(ReaderHtml.appearanceScript(theme, textScale), null)
+            }
+            if (state.topSignal != scrollToTopSignal) {
+                state.topSignal = scrollToTopSignal
+                view.scrollTo(0, 0)
+                view.evaluateJavascript("window.scrollTo(0,0);", null)
             }
             view.setBackgroundColor(theme.backgroundArgb)
         },

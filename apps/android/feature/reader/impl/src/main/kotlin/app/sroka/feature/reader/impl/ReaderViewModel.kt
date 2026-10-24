@@ -8,12 +8,14 @@ import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.domain.SettingsRepository
+import app.sroka.core.domain.SyncStatusRepository
 import app.sroka.core.domain.TagRepository
 import app.sroka.core.model.Item
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.ReaderTheme
+import app.sroka.core.model.SyncPhase
 import app.sroka.core.model.UserPreferences
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -21,7 +23,11 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -56,6 +62,15 @@ sealed interface ReaderUiState {
     data object Missing : ReaderUiState
 }
 
+/** One-shot reader notifications for snackbars. */
+sealed interface ReaderEvent {
+    /** A user-requested refresh settled with [result] (OK, PARTIAL or FAILED). */
+    data class RefreshSettled(val result: ParseStatus) : ReaderEvent
+
+    /** The article opened at a restored position; offer "Start over". */
+    data class ResumedFromProgress(val progress: Float) : ReaderEvent
+}
+
 enum class NotDownloadedReason { OFFLINE, SIGN_IN, ERROR }
 
 /** Where to scroll when the article is shown. */
@@ -69,6 +84,7 @@ class ReaderViewModel @AssistedInject constructor(
     private val content: ContentStore,
     private val settings: SettingsRepository,
     tagRepository: TagRepository,
+    syncStatus: SyncStatusRepository,
     @ApplicationScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -111,6 +127,43 @@ class ReaderViewModel @AssistedInject constructor(
     private val _progress = MutableStateFlow(0f)
     val progress: StateFlow<Float> = _progress
 
+    /** True while sync reports no network; Refresh is disabled then. */
+    val offline: StateFlow<Boolean> = syncStatus.status.map { it.phase == SyncPhase.Offline }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    private enum class RefreshPhase { NONE, REQUESTED, PENDING }
+
+    private val refreshPhase = MutableStateFlow(RefreshPhase.NONE)
+
+    /** True from a user refresh until the item's parse settles; drives the indeterminate bar. */
+    val refreshing: StateFlow<Boolean> = refreshPhase.map { it != RefreshPhase.NONE }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    private val _events = Channel<ReaderEvent>(Channel.BUFFERED)
+    val events: Flow<ReaderEvent> = _events.receiveAsFlow()
+
+    private var resumeAnnounced = false
+    private var refreshTimeout: kotlinx.coroutines.Job? = null
+
+    init {
+        viewModelScope.launch {
+            library.observeItem(itemId).map { it?.parseStatus }.distinctUntilChanged().collect { status ->
+                when {
+                    status == null -> Unit
+                    refreshPhase.value == RefreshPhase.NONE -> Unit
+                    status == ParseStatus.PENDING -> refreshPhase.value = RefreshPhase.PENDING
+                    refreshPhase.value == RefreshPhase.PENDING -> {
+                        refreshPhase.value = RefreshPhase.NONE
+                        refreshTimeout?.cancel()
+                        if (status == ParseStatus.OK || status == ParseStatus.PARTIAL || status == ParseStatus.FAILED) {
+                            _events.trySend(ReaderEvent.RefreshSettled(status))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     val uiState: StateFlow<ReaderUiState> = combine(
         library.observeItem(itemId),
         content.observeOffline(itemId),
@@ -152,6 +205,7 @@ class ReaderViewModel @AssistedInject constructor(
         ready = true
         // Start from the saved position; restorePoint() refines it for recreated WebViews.
         reported = null
+        _progress.value = latestItem?.progress ?: 0f
         emit(ReaderUiState.Ready(html, content.articleBaseUrl(itemId)))
     }
 
@@ -178,6 +232,7 @@ class ReaderViewModel @AssistedInject constructor(
             if (html != null) {
                 ready = true
                 reported = null
+                _progress.value = latestItem?.progress ?: 0f
                 ReaderUiState.Ready(html, content.articleBaseUrl(itemId))
             } else {
                 ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR)
@@ -252,8 +307,33 @@ class ReaderViewModel @AssistedInject constructor(
         viewModelScope.launch { library.setTags(itemId, names) }
     }
 
+    /** Re-fetches the article. No-op while offline or when a refresh is already running. */
     fun refresh() {
+        if (offline.value || refreshPhase.value != RefreshPhase.NONE) return
+        refreshPhase.value = RefreshPhase.REQUESTED
+        refreshTimeout?.cancel()
+        refreshTimeout = viewModelScope.launch {
+            delay(REFRESH_TIMEOUT_MS)
+            refreshPhase.value = RefreshPhase.NONE // gave up waiting; no result to announce
+        }
         viewModelScope.launch { library.refresh(itemId) }
+    }
+
+    /** Called once the article is on screen: offers "Start over" when it opened part-way through. */
+    fun onArticleShown() {
+        if (resumeAnnounced) return
+        resumeAnnounced = true
+        val progress = restorePoint().progress
+        if (progress > RESUME_THRESHOLD) _events.trySend(ReaderEvent.ResumedFromProgress(progress))
+    }
+
+    /** Resets the reading position to the top; the screen scrolls the WebView. */
+    fun startOver() {
+        reported = ProgressReport(0f, null)
+        _progress.value = 0f
+        unsaved = false
+        lastSavedAt = nowMillis()
+        viewModelScope.launch { library.setProgress(itemId, 0f, null) }
     }
 
     fun delete() {
@@ -273,5 +353,7 @@ class ReaderViewModel @AssistedInject constructor(
         const val STOP_TIMEOUT_MS = 5_000L
         const val SAVE_INTERVAL_MS = 2_000L
         const val RECENT_TAGS = 8
+        const val REFRESH_TIMEOUT_MS = 90_000L
+        const val RESUME_THRESHOLD = 0.02f
     }
 }

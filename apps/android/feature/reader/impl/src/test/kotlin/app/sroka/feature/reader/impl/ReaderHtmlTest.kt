@@ -81,4 +81,18 @@ class ReaderHtmlTest {
         assertNull(parseProgressMessage("0.5|x"))
         assertNull(parseProgressMessage("NaN|1"))
     }
+
+    @Test
+    fun headerIsInjectedAtBodyStartAndEscaped() {
+        val header = ReaderHeader("a.com", "T <b>", "5 min read \u00b7 ", 0.42f, "Only part")
+        val out = ReaderHtml.wrap(
+            "<html><head></head><body><p>x</p></body></html>",
+            "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f, "n1", header,
+        )
+        assertTrue(out.contains("<body><header class=\"sk-head\">"))
+        assertTrue(out.contains("T &lt;b&gt;"))
+        assertTrue(out.contains("<span id=\"sk-pct\">42%</span>"))
+        assertTrue(out.contains("sk-warn"))
+        assertFalse(wrap("<p>x</p>").contains("sk-head\""))
+    }
 }

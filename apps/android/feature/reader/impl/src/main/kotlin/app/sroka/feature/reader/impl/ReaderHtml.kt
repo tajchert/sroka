@@ -20,6 +20,17 @@ fun resolveTheme(theme: ReaderTheme, systemDark: Boolean): EffectiveTheme = when
     ReaderTheme.DARK -> EffectiveTheme.DARK
 }
 
+/** Article header rendered at the top of the document (redesign R10). */
+data class ReaderHeader(
+    val site: String,
+    val title: String,
+    /** Pre-formatted "N min read · " prefix (may be empty); the live percentage follows it. */
+    val metaPrefix: String,
+    val progress: Float,
+    /** Text of the partial-save warning row, or null when the save is complete. */
+    val partialWarning: String?,
+)
+
 /** A reading position reported by the reader script. */
 data class ProgressReport(val progress: Float, val anchor: Int?)
 
@@ -60,7 +71,9 @@ object ReaderHtml {
         startAnchor: Int?,
         startProgress: Float,
         nonce: String = newNonce(),
+        header: ReaderHeader? = null,
     ): String {
+        val headerHtml = header?.let(::headerHtml).orEmpty()
         val inject = "<meta http-equiv=\"Content-Security-Policy\" content=\"${escapeAttr(csp(nonce))}\">" +
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
             "<base href=\"${escapeAttr(baseUrl)}\">" +
@@ -69,10 +82,12 @@ object ReaderHtml {
         val htmlAttrs = " data-theme=\"${theme.cssName}\" style=\"--scale:${scaleText(textScale)}\""
         val headOpen = Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
         val htmlOpen = Regex("<html(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
+        val bodyOpen = Regex("<body(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
         return when {
             headOpen.containsMatchIn(articleHtml) -> {
                 // Keep a full document; inject ours first and set theme attributes on <html>.
-                val withHead = replaceMatch(articleHtml, headOpen) { it + inject }
+                var withHead = replaceMatch(articleHtml, headOpen) { it + inject }
+                if (headerHtml.isNotEmpty()) withHead = replaceMatch(withHead, bodyOpen) { it + headerHtml }
                 if (htmlOpen.containsMatchIn(withHead)) {
                     replaceMatch(withHead, htmlOpen) { "<html$htmlAttrs>" }
                 } else {
@@ -82,7 +97,7 @@ object ReaderHtml {
             htmlOpen.containsMatchIn(articleHtml) ->
                 replaceMatch(articleHtml, htmlOpen) { "<html$htmlAttrs><head><meta charset=\"utf-8\">$inject</head>" }
             else ->
-                "<!doctype html><html$htmlAttrs><head><meta charset=\"utf-8\">$inject</head><body>$articleHtml</body></html>"
+                "<!doctype html><html$htmlAttrs><head><meta charset=\"utf-8\">$inject</head><body>$headerHtml$articleHtml</body></html>"
         }
     }
 
@@ -94,6 +109,19 @@ object ReaderHtml {
         val m = regex.find(src) ?: return src
         return src.replaceRange(m.range, transform(m.value))
     }
+
+    private const val WARN_SVG = "<svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"currentColor\" aria-hidden=\"true\">" +
+        "<path d=\"M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z\"/></svg>"
+
+    internal fun headerHtml(h: ReaderHeader): String {
+        val pct = Math.round(h.progress.coerceIn(0f, 1f) * 100)
+        val warn = h.partialWarning?.let { "<div class=\"sk-warn\">$WARN_SVG<span>${escapeText(it)}</span></div>" }.orEmpty()
+        return "<header class=\"sk-head\"><div class=\"sk-site\">${escapeText(h.site)}</div>" +
+            "<div class=\"sk-title\">${escapeText(h.title)}</div>" +
+            "<div class=\"sk-meta\">${escapeText(h.metaPrefix)}<span id=\"sk-pct\">$pct%</span></div>$warn</header>"
+    }
+
+    private fun escapeText(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     private fun scaleText(scale: Float): String = String.format(java.util.Locale.ROOT, "%.2f", scale)
 
@@ -115,7 +143,7 @@ function sc(){return document.scrollingElement||root}
 function anchors(){return document.body?document.body.querySelectorAll(SEL):[]}
 function send(m){try{if(window.__BRIDGE__&&window.__BRIDGE__.postMessage){window.__BRIDGE__.postMessage(m)}else if(window.__FALLBACK__){window.__FALLBACK__.post(m)}}catch(e){}}
 function firstVisible(){var l=anchors();for(var i=0;i<l.length;i++){if(l[i].getBoundingClientRect().bottom>1)return i}return null}
-function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,a=firstVisible();send(p.toFixed(4)+"|"+(a==null?"":a))}
+function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,a=firstVisible();var pe=document.getElementById("sk-pct");if(pe)pe.textContent=Math.round(p*100)+"%";send(p.toFixed(4)+"|"+(a==null?"":a))}
 function toAnchor(i){var el=anchors()[i];if(el){var s=sc();s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8;return true}return false}
 function restore(){if(user)return;if(START_A!==null&&toAnchor(START_A))return;if(START_P>0){var s=sc(),max=s.scrollHeight-s.clientHeight;if(max>0)s.scrollTop=START_P*max}}
 addEventListener("scroll",function(){clearTimeout(timer);timer=setTimeout(report,500)},{passive:true});
@@ -127,9 +155,10 @@ window.__srokaScrollToId=function(id){var el=document.getElementById(id);if(el)e
 """.trimIndent()
 
     private val CSS = """
-:root{--scale:1;--bg:#fbfbf9;--fg:#1b1c1d;--muted:#6b6e71;--link:#0b7f7c;--rule:#e3e3df}
-html[data-theme=dark]{--bg:#121314;--fg:#dcdcd8;--muted:#8f9396;--link:#4cd6c8;--rule:#2a2d2f}
+:root{--scale:1;--warn:#7a5a00;--bg:#fbfbf9;--fg:#1b1c1d;--muted:#6b6e71;--link:#0b7f7c;--rule:#e3e3df}
+html[data-theme=dark]{--bg:#121314;--fg:#d9d7d1;--muted:#a5a8ae;--link:#7cc0da;--rule:#2a2d2f;--warn:#e8cf86}
 html[data-theme=sepia]{--bg:#f3ead8;--fg:#40321f;--muted:#8a7656;--link:#1f6f6a;--rule:#e0d3b8}
+.sk-head{margin:0 0 1.4em}.sk-site{font-size:14px;font-weight:500;color:var(--link);margin-bottom:14px}.sk-title{font-size:28px;font-weight:600;line-height:1.2;margin-bottom:14px}.sk-meta{font-size:14px;color:var(--muted)}.sk-warn{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--warn);margin-top:14px}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
 body{margin:0 auto;max-width:42em;padding:1.25rem 1.1rem 6rem;background:var(--bg);color:var(--fg);font-family:system-ui,Roboto,sans-serif;font-size:calc(18px*var(--scale));line-height:1.65;overflow-wrap:break-word}
 h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.6em 0 .6em}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}

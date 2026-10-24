@@ -5,49 +5,51 @@
     <string name="feature_settings_cancel">Cancel</string>
     <string name="feature_settings_save">Save</string>
     <string name="feature_settings_remove">Remove</string>
-
-    <string name="feature_settings_section_downloads">Downloads</string>
-    <string name="feature_settings_policy_wifi">Download on Wi-Fi only</string>
-    <string name="feature_settings_policy_any">Download on any network</string>
-    <string name="feature_settings_policy_manual">Manual only</string>
-    <string name="feature_settings_download_all">Download all now</string>
-    <string name="feature_settings_download_all_hint">Fetch new articles and save them for offline reading</string>
-    <string name="feature_settings_fetch_started">Fetching new articles</string>
-    <string name="feature_settings_storage_used">Storage used</string>
-    <string name="feature_settings_remove_downloads">Remove downloaded articles</string>
-    <string name="feature_settings_remove_downloads_body">Articles stay in your list but will need to be downloaded again to read offline.</string>
-    <string name="feature_settings_downloads_removed">Downloaded articles removed</string>
+    <string name="feature_settings_ok">OK</string>
 
     <string name="feature_settings_section_reading">Reading</string>
     <string name="feature_settings_theme">Theme</string>
     <string name="feature_settings_theme_system">System</string>
     <string name="feature_settings_theme_light">Light</string>
     <string name="feature_settings_theme_dark">Dark</string>
-    <string name="feature_settings_dynamic_color">Dynamic color</string>
-    <string name="feature_settings_dynamic_color_hint">Use colors from your wallpaper</string>
     <string name="feature_settings_reader_theme">Reader theme</string>
     <string name="feature_settings_reader_auto">Auto</string>
     <string name="feature_settings_reader_light">Light</string>
     <string name="feature_settings_reader_sepia">Sepia</string>
     <string name="feature_settings_reader_dark">Dark</string>
     <string name="feature_settings_text_size">Text size</string>
+    <string name="feature_settings_text_size_default">Default · %1$d sp</string>
+    <string name="feature_settings_text_size_value">%1$d sp</string>
+
+    <string name="feature_settings_section_library">Library</string>
+    <string name="feature_settings_offline">Offline downloads</string>
+    <string name="feature_settings_offline_sub">%1$s · %2$s used</string>
+    <string name="feature_settings_policy_wifi">Wi-Fi only</string>
+    <string name="feature_settings_policy_any">Any network</string>
+    <string name="feature_settings_policy_manual">Manual only</string>
+    <string name="feature_settings_download_all">Download all now</string>
+    <string name="feature_settings_download_all_hint">Fetch new articles and save them for offline reading</string>
+    <string name="feature_settings_fetch_started">Fetching new articles</string>
+    <string name="feature_settings_remove_downloads">Remove downloaded articles</string>
+    <string name="feature_settings_remove_downloads_body">Articles stay in your list but will need to be downloaded again to read offline.</string>
+    <string name="feature_settings_downloads_removed">Downloaded articles removed</string>
+    <string name="feature_settings_export">Export library</string>
+    <string name="feature_settings_export_sub">CSV or JSON</string>
+    <string name="feature_settings_import">Import</string>
+    <string name="feature_settings_import_sub">From Pocket and others</string>
 
     <string name="feature_settings_section_account">Account</string>
-    <string name="feature_settings_signed_in_as">Signed in as</string>
     <string name="feature_settings_signed_out">Not signed in</string>
     <string name="feature_settings_sign_out">Sign out</string>
     <string name="feature_settings_sign_out_body">Signing out removes your saved articles and downloads from this device. They stay in your account and come back when you sign in again. Changes not yet synced will be lost.</string>
     <string name="feature_settings_delete_account">Delete account</string>
-    <string name="feature_settings_delete_account_body">This permanently deletes your account and all saved articles, tags and highlights on the server, and removes everything from this device. This cannot be undone.</string>
-    <string name="feature_settings_delete_type">Type %1$s to confirm</string>
-    <string name="feature_settings_delete_forever">Delete forever</string>
+    <string name="feature_settings_delete_title">Delete your account?</string>
+    <string name="feature_settings_delete_account_body">This permanently deletes your library, tags and reading progress on every device. Export first if you want a copy.</string>
+    <string name="feature_settings_delete_type">Type your email to confirm</string>
+    <string name="feature_settings_delete_confirm">Delete</string>
     <string name="feature_settings_delete_failed">Could not delete the account. Check your connection and try again.</string>
+    <string name="feature_settings_version">Version</string>
 
-    <string name="feature_settings_section_data">Import and export</string>
-    <string name="feature_settings_import_export">Import or export your library</string>
-    <string name="feature_settings_import_export_hint">Opens the Sroka web app in your browser</string>
-
-    <string name="feature_settings_section_advanced">Advanced</string>
     <string name="feature_settings_server">Server</string>
     <string name="feature_settings_server_body">Only change this if you run your own Sroka server. Leave empty to use the default.</string>
     <string name="feature_settings_server_label">Server URL</string>
@@ -56,6 +58,60 @@
     <string name="feature_settings_server_switch_warning">Changing the server signs you out and removes all local data from this device. Unsynced changes are lost.</string>
     <string name="feature_settings_server_switch">Sign out and switch</string>
 
-    <string name="feature_settings_section_about">About</string>
-    <string name="feature_settings_version">Version</string>
+    <!-- Import -->
+    <string name="feature_settings_import_title">Import</string>
+    <string name="feature_settings_import_intro">Bring links over from another app. The server fetches each article, and they appear in My List as they\'re ready.</string>
+    <string name="feature_settings_import_source">Source</string>
+    <string name="feature_settings_import_source_pocket">Pocket</string>
+    <string name="feature_settings_import_source_instapaper">Instapaper</string>
+    <string name="feature_settings_import_source_browser">Browser bookmarks (HTML)</string>
+    <string name="feature_settings_import_choose_file">Choose file</string>
+    <string name="feature_settings_import_change">Change</string>
+    <string name="feature_settings_import_button">Import</string>
+    <string name="feature_settings_import_uploading">Uploading…</string>
+    <string name="feature_settings_import_importing">Importing…</string>
+    <string name="feature_settings_import_progress">%1$s of %2$s</string>
+    <string name="feature_settings_import_progress_count">%1$s done</string>
+    <string name="feature_settings_import_leave">You can leave this screen. Progress continues in a notification.</string>
+    <plurals name="feature_settings_import_finished">
+        <item quantity="one">Imported %1$s link</item>
+        <item quantity="other">Imported %1$s links</item>
+    </plurals>
+    <plurals name="feature_settings_import_skipped">
+        <item quantity="one">%1$s skipped because it had no usable web address</item>
+        <item quantity="other">%1$s skipped because they had no usable web address</item>
+    </plurals>
+    <string name="feature_settings_import_done">Done</string>
+    <string name="feature_settings_import_failed">Import failed</string>
+    <string name="feature_settings_import_err_too_large">That file is larger than 20 MB. Remove unneeded entries and try again.</string>
+    <string name="feature_settings_import_err_rate_limited">You have reached today\'s import limit. Try again tomorrow.</string>
+    <string name="feature_settings_import_err_bad_file">Sroka could not read that file. Check that it matches the source you picked.</string>
+    <string name="feature_settings_import_err_unavailable">Import is unavailable right now. Try again in a little while.</string>
+    <string name="feature_settings_import_err_network">No connection. Check your network and try again.</string>
+    <string name="feature_settings_import_err_signed_out">Your session has expired. Sign in again to import.</string>
+    <string name="feature_settings_import_err_unknown">Something went wrong. Try again.</string>
+    <string name="feature_settings_import_job_too_many">The file has too many links (the limit is 50,000).</string>
+    <string name="feature_settings_import_job_zip">The ZIP file is too large or could not be opened.</string>
+    <string name="feature_settings_import_job_missing_url">The file has no URL column. Check that you picked the right source.</string>
+    <string name="feature_settings_import_job_no_csv">The ZIP file does not contain a CSV file.</string>
+    <string name="feature_settings_import_job_generic">The server could not import this file.</string>
+
+    <!-- Export -->
+    <string name="feature_settings_export_title">Export</string>
+    <string name="feature_settings_export_format">Format</string>
+    <string name="feature_settings_export_csv">CSV</string>
+    <string name="feature_settings_export_csv_sub">Links, tags and dates in a spreadsheet</string>
+    <string name="feature_settings_export_json">JSON</string>
+    <string name="feature_settings_export_json_sub">Everything Sroka knows about each link</string>
+    <string name="feature_settings_export_button">Export</string>
+    <string name="feature_settings_export_building">Building export…</string>
+    <string name="feature_settings_export_ready">Ready · %1$s</string>
+    <string name="feature_settings_export_share">Share</string>
+    <string name="feature_settings_export_share_chooser">Share export</string>
+    <string name="feature_settings_export_save">Save</string>
+    <string name="feature_settings_export_saved">Saved</string>
+    <string name="feature_settings_export_save_failed">Could not save the file.</string>
+    <string name="feature_settings_export_err_network">No connection. Check your network and try again.</string>
+    <string name="feature_settings_export_err_signed_out">Your session has expired. Sign in again to export.</string>
+    <string name="feature_settings_export_err_server">The server could not build the export. Try again in a little while.</string>
 </resources>

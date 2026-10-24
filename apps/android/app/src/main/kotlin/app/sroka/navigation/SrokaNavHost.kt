@@ -49,6 +49,8 @@ import app.sroka.feature.library.api.TagItemsKey
 import app.sroka.feature.library.impl.navigation.libraryEntries
 import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.feature.reader.impl.navigation.readerEntries
+import app.sroka.feature.settings.api.ExportKey
+import app.sroka.feature.settings.api.ImportKey
 import app.sroka.feature.settings.api.SettingsKey
 import app.sroka.feature.settings.impl.navigation.settingsEntries
 import kotlinx.coroutines.launch
@@ -210,7 +212,11 @@ private fun SrokaNavDisplay(
                 onCloseSearch = goBack,
             )
             readerEntries(onBack = goBack, onArchived = onArchived)
-            settingsEntries(onBack = goBack)
+            settingsEntries(
+                onBack = goBack,
+                onOpenImport = { backStack.add(ImportKey) },
+                onOpenExport = { backStack.add(ExportKey) },
+            )
         },
     )
 }

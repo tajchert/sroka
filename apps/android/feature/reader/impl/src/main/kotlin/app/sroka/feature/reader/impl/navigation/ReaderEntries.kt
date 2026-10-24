@@ -23,14 +23,14 @@ import java.io.File
  * @param onArchived the open item was archived: pop and show an undo snackbar (unarchive via
  *   LibraryRepository.setStatus). Defaults to [onBack] with no undo.
  * @param isExpanded / onToggleExpanded R14.3: the list pane is collapsed; the app bar button toggles it
- * @param detailPaneActive true while the reader sits next to the list (two-pane, R13): it is drawn in
+ * @param detailPaneActive (read lazily) true while the reader sits next to the list (two-pane, R13): it is drawn in
  *   the rounded detail card without a back arrow. When false it is full screen (phone, folded).
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun EntryProviderScope<NavKey>.readerEntries(
     onBack: () -> Unit,
     onArchived: (itemId: String) -> Unit = { onBack() },
-    detailPaneActive: Boolean = false,
+    detailPaneActive: () -> Boolean = { false },
     isExpanded: () -> Boolean = { false },
     onToggleExpanded: (() -> Unit)? = null,
 ) {
@@ -39,6 +39,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
             key = key.itemId,
             creationCallback = { factory -> factory.create(key.itemId) },
         )
+        val detailPaneActive = detailPaneActive()
         val screen = @Composable { paneWidthDp: Int -> 
             ReaderScreen(
                 viewModel = viewModel,

@@ -192,7 +192,8 @@ fun SettingsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val downloadAllNow = rememberWithNotificationPermission(vm.downloadAllNow)
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+        // Two-pane: every row is inset the same, so the rounded highlight of the open row lines up with the rest (R13).
+        Column(Modifier.padding(padding).padding(horizontal = if (twoPane) 8.dp else 0.dp).verticalScroll(rememberScrollState())) {
             SectionHeader(R.string.feature_settings_section_reading)
             SettingRow(
                 Icons.Rounded.DarkMode,
@@ -357,7 +358,7 @@ private fun SettingRow(
         headlineContent = { Text(title, color = color) },
         supportingContent = sub?.let { { Text(it) } },
         trailingContent = trailing,
-        modifier = (if (selected) Modifier.padding(horizontal = 8.dp).clip(RoundedCornerShape(16.dp)) else Modifier)
+        modifier = (if (selected) Modifier.clip(RoundedCornerShape(16.dp)) else Modifier)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier),
     )
 }

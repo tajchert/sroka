@@ -8,6 +8,7 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
+import android.view.MotionEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
@@ -40,6 +41,9 @@ private class WebState {
     var header: String = ""
     var appliedHeader: String = ""
     var pageReady: Boolean = false
+
+    /** A finger touched the page since it was loaded; until then scrolls are the saved-position restore. */
+    var userTouched: Boolean = false
 }
 
 /**
@@ -103,8 +107,13 @@ internal fun ArticleWebView(
                 webViewRef[0] = this
                 setBackgroundColor(backgroundArgb)
                 configure()
+                setOnTouchListener { _, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) state.userTouched = true
+                    false
+                }
                 setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                    currentOnScrollDelta((scrollY - oldScrollY).toFloat())
+                    // The restore scroll after load is programmatic: it must not collapse the app bar.
+                    if (state.userTouched) currentOnScrollDelta((scrollY - oldScrollY).toFloat())
                 }
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
@@ -143,6 +152,7 @@ internal fun ArticleWebView(
                 state.loadedHtml = html
                 state.appliedHeader = headerScript // the wrapped document carries the header it was built with
                 state.pageReady = false
+                state.userTouched = false
                 state.theme = theme
                 state.scale = textScale
                 view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)

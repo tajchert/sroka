@@ -323,6 +323,8 @@ internal fun ReaderScreen(
                             pane = pane,
                         )
                     }
+                    // A new document starts with the bar fully shown (the previous article may have hidden it).
+                    LaunchedEffect(wrapped) { scrollBehavior.state.heightOffset = 0f }
                     var rendererGone by remember(s.html) { mutableStateOf(false) }
                     if (rendererGone) {
                         Centered {

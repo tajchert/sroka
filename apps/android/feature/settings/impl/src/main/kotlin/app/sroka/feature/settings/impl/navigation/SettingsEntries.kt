@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.sroka.core.designsystem.component.DetailPaneCard
+import app.sroka.core.ui.adaptive.LocalPaneLayout
 import app.sroka.feature.settings.api.ExportKey
 import app.sroka.feature.settings.api.ImportKey
 import app.sroka.feature.settings.api.SettingsChoiceKey
@@ -19,6 +20,12 @@ import app.sroka.feature.settings.impl.SettingsRoute
 import app.sroka.feature.settings.impl.SettingsSelection
 
 /**
+ * Own scene key: Settings pairs only with its own detail pages, never with a reader left on the
+ * stack below it (ListDetailSceneStrategy otherwise combines the newest list and detail entries).
+ */
+private const val SettingsSceneKey = "sroka.settings"
+
+/**
  * Settings, import and export entries. Sign-out and account deletion change the session; the app
  * then navigates to sign-in on its own.
  *
@@ -29,7 +36,6 @@ import app.sroka.feature.settings.impl.SettingsSelection
  * @param onOpenImport open the import screen
  * @param onOpenExport open the export screen
  * @param onOpenChoice open a choice page in the detail pane (two-pane only)
- * @param twoPane settings is the left pane of the list-detail layout
  * @param topKey the key on top of the back stack (read lazily; highlights the open row)
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -38,14 +44,15 @@ fun EntryProviderScope<NavKey>.settingsEntries(
     onOpenImport: () -> Unit,
     onOpenExport: () -> Unit,
     onOpenChoice: (SettingsChoiceKind) -> Unit = {},
-    twoPane: Boolean = false,
     topKey: () -> NavKey? = { null },
 ) {
     entry<SettingsKey>(
         metadata = ListDetailSceneStrategy.listPane(
+            sceneKey = SettingsSceneKey,
             detailPlaceholder = { DetailPaneCard { SettingsDetailPlaceholder() } },
         ) + ListDetailSceneStrategy.preferredPaneSize(width = 360.dp),
     ) {
+        val twoPane = LocalPaneLayout.current.twoPane
         SettingsRoute(
             onBack = onBack,
             onOpenImport = onOpenImport,
@@ -55,13 +62,15 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onOpenChoice = onOpenChoice,
         )
     }
-    entry<SettingsChoiceKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
+    entry<SettingsChoiceKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) { key ->
         DetailPaneCard { SettingsChoiceRoute(key.kind) }
     }
-    entry<ImportKey>(metadata = ListDetailSceneStrategy.detailPane()) {
+    entry<ImportKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) {
+        val twoPane = LocalPaneLayout.current.twoPane
         if (twoPane) DetailPaneCard { ImportRoute(onBack = onBack, detailPane = true) } else ImportRoute(onBack = onBack)
     }
-    entry<ExportKey>(metadata = ListDetailSceneStrategy.detailPane()) {
+    entry<ExportKey>(metadata = ListDetailSceneStrategy.detailPane(sceneKey = SettingsSceneKey)) {
+        val twoPane = LocalPaneLayout.current.twoPane
         if (twoPane) DetailPaneCard { ExportRoute(onBack = onBack, detailPane = true) } else ExportRoute(onBack = onBack)
     }
 }

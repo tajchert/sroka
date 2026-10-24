@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavKey
 import app.sroka.core.model.LibraryTab
+import app.sroka.core.ui.adaptive.LocalPaneLayout
 import app.sroka.feature.library.api.LibraryKey
 import app.sroka.feature.library.api.SearchKey
 import app.sroka.feature.library.api.TagItemsKey
@@ -31,10 +32,10 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param selectedTag the tag open in the detail pane, or null (two-pane highlight in the Tags list)
  * @param onSignIn the "sign in again" banner action; the app navigates to auth
  * @param selectedItemId the article open in the detail pane, or null (read lazily; two-pane highlight)
- * @param twoPane the list is the left pane of the list-detail layout
- * @param navRailShown the navigation rail hosts the save-link FAB and avatar, so lists hide theirs
- * @param addLinkRequested the rail's FAB was tapped; a list opens its add-link dialog and calls
- *   [onAddLinkHandled]
+ * @param addLinkRequested the rail's FAB was tapped (read lazily); a list opens its add-link dialog and
+ *   calls [onAddLinkHandled]
+ *
+ * Two-pane / rail state is read live from [LocalPaneLayout] (entry content outlives window changes).
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun EntryProviderScope<NavKey>.libraryEntries(
@@ -47,13 +48,12 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     onCloseSearch: (SearchKey) -> Unit = {},
     selectedTag: () -> String? = { null },
     selectedItemId: () -> String? = { null },
-    twoPane: Boolean = false,
-    navRailShown: Boolean = false,
-    addLinkRequested: Boolean = false,
+    addLinkRequested: () -> Boolean = { false },
     onAddLinkHandled: () -> Unit = {},
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
     entry<LibraryKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
+        val layout = LocalPaneLayout.current
         LibraryListRoute(
             scope = ListScope.Tab(key.tab),
             onOpenItem = onOpenItem,
@@ -61,40 +61,43 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             onOpenSettings = onOpenSettings,
             onOpenSearch = onOpenSearch,
             selectedItemId = selectedItemId(),
-            twoPane = twoPane,
-            navRailShown = navRailShown,
-            addLinkRequested = addLinkRequested,
+            twoPane = layout.twoPane,
+            navRailShown = layout.railShown,
+            addLinkRequested = addLinkRequested(),
             onAddLinkHandled = onAddLinkHandled,
         )
     }
     entry<SearchKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
+        val layout = LocalPaneLayout.current
         SearchRoute(
             initialTab = key.tab,
             onOpenItem = onOpenItem,
             onBack = { onCloseSearch(key) },
             selectedItemId = selectedItemId(),
-            twoPane = twoPane,
+            twoPane = layout.twoPane,
         )
     }
     entry<TagsKey>(metadata = listPaneMetadata(onOpenItem)) {
+        val layout = LocalPaneLayout.current
         TagsRoute(
             onOpenTag = onOpenTag,
             onOpenSettings = onOpenSettings,
             selectedTag = selectedTag(),
-            navRailShown = navRailShown,
+            navRailShown = layout.railShown,
         )
     }
     // Detail pane on wide windows (the opened article covers it); no back arrow beside the tag list.
     entry<TagItemsKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
+        val layout = LocalPaneLayout.current
         LibraryListRoute(
             scope = ListScope.Tag(key.name),
             onOpenItem = onOpenItem,
             onSignIn = onSignIn,
-            onBack = if (twoPane) null else ({ onCloseTag(key) }),
+            onBack = if (layout.twoPane) null else ({ onCloseTag(key) }),
             selectedItemId = selectedItemId(),
-            twoPane = twoPane,
-            navRailShown = navRailShown,
-            detailCard = twoPane,
+            twoPane = layout.twoPane,
+            navRailShown = layout.railShown,
+            detailCard = layout.twoPane,
         )
     }
 }

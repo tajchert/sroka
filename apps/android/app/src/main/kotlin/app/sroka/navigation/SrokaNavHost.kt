@@ -36,6 +36,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -57,6 +58,8 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import app.sroka.R
 import app.sroka.core.model.SessionState
+import app.sroka.core.ui.adaptive.LocalPaneLayout
+import app.sroka.core.ui.adaptive.PaneLayout
 import app.sroka.feature.auth.api.AuthKey
 import app.sroka.feature.auth.impl.navigation.authEntries
 import app.sroka.feature.library.api.SearchKey
@@ -146,8 +149,6 @@ fun SrokaApp(
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     val layoutType = if (current != null) adaptiveType else NavigationSuiteType.None
     val railShown = layoutType.isRail()
-    val detailItemId = detailPaneItemId(backStack, twoPane)
-    val selectedTag = selectedTagName(backStack, twoPane)
     // The rail's "Save link" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
     val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
@@ -206,17 +207,17 @@ fun SrokaApp(
             },
         ) {
             Box(Modifier.fillMaxSize()) {
-                SrokaNavDisplay(
-                    backStack = backStack,
-                    directive = directive,
-                    onArchived = onArchived,
-                    twoPane = twoPane,
-                    detailItemId = detailItemId,
-                    selectedTag = selectedTag,
-                    railShown = railShown,
-                    addLinkRequested = addLinkRequested,
-                    onAddLinkHandled = { addLinkRequested = false },
-                )
+                // Live layout for entry content (NavDisplay keeps content across window changes).
+                CompositionLocalProvider(LocalPaneLayout provides PaneLayout(twoPane = twoPane, railShown = railShown)) {
+                    SrokaNavDisplay(
+                        backStack = backStack,
+                        directive = directive,
+                        onArchived = onArchived,
+                        twoPane = twoPane,
+                        addLinkRequested = { addLinkRequested },
+                        onAddLinkHandled = { addLinkRequested = false },
+                    )
+                }
                 // App-level snackbar for results that outlive a screen (archive from the reader).
                 // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
                 val placement = snackbarPlacement(twoPane, railShown, hasFab = current != null)
@@ -258,10 +259,7 @@ private fun SrokaNavDisplay(
     directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
     twoPane: Boolean,
-    detailItemId: String?,
-    selectedTag: String?,
-    railShown: Boolean,
-    addLinkRequested: Boolean,
+    addLinkRequested: () -> Boolean,
     onAddLinkHandled: () -> Unit,
 ) {
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
@@ -280,6 +278,9 @@ private fun SrokaNavDisplay(
         }
     }
     val scope = rememberCoroutineScope()
+    // Entry callbacks and getters below outlive recompositions: read the window state through State.
+    val twoPaneState = rememberUpdatedState(twoPane)
+    val detailItemId = detailPaneItemId(backStack, twoPane)
     val expanded = twoPane && anchorIndex == COLLAPSED_INDEX
     // Read through State: NavDisplay keeps entry content while the back stack is unchanged, so a plain
     // Boolean captured here would go stale when only the divider moves.
@@ -317,7 +318,7 @@ private fun SrokaNavDisplay(
             libraryEntries(
                 // In two-pane mode a new selection replaces the open article instead of stacking.
                 onOpenItem = backStack::openReader,
-                onOpenTag = { name -> backStack.openTag(name, twoPane) },
+                onOpenTag = { name -> backStack.openTag(name, twoPaneState.value) },
                 onOpenSettings = { backStack.add(SettingsKey) },
                 onCloseTag = { key ->
                     val i = backStack.lastIndexOf(key)
@@ -330,17 +331,15 @@ private fun SrokaNavDisplay(
                     val i = backStack.lastIndexOf(key)
                     if (i > 0) backStack.subList(i, backStack.size).clear()
                 },
-                selectedTag = { selectedTag },
-                selectedItemId = { detailItemId },
-                twoPane = twoPane,
-                navRailShown = railShown,
+                selectedTag = { selectedTagName(backStack, twoPaneState.value) },
+                selectedItemId = { detailPaneItemId(backStack, twoPaneState.value) },
                 addLinkRequested = addLinkRequested,
                 onAddLinkHandled = onAddLinkHandled,
             )
             readerEntries(
                 onBack = goBack,
                 onArchived = onArchived,
-                detailPaneActive = detailItemId != null,
+                detailPaneActive = { detailPaneItemId(backStack, twoPaneState.value) != null },
                 isExpanded = { expandedState.value },
                 onToggleExpanded = {
                     if (expandedState.value) restoreList()
@@ -352,7 +351,6 @@ private fun SrokaNavDisplay(
                 onOpenImport = { backStack.openSettingsDetail(ImportKey) },
                 onOpenExport = { backStack.openSettingsDetail(ExportKey) },
                 onOpenChoice = { backStack.openSettingsDetail(SettingsChoiceKey(it)) },
-                twoPane = twoPane,
                 topKey = { backStack.lastOrNull() },
             )
         },

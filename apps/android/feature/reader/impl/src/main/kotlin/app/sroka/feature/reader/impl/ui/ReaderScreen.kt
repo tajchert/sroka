@@ -61,6 +61,10 @@ import app.sroka.core.model.ParseStatus
 import app.sroka.feature.reader.impl.ReaderEvent
 import app.sroka.feature.reader.impl.ReaderHeader
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ScaffoldDefaults
+import app.sroka.feature.reader.impl.ReaderPaneStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -85,6 +89,8 @@ import app.sroka.feature.reader.impl.resolveTheme
  *
  * @param onBack leave the reader
  * @param onArchived the item was archived; caller pops and shows an undo snackbar (defaults to [onBack])
+ * @param detailPane true while shown in the two-pane detail card (R13): no back arrow, transparent
+ *   bars, the page background follows the card and the article column is wider-pane styled
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +100,7 @@ internal fun ReaderScreen(
     onBack: () -> Unit,
     onArchived: (itemId: String) -> Unit,
     itemId: String,
+    detailPane: Boolean = false,
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -172,15 +179,20 @@ internal fun ReaderScreen(
     val settledPartial = remember { booleanArrayOf(false) }
     item?.parseStatus?.takeIf { it != ParseStatus.PENDING }?.let { settledPartial[0] = it == ParseStatus.PARTIAL }
 
+    val cardArgb = MaterialTheme.colorScheme.surfaceContainerLow.toArgb()
     Scaffold(
+        containerColor = if (detailPane) Color.Transparent else MaterialTheme.colorScheme.background,
+        contentWindowInsets = if (detailPane) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             Column {
                 TopAppBar(
                     title = {},
                     navigationIcon = {
-                        IconButton(onClick = leave) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.feature_reader_back))
+                        if (!detailPane) {
+                            IconButton(onClick = leave) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.feature_reader_back))
+                            }
                         }
                     },
                     actions = {
@@ -241,6 +253,15 @@ internal fun ReaderScreen(
                         }
                     },
                     scrollBehavior = scrollBehavior,
+                    windowInsets = if (detailPane) WindowInsets(0) else TopAppBarDefaults.windowInsets,
+                    colors = if (detailPane) {
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent,
+                        )
+                    } else {
+                        TopAppBarDefaults.topAppBarColors()
+                    },
                 )
                 ReadingProgressLine(progress)
             }
@@ -272,7 +293,8 @@ internal fun ReaderScreen(
                         null
                     }
                     // Keyed on the article only: header changes are pushed into the live page by script.
-                    val wrapped = remember(s.html, s.baseUrl) {
+                    val pane = if (detailPane) ReaderPaneStyle(cardArgb) else null
+                    val wrapped = remember(s.html, s.baseUrl, pane) {
                         val restore = viewModel.restorePoint()
                         ReaderHtml.wrap(
                             articleHtml = s.html,
@@ -282,6 +304,7 @@ internal fun ReaderScreen(
                             startAnchor = restore.anchor,
                             startProgress = restore.progress,
                             header = header?.copy(progress = restore.progress),
+                            pane = pane,
                         )
                     }
                     var rendererGone by remember(s.html) { mutableStateOf(false) }
@@ -309,6 +332,7 @@ internal fun ReaderScreen(
                         onRendererGone = { rendererGone = true },
                         scrollToTopSignal = scrollTopSignal,
                         headerScript = header?.let(ReaderHtml::headerScript).orEmpty(),
+                        backgroundArgb = if (detailPane) cardArgb else theme.backgroundArgb,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

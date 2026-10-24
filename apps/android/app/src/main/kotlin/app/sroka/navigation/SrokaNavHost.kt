@@ -8,7 +8,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuite
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldLayout
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -21,12 +30,12 @@ import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
@@ -118,14 +127,22 @@ fun SrokaApp(
 
     // Wide windows show the reader next to the list (list-detail scene), so the tab bar stays.
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    // The 24dp gutter between the panes holds the drag handle (R13); single pane has no gutter.
     val directive = remember(windowAdaptiveInfo) {
-        calculatePaneScaffoldDirective(windowAdaptiveInfo).copy(horizontalPartitionSpacerSize = 0.dp)
+        val base = calculatePaneScaffoldDirective(windowAdaptiveInfo)
+        base.copy(horizontalPartitionSpacerSize = if (base.maxHorizontalPartitions > 1) PaneGutter else 0.dp)
     }
     val twoPane = directive.maxHorizontalPartitions > 1
     val top = backStack.lastOrNull()
     val current = TopLevelDestination.of(top)
         ?: if (twoPane && top is ReaderKey) TopLevelDestination.of(backStack.getOrNull(backStack.size - 2)) else null
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
+    val layoutType = if (current != null) adaptiveType else NavigationSuiteType.None
+    val railShown = layoutType.isRail()
+    val detailItemId = detailPaneItemId(backStack, twoPane)
+    // The rail's "Save link" button asks the next list that is shown to open its add-link dialog.
+    var addLinkRequested by rememberSaveable { mutableStateOf(false) }
+    val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
 
     val itemColors = NavigationSuiteDefaults.itemColors(
         navigationBarItemColors = NavigationBarItemDefaults.colors(
@@ -135,41 +152,83 @@ fun SrokaApp(
         ),
     )
 
-    NavigationSuiteScaffold(
+    Surface(
         modifier = modifier,
-        layoutType = if (current != null) adaptiveType else NavigationSuiteType.None,
-        navigationSuiteItems = {
-            TopLevelDestination.entries.forEach { destination ->
-                val selected = destination == current
-                item(
-                    selected = selected,
-                    onClick = { backStack.navigateToTopLevel(destination) },
-                    icon = {
-                        Icon(
-                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(destination.label)) },
-                    colors = itemColors,
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ) {
+        NavigationSuiteScaffoldLayout(
+            layoutType = layoutType,
+            navigationSuite = {
+                if (railShown) {
+                    val destinations = TopLevelDestination.entries.map {
+                        RailDestination(stringResource(it.label), it.unselectedIcon, it.selectedIcon)
+                    }
+                    SrokaRail(
+                        destinations = destinations,
+                        selectedIndex = TopLevelDestination.entries.indexOf(current),
+                        avatarLetter = railAvatarLetter(email),
+                        onSaveLink = {
+                            // Tags has no add-link dialog: go to My List first.
+                            if (current == TopLevelDestination.TAGS) backStack.navigateToTopLevel(TopLevelDestination.MY_LIST)
+                            addLinkRequested = true
+                        },
+                        onSelect = { backStack.navigateToTopLevel(TopLevelDestination.entries[it]) },
+                        onOpenSettings = { backStack.add(SettingsKey) },
+                    )
+                } else {
+                    NavigationSuite(layoutType = layoutType) {
+                        TopLevelDestination.entries.forEach { destination ->
+                            val selected = destination == current
+                            item(
+                                selected = selected,
+                                onClick = { backStack.navigateToTopLevel(destination) },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                                        contentDescription = null,
+                                    )
+                                },
+                                label = { Text(stringResource(destination.label)) },
+                                colors = itemColors,
+                            )
+                        }
+                    }
+                }
+            },
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                SrokaNavDisplay(
+                    backStack = backStack,
+                    directive = directive,
+                    onArchived = onArchived,
+                    twoPane = twoPane,
+                    detailItemId = detailItemId,
+                    railShown = railShown,
+                    addLinkRequested = addLinkRequested,
+                    onAddLinkHandled = { addLinkRequested = false },
+                )
+                // App-level snackbar for results that outlive a screen (archive from the reader).
+                // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(bottom = if (current != null && !railShown) FabClearance else 0.dp),
                 )
             }
-        },
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            SrokaNavDisplay(backStack, directive, onArchived)
-            // App-level snackbar for results that outlive a screen (archive from the reader).
-            // On tab roots it sits above the list's FAB, like a Scaffold snackbar would.
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = if (current != null) FabClearance else 0.dp),
-            )
         }
     }
 }
+
+private fun NavigationSuiteType.isRail(): Boolean = this != NavigationSuiteType.None &&
+    this != NavigationSuiteType.NavigationBar &&
+    this != NavigationSuiteType.ShortNavigationBarCompact &&
+    this != NavigationSuiteType.ShortNavigationBarMedium
+
+/** Gutter between list and detail; hosts the drag handle. */
+private val PaneGutter = 24.dp
 
 /** FAB height (56dp) plus its two 16dp margins. */
 private val FabClearance = 88.dp
@@ -180,12 +239,24 @@ private fun SrokaNavDisplay(
     backStack: NavBackStack<NavKey>,
     directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
+    twoPane: Boolean,
+    detailItemId: String?,
+    railShown: Boolean,
+    addLinkRequested: Boolean,
+    onAddLinkHandled: () -> Unit,
 ) {
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
     // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>(
         backNavigationBehavior = BackNavigationBehavior.PopLatest,
         directive = directive,
+        // Dragging this handle in the gutter resizes the panes (PaneExpansionState).
+        paneExpansionDragHandle = { state ->
+            val interactionSource = remember { MutableInteractionSource() }
+            PaneDividerHandle(
+                Modifier.paneExpansionDraggable(state, LocalMinimumInteractiveComponentSize.current, interactionSource),
+            )
+        },
     )
     val goBack: () -> Unit = { if (backStack.size > 1) backStack.removeLastOrNull() }
     NavDisplay(
@@ -213,8 +284,13 @@ private fun SrokaNavDisplay(
                 onSignIn = { if (backStack.lastOrNull() != AuthKey) backStack.add(AuthKey) },
                 onOpenSearch = { tab -> backStack.add(SearchKey(tab)) },
                 onCloseSearch = goBack,
+                selectedItemId = { detailItemId },
+                twoPane = twoPane,
+                navRailShown = railShown,
+                addLinkRequested = addLinkRequested,
+                onAddLinkHandled = onAddLinkHandled,
             )
-            readerEntries(onBack = goBack, onArchived = onArchived)
+            readerEntries(onBack = goBack, onArchived = onArchived, detailPaneActive = detailItemId != null)
             settingsEntries(
                 onBack = goBack,
                 onOpenImport = { backStack.add(ImportKey) },
@@ -238,7 +314,7 @@ internal fun NavBackStack<NavKey>.openReader(itemId: String) {
  * Switches tab. My List always stays at the bottom so Back from another tab returns to it, the
  * Android convention for the start destination.
  */
-private fun NavBackStack<NavKey>.navigateToTopLevel(destination: TopLevelDestination) {
+internal fun NavBackStack<NavKey>.navigateToTopLevel(destination: TopLevelDestination) {
     val target = buildList {
         add(TopLevelDestination.MY_LIST.key)
         if (destination != TopLevelDestination.MY_LIST) add(destination.key)

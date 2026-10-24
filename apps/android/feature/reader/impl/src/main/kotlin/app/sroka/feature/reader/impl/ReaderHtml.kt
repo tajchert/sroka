@@ -31,6 +31,18 @@ data class ReaderHeader(
     val partialWarning: String?,
 )
 
+/**
+ * Styling for an article shown in the two-pane detail card (R13): the page background matches the
+ * card ([backgroundArgb]), the title is larger and the column is capped at 640dp with 48dp padding.
+ */
+data class ReaderPaneStyle(val backgroundArgb: Int) {
+    internal fun css(): String {
+        val hex = String.format(java.util.Locale.ROOT, "#%06x", backgroundArgb and 0xFFFFFF)
+        return "html[data-theme]{--bg:$hex}.sk-title{font-size:36px;font-weight:600;line-height:1.15}" +
+            "body{margin:0;max-width:640px;padding-left:48px;padding-right:48px}"
+    }
+}
+
 /** A reading position reported by the reader script. */
 data class ProgressReport(val progress: Float, val anchor: Int?)
 
@@ -72,12 +84,13 @@ object ReaderHtml {
         startProgress: Float,
         nonce: String = newNonce(),
         header: ReaderHeader? = null,
+        pane: ReaderPaneStyle? = null,
     ): String {
         val headerHtml = header?.let(::headerHtml).orEmpty()
         val inject = "<meta http-equiv=\"Content-Security-Policy\" content=\"${escapeAttr(csp(nonce))}\">" +
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
             "<base href=\"${escapeAttr(baseUrl)}\">" +
-            "<style>$CSS</style>" +
+            "<style>$CSS${pane?.css().orEmpty()}</style>" +
             "<script nonce=\"$nonce\">${script(startAnchor, startProgress)}</script>"
         val htmlAttrs = " data-theme=\"${theme.cssName}\" style=\"--scale:${scaleText(textScale)}\""
         val headOpen = Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE)

@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -63,7 +64,11 @@ internal fun rowStatus(item: ItemSummary): RowStatus? = when {
     else -> null
 }
 
-/** One list row (R6): thumbnail, title, `domain · N min`, status line, trailing star when favourite. */
+/**
+ * One list row (R6): thumbnail, title, `domain · N min`, status line, trailing star when favourite.
+ * [selected] highlights the article open in the detail pane (R13): `primaryContainer` background and
+ * `onPrimaryContainer` title; [rounded] gives the row 16dp corners (two-pane list).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemRow(
@@ -71,8 +76,14 @@ internal fun ItemRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    rounded: Boolean = false,
 ) {
-    Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = if (rounded) RoundedCornerShape(16.dp) else RectangleShape,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+    ) {
         Row(
             Modifier
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
@@ -85,6 +96,7 @@ internal fun ItemRow(
                 Text(
                     item.displayTitle,
                     style = MaterialTheme.typography.titleMedium,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else Color.Unspecified,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

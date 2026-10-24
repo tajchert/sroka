@@ -64,6 +64,8 @@ internal fun ArticleWebView(
     scrollToTopSignal: Int = 0,
     /** `ReaderHtml.headerScript(..)` for the current header, or empty; pushed without reloading the page. */
     headerScript: String = "",
+    /** Overrides the WebView background (the detail card colour in two-pane mode). */
+    backgroundArgb: Int = theme.backgroundArgb,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -99,7 +101,7 @@ internal fun ArticleWebView(
         factory = { ctx ->
             WebView(ctx).apply {
                 webViewRef[0] = this
-                setBackgroundColor(theme.backgroundArgb)
+                setBackgroundColor(backgroundArgb)
                 configure()
                 setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
                     currentOnScrollDelta((scrollY - oldScrollY).toFloat())
@@ -158,7 +160,7 @@ internal fun ArticleWebView(
                 view.scrollTo(0, 0)
                 view.evaluateJavascript("window.scrollTo(0,0);", null)
             }
-            view.setBackgroundColor(theme.backgroundArgb)
+            view.setBackgroundColor(backgroundArgb)
         },
         onRelease = { view ->
             webViewRef[0] = null

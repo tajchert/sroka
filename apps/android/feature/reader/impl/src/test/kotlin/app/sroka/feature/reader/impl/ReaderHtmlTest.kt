@@ -112,3 +112,23 @@ class ReaderHtmlTest {
         assertFalse(page.contains("innerHTML"))
     }
 }
+
+class ReaderPaneStyleTest {
+    @Test
+    fun paneStyleOverridesBackgroundAndWidensTheColumn() {
+        val out = ReaderHtml.wrap(
+            "<p>Hello</p>", "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f,
+            "abc123", pane = ReaderPaneStyle(0xFF1B1E23.toInt()),
+        )
+        org.junit.Assert.assertTrue(out.contains("html[data-theme]{--bg:#1b1e23}"))
+        org.junit.Assert.assertTrue(out.contains("max-width:640px"))
+    }
+
+    @Test
+    fun noPaneStyleLeavesTheThemeBackground() {
+        val out = ReaderHtml.wrap(
+            "<p>Hello</p>", "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f, "abc123",
+        )
+        org.junit.Assert.assertFalse(out.contains("max-width:640px"))
+    }
+}

@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -95,6 +97,11 @@ import kotlinx.coroutines.launch
  * @param onOpenSettings opened by the avatar in the search bar (null on tag lists)
  * @param onOpenSearch opens the full-screen search for the tab (null on tag lists)
  * @param onBack null hides the back arrow (top-level tabs)
+ * @param selectedItemId the article open in the detail pane (two-pane only): its row is highlighted
+ * @param twoPane the list is the left pane of the list-detail layout: rows are inset as rounded cards
+ * @param navRailShown the navigation rail is visible: it hosts the save-link FAB and the avatar, so
+ *   the list hides its own
+ * @param addLinkRequested the rail's FAB was tapped: open the add-link dialog, then call [onAddLinkHandled]
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +112,11 @@ fun LibraryListRoute(
     onOpenSettings: (() -> Unit)? = null,
     onOpenSearch: ((LibraryTab) -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    selectedItemId: String? = null,
+    twoPane: Boolean = false,
+    navRailShown: Boolean = false,
+    addLinkRequested: Boolean = false,
+    onAddLinkHandled: () -> Unit = {},
     viewModel: LibraryListViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(scope) { viewModel.setScope(scope) }
@@ -121,6 +133,12 @@ fun LibraryListRoute(
     var confirmDeleteFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    LaunchedEffect(addLinkRequested) {
+        if (addLinkRequested && tabScope(scope)) {
+            showAdd = true
+            onAddLinkHandled()
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -181,7 +199,7 @@ fun LibraryListRoute(
                     sort = state.sort,
                     onSortChange = viewModel::setSort,
                     onOpenSearch = { onOpenSearch?.invoke(tab) },
-                    onOpenSettings = onOpenSettings,
+                    onOpenSettings = onOpenSettings.takeUnless { navRailShown },
                 )
             } else {
                 TopAppBar(
@@ -198,7 +216,7 @@ fun LibraryListRoute(
             }
         },
         floatingActionButton = {
-            if (isTopLevel) {
+            if (isTopLevel && !navRailShown) {
                 val brand = MaterialTheme.srokaColors
                 ExtendedFloatingActionButton(
                     onClick = { showAdd = true },
@@ -233,7 +251,9 @@ fun LibraryListRoute(
                         onOpenItem = onOpenItem,
                         onLongClick = { viewModel.showActions(it.id) },
                         onArchive = { viewModel.toggleArchive(it.id, it.status) },
-                        bottomPadding = if (isTopLevel) FAB_CLEARANCE else 0.dp,
+                        bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
+                        selectedItemId = selectedItemId,
+                        inset = twoPane,
                     )
                 }
             }
@@ -443,6 +463,13 @@ private fun EmptyContent(scope: ListScope) {
 /** 56dp FAB + 16dp margin + 16dp gap; same as the app-level snackbar clearance. */
 private val FAB_CLEARANCE = 88.dp
 
+/** Two-pane list: rows are rounded 16dp cards, inset 8dp, with a 2dp gap (R13). */
+private val ROW_INSET = 8.dp
+private val ROW_GAP = 2.dp
+private val rowShape = RoundedCornerShape(16.dp)
+
+private fun tabScope(scope: ListScope) = scope is ListScope.Tab
+
 @Composable
 private fun ItemList(
     items: LazyPagingItems<ItemSummary>,
@@ -452,8 +479,15 @@ private fun ItemList(
     onLongClick: (ItemSummary) -> Unit,
     onArchive: (ItemSummary) -> Unit,
     bottomPadding: Dp,
+    selectedItemId: String? = null,
+    inset: Boolean = false,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = bottomPadding)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(bottom = bottomPadding),
+        verticalArrangement = Arrangement.spacedBy(if (inset) ROW_GAP else 0.dp),
+    ) {
         items(
             count = items.itemCount,
             key = items.itemKey { it.id },
@@ -464,6 +498,8 @@ private fun ItemList(
                 modifier = Modifier.animateItem(),
                 item = item,
                 archiveTab = archiveTab,
+                selected = item.id == selectedItemId,
+                inset = inset,
                 onClick = { onOpenItem(item.id) },
                 onLongClick = { onLongClick(item) },
                 onArchive = { onArchive(item) },
@@ -481,6 +517,8 @@ private fun SwipeableRow(
     modifier: Modifier,
     item: ItemSummary,
     archiveTab: Boolean,
+    selected: Boolean,
+    inset: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onArchive: () -> Unit,
@@ -491,7 +529,7 @@ private fun SwipeableRow(
     val unarchive = archiveTab || item.status == ItemStatus.ARCHIVED
     SwipeToDismissBox(
         state = state,
-        modifier = modifier,
+        modifier = if (inset) modifier.padding(horizontal = ROW_INSET).clip(rowShape) else modifier,
         enableDismissFromStartToEnd = false,
         onDismiss = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) currentArchive()
@@ -517,6 +555,6 @@ private fun SwipeableRow(
             }
         },
     ) {
-        ItemRow(item = item, onClick = onClick, onLongClick = onLongClick)
+        ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset)
     }
 }

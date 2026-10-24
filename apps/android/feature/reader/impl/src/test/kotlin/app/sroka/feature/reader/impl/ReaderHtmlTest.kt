@@ -156,4 +156,14 @@ class ReaderPaneStyleTest {
         )
         org.junit.Assert.assertFalse(out.contains("max-width:640px"))
     }
+
+    @Test
+    fun `styles X post cards in every theme`() {
+        val out = ReaderHtml.wrap("<div class=\"sr-thread\"><div class=\"sr-post\"></div></div>", theme = EffectiveTheme.DARK, textScale = 1f, startAnchor = null, startProgress = 0f, nonce = "n")
+        assertTrue(out.contains(".sr-post{position:relative"))
+        assertTrue(out.contains(".sr-thread>.sr-post+.sr-post::before"))
+        assertTrue(out.contains("blockquote.sr-post-quote{"))
+        // cards use the theme variables only, so light / sepia / dark all apply
+        assertFalse(Regex("\\.sr-[^{]*\\{[^}]*#[0-9a-fA-F]{3,6}").containsMatchIn(out))
+    }
 }

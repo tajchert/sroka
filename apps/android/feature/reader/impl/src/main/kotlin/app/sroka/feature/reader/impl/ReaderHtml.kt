@@ -212,6 +212,29 @@ window.__srokaScrollToId=function(id){var el=document.getElementById(id);if(el)e
 })();
 """.trimIndent()
 
+    /**
+     * X / Twitter post cards (repo decisions D11; same classes and look as the web reader's `POST_CARD_CSS`):
+     * one card per post, a thread line joining the avatars of consecutive cards, quoted posts as nested cards.
+     */
+    private val POST_CARD_CSS = """
+.sr-thread{display:flex;flex-direction:column;gap:1rem;margin:0 0 1.1em}
+.sr-post{position:relative;padding:.9rem 1rem;border:1px solid var(--rule);border-radius:14px;background:var(--bg);background:color-mix(in srgb,var(--fg) 2.5%,var(--bg))}
+.sr-thread>.sr-post+.sr-post::before{content:"";position:absolute;left:calc(1rem + 19px);top:calc(-1rem - 1px);height:1rem;width:2px;background:var(--rule)}
+.sr-post-focus{border-color:var(--link)}
+.sr-post-head{display:flex;align-items:center;flex-wrap:wrap;column-gap:.35em;margin:0 0 .6rem;font-size:.8em;line-height:1.3;color:var(--muted)}
+.sr-post-head .sr-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;margin-right:.35em;flex:none}
+.sr-post-who strong{color:var(--fg)}
+.sr-post-head a{color:inherit;text-decoration:none}
+.sr-post-body>:last-child{margin-bottom:0}
+.sr-post-body figure img{display:block;width:100%;border-radius:10px;border:1px solid var(--rule)}
+.sr-post-body figure>a{display:block}
+.sr-post-stats{margin:.6rem 0 0;color:var(--muted);font-size:.85em}
+blockquote.sr-post-quote{margin:0 0 1.1em;padding:.7rem .85rem;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--fg);font-size:.92em}
+blockquote.sr-post-quote .sr-avatar{width:22px;height:22px}
+blockquote.sr-note{padding:.6rem .85rem;border:1px solid var(--rule);border-radius:10px;color:var(--fg);font-size:.9em}
+.sr-thread-foot{color:var(--muted);text-align:center}
+""".trimIndent().replace("\n", "")
+
     private val CSS = """
 :root{--scale:1;--warn:#7a5a00;--bg:#f6f5f1;--fg:#15171c;--muted:#5d5f66;--link:#1e6f8f;--rule:#e3e3df}
 html[data-theme=dark]{--bg:#15171c;--fg:#d9d7d1;--muted:#a5a8ae;--link:#7cc0da;--rule:#2a2d2f;--warn:#e8cf86}
@@ -231,5 +254,5 @@ pre{overflow-x:auto;padding:.8em 1em;border:1px solid var(--rule);border-radius:
 hr{border:0;border-top:1px solid var(--rule);margin:2em 0}
 table{border-collapse:collapse;display:block;overflow-x:auto}td,th{border:1px solid var(--rule);padding:.35em .6em}
 html[data-theme=dark] img{filter:brightness(.85) contrast(1.05)}
-""".trimIndent().replace("\n", "")
+""".trimIndent().replace("\n", "") + POST_CARD_CSS
 }

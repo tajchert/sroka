@@ -26,6 +26,9 @@ const ITEM = {
   archivedAt: null,
   lastReadAt: null,
   source: "web",
+  kind: "article",
+  fileName: null,
+  fileSize: null,
   tags: [],
   seq: 1,
 };

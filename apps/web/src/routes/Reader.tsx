@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { patchItem } from "../lib/cache.ts";
+import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
+import { formatSize } from "../lib/pdf.ts";
 import { hostOf, isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import {
   DEFAULT_READER_SETTINGS,
@@ -28,12 +30,13 @@ export default function Reader() {
   const item = itemQ.data;
   const qc = useQueryClient();
   const { gaveUp } = useParsePolling(item);
+  const pdfBlob = usePdfBlob(id, item?.kind === "pdf" ? item.contentId : null);
 
   const contentId = item?.contentId;
   const contentQ = useQuery({
     queryKey: ["content", id, contentId],
     queryFn: () => api.getContent(id),
-    enabled: !!contentId,
+    enabled: !!contentId && item?.kind !== "pdf",
     // Re-signing (new exp) must not rebuild an open article: that reloads the iframe and loses the position.
     staleTime: Infinity,
     refetchOnReconnect: false,
@@ -44,7 +47,7 @@ export default function Reader() {
   const articleQ = useQuery({
     queryKey: ["article", contentId],
     queryFn: () => api.fetchArticle(contentQ.data!.articleUrl),
-    enabled: !!contentQ.data,
+    enabled: !!contentQ.data && item?.kind !== "pdf",
     staleTime: Infinity,
     retry: 1,
   });
@@ -162,9 +165,13 @@ export default function Reader() {
   }
 
   const archived = item.status === "archived";
+  const isPdf = item.kind === "pdf";
   const waiting = item.parseStatus === "pending" && !contentId;
   const failed = !contentId && !waiting;
   const domain = hostOf(item.canonicalUrl || item.url);
+  const subtitle = isPdf
+    ? ["PDF", item.fileSize ? formatSize(item.fileSize) : null, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ")
+    : [item.siteName ?? domain, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ");
 
   return (
     <div className="flex h-full flex-col">
@@ -177,12 +184,19 @@ export default function Reader() {
               </Link>
               <h1 className="font-serif text-xl font-semibold leading-snug sm:text-2xl">{itemTitle(item)}</h1>
               <p className="mt-0.5 text-sm text-ink2">
-                {[item.siteName ?? domain, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ")}
+                {subtitle}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a className="btn" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
+            {isPdf ? (
+              <>
+                <a className="btn" aria-disabled={!pdfBlob.url} href={pdfBlob.url ?? undefined} download={item.fileName ?? "document.pdf"}>Download</a>
+                <a className="btn" aria-disabled={!pdfBlob.url} href={pdfBlob.url ?? undefined} target="_blank" rel="noopener noreferrer">Open in new tab</a>
+              </>
+            ) : (
+              <a className="btn" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
+            )}
             <button className="btn" onClick={() => void actions.setArchived(item, !archived)}>{archived ? "Move to My List" : "Archive"}</button>
             <button className="btn" aria-pressed={item.isFavorite} onClick={() => void actions.toggleFavorite(item)}>
               {item.isFavorite ? "★ Favorite" : "☆ Favorite"}
@@ -190,16 +204,16 @@ export default function Reader() {
             <button className="btn" aria-expanded={panel === "tags"} onClick={() => setPanel(panel === "tags" ? "" : "tags")}>
               Tags{item.tags.length ? ` (${item.tags.length})` : ""}
             </button>
-            <button className="btn" aria-expanded={panel === "settings"} onClick={() => setPanel(panel === "settings" ? "" : "settings")}>Reader settings</button>
-            <button className="btn" onClick={() => void actions.refresh(item)}>Refresh</button>
+            {!isPdf && <button className="btn" aria-expanded={panel === "settings"} onClick={() => setPanel(panel === "settings" ? "" : "settings")}>Reader settings</button>}
+            {!isPdf && <button className="btn" onClick={() => void actions.refresh(item)}>Refresh</button>}
             <button className="btn btn-danger" onClick={() => actions.remove(item, () => navigate(archived ? "/archive" : "/"))}>Delete</button>
           </div>
           {panel === "tags" && <TagEditor tags={item.tags} onChange={(tags) => void actions.setTags(item, tags)} />}
-          {panel === "settings" && <SettingsPanel settings={settings} onChange={change} />}
+          {!isPdf && panel === "settings" && <SettingsPanel settings={settings} onChange={change} />}
         </div>
       </header>
 
-      {contentId && item.parseStatus === "partial" && (
+      {!isPdf && contentId && item.parseStatus === "partial" && (
         <div role="note" className="border-b border-rule bg-ink/5 px-4 py-2 text-sm sm:px-8">
           <p className="mx-auto max-w-4xl">
             {item.parseError === "paywalled" ? (
@@ -219,7 +233,13 @@ export default function Reader() {
         </div>
       )}
       <div className="relative min-h-0 flex-1">
-        {srcdoc ? (
+        {isPdf ? (
+          contentId ? (
+            <PdfViewer item={item} blobUrl={pdfBlob.url} error={pdfBlob.error} onRetry={pdfBlob.retry} />
+          ) : (
+            <Notice title="This PDF is not available" body="The file is missing. Delete this item and add the PDF again." />
+          )
+        ) : srcdoc ? (
           <iframe
             ref={iframeRef}
             title={itemTitle(item)}
@@ -256,10 +276,10 @@ export default function Reader() {
         ) : (
           <Notice busy title="Loading article" body="" />
         )}
-        {srcdoc && item.parseStatus === "pending" && (
+        {!isPdf && srcdoc && item.parseStatus === "pending" && (
           <div className="pointer-events-none absolute top-2 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">Refreshing</div>
         )}
-        {srcdoc && item.parseStatus === "failed" && (
+        {!isPdf && srcdoc && item.parseStatus === "failed" && (
           <div className="absolute top-2 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">Refresh failed. Showing the earlier copy.</div>
         )}
       </div>

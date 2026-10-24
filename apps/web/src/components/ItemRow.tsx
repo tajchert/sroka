@@ -1,6 +1,7 @@
 import type { Item } from "@sroka/shared";
 import { useState } from "react";
 import { Link } from "react-router";
+import { formatSize } from "../lib/pdf.ts";
 import { hostOf, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import { TagEditor } from "./TagEditor.tsx";
 
@@ -17,7 +18,8 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
   useParsePolling(item);
   const temp = item.id.startsWith("tmp-");
   const archived = item.status === "archived";
-  const domain = hostOf(item.canonicalUrl || item.url);
+  const pdf = item.kind === "pdf";
+  const domain = pdf ? "PDF" : hostOf(item.canonicalUrl || item.url);
 
   return (
     <li
@@ -27,7 +29,15 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
     >
       {selected && <span aria-hidden className="sheen-bg absolute inset-y-3 left-0 w-0.5 rounded" />}
       <div className="h-[72px] w-24 shrink-0 overflow-hidden rounded-md bg-paper2 sm:w-28">
-        {item.leadImageUrl ? (
+        {pdf ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-ink2" aria-hidden>
+            <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+              <path d="M6 3h8l4 4v14H6z" />
+              <path d="M14 3v4h4" />
+            </svg>
+            <span className="rounded bg-ink px-1.5 text-[0.65rem] font-semibold tracking-wide text-paper">PDF</span>
+          </div>
+        ) : item.leadImageUrl ? (
           <img src={item.leadImageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center font-serif text-2xl text-ink2" aria-hidden>
@@ -47,28 +57,32 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
           )}
         </h3>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8rem] text-ink2">
-          <button type="button" className="cursor-pointer hover:text-ink hover:underline" onClick={() => onDomain(domain)} title={`Show only ${domain}`}>
-            {domain}
-          </button>
+          {pdf ? (
+            <span>PDF{item.fileSize ? ` · ${formatSize(item.fileSize)}` : ""}</span>
+          ) : (
+            <button type="button" className="cursor-pointer hover:text-ink hover:underline" onClick={() => onDomain(domain)} title={`Show only ${domain}`}>
+              {domain}
+            </button>
+          )}
           {item.readingMinutes ? <span>{item.readingMinutes} min read</span> : null}
-          {item.parseStatus === "pending" && (
+          {item.parseStatus === "pending" && !pdf && (
             <span className="inline-flex items-center gap-1.5">
               <span className="spinner" aria-hidden /> Fetching
             </span>
           )}
-          {item.parseStatus === "failed" && (
+          {item.parseStatus === "failed" && !pdf && (
             <span className="rounded border border-[#c2362f]/50 px-1.5 text-[#c2362f]" title={item.parseError ?? undefined}>
               Could not parse
             </span>
           )}
-          {item.parseStatus === "partial" && (
+          {item.parseStatus === "partial" && !pdf && (
             <span className="rounded border border-rule px-1.5" title={item.parseError === "paywalled" ? "Subscriber-only article: save it with the extension while signed in" : undefined}>
               {item.parseError === "paywalled" ? "Preview only" : "Partial"}
             </span>
           )}
           {item.progress > 0.02 && item.progress < 0.98 && <span>{Math.round(item.progress * 100)}% read</span>}
         </div>
-        {item.excerpt && item.parseStatus !== "pending" && <p className="mt-1 line-clamp-2 text-sm text-ink2">{item.excerpt}</p>}
+        {item.excerpt && (pdf || item.parseStatus !== "pending") && <p className="mt-1 line-clamp-2 text-sm text-ink2">{item.excerpt}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {!editing &&
             item.tags.map((t) => (

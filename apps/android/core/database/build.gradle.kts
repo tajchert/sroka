@@ -65,6 +65,7 @@ dependencies {
     // DAO tests run on the JVM against an in-memory database (Robolectric).
     testImplementation(libs.bundles.testing)
     testImplementation(libs.robolectric)
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.room.testing)
 

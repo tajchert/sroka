@@ -4,7 +4,12 @@ import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import android.app.Activity
+import android.content.ContextWrapper
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.draganddrop.DragAndDropEvent
@@ -96,6 +101,7 @@ import app.sroka.core.model.SyncErrorKind
 import app.sroka.core.ui.tags.EditTagsSheet
 import app.sroka.core.ui.rememberWithNotificationPermission
 import app.sroka.feature.library.impl.R
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 /**
@@ -142,6 +148,12 @@ fun LibraryListRoute(
     var editTagsFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     var confirmDeleteFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val uploads by viewModel.uploads.collectAsStateWithLifecycle()
+    val uploadCards = remember(uploads) { selectUploadCards(uploads) }
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        viewModel.addPdfs(uris)
+    }
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     val currentOpenItem by rememberUpdatedState(onOpenItem)
     var dropState by remember { mutableStateOf(DropState.Idle) }
@@ -160,9 +172,18 @@ fun LibraryListRoute(
                         text = item.text?.toString(),
                         uri = item.uri?.takeIf { it.scheme == "http" || it.scheme == "https" }?.toString(),
                         html = item.htmlText,
+                        documentUri = item.uri?.takeIf { it.scheme == "content" || it.scheme == "file" }?.toString(),
                     )
                 }
-                viewModel.dropUrls(extractDroppedUrls(dropped))
+                val clipIsPdf = clip?.description?.hasMimeType(PDF_MIME) == true
+                val pdfs = extractDroppedPdfUris(dropped, clipIsPdf)
+                if (pdfs.isNotEmpty()) {
+                    // Content URIs dragged from another app need a permission grant tied to this activity.
+                    context.findActivity()?.requestDragAndDropPermissions(event.toAndroidDragEvent())
+                    viewModel.addPdfs(pdfs.map(android.net.Uri::parse))
+                } else {
+                    viewModel.dropUrls(extractDroppedUrls(dropped))
+                }
                 return true
             }
         }
@@ -179,11 +200,22 @@ fun LibraryListRoute(
     }
 
     LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
+        merge(viewModel.events, viewModel.uploadEvents).collect { event ->
             // collectLatest-like behavior: a newer message replaces the current one.
             snackbarHostState.currentSnackbarData?.dismiss()
             coroutineScope.launch {
                 when (event) {
+                    is ListEvent.PdfQueued -> snackbarHostState.showSnackbar(
+                        resources.getQuantityString(R.plurals.feature_library_snack_pdf_queued, event.count, event.count),
+                    )
+                    is ListEvent.PdfDone -> snackbarHostState.showSnackbar(
+                        resources.getString(
+                            if (event.duplicate) R.string.feature_library_snack_pdf_duplicate else R.string.feature_library_snack_pdf_done,
+                        ),
+                    )
+                    is ListEvent.PdfFailed -> snackbarHostState.showSnackbar(
+                        resources.getString(R.string.feature_library_snack_pdf_failed, resources.getString(uploadErrorMessage(event.error))),
+                    )
                     is ListEvent.Info -> snackbarHostState.showSnackbar(resources.getString(event.message))
                     is ListEvent.DropSaved -> {
                         val message = if (event.ids.size == 1) {
@@ -276,6 +308,12 @@ fun LibraryListRoute(
         detailCard = detailCard,
         dropState = dropState,
         dropModifier = dropModifier,
+        uploadCards = uploadCards,
+        onRetryUpload = {
+            viewModel.dismissUploadFailures()
+            pdfPicker.launch(arrayOf(PDF_MIME))
+        },
+        onDismissUploads = viewModel::dismissUploadFailures,
     )
 
     selected?.let { item ->
@@ -314,7 +352,14 @@ fun LibraryListRoute(
         )
     }
     if (showAdd) {
-        AddUrlDialog(onSubmit = viewModel::addLink, onDismiss = { showAdd = false })
+        AddUrlDialog(
+            onSubmit = viewModel::addLink,
+            onDismiss = { showAdd = false },
+            onChoosePdf = {
+                showAdd = false
+                pdfPicker.launch(arrayOf(PDF_MIME))
+            },
+        )
     }
 }
 
@@ -351,6 +396,9 @@ fun LibraryListContent(
     detailCard: Boolean = false,
     dropState: DropState = DropState.Idle,
     dropModifier: Modifier = Modifier,
+    uploadCards: List<UploadCard> = emptyList(),
+    onRetryUpload: () -> Unit = {},
+    onDismissUploads: () -> Unit = {},
 ) {
     val tab = (scope as? ListScope.Tab)?.tab
     val isTopLevel = tab != null
@@ -407,6 +455,7 @@ fun LibraryListContent(
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             StatusCards(selectStatusCard(state.sync, state.needsSignIn), onSignIn = onSignIn)
+            UploadCards(uploadCards, onRetry = onRetryUpload, onDismiss = onDismissUploads)
             AnimatedVisibility(dropState != DropState.Idle) { DropTargetCard(hovered = dropState == DropState.Hovered) }
             PullToRefreshBox(
                 isRefreshing = refreshing,
@@ -674,4 +723,10 @@ private fun SwipeableRow(
             ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset)
         }
     }
+}
+
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

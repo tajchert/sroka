@@ -61,7 +61,7 @@ class LibraryListScreenTest {
     private val searchOpened = mutableListOf<LibraryTab>()
 
     private fun show(scope: ListScope = ListScope.Tab(LibraryTab.MY_LIST)) {
-        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), sync, status, auth, FakeSettingsRepository())
+        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), sync, status, auth, FakeSettingsRepository(), app.sroka.core.testing.fake.FakePdfUploader())
         compose.setContent {
             SrokaTheme(dynamicColor = false) {
                 LibraryListRoute(

@@ -23,6 +23,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.File
@@ -37,6 +38,8 @@ internal class OkHttpSrokaApi(
     private val json: Json,
     /** Response bodies are read and closed here: never on the caller's (possibly Main) dispatcher. */
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** Authenticated client with long write/read timeouts for file uploads. */
+    private val uploadClient: OkHttpClient = client,
 ) : SrokaApi {
 
     override suspend fun sendOtp(email: String): ApiResult<Unit> =
@@ -62,6 +65,23 @@ internal class OkHttpSrokaApi(
 
     override suspend fun contentUrls(itemId: String): ApiResult<ContentUrlsDto> =
         execute(get("/v1/items/${segment(itemId)}/content")) { decode(it) }
+
+    override suspend fun uploadPdf(
+        file: File,
+        fileName: String,
+        tags: List<String>,
+        source: String,
+        onProgress: (Long, Long) -> Unit,
+    ): ApiResult<PdfUploadResponseDto> {
+        val base = session.baseUrl().trimEnd('/')
+        val url = (base + "/v1/items/pdf").toHttpUrl().newBuilder()
+            .addQueryParameter("name", fileName)
+            .addQueryParameter("source", source)
+            .apply { tags.forEach { addQueryParameter("tag", it) } }
+            .build()
+        val body = ProgressRequestBody(file.asRequestBody(PDF_TYPE), onProgress)
+        return executeWith(uploadClient, Request.Builder().url(url).post(body).build()) { decode(it) }
+    }
 
     override suspend fun getItem(itemId: String): ApiResult<ItemDto> =
         execute(get("/v1/items/${segment(itemId)}")) { decode(it) }
@@ -202,6 +222,7 @@ internal class OkHttpSrokaApi(
 
     private companion object {
         val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+        val PDF_TYPE = "application/pdf".toMediaType()
         val OCTET_TYPE = "application/octet-stream".toMediaType()
         const val BUFFER_BYTES = 16L * 1024
     }
@@ -218,4 +239,28 @@ private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont 
             if (cont.isActive) cont.resume(response) else response.close()
         }
     })
+}
+
+/** Streams the wrapped body unchanged (known length) and reports bytes written to the socket. */
+private class ProgressRequestBody(
+    private val delegate: RequestBody,
+    private val onProgress: (Long, Long) -> Unit,
+) : RequestBody() {
+    override fun contentType() = delegate.contentType()
+
+    override fun contentLength() = delegate.contentLength()
+
+    override fun writeTo(sink: okio.BufferedSink) {
+        val total = contentLength()
+        var sent = 0L
+        val counting = object : okio.ForwardingSink(sink) {
+            override fun write(source: okio.Buffer, byteCount: Long) {
+                super.write(source, byteCount)
+                sent += byteCount
+                onProgress(sent, total)
+            }
+        }.buffer()
+        delegate.writeTo(counting)
+        counting.flush()
+    }
 }

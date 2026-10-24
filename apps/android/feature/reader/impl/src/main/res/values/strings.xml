@@ -52,4 +52,12 @@
     <string name="feature_reader_tabletop_text_size_px">%1$d px</string>
     <string name="feature_reader_tabletop_up_next">Up next in My List</string>
     <string name="feature_reader_tabletop_read">Read</string>
+    <!-- PDF reader -->
+    <string name="feature_reader_downloading_pdf">Downloading PDF\u2026</string>
+    <string name="feature_reader_share_pdf">Share PDF</string>
+    <string name="feature_reader_open_with">Open with another app</string>
+    <string name="feature_reader_pdf_page">Page %1$d of %2$d</string>
+    <string name="feature_reader_pdf_page_of">%1$d / %2$d</string>
+    <string name="feature_reader_pdf_unreadable_title">Can\u2019t display this PDF</string>
+    <string name="feature_reader_pdf_unreadable">The file may be damaged or protected. Try opening it in another app.</string>
 </resources>

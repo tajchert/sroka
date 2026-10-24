@@ -42,6 +42,7 @@ internal class LocalDataWiper @Inject constructor(
             maintenanceDao.wipeAll()
             withContext(io) {
                 paths.deleteAll()
+                paths.pdfUploads.deleteRecursively()
                 deleteTransferCaches(context.cacheDir)
             }
             // DELETE never shrinks the file: reclaim the article text the FTS index held.

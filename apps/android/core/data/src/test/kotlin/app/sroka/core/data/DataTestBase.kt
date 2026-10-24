@@ -18,6 +18,7 @@ import app.sroka.core.database.SrokaDatabase
 import app.sroka.core.database.entity.ItemEntity
 import app.sroka.core.datastore.SessionStore
 import app.sroka.core.datastore.TokenCipher
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.network.NetworkConfig
@@ -118,12 +119,14 @@ internal abstract class DataTestBase {
         contentId: String? = "c-$id",
         archivedAt: Long? = null,
         leadImageKey: String? = null,
+        kind: ItemKind = ItemKind.ARTICLE,
     ) = ItemEntity(
         id = id, url = "https://example.com/$id", canonicalUrl = "https://example.com/$id",
         title = title, excerpt = null, siteName = null, author = null, lang = null, leadImageKey = leadImageKey,
         wordCount = 500, readingMinutes = 3, contentId = contentId, contentPrivate = false,
         parseStatus = ParseStatus.OK, parseError = null, status = status, isFavorite = favorite, progress = 0f,
         progressAnchor = null, savedAt = savedAt, archivedAt = archivedAt, lastReadAt = null, source = "web", serverSeq = 1,
+        kind = kind, fileName = if (kind == ItemKind.PDF) "$id.pdf" else null, fileSize = if (kind == ItemKind.PDF) 1234 else null,
     )
 
     /** Server item JSON (api.md §4.1). */

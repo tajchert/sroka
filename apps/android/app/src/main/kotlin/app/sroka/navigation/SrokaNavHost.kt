@@ -65,6 +65,7 @@ import app.sroka.feature.reader.api.ReaderKey
 import app.sroka.feature.reader.impl.navigation.readerEntries
 import app.sroka.feature.settings.api.ExportKey
 import app.sroka.feature.settings.api.ImportKey
+import app.sroka.feature.settings.api.SettingsChoiceKey
 import app.sroka.feature.settings.api.SettingsKey
 import app.sroka.feature.settings.impl.navigation.settingsEntries
 import kotlinx.coroutines.launch
@@ -334,11 +335,23 @@ private fun SrokaNavDisplay(
             )
             settingsEntries(
                 onBack = goBack,
-                onOpenImport = { backStack.add(ImportKey) },
-                onOpenExport = { backStack.add(ExportKey) },
+                onOpenImport = { backStack.openSettingsDetail(ImportKey) },
+                onOpenExport = { backStack.openSettingsDetail(ExportKey) },
+                onOpenChoice = { backStack.openSettingsDetail(SettingsChoiceKey(it)) },
+                twoPane = twoPane,
+                topKey = { backStack.lastOrNull() },
             )
         },
     )
+}
+
+/** Opens a settings sub-page; one already open (import, export, choice page) is replaced, not stacked. */
+internal fun NavBackStack<NavKey>.openSettingsDetail(key: NavKey) {
+    when (lastOrNull()) {
+        key -> Unit
+        is SettingsChoiceKey, ImportKey, ExportKey -> this[lastIndex] = key
+        else -> add(key)
+    }
 }
 
 /** Opens [itemId] in the reader; a reader already on top is replaced rather than stacked. */

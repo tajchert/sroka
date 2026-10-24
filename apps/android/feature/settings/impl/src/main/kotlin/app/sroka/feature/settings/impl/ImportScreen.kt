@@ -51,11 +51,12 @@ private const val STALE_JOB_MS = 10 * 60 * 1000L
 private const val STALE_CHECK_MS = 30_000L
 
 @Composable
-fun ImportRoute(onBack: () -> Unit, viewModel: ImportViewModel = hiltViewModel()) {
+fun ImportRoute(onBack: () -> Unit, detailPane: Boolean = false, viewModel: ImportViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ImportScreen(
         state = state,
         onBack = onBack,
+        detailPane = detailPane,
         onSource = viewModel::selectSource,
         onPicked = viewModel::onFilePicked,
         onImport = viewModel::startImport,
@@ -72,6 +73,7 @@ fun ImportScreen(
     onPicked: (String?) -> Unit,
     onImport: () -> Unit,
     onDone: () -> Unit,
+    detailPane: Boolean = false,
 ) {
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -88,17 +90,10 @@ fun ImportScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.feature_settings_import_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.feature_settings_back))
-                    }
-                },
-            )
-        },
+    SettingsPageScaffold(
+        title = stringResource(R.string.feature_settings_import_title),
+        detailPane = detailPane,
+        onBack = onBack,
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
             Text(

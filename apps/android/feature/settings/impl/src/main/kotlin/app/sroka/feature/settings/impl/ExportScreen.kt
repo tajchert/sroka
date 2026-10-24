@@ -54,9 +54,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-fun ExportRoute(onBack: () -> Unit, viewModel: ExportViewModel = hiltViewModel()) {
+fun ExportRoute(onBack: () -> Unit, detailPane: Boolean = false, viewModel: ExportViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ExportScreen(state, onBack, viewModel::selectFormat, viewModel::export)
+    ExportScreen(state, onBack, viewModel::selectFormat, viewModel::export, detailPane)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +66,7 @@ fun ExportScreen(
     onBack: () -> Unit,
     onFormat: (ExportFormat) -> Unit,
     onExport: () -> Unit,
+    detailPane: Boolean = false,
 ) {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -95,17 +96,10 @@ fun ExportScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.feature_settings_export_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.feature_settings_back))
-                    }
-                },
-            )
-        },
+    SettingsPageScaffold(
+        title = stringResource(R.string.feature_settings_export_title),
+        detailPane = detailPane,
+        onBack = onBack,
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {

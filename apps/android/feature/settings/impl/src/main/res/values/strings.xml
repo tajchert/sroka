@@ -2,6 +2,7 @@
 <resources>
     <string name="feature_settings_title">Settings</string>
     <string name="feature_settings_back">Back</string>
+    <string name="feature_settings_choose_setting">Choose a setting</string>
     <string name="feature_settings_cancel">Cancel</string>
     <string name="feature_settings_save">Save</string>
     <string name="feature_settings_remove">Remove</string>

@@ -19,3 +19,10 @@ fun isDefaultTextScale(scale: Float): Boolean = abs(scale - 1.0f) < 0.01f
 
 /** The step closest to [scale]. */
 fun nearestTextScaleStep(scale: Float): Float = TextScaleSteps.minBy { abs(it - scale) }
+
+/**
+ * True when saving [value] would switch to another server (which signs out and wipes local data).
+ * Settings is only reachable signed in.
+ */
+fun isServerSwitch(value: String, initial: String): Boolean =
+    value.isNotBlank() && value.trim().trimEnd('/') != initial.trimEnd('/')

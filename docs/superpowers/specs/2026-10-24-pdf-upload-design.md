@@ -86,7 +86,10 @@ because text extraction failed.
 - Extraction failure, encrypted PDF, or no text (scans) → still `status:"ok"` with null metadata and
   `error: "pdf_no_text"` / `"pdf_encrypted"` / `"pdf_extract_failed"`, so the item stays readable and isn't shown as failed.
   Only R2 read failures are transient (retry like other jobs).
-- On `markParsed` → `ok:false`: delete only `text.txt` you wrote, **never** `document.pdf`.
+- On `markParsed` → `ok:false`: for pdf jobs delete **nothing** (every job of the item writes the same `text.txt` key, so a
+  stale/duplicate delivery could remove the accepted result's text; an orphan text.txt is collected with the dir).
+- Originals over 20 MiB (`obj.size`, checked before reading the body) are not extracted: `status:"ok"`,
+  `error:"pdf_too_large"`, null metadata (item stays readable).
 - Never touches the shared D1 `content` cache; no `content` row; `parse_attempts` row with `method:"pdf"`
   (extend the method enum), `url` NULL (private).
 - Bump nothing in PARSER_VERSION (article output unchanged).

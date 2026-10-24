@@ -22,6 +22,9 @@ import {
 import { failedResult, TransientError, type JobStats } from "./process.ts";
 
 
+/** Larger originals are not extracted (memory). */
+export const PDF_MAX_BYTES = 20 * 1024 * 1024;
+
 type PdfCode = "pdf_no_text" | "pdf_encrypted" | "pdf_extract_failed";
 
 interface Extraction {
@@ -97,6 +100,12 @@ export async function processPdfJob(
     if (!obj) {
       stats.errorDetail = "pdf_object_missing";
       return failedResult(job, "pdf_missing");
+    }
+    if (obj.size > PDF_MAX_BYTES) {
+      // Too big to hold in the isolate: keep the item readable (original only), no text.
+      stats.bytes = obj.size;
+      stats.errorDetail = "pdf_too_large";
+      return okResult(job, { error: "pdf_too_large" });
     }
     data = new Uint8Array(await obj.arrayBuffer());
   } catch (e) {

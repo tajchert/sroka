@@ -3,6 +3,8 @@ import { LIMITS, PDF_FILE, r2Keys, uuidv7 } from "@sroka/shared";
 import { describe, expect, it } from "vitest";
 import { freshLibrary, testEnv } from "../do/helpers.ts";
 import type { LibraryDO } from "../../src/library-do.ts";
+import { cleanFileName } from "../../src/routes/items.ts";
+import type { Env } from "../../src/env.ts";
 import { makeApp } from "./app.ts";
 
 /** A minimal "PDF": the marker is all the API checks. */
@@ -204,5 +206,133 @@ describe("pdf items in the library", () => {
     expect(urls.documentUrl).toMatch(/\/document\.pdf$/);
     expect(urls.articleUrl).toMatch(/\/article\.html$/);
     expect(urls.packageUrl).toMatch(/\/package\.zip$/);
+  });
+});
+
+const sqlRows = async (user: string, q: string): Promise<Record<string, unknown>[]> =>
+  runInDurableObject(testEnv.LIBRARY.getByName(user), (_i: LibraryDO, state) => state.storage.sql.exec(q).toArray() as Record<string, unknown>[]);
+
+describe("review fixes", () => {
+  it("keeps the object when the addPdf outcome is unknown (DO committed, RPC failed)", async () => {
+    const real = testEnv.LIBRARY;
+    const flaky = {
+      getByName: (n: string) => {
+        const stub = real.getByName(n);
+        return new Proxy(stub, {
+          get: (t, p) =>
+            p === "addPdf"
+              ? async (...a: unknown[]) => {
+                  await (t as any).addPdf(...a);
+                  throw new Error("rpc wire failure");
+                }
+              : (...a: unknown[]) => (t as any)[p](...a),
+        });
+      },
+    } as unknown as Env["LIBRARY"];
+    const { raw, call, user, env } = makeApp({ LIBRARY: flaky });
+    const b = pdfBytes("unknown");
+    const r = await raw("POST", "/v1/items/pdf?name=u.pdf", b, hdr(b));
+    expect(r.status).toBe(500);
+    const items = (await call("GET", "/v1/items?state=all")).json.items;
+    expect(items).toHaveLength(1);
+    expect(await env.CONTENT.head(r2Keys.contentDir(items[0].contentId, user) + PDF_FILE)).not.toBeNull();
+  });
+
+  it("a duplicate whose original is gone adopts the new copy (seq bumped, new pdf job)", async () => {
+    const { raw, call, sent, user, env } = makeApp();
+    const b = pdfBytes("lost");
+    const first = (await raw("POST", "/v1/items/pdf?name=a.pdf", b, hdr(b))).json.item;
+    const oldKey = r2Keys.contentDir(first.contentId, user) + PDF_FILE;
+    await env.CONTENT.delete(oldKey);
+    await env.CONTENT.put(r2Keys.contentDir(first.contentId, user) + "text.txt", "old text");
+    sent.length = 0;
+    const again = await raw("POST", "/v1/items/pdf?name=a.pdf", b, hdr(b));
+    expect(again.status).toBe(202);
+    expect(again.json.created).toBe(false);
+    const item = again.json.item;
+    expect(item.id).toBe(first.id);
+    expect(item.contentId).not.toBe(first.contentId);
+    expect(item.seq).toBeGreaterThan(first.seq);
+    const newKey = r2Keys.contentDir(item.contentId, user) + PDF_FILE;
+    expect(new Uint8Array(await (await env.CONTENT.get(newKey))!.arrayBuffer())).toEqual(b);
+    expect(await listPrefix(`private/${user}/`)).toEqual([newKey]); // old dir (stale text.txt) removed
+    expect(sent).toEqual([{ userId: user, itemId: first.id, url: first.url, parseGen: 2, pdf: { contentId: item.contentId } }]);
+    expect((await call("GET", `/v1/items/${first.id}`)).json.item.contentId).toBe(item.contentId);
+    expect(await sqlRows(user, "SELECT * FROM pdf_uploads")).toEqual([]);
+  });
+
+  it("item.add of a /pdf/{sha} url is rejected unless the pdf item exists", async () => {
+    const { raw, call, env } = makeApp();
+    const b = pdfBytes("junk");
+    const url = `${env.APP_ORIGIN}/pdf/${await sha(b)}`;
+    const rest = await call("POST", "/v1/items", { url });
+    expect(rest.status).toBe(400);
+    expect(rest.json.error).toBe("invalid_url");
+    const op = { opId: uuidv7(), at: Date.now(), type: "item.add", itemId: uuidv7(), url };
+    const push = await call("POST", "/v1/sync/push", { deviceId: "dev", ops: [op] });
+    expect(push.json.rejected).toEqual([{ opId: op.opId, reason: "invalid_url" }]);
+    // the real upload still works, and afterwards the same add is a normal duplicate re-add
+    const up = await raw("POST", "/v1/items/pdf?name=real.pdf", b, hdr(b));
+    expect(up.json.created).toBe(true);
+    const dup = await call("POST", "/v1/items", { url });
+    expect(dup.status).toBeLessThan(300);
+    expect(dup.json.item.id).toBe(up.json.item.id);
+    // other hosts / shapes are ordinary urls
+    expect((await call("POST", "/v1/items", { url: `https://example.com/pdf/${await sha(b)}` })).status).toBeLessThan(300);
+    expect((await call("POST", "/v1/items", { url: `${env.APP_ORIGIN}/pdf/abc` })).status).toBeLessThan(300);
+  });
+
+  it("reservations: removed on commit; the sweep reclaims unreferenced old uploads only", async () => {
+    const { raw, user, env } = makeApp();
+    const b = pdfBytes("res");
+    const item = (await raw("POST", "/v1/items/pdf?name=r.pdf", b, hdr(b))).json.item;
+    expect(await sqlRows(user, "SELECT * FROM pdf_uploads")).toEqual([]);
+    const lib = env.LIBRARY.getByName(user);
+    const orphan = uuidv7();
+    const orphanKey = r2Keys.contentDir(orphan, user) + PDF_FILE;
+    await lib.reservePdfUpload(orphan);
+    await env.CONTENT.put(orphanKey, pdfBytes("orphan"));
+    await lib.reservePdfUpload(item.contentId); // stale row for a referenced content id
+    const fresh = uuidv7();
+    await lib.reservePdfUpload(fresh);
+    await env.CONTENT.put(r2Keys.contentDir(fresh, user) + PDF_FILE, pdfBytes("fresh"));
+    // not old enough yet
+    expect(await lib.sweepPdfUploads(Date.now() + 30 * 60_000)).toBe(0);
+    expect(await env.CONTENT.head(orphanKey)).not.toBeNull();
+    // 2 hours later
+    expect(await lib.sweepPdfUploads(Date.now() + 2 * 3_600_000)).toBe(2);
+    expect(await env.CONTENT.head(orphanKey)).toBeNull();
+    expect(await env.CONTENT.head(r2Keys.contentDir(item.contentId, user) + PDF_FILE)).not.toBeNull();
+    expect(await sqlRows(user, "SELECT * FROM pdf_uploads")).toEqual([]);
+  });
+
+  it("a rejected upload keeps no object but leaves a reservation the alarm drops", async () => {
+    const { raw, user } = makeApp();
+    const b = new TextEncoder().encode("not a pdf at all");
+    expect((await raw("POST", "/v1/items/pdf?name=x.pdf", b, hdr(b))).status).toBe(415);
+    expect(await listPrefix(`private/${user}/`)).toEqual([]);
+    expect(await sqlRows(user, "SELECT * FROM pdf_uploads")).toHaveLength(1);
+  });
+
+  it("cleanFileName", () => {
+    expect(cleanFileName("a/b\\c:d.pdf")).toBe("a_b_c_d.pdf");
+    expect(cleanFileName("\u202Efdp.exe\u200B.pdf\u0007")).toBe("fdp.exe.pdf");
+    expect(cleanFileName(" \u200B ")).toBe("document.pdf");
+    const max = LIMITS.maxFileNameLength;
+    // an emoji straddling the cut is dropped whole, .pdf is kept
+    const n = cleanFileName("a" + "\u{1F600}".repeat(max) + ".pdf");
+    expect(n.length).toBeLessThanOrEqual(max);
+    expect(n.endsWith(".pdf")).toBe(true);
+    expect(n).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);
+    expect(n).not.toMatch(/(?<![\ud800-\udbff])[\udc00-\udfff]/);
+    expect(cleanFileName("n".repeat(max + 5))).toHaveLength(max);
+  });
+
+  it("a body longer than Content-Length fails cleanly with no object left", async () => {
+    const { raw, user } = makeApp();
+    const b = pdfBytes("over", 3000);
+    const r = await raw("POST", "/v1/items/pdf?name=x.pdf", b, { "content-type": "application/pdf", "content-length": "1500" });
+    expect(r.status).toBe(400);
+    expect(await listPrefix(`private/${user}/`)).toEqual([]);
   });
 });

@@ -131,12 +131,25 @@ describe("pdf jobs", () => {
     expect(marked[0]!.contentId).toBeUndefined();
   });
 
-  it("markParsed ok:false removes only text.txt, never document.pdf", async () => {
+  it("markParsed ok:false deletes nothing for a pdf job (text.txt of the accepted result survives)", async () => {
     await put(buildPdf({ pages: ["hello world"] }));
+    await base.CONTENT.put(dir + "text.txt", "accepted text");
     markOk = false;
     await run(msg(job()));
-    expect(await base.CONTENT.head(dir + "text.txt")).toBeNull();
+    expect(await (await base.CONTENT.get(dir + "text.txt"))!.text()).not.toBe("");
     expect(await base.CONTENT.head(dir + PDF_FILE)).not.toBeNull();
+  });
+
+  it("an original over 20 MiB is not read: ok + pdf_too_large, null metadata", async () => {
+    const getSpy = vi.fn();
+    const big = { size: 20 * 1024 * 1024 + 1, arrayBuffer: getSpy } as unknown as R2ObjectBody;
+    const e = env();
+    (e as { CONTENT: unknown }).CONTENT = { ...base.CONTENT, get: async () => big, put: base.CONTENT.put.bind(base.CONTENT), delete: base.CONTENT.delete.bind(base.CONTENT) };
+    const m = msg(job());
+    await worker.queue({ queue: "sroka-parse", messages: [m] } as never, e);
+    expect(getSpy).not.toHaveBeenCalled();
+    expect(marked[0]).toMatchObject({ status: "ok", error: "pdf_too_large", title: null, wordCount: null, excerpt: null, contentId: CID });
+    expect(m.ack).toHaveBeenCalled();
   });
 
   it("DLQ marks failed without touching R2", async () => {

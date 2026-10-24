@@ -4,7 +4,9 @@ import {
   ItemSource,
   LIMITS,
   ListItemsQuery,
+  type Item,
   type Op,
+  type ParseJob,
   PDF_FILE,
   TagNames,
   UpdateItemRequest,
@@ -102,7 +104,7 @@ itemsRoutes.post("/", async (c) => {
 });
 
 // 5.8 PDF upload
-type UploadAbortReason = "too_large" | "not_pdf";
+type UploadAbortReason = "too_large" | "not_pdf" | "length";
 class UploadAbort extends Error {
   constructor(
     readonly reason: UploadAbortReason,
@@ -113,22 +115,34 @@ class UploadAbort extends Error {
   }
 }
 
-/** Counts bytes, enforces the size cap while streaming and requires `%PDF-` within the first 1024 bytes. */
-function pdfGuard(maxBytes: number, state: { abort: UploadAbortReason | null }): TransformStream<Uint8Array, Uint8Array> {
+/** Counts bytes, enforces the size cap (and the declared length) while streaming and requires `%PDF-` within the first 1024 bytes. */
+function pdfGuard(maxBytes: number, declared: number, state: { abort: UploadAbortReason | null }): TransformStream<Uint8Array, Uint8Array> {
   let total = 0;
   let head = new Uint8Array(0);
   let checked = false;
+  let rejected = false;
   const check = (): void => {
     checked = true;
     // Latin-1 view of the head is enough for the ASCII marker.
     let text = "";
     for (const b of head) text += String.fromCharCode(b);
-    if (!text.includes("%PDF-")) throw new UploadAbort("not_pdf", state);
+    // Not an error: the body keeps flowing (it is <= maxPdfBytes, declared) and the route sees state.abort after the
+    // upload and deletes the object. Erroring/cancelling mid-body leaves the runtime's request stream unread, which
+    // rejects unhandled ("client disconnected").
+    if (!text.includes("%PDF-")) rejected = true;
   };
   return new TransformStream({
     transform(chunk, ctrl) {
+      const before = total;
       total += chunk.byteLength;
       if (total > maxBytes) throw new UploadAbort("too_large", state);
+      if (total > declared) {
+        // Body longer than Content-Length: clip it and keep draining (a mid-body error leaves the runtime's request
+        // stream unread, which rejects unhandled); the route answers 400 and deletes the object.
+        state.abort ??= "length";
+        chunk = chunk.subarray(0, Math.max(0, declared - before));
+        if (chunk.byteLength === 0) return;
+      }
       if (!checked) {
         const merged = new Uint8Array(Math.min(1024, head.byteLength + chunk.byteLength));
         merged.set(head);
@@ -140,22 +154,33 @@ function pdfGuard(maxBytes: number, state: { abort: UploadAbortReason | null }):
     },
     flush() {
       if (!checked) check();
+      if (rejected) state.abort = "not_pdf"; // no throw: the stream completes normally; the caller checks the state
     },
   });
 }
 
 const hex = (buf: ArrayBuffer): string => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-/** Trimmed, control characters removed, truncated to maxFileNameLength keeping a trailing ".pdf". */
-function cleanFileName(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  let name = raw.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+/**
+ * Display file name: control/format (bidi, zero-width) characters removed, `/ \\ :` replaced by `_`, trimmed, truncated
+ * to maxFileNameLength keeping a trailing ".pdf" and never splitting a surrogate pair. Empty → "document.pdf".
+ */
+export function cleanFileName(raw: string): string {
+  let name = raw
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/\p{Cf}/gu, "")
+    .replace(/[/\\:]/g, "_")
+    .trim();
   const max = LIMITS.maxFileNameLength;
   if (name.length > max) {
     const ext = /\.pdf$/i.test(name) ? name.slice(-4) : "";
-    name = name.slice(0, max - ext.length) + ext;
+    let cut = max - ext.length;
+    const last = name.charCodeAt(cut - 1);
+    if (last >= 0xd800 && last <= 0xdbff) cut--; // would leave a lone high surrogate
+    name = name.slice(0, cut) + ext;
   }
-  return name;
+  return name === "" ? "document.pdf" : name;
 }
 
 itemsRoutes.post("/pdf", async (c) => {
@@ -165,8 +190,8 @@ itemsRoutes.post("/pdf", async (c) => {
   if (len > LIMITS.maxPdfBytes) return apiError(c, 413, "payload_too_large");
   const ctype = (c.req.header("content-type") ?? "application/pdf").split(";")[0]!.trim().toLowerCase();
   if (ctype !== "application/pdf" && ctype !== "application/octet-stream") return apiError(c, 415, "unsupported_media_type");
-  const name = cleanFileName(c.req.query("name") ?? "");
-  if (name === "") return apiError(c, 400, "invalid_request", "name_required");
+  if ((c.req.query("name") ?? "").trim() === "") return apiError(c, 400, "invalid_request", "name_required");
+  const name = cleanFileName(c.req.query("name")!);
   const tags = TagNames.safeParse(c.req.queries("tag") ?? []);
   if (!tags.success) return validationError(c, tags.error);
   const source = ItemSource.safeParse(c.req.query("source") ?? "api");
@@ -176,25 +201,43 @@ itemsRoutes.post("/pdf", async (c) => {
   const userId = c.var.userId;
   const contentId = uuidv7();
   const key = r2Keys.contentDir(contentId, userId) + PDF_FILE;
-  const removeObject = (): Promise<void> => c.env.CONTENT.delete(key).catch((e) => log.exception("pdf upload cleanup failed", e, { event: "pdf_cleanup_failed" }));
+  const exec = (p: Promise<unknown>): void => c.executionCtx.waitUntil(p); // survives a client disconnect
+  const removeObject = (k = key): Promise<void> =>
+    c.env.CONTENT.delete(k).catch((e) => log.exception("pdf upload cleanup failed", e, { event: "pdf_cleanup_failed" }));
+  const stub = library(c);
+
+  // Reserve the content id first: an upload that is never committed (disconnect, failed delete) is reclaimed by the DO alarm.
+  await stub.reservePdfUpload(contentId);
 
   // Stream into R2 and the SHA-256 digest at once; never buffer the file.
   let sha = "";
+  let bodyPipe: Promise<void> = Promise.resolve();
   const guard: { abort: UploadAbortReason | null } = { abort: null };
   try {
-    const [forR2, forHash] = c.req.raw.body.pipeThrough(pdfGuard(LIMITS.maxPdfBytes, guard)).tee();
+    const guardStream = pdfGuard(LIMITS.maxPdfBytes, len, guard);
+    // Own the pipe promise (pipeThrough would drop it): once the guard aborts, the rest of the request body
+    // rejects with "client disconnected" and would surface as an uncaught exception.
+    bodyPipe = c.req.raw.body.pipeTo(guardStream.writable).catch(() => {});
+    const [forR2, forHash] = guardStream.readable.tee();
     const digest = new crypto.DigestStream("SHA-256");
     digest.digest.catch(() => {}); // rejects with the stream error; handled through `hashed` below
     const hashed = forHash.pipeTo(digest);
-    const [put, hash] = await Promise.allSettled([
-      c.env.CONTENT.put(key, forR2.pipeThrough(new FixedLengthStream(len)), { httpMetadata: { contentType: "application/pdf" } }),
+    const fixed = new FixedLengthStream(len);
+    // Keep the pipe promise: when the guard aborts or the client disconnects it rejects, and nobody else awaits it.
+    const piped = forR2.pipeTo(fixed.writable);
+    const [put, hash, pipe] = await Promise.allSettled([
+      c.env.CONTENT.put(key, fixed.readable, { httpMetadata: { contentType: "application/pdf" } }),
       hashed.then(() => digest.digest),
+      piped,
     ]);
     if (put.status === "rejected") throw put.reason;
     if (hash.status === "rejected") throw hash.reason;
+    if (pipe.status === "rejected") throw pipe.reason;
+    if (guard.abort) throw new UploadAbort(guard.abort, guard);
     sha = hex(hash.value);
-  } catch (e) {
-    await removeObject();
+  } catch {
+    await bodyPipe; // settle the body read before responding (else it surfaces as an uncaught "client disconnected")
+    exec(removeObject());
     if (guard.abort === "too_large") return apiError(c, 413, "payload_too_large");
     if (guard.abort === "not_pdf") return apiError(c, 415, "unsupported_media_type");
     // A body shorter/longer than Content-Length, or a dropped connection.
@@ -203,31 +246,58 @@ itemsRoutes.post("/pdf", async (c) => {
   }
 
   const fileName = name;
+  const req = {
+    itemId: uuidv7(),
+    url: `${c.env.APP_ORIGIN}/pdf/${sha}`,
+    title: fileName.replace(/\.pdf$/i, "") || fileName,
+    fileName,
+    fileSize: len,
+    contentId,
+    tags: tags.data,
+    source: source.data,
+    at: Date.now(),
+  };
   let result;
   try {
-    result = await library(c).addPdf(restDeviceId(c), {
-      itemId: uuidv7(),
-      url: `${c.env.APP_ORIGIN}/pdf/${sha}`,
-      title: fileName.replace(/\.pdf$/i, "") || fileName,
-      fileName,
-      fileSize: len,
-      contentId,
-      tags: tags.data,
-      source: source.data,
-      at: Date.now(),
-    });
+    result = await stub.addPdf(restDeviceId(c), req);
   } catch (e) {
-    await removeObject();
+    // Only a known pre-commit failure deletes the object. Anything else (RPC wire failure, a throw after the DO
+    // committed) is an unknown outcome: keep the object; the reservation sweep reclaims it if no item references it.
+    if (e instanceof Error && (e.name === "LibraryDestroyedError" || e.message === "library_destroyed")) exec(removeObject());
+    else log.exception("pdf addPdf outcome unknown, object kept", e, { event: "pdf_commit_unknown" });
     throw e;
   }
-  if (!result.ok || !result.created) await removeObject();
-  writeMetric(c.env.METRICS, { event: "save", blobs: [`pdf:${source.data}`, result.ok ? (result.created ? "ok" : "duplicate") : result.error] });
-  if (!result.ok) {
-    if (result.error === "storage_full") return apiError(c, 409, "storage_full");
-    return apiError(c, 400, "invalid_request", result.message ?? result.error);
+  let response: { ok: true; item: Item; created: boolean; parseJobs: ParseJob[] } | { ok: false; error: string; message?: string } = result;
+  if (result.ok && !result.created) {
+    // Duplicate. If the existing item lost its original, adopt the new copy instead of discarding it.
+    const oldId = result.item.contentId;
+    let missing = result.item.kind !== "pdf" || !oldId;
+    let known = true;
+    if (!missing) {
+      try {
+        missing = (await c.env.CONTENT.head(r2Keys.contentDir(oldId!, userId) + PDF_FILE)) === null;
+      } catch (e) {
+        known = false; // cannot tell: keep both, never delete on a guess
+        log.warnException("pdf duplicate head failed", e, { event: "pdf_dup_head_failed" });
+      }
+    }
+    if (missing) {
+      const fix = await stub.repointPdf(restDeviceId(c), { itemId: result.item.id, expectContentId: oldId, contentId, fileName, fileSize: len });
+      if (fix.ok) response = { ok: true, item: fix.item, created: false, parseJobs: fix.parseJobs };
+      else exec(removeObject());
+    } else if (known) {
+      exec(removeObject());
+    }
+  } else if (!result.ok) {
+    exec(removeObject());
   }
-  await enqueueParseJobs(c.env, result.parseJobs, userId);
-  return c.json({ item: result.item, created: result.created }, 202);
+  writeMetric(c.env.METRICS, { event: "save", blobs: [`pdf:${source.data}`, response.ok ? (response.created ? "ok" : "duplicate") : response.error] });
+  if (!response.ok) {
+    if (response.error === "storage_full") return apiError(c, 409, "storage_full");
+    return apiError(c, 400, "invalid_request", response.message ?? response.error);
+  }
+  await enqueueParseJobs(c.env, response.parseJobs, userId);
+  return c.json({ item: response.item, created: response.created }, 202);
 });
 
 // 5.2 list / search / lookup

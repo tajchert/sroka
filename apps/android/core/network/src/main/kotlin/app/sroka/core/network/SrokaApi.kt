@@ -1,6 +1,8 @@
 package app.sroka.core.network
 
 import kotlinx.serialization.json.JsonObject
+import app.sroka.core.model.ExportFormat
+import app.sroka.core.model.ImportFormat
 import java.io.File
 
 /** Hand-written client for the Sroka server (api.md; DECISIONS A5). */
@@ -36,4 +38,15 @@ interface SrokaApi {
      * success, so [dest] is never half-written. [onProgress] gets (bytesRead, totalBytes or -1).
      */
     suspend fun download(url: String, dest: File, onProgress: (Long, Long) -> Unit = { _, _ -> }): ApiResult<Unit>
+
+    /** `POST /v1/imports` (multipart `file` + `format`). 413 too large, 429 `rate_limited`, 400 bad file, 503 unavailable. */
+    suspend fun createImport(source: File, fileName: String, mimeType: String, format: ImportFormat): ApiResult<JobDto>
+
+    suspend fun getImport(id: String): ApiResult<JobDto>
+
+    /**
+     * Streams `GET /v1/exports?format=` into [dest] (via a `.part` file). The name comes from
+     * `Content-Disposition`, falling back to `sroka-export-YYYY-MM-DD.ext`.
+     */
+    suspend fun export(format: ExportFormat, dest: File): ApiResult<ExportFileDto>
 }

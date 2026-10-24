@@ -11,6 +11,10 @@ import app.sroka.core.data.repository.LibraryRepositoryImpl
 import app.sroka.core.data.repository.SettingsRepositoryImpl
 import app.sroka.core.data.repository.TagRepositoryImpl
 import app.sroka.core.data.session.SessionProviderImpl
+import app.sroka.core.data.transfer.DataTransferRepositoryImpl
+import app.sroka.core.data.transfer.ImportScheduler
+import app.sroka.core.data.transfer.WorkImportScheduler
+import app.sroka.core.domain.DataTransferRepository
 import app.sroka.core.data.sync.SyncControllerImpl
 import app.sroka.core.data.sync.SyncStatusRepositoryImpl
 import app.sroka.core.data.sync.WorkDownloadCanceller
@@ -48,6 +52,8 @@ internal abstract class DataModule {
     @Binds abstract fun settings(impl: SettingsRepositoryImpl): SettingsRepository
     @Binds abstract fun account(impl: AccountRepositoryImpl): AccountRepository
     @Binds abstract fun sessionProvider(impl: SessionProviderImpl): SessionProvider
+    @Binds abstract fun dataTransfer(impl: DataTransferRepositoryImpl): DataTransferRepository
+    @Binds abstract fun importScheduler(impl: WorkImportScheduler): ImportScheduler
     @Binds abstract fun downloadCanceller(impl: WorkDownloadCanceller): DownloadCanceller
 
     companion object {

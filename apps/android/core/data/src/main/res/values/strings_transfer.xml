@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_channel_name">Imports</string>
+    <string name="import_channel_description">Progress while Sroka imports links from a file</string>
+    <string name="import_notification_title">Importing links…</string>
+    <string name="import_notification_progress">%1$d of %2$d</string>
+    <string name="import_notification_waiting">Waiting for the server…</string>
+    <string name="import_notification_failed">Import failed</string>
+    <plurals name="import_notification_finished">
+        <item quantity="one">Import finished · %1$d link</item>
+        <item quantity="few">Import finished · %1$d links</item>
+        <item quantity="many">Import finished · %1$d links</item>
+        <item quantity="other">Import finished · %1$d links</item>
+    </plurals>
+</resources>

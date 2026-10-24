@@ -3,8 +3,11 @@ package app.sroka.feature.auth.impl
 import androidx.lifecycle.SavedStateHandle
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import app.sroka.core.domain.AuthError
 import app.sroka.core.domain.AuthResult
@@ -35,15 +38,15 @@ class AuthScreenTest {
 
     private fun toCodeStep() {
         compose.onNodeWithText("Email").performTextInput("a@b.co")
-        compose.onNodeWithText("Send code").performClick()
+        compose.onNodeWithText("Send code").performScrollTo().performClick()
     }
 
     @Test
     fun codeAutoSubmitsAtSixDigits() {
         val vm = setContent()
         toCodeStep()
-        compose.onNodeWithText("6-digit code").assertIsDisplayed()
-        compose.onNodeWithText("6-digit code").performTextInput("123456")
+        compose.onNodeWithText("Check your inbox").assertIsDisplayed()
+        compose.onNodeWithTag(OTP_TAG).performTextInput("123456")
         compose.waitForIdle()
         assertEquals(SessionState.SignedIn("a@b.co"), auth.sessionFlow.value)
         assertEquals(listOf("a@b.co"), auth.sentCodesTo)
@@ -53,11 +56,39 @@ class AuthScreenTest {
     @Test
     fun invalidCodeShowsErrorAndClearsField() {
         auth.signInResult = AuthResult.Failure(AuthError.InvalidCode)
-        setContent()
+        val vm = setContent()
         toCodeStep()
-        compose.onNodeWithText("6-digit code").performTextInput("000000")
+        compose.onNodeWithTag(OTP_TAG).performTextInput("000000")
         compose.onNodeWithText("That code is not correct. Try again.").assertIsDisplayed()
+        assertEquals("", vm.state.value.code)
         assertEquals(SessionState.SignedOut, auth.sessionFlow.value)
+    }
+
+    @Test
+    fun nonDigitsIgnoredAndNoSubmitBelowSix() {
+        val vm = setContent()
+        toCodeStep()
+        compose.onNodeWithTag(OTP_TAG).performTextInput("1a2-3")
+        compose.waitForIdle()
+        assertEquals("123", vm.state.value.code)
+        assertEquals(SessionState.SignedOut, auth.sessionFlow.value)
+    }
+
+    @Test
+    fun backReturnsToEmailStep() {
+        val vm = setContent()
+        toCodeStep()
+        compose.onNodeWithContentDescription("Back").performClick()
+        assertEquals(AuthStep.EMAIL, vm.state.value.step)
+        compose.onNodeWithText("Sign in to Sroka").assertIsDisplayed()
+    }
+
+    @Test
+    fun serverRowShowsHostAndOpensDialog() {
+        val vm = setContent()
+        compose.onNodeWithText("Server").assertIsDisplayed()
+        compose.onNodeWithText("Change").performClick()
+        assertEquals(true, vm.state.value.serverDialogOpen)
     }
 
     @Test

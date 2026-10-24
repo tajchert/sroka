@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_auth_title">Sign in to Sroka</string>
-    <string name="feature_auth_email_hint">Enter your email and we will send you a 6-digit code. No password needed.</string>
+    <string name="feature_auth_email_hint">We’ll email you a 6-digit code. No password needed.</string>
     <string name="feature_auth_email_label">Email</string>
     <string name="feature_auth_send_code">Send code</string>
-    <string name="feature_auth_code_hint">Enter the 6-digit code we sent to %1$s.</string>
+    <string name="feature_auth_code_hint">Enter the code sent to %1$s</string>
     <string name="feature_auth_code_label">6-digit code</string>
     <string name="feature_auth_resend">Resend code</string>
     <string name="feature_auth_resend_in">Resend code in %1$d s</string>
-    <string name="feature_auth_change_email">Use a different email</string>
-    <string name="feature_auth_change_server">Change server</string>
+    <string name="feature_auth_change_email">Use another email</string>
+    <string name="feature_auth_change_server">Change</string>
+    <string name="feature_auth_code_title">Check your inbox</string>
+    <string name="feature_auth_back">Back</string>
+    <string name="feature_auth_server_row">Server</string>
+    <string name="feature_auth_code_a11y">6-digit code</string>
     <string name="feature_auth_server_title">Server</string>
     <string name="feature_auth_server_body">Only change this if you run your own Sroka server. Leave empty to use the default.</string>
     <string name="feature_auth_server_label">Server URL</string>

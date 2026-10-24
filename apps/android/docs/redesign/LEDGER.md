@@ -5,7 +5,7 @@
 | T1 theme + mark | done | Brand dark/light schemes, Outfit type, shapes, SrokaMark, ic_stat_sroka; dynamic colour off. Gate: designsystem test+lint, :app:assembleDebug pass. |
 | T0a core library (pending flag, Resyncing, search) | done | tests green, assembleDebug ok; API in notes below |
 | T0b core transfer (import/export) | done | see notes below |
-| T2 auth | todo | |
+| T2 auth | done | Email + OTP-box screens; single hidden BasicTextField (NumberPassword, SmsOtpCode), auto-submit on 6th digit; server row = M3 ListItem opening existing dialog |
 | T3 library list + search + nav | todo | |
 | T4 share sheet + tags | todo | |
 | T5 reader | todo | |

@@ -39,6 +39,10 @@ data class ItemDto(
 )
 
 /** `POST /v1/items/pdf` answer (`202`): the item (new or the existing duplicate) and whether it was created. */
+/** `{"item": …}` answers (`PUT /v1/items/{id}/thumbnail`). */
+@Serializable
+data class ItemResponseDto(val item: ItemDto)
+
 @Serializable
 data class PdfUploadResponseDto(val item: ItemDto, val created: Boolean = true)
 

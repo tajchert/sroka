@@ -41,6 +41,12 @@ interface SrokaApi {
 
     suspend fun getItem(itemId: String): ApiResult<ItemDto>
 
+    /**
+     * `PUT /v1/items/{id}/thumbnail` (api.md §5.9): first-page preview of a PDF item, raw [bytes] of
+     * [contentType] `image/webp` or `image/jpeg`, at most 512 KiB. Answers the updated item.
+     */
+    suspend fun uploadThumbnail(itemId: String, bytes: ByteArray, contentType: String = "image/webp"): ApiResult<ItemDto>
+
     suspend fun me(): ApiResult<MeDto>
 
     suspend fun config(): ApiResult<ConfigDto>

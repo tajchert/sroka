@@ -153,6 +153,7 @@ internal class ContentStoreTest : DataTestBase() {
         override suspend fun push(deviceId: String, ops: List<JsonObject>) = error("unused")
         override suspend fun pull(cursor: Long, limit: Int, full: Boolean) = error("unused")
         override suspend fun getItem(itemId: String) = error("unused")
+        override suspend fun uploadThumbnail(itemId: String, bytes: ByteArray, contentType: String) = error("unused")
         override suspend fun me() = error("unused")
         override suspend fun config() = error("unused")
         override suspend fun deleteAccount() = error("unused")

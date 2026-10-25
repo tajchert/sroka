@@ -203,6 +203,20 @@ class OkHttpSrokaApiTest {
     }
 
     @Test
+    fun uploadThumbnailPutsRawImage() = runBlocking {
+        json("""{"item":{"id":"i1","url":"u","kind":"pdf","leadImageKey":"thumb.webp"}}""")
+        val bytes = byteArrayOf(1, 2, 3)
+        val r = api.uploadThumbnail("i1", bytes) as ApiResult.Success
+        assertEquals("thumb.webp", r.value.leadImageKey)
+        val req = server.takeRequest()
+        assertEquals("PUT", req.method)
+        assertEquals("/v1/items/i1/thumbnail", req.url.encodedPath)
+        assertEquals("image/webp", req.headers["Content-Type"])
+        assertEquals("3", req.headers["Content-Length"])
+        assertEquals(3, req.body!!.size)
+    }
+
+    @Test
     fun deleteAccountSendsConfirm() = runBlocking {
         json("""{"deleted":true}""")
         assertTrue(api.deleteAccount() is ApiResult.Success)

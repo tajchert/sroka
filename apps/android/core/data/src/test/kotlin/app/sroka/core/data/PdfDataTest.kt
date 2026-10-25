@@ -8,6 +8,8 @@ import androidx.work.Data
 import androidx.work.WorkInfo
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.sroka.core.data.content.ContentPaths
+import app.sroka.core.data.upload.PdfThumbnail
+import app.sroka.core.data.upload.PdfThumbnailRenderer
 import app.sroka.core.data.upload.PdfUploadProcessor
 import app.sroka.core.data.upload.PdfUploadWork
 import app.sroka.core.data.upload.PdfUploaderImpl
@@ -101,6 +103,55 @@ internal class PdfDataTest : DataTestBase() {
         assertEquals(pdfBytes.size, req.body!!.size)
         assertEquals("Bearer tok", req.headers["Authorization"])
         assertTrue(progress.isNotEmpty() && progress.last() == pdfBytes.size.toLong())
+    }
+
+    // ---- first-page preview --------------------------------------------------------------
+
+    private val preview = byteArrayOf(9, 8, 7)
+
+    private class RecordingRenderer(private val bytes: ByteArray?) : PdfThumbnailRenderer {
+        val rendered = mutableListOf<File>()
+        override fun render(file: File): PdfThumbnail? {
+            rendered += file
+            return bytes?.let { PdfThumbnail(it, "image/webp") }
+        }
+    }
+
+    @Test fun uploadsTheRenderedPreviewForAnItemWithoutOne() = runBlocking {
+        respond(202, """{"item":{"id":"srv1","url":"u","kind":"pdf"},"created":true}""")
+        respond(200, """{"item":{"id":"srv1","url":"u","kind":"pdf","leadImageKey":"thumb.webp"}}""")
+        val renderer = RecordingRenderer(preview)
+        val file = uploadFile()
+        val result = PdfUploadProcessor(api, renderer).upload(file, "a.pdf", "share") { _, _ -> }
+        assertEquals(UploadOutcome.Uploaded("srv1", duplicate = false), result)
+        assertEquals(listOf(file), renderer.rendered)
+        takeRequest()
+        val put = takeRequest()
+        assertEquals("PUT", put.method)
+        assertEquals("/v1/items/srv1/thumbnail", put.url.encodedPath)
+        assertEquals("image/webp", put.headers["Content-Type"])
+        assertEquals(preview.size, put.body!!.size)
+    }
+
+    @Test fun skipsThePreviewWhenTheDuplicateAlreadyHasOne() = runBlocking {
+        respond(202, """{"item":{"id":"srv1","url":"u","kind":"pdf","leadImageKey":"thumb.webp"},"created":false}""")
+        val renderer = RecordingRenderer(preview)
+        val result = PdfUploadProcessor(api, renderer).upload(uploadFile(), "a.pdf", "share") { _, _ -> }
+        assertEquals(UploadOutcome.Uploaded("srv1", duplicate = true), result)
+        assertTrue(renderer.rendered.isEmpty())
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test fun aFailedPreviewNeverFailsTheUpload() = runBlocking {
+        // renderer gives nothing: no PUT
+        respond(202, """{"item":{"id":"srv1","url":"u","kind":"pdf"},"created":true}""")
+        assertEquals(UploadOutcome.Uploaded("srv1", duplicate = false), PdfUploadProcessor(api, RecordingRenderer(null)).upload(uploadFile(), "a.pdf", "share") { _, _ -> })
+        assertEquals(1, server.requestCount)
+        // PUT rejected: still uploaded
+        respond(202, """{"item":{"id":"srv2","url":"u","kind":"pdf"},"created":true}""")
+        respond(500)
+        assertEquals(UploadOutcome.Uploaded("srv2", duplicate = false), PdfUploadProcessor(api, RecordingRenderer(preview)).upload(uploadFile(), "a.pdf", "share") { _, _ -> })
+        assertEquals(3, server.requestCount)
     }
 
     @Test fun permanentErrors() = runBlocking {

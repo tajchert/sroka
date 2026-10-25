@@ -14,6 +14,8 @@ import app.sroka.core.data.session.SessionProviderImpl
 import app.sroka.core.data.transfer.DataTransferRepositoryImpl
 import app.sroka.core.data.transfer.ImportScheduler
 import app.sroka.core.data.transfer.WorkImportScheduler
+import app.sroka.core.data.upload.AndroidPdfThumbnailRenderer
+import app.sroka.core.data.upload.PdfThumbnailRenderer
 import app.sroka.core.data.upload.PdfUploaderImpl
 import app.sroka.core.domain.DataTransferRepository
 import app.sroka.core.domain.PdfUploader
@@ -57,6 +59,7 @@ internal abstract class DataModule {
     @Binds abstract fun dataTransfer(impl: DataTransferRepositoryImpl): DataTransferRepository
     @Binds abstract fun importScheduler(impl: WorkImportScheduler): ImportScheduler
     @Binds abstract fun pdfUploader(impl: PdfUploaderImpl): PdfUploader
+    @Binds abstract fun pdfThumbnails(impl: AndroidPdfThumbnailRenderer): PdfThumbnailRenderer
     @Binds abstract fun downloadCanceller(impl: WorkDownloadCanceller): DownloadCanceller
 
     companion object {

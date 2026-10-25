@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 /**
  * Uploads one copied PDF (`filesDir/pdf-uploads/{id}.pdf`). The file stays until success or a permanent
  * error; transient errors retry with exponential backoff up to [MAX_ATTEMPTS], then fail. On success the
- * temp copy is deleted and a sync is queued so the new item arrives through the normal pull.
+ * first-page preview is sent (before the sync, so the pulled item already has it), the temp copy is deleted
+ * and a sync is queued so the new item arrives through the normal pull.
  * Progress is published via `setProgress(sent, total)`; results via output data (see [PdfUploadWork]).
  */
 @HiltWorker
@@ -33,6 +34,7 @@ class PdfUploadWorker @AssistedInject constructor(
     private val paths: ContentPaths,
     private val sessionStore: SessionStore,
     private val scheduler: WorkScheduler,
+    private val thumbnails: PdfThumbnailRenderer,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -53,7 +55,7 @@ class PdfUploadWorker @AssistedInject constructor(
                 }
             }
             try {
-                PdfUploadProcessor(api).upload(file, name, SOURCE) { sent, total -> progress.trySend(sent to total) }
+                PdfUploadProcessor(api, thumbnails).upload(file, name, SOURCE) { sent, total -> progress.trySend(sent to total) }
             } catch (e: CancellationException) {
                 throw e
             } finally {

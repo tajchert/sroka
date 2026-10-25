@@ -86,6 +86,11 @@ internal class OkHttpSrokaApi(
     override suspend fun getItem(itemId: String): ApiResult<ItemDto> =
         execute(get("/v1/items/${segment(itemId)}")) { decode(it) }
 
+    override suspend fun uploadThumbnail(itemId: String, bytes: ByteArray, contentType: String): ApiResult<ItemDto> =
+        execute(request("/v1/items/${segment(itemId)}/thumbnail") { put(bytes.toRequestBody(contentType.toMediaType())) }) {
+            decode<ItemResponseDto>(it).item
+        }
+
     override suspend fun me(): ApiResult<MeDto> = execute(get("/v1/me")) { decode(it) }
 
     override suspend fun config(): ApiResult<ConfigDto> = execute(get("/v1/config")) { decode(it) }

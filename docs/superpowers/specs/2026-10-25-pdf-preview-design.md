@@ -58,9 +58,9 @@ through the existing `leadImageKey`/`leadImageUrl` path to every client.
 - After a successful upload in the WorkManager upload job (`PdfUploadProcessor` `Uploaded`, not duplicate-with-thumb):
   render page 1 with `PdfRenderer` from the local temp copy (before it is deleted), compress `WEBP_LOSSY`, `PUT` it.
   Best effort: one attempt, any failure is logged and ignored; it never turns the upload into a retry or failure.
-- Save the same image as the item's local thumbnail file (`ContentPaths` thumb path, the `content_files.thumbPath`
-  row field) so the uploading device shows it immediately without a download.
-- Other devices: `ContentStoreImpl.downloadPdfLocked` downloads the thumbnail like article downloads do
+- The thumbnail `PUT` happens **before** the worker queues its sync pull, so the pulled item already carries
+  `leadImageKey` and the normal download fetches it (no separate local-save path; builder's call).
+- All devices: `ContentStoreImpl.downloadPdfLocked` downloads the thumbnail like article downloads do
   (`downloadThumbnail(itemId, urls.baseUrl, leadImageKey, gen)` after the PDF arrives, and
   `retryMissingThumbnail` on the `AlreadyCurrent` path, so a thumbnail that arrives after the PDF was downloaded is
   still fetched on the next download pass).

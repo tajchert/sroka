@@ -2,6 +2,7 @@ import type { ItemSort, ItemState } from "@sroka/shared";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
+import { AddFab } from "../components/AddFab.tsx";
 import { ItemRow } from "../components/ItemRow.tsx";
 import { api } from "../lib/api.ts";
 import { itemsKey, type ItemsData, type ListParams } from "../lib/cache.ts";
@@ -12,10 +13,10 @@ import { useHiddenIds } from "../lib/store.tsx";
 
 const TITLES: Record<ItemState, string> = { unread: "My List", archived: "Archive", favorites: "Favorites", all: "All items" };
 const EMPTY: Record<ItemState, string> = {
-  unread: "Nothing waiting. Paste a link or drop a PDF, or save pages with the browser extension.",
+  unread: "Nothing waiting. Tap Save to add a link, or save pages with the browser extension.",
   archived: "Nothing archived yet. Finished reading? Archive it to keep My List short.",
   favorites: "No favorites yet. Star the pieces you want to find again.",
-  all: "Your library is empty. Paste a link above to save your first page.",
+  all: "Your library is empty. Tap Save to add your first page.",
 };
 const SORTS: { value: ItemSort; label: string }[] = [
   { value: "newest", label: "Newest first" },
@@ -109,17 +110,6 @@ export default function Library({ state: baseState }: { state: ItemState }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [items, sel, actions, navigate]);
 
-  const [url, setUrl] = useState("");
-  const [adding, setAdding] = useState(false);
-  const onAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adding || !url.trim()) return;
-    setAdding(true);
-    const ok = await actions.add(url);
-    setAdding(false);
-    if (ok) setUrl("");
-  };
-
   // PDF upload: picker + drag and drop anywhere on the page
   const uploads = usePdfUploads();
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -164,32 +154,24 @@ export default function Library({ state: baseState }: { state: ItemState }) {
   const filtered = !!(q || domain);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-8">
+    <div className="mx-auto max-w-4xl px-4 pt-6 pb-24 sm:px-8">
       <h1 className="font-serif text-3xl font-semibold tracking-tight">{title}</h1>
 
-      <form onSubmit={onAdd} className="mt-5 flex gap-2">
-        <input className="input" type="text" inputMode="url" aria-label="Page address" placeholder="Paste a link to save" value={url} onChange={(e) => setUrl(e.target.value)} />
-        <button className="btn btn-primary shrink-0" disabled={adding || !url.trim()}>
-          Save
-        </button>
-        <button type="button" className="btn shrink-0" onClick={() => pickerRef.current?.click()}>
-          Add PDF
-        </button>
-        <input
-          ref={pickerRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          multiple
-          className="sr-only"
-          tabIndex={-1}
-          aria-hidden
-          data-testid="pdf-picker"
-          onChange={(e) => {
-            uploads.addFiles(Array.from(e.target.files ?? []));
-            e.target.value = "";
-          }}
-        />
-      </form>
+      <AddFab onAdd={actions.add} onPickPdf={() => pickerRef.current?.click()} />
+      <input
+        ref={pickerRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        data-testid="pdf-picker"
+        onChange={(e) => {
+          uploads.addFiles(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
 
       <div aria-live="polite" className="sr-only">{dragging ? "Drop PDF to save" : ""}</div>
       {dragging && (

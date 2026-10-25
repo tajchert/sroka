@@ -40,7 +40,7 @@ export default function Library({ state: baseState }: { state: ItemState }) {
 
   const { query, items } = useItemList(params);
   const sentinel = useInfiniteScroll(query, items.length);
-  const [sel, setSel] = useListKeyboard(items, `${state}|${tag}|${sort}|${domain}`);
+  const [sel] = useListKeyboard(items, `${state}|${tag}|${sort}|${domain}`);
 
   const title = tag ? `#${tag}` : TITLES[state];
   const total = domain
@@ -81,7 +81,6 @@ export default function Library({ state: baseState }: { state: ItemState }) {
               key={it.id}
               item={it}
               selected={i === sel}
-              onSelect={() => setSel(i)}
               onDomain={(d) => setDomain(d)}
               onTag={(t) => navigate(`/tag/${encodeURIComponent(t)}`)}
             />

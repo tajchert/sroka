@@ -215,7 +215,7 @@ export function isTyping(e: KeyboardEvent): boolean {
 
 /**
  * List keyboard shortcuts: j/k move the selection, Enter opens, a archives, f favourites.
- * Nothing is selected until the user presses j/k (or clicks a row with a mouse);
+ * Nothing is selected until the user presses j/k (a click opens the row instead);
  * `resetKey` clears the selection when the list changes.
  */
 export function useListKeyboard(items: Item[], resetKey: string): [number, (i: number) => void] {

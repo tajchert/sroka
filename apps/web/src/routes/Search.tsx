@@ -27,7 +27,7 @@ export default function Search() {
   const groups = GROUPS.map((g) => ({ ...g, ...lists[g.state], open: !collapsed[g.state] })).filter((g) => g.items.length > 0);
 
   const visible: Item[] = groups.flatMap((g) => (g.open ? g.items : []));
-  const [sel, setSel] = useListKeyboard(visible, `${q}|${sort}`);
+  const [sel] = useListKeyboard(visible, `${q}|${sort}`);
 
   const pending = !!q && (unread.query.isPending || archived.query.isPending);
   const failed = unread.query.isError || archived.query.isError;
@@ -93,8 +93,7 @@ export default function Search() {
                           key={it.id}
                           item={it}
                           selected={i === sel}
-                          onSelect={() => setSel(i)}
-                          onDomain={(d) => navigate(`/all?domain=${encodeURIComponent(d)}`)}
+                                      onDomain={(d) => navigate(`/all?domain=${encodeURIComponent(d)}`)}
                           onTag={(t) => navigate(`/tag/${encodeURIComponent(t)}`)}
                         />
                       );

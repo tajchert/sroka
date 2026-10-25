@@ -102,6 +102,7 @@ addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-l
 ["wheel","touchstart","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("message",function(e){if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=="object")return;
 if(d.type==="sroka:scrollToAnchor"&&typeof d.anchor==="number"){pending=d.anchor;if(!user)restore()}
+else if(d.type==="sroka:scrollToTop"){pending=null;user=true;sc().scrollTop=0;report()}
 else if(d.type==="sroka:settings"&&d.vars){for(var k in d.vars){root.style.setProperty(k,d.vars[k])}}});
 addEventListener("load",function(){if(!user)restore()});
 document.addEventListener("DOMContentLoaded",function(){post({type:"sroka:ready"})});

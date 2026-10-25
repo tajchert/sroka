@@ -5,6 +5,7 @@ import { patchItem } from "../lib/cache.ts";
 import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
+import { useToasts } from "../lib/store.tsx";
 import { formatSize } from "../lib/pdf.ts";
 import { hostOf, isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import {
@@ -15,6 +16,9 @@ import {
   saveReaderSettings,
   type ReaderSettings,
 } from "../lib/reader.ts";
+
+/** Positions below this open as if new: no "Resumed" toast. */
+const RESUME_THRESHOLD = 0.02;
 
 const prefersDark = () => typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
 
@@ -56,7 +60,13 @@ export default function Reader() {
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const startAnchor = useRef<number | null>(null);
-  if (item && !itemQ.isFetching && startAnchor.current === null && item.progressAnchor !== null) startAnchor.current = item.progressAnchor;
+  // The saved position this article opens at, for the "Resumed at N%" toast (null = opens at the top).
+  const resumeAt = useRef<number | null>(null);
+  if (item && !itemQ.isFetching && startAnchor.current === null && item.progressAnchor !== null) {
+    startAnchor.current = item.progressAnchor;
+    resumeAt.current = item.progress;
+  }
+  const { push: pushToast } = useToasts();
   const srcdoc = useMemo(
     () =>
       articleQ.data && contentQ.data
@@ -132,6 +142,22 @@ export default function Reader() {
         if (startAnchor.current !== null) {
           iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToAnchor", anchor: startAnchor.current }, "*");
         }
+        // Once per article: say where it resumed and offer the top (a settings rebuild sends ready again).
+        const at = resumeAt.current;
+        resumeAt.current = null;
+        if (at !== null && at > RESUME_THRESHOLD) {
+          pushToast(
+            {
+              message: `Resumed at ${Math.round(at * 100)}%`,
+              actionLabel: "Start over",
+              onAction: () => {
+                startAnchor.current = null;
+                iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToTop" }, "*");
+              },
+            },
+            8000,
+          );
+        }
       } else if (d.type === "sroka:metrics" && typeof d.progress === "number") {
         const anchor = typeof d.anchor === "number" ? d.anchor : null;
         if (anchor !== null) startAnchor.current = anchor; // a rebuilt frame resumes here, not at the first position
@@ -145,7 +171,7 @@ export default function Reader() {
       window.removeEventListener("message", onMsg);
       flush();
     };
-  }, [flush, pushSettings]);
+  }, [flush, pushSettings, pushToast]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

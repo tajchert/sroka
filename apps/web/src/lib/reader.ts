@@ -97,7 +97,7 @@ function post(m){parent.postMessage(m,"*")}
 function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,l=anchors(),a=null;
 for(var i=0;i<l.length;i++){if(l[i].getBoundingClientRect().bottom>1){a=i;break}}
 post({type:"sroka:metrics",progress:p,anchor:a})}
-function restore(){if(pending==null)return;var el=anchors()[pending];if(el){var s=sc();s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8}}
+function restore(){if(pending==null)return;var el=anchors()[pending],s=sc();if(el&&s.clientHeight>0){s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8}}
 addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-last>=150){last=n;report()}else{timer=setTimeout(function(){last=Date.now();report()},150)}},{passive:true});
 ["wheel","touchstart","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("message",function(e){if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=="object")return;
@@ -105,6 +105,7 @@ if(d.type==="sroka:scrollToAnchor"&&typeof d.anchor==="number"){pending=d.anchor
 else if(d.type==="sroka:scrollToTop"){pending=null;user=true;sc().scrollTop=0;report()}
 else if(d.type==="sroka:settings"&&d.vars){for(var k in d.vars){root.style.setProperty(k,d.vars[k])}}});
 addEventListener("load",function(){if(!user)restore()});
+addEventListener("resize",function(){if(!user)restore()});
 document.addEventListener("DOMContentLoaded",function(){post({type:"sroka:ready"})});
 })();`;
 }

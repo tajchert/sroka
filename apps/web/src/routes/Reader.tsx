@@ -87,6 +87,33 @@ export default function Reader() {
     pushSettings(next);
   };
 
+  // The frame can report ready before the item refetch yields the saved position (cached article on SPA
+  // navigation), so the position is sent on ready and again once it is known. The frame ignores it after user input.
+  const frameReady = useRef(false);
+  useEffect(() => { frameReady.current = false; }, [srcdoc]);
+  const resume = useCallback(() => {
+    if (!frameReady.current || startAnchor.current === null) return;
+    iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToAnchor", anchor: startAnchor.current }, "*");
+    // Once per article: say where it resumed and offer the top (a settings rebuild sends ready again).
+    const at = resumeAt.current;
+    resumeAt.current = null;
+    if (at !== null && at > RESUME_THRESHOLD) {
+      pushToast(
+        {
+          message: `Resumed at ${Math.round(at * 100)}%`,
+          actionLabel: "Start over",
+          onAction: () => {
+            startAnchor.current = null;
+            iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToTop" }, "*");
+          },
+        },
+        8000,
+      );
+    }
+  }, [pushToast]);
+  const savedAnchorKnown = !!item && !itemQ.isFetching && item.progressAnchor !== null;
+  useEffect(() => { if (savedAnchorKnown) resume(); }, [savedAnchorKnown, resume]);
+
   // Live position for the progress bar; the frame reports it every 150 ms while scrolling.
   const [liveProgress, setLiveProgress] = useState<number | null>(null);
   useEffect(() => setLiveProgress(null), [id]);
@@ -141,26 +168,9 @@ export default function Reader() {
       const d = e.data as { type?: string; progress?: unknown; anchor?: unknown } | null;
       if (!d || typeof d !== "object") return;
       if (d.type === "sroka:ready") {
+        frameReady.current = true;
         pushSettings(settingsRef.current);
-        if (startAnchor.current !== null) {
-          iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToAnchor", anchor: startAnchor.current }, "*");
-        }
-        // Once per article: say where it resumed and offer the top (a settings rebuild sends ready again).
-        const at = resumeAt.current;
-        resumeAt.current = null;
-        if (at !== null && at > RESUME_THRESHOLD) {
-          pushToast(
-            {
-              message: `Resumed at ${Math.round(at * 100)}%`,
-              actionLabel: "Start over",
-              onAction: () => {
-                startAnchor.current = null;
-                iframeRef.current?.contentWindow?.postMessage({ type: "sroka:scrollToTop" }, "*");
-              },
-            },
-            8000,
-          );
-        }
+        resume();
       } else if (d.type === "sroka:metrics" && typeof d.progress === "number") {
         const anchor = typeof d.anchor === "number" ? d.anchor : null;
         if (anchor !== null) startAnchor.current = anchor; // a rebuilt frame resumes here, not at the first position
@@ -174,7 +184,7 @@ export default function Reader() {
       window.removeEventListener("message", onMsg);
       flush();
     };
-  }, [flush, pushSettings, pushToast]);
+  }, [flush, pushSettings, resume]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

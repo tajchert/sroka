@@ -119,7 +119,7 @@ export function ItemRow({ item, selected, onSelect, onDomain, onTag }: ItemRowPr
               {item.parseError === "paywalled" ? "Preview only" : "Partial"}
             </span>
           )}
-          {item.progress > 0.02 && item.progress < 0.98 && <span>{Math.round(item.progress * 100)}% read</span>}
+          {item.progress >= 0.98 ? <span>Read</span> : item.progress > 0.02 && <span>{Math.round(item.progress * 100)}% read</span>}
           {!editing &&
             item.tags.map((t) => (
               <button key={t} type="button" className="chip" onClick={() => onTag(t)}>

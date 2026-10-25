@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import app.sroka.feature.library.impl.list.ScrollToTopOn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,8 +75,11 @@ fun TagsRoute(
     onOpenSearch: () -> Unit = {},
     selectedTag: String? = null,
     navRailShown: Boolean = false,
+    scrollToTopSignal: Int = 0,
     viewModel: TagsViewModel = hiltViewModel(),
 ) {
+    val listState = rememberLazyListState()
+    ScrollToTopOn(scrollToTopSignal, listState)
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val avatar by viewModel.avatarLetter.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<String?>(null) }
@@ -90,6 +96,7 @@ fun TagsRoute(
         onOpenSearch = onOpenSearch,
         onRename = { renaming = it },
         onDelete = { deleting = it },
+        listState = listState,
     )
 
     renaming?.let { name ->
@@ -132,6 +139,7 @@ fun TagsContent(
     onRename: (String) -> Unit,
     onDelete: (String) -> Unit,
     onOpenSearch: () -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
 ) {
     Scaffold(
         topBar = {
@@ -155,7 +163,7 @@ fun TagsContent(
                     description = stringResource(R.string.feature_library_empty_tags_body),
                 )
             }
-            else -> LazyColumn(Modifier.padding(padding).fillMaxSize()) {
+            else -> LazyColumn(Modifier.padding(padding).fillMaxSize(), state = listState) {
                 item(key = "title", contentType = "title") { TagsTitle() }
                 items(tags, key = { it.name }, contentType = { "tag" }) { tag ->
                     TagRow(

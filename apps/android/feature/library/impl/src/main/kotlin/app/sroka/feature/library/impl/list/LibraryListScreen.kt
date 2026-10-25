@@ -138,6 +138,7 @@ fun LibraryListRoute(
     addLinkRequested: Boolean = false,
     onAddLinkHandled: () -> Unit = {},
     detailCard: Boolean = false,
+    scrollToTopSignal: Int = 0,
     viewModel: LibraryListViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(scope) { viewModel.setScope(scope) }
@@ -162,6 +163,7 @@ fun LibraryListRoute(
     val listState = rememberLazyListState()
     val currentOpenItem by rememberUpdatedState(onOpenItem)
     val currentSort by rememberUpdatedState(state.sort)
+    ScrollToTopOn(scrollToTopSignal, listState)
     listState.StayAtTopOnInsert(firstKey = if (items.itemCount > 0) items.peek(0)?.id else null)
     var dropState by remember { mutableStateOf(DropState.Idle) }
     val dropTarget = remember {
@@ -531,6 +533,13 @@ internal fun DropTargetCard(hovered: Boolean) {
         Icon(SrokaIcons.AddLink, contentDescription = null, modifier = Modifier.size(28.dp), tint = colors.onPrimaryContainer)
         Text(label, style = MaterialTheme.typography.titleMedium, color = colors.onPrimaryContainer)
     }
+}
+
+/** Scrolls [state] to the top whenever [signal] changes after this list was first shown (tab tapped again). */
+@Composable
+internal fun ScrollToTopOn(signal: Int, state: LazyListState) {
+    val initial = remember { signal }
+    LaunchedEffect(signal) { if (signal != initial) state.animateScrollToItem(0) }
 }
 
 /**

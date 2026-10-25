@@ -164,6 +164,11 @@ fun SrokaApp(
     val railShown = layoutType.isRail()
     // The rail's "Save" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
+    // Tapping the tab that is already showing (nothing above it) scrolls its list to the top.
+    var tabReselects by remember { mutableIntStateOf(0) }
+    val selectTab: (TopLevelDestination) -> Unit = { destination ->
+        if (!backStack.navigateToTopLevel(destination)) tabReselects++
+    }
     val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
 
     val itemColors = NavigationSuiteDefaults.itemColors(
@@ -195,7 +200,7 @@ fun SrokaApp(
                             if (current == TopLevelDestination.TAGS) backStack.navigateToTopLevel(TopLevelDestination.MY_LIST)
                             addLinkRequested = true
                         },
-                        onSelect = { backStack.navigateToTopLevel(TopLevelDestination.entries[it]) },
+                        onSelect = { selectTab(TopLevelDestination.entries[it]) },
                         onOpenSettings = { backStack.add(SettingsKey) },
                     )
                 } else {
@@ -204,7 +209,7 @@ fun SrokaApp(
                             val selected = destination == current
                             item(
                                 selected = selected,
-                                onClick = { backStack.navigateToTopLevel(destination) },
+                                onClick = { selectTab(destination) },
                                 icon = {
                                     Icon(
                                         imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
@@ -230,6 +235,7 @@ fun SrokaApp(
                         drawnTwoPane = drawnTwoPane,
                         addLinkRequested = { addLinkRequested },
                         onAddLinkHandled = { addLinkRequested = false },
+                        tabReselects = { tabReselects },
                     )
                 }
                 // App-level snackbar for results that outlive a screen (archive from the reader).
@@ -276,6 +282,7 @@ private fun SrokaNavDisplay(
     drawnTwoPane: Boolean,
     addLinkRequested: () -> Boolean,
     onAddLinkHandled: () -> Unit,
+    tabReselects: () -> Int,
 ) {
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
     // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
@@ -352,6 +359,7 @@ private fun SrokaNavDisplay(
                 selectedItemId = { detailPaneItemId(backStack, twoPaneState.value) },
                 addLinkRequested = addLinkRequested,
                 onAddLinkHandled = onAddLinkHandled,
+                tabReselects = tabReselects,
             )
             readerEntries(
                 onBack = goBack,
@@ -419,12 +427,15 @@ internal fun NavBackStack<NavKey>.openReader(itemId: String) {
  * Switches tab. My List always stays at the bottom so Back from another tab returns to it, the
  * Android convention for the start destination.
  */
-internal fun NavBackStack<NavKey>.navigateToTopLevel(destination: TopLevelDestination) {
+/** Shows [destination]'s root; returns false when it was already showing with nothing above it. */
+internal fun NavBackStack<NavKey>.navigateToTopLevel(destination: TopLevelDestination): Boolean {
     val target = buildList {
         add(TopLevelDestination.MY_LIST.key)
         if (destination != TopLevelDestination.MY_LIST) add(destination.key)
     }
-    if (toList() != target) replaceAll(*target.toTypedArray())
+    if (toList() == target) return false
+    replaceAll(*target.toTypedArray())
+    return true
 }
 
 /** Replaces the whole stack atomically (never observed empty). */

@@ -36,6 +36,7 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param selectedItemId the article open in the detail pane, or null (read lazily; two-pane highlight)
  * @param addLinkRequested the rail's FAB was tapped (read lazily); a list opens its add-link dialog and
  *   calls [onAddLinkHandled]
+ * @param tabReselects counter bumped when the current tab is tapped again (read lazily); its list scrolls to the top
  *
  * Two-pane / rail state is read live from [LocalPaneLayout] (entry content outlives window changes).
  */
@@ -53,6 +54,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     selectedItemId: () -> String? = { null },
     addLinkRequested: () -> Boolean = { false },
     onAddLinkHandled: () -> Unit = {},
+    tabReselects: () -> Int = { 0 },
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
     entry<LibraryKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
@@ -68,6 +70,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             navRailShown = layout.railShown,
             addLinkRequested = addLinkRequested(),
             onAddLinkHandled = onAddLinkHandled,
+            scrollToTopSignal = tabReselects(),
         )
     }
     entry<SearchKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
@@ -89,6 +92,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             onOpenSearch = onOpenTagsSearch,
             selectedTag = selectedTag(),
             navRailShown = layout.railShown,
+            scrollToTopSignal = tabReselects(),
         )
     }
     // Detail pane on wide windows (the opened article covers it); no back arrow beside the tag list.

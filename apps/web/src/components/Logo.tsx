@@ -16,7 +16,7 @@ export function Wordmark() {
   return (
     <span className="inline-flex items-center gap-2 text-ink">
       <LogoMark />
-      <span className="font-serif text-xl font-semibold tracking-tight">Sroka</span>
+      <span className="text-[1.2rem] font-extrabold tracking-tight">Sroka</span>
     </span>
   );
 }

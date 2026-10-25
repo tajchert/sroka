@@ -333,7 +333,7 @@ function Notice({ title, body, busy, actions }: { title: string; body: string; b
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
       {busy && <span className="spinner" aria-hidden />}
-      <h2 className="font-serif text-xl font-semibold">{title}</h2>
+      <h2 className="text-xl font-semibold">{title}</h2>
       {body && <p className="text-ink2">{body}</p>}
       {actions && <div className="mt-2 flex gap-2">{actions}</div>}
     </div>

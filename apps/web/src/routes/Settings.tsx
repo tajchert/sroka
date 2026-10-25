@@ -88,7 +88,7 @@ export default function Settings() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-8">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">Settings</h1>
 
       <Section title="Account">
         <p className="text-sm text-ink2">Signed in as <strong className="text-ink">{me.data?.user.email}</strong></p>
@@ -141,7 +141,7 @@ export default function Settings() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-8 border-t border-rule pt-6">
-      <h2 className="mb-2 font-serif text-xl font-semibold">{title}</h2>
+      <h2 className="mb-2 text-xl font-semibold">{title}</h2>
       {children}
     </section>
   );

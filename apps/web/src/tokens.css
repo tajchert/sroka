@@ -1,27 +1,47 @@
-/* Sroka brand tokens. Black and white, with the sheen of a magpie wing (teal through blue to violet). */
+/* Sroka brand tokens — "Sroka Web App" (Claude Design). Dark is the design's palette; light mirrors the landing page. */
 :root {
-  --paper: #fafaf8;
-  --paper-2: #f0f0ec;
-  --ink: #0b0c0d;
-  --ink-2: #5a5d60;
-  --rule: #e0e0db;
-  --wing: #0b7f7c;
+  --paper: #fbfaf7;
+  --paper-2: #f3f2ee;
+  --paper-3: #e9e7e1;
+  --ink: #15171c;
+  --ink-2: #4a4c52;
+  --ink-3: #6b6d73;
+  --rule: #e3e0d8;
+  --rule-2: #d3d0c6;
+  --wing: #1e6f8f;
   --wing-ink: #ffffff;
-  --sheen: linear-gradient(112deg, #0a7a76 0%, #1496a6 34%, #2b6bd6 68%, #6a4fc8 100%);
-  --font-ui: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --link: #1e6f8f;
+  --tag: #dcebf1;
+  --tag-ink: #1e5a73;
+  --beak: #f2c84b;
+  --partial: #7a5c0e;
+  --partial-bg: #fbf1d3;
+  --partial-rule: #ecd998;
+  --sheen: linear-gradient(112deg, #1e6f8f 0%, #4f9fbf 60%, #7cc0da 100%);
+  --font-ui: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-read: "Literata", "Iowan Old Style", Charter, Georgia, serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0b0c0d;
-    --paper-2: #151719;
-    --ink: #f1f1ee;
-    --ink-2: #9a9ea2;
-    --rule: #25282b;
-    --wing: #45d2c4;
-    --wing-ink: #04201e;
-    --sheen: linear-gradient(112deg, #2fd0bd 0%, #3bb4d6 34%, #5b8cf0 68%, #9a82f2 100%);
+    --paper: #15171c;
+    --paper-2: #1b1e23;
+    --paper-3: #23272e;
+    --ink: #f1efe9;
+    --ink-2: #a5a8ae;
+    --ink-3: #7d8188;
+    --rule: #2c3038;
+    --rule-2: #3a3f48;
+    --wing: #4f9fbf;
+    --wing-ink: #04161e;
+    --link: #7cc0da;
+    --tag: #1d3a47;
+    --tag-ink: #9fd0e3;
+    --partial: #e8cf86;
+    --partial-bg: #2a2619;
+    --partial-rule: #4d4226;
+    --sheen: linear-gradient(112deg, #1e6f8f 0%, #4f9fbf 60%, #7cc0da 100%);
     color-scheme: dark;
   }
 }

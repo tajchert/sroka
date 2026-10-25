@@ -164,7 +164,7 @@ Body = the raw file bytes (`Content-Type: application/pdf`; `application/octet-s
 `/pdf/{sha256hex}` is the item URL of an uploaded PDF, made a working "open original" link: with a session (cookie or bearer) and a live PDF item of that hash: `302` to its signed `document.pdf` URL (§10); no session: `302 /app/`; unknown or malformed hash, or not owned: `404`. `Cache-Control: private, no-store`. `/pdf/*` reaches the Worker before static assets (`run_worker_first`).
 
 ### 5.2 `GET /v1/items` — list / search / lookup
-Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`), `tag`, `q`, `sort` (`newest`*default*|`oldest`|`shortest`|`longest`), `domain`, `url`, `cursor`, `limit` (1–100, default 30).
+Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`), `tag`, `q`, `sort` (`newest`*default*|`oldest`|`shortest`|`longest`|`archived`), `domain`, `url`, `cursor`, `limit` (1–100, default 30).
 
 - Never returns deleted items.
 - `state`: unread → `status='unread'`; archived → `status='archived'`; favorites → `isFavorite` (any status); all → everything.
@@ -172,7 +172,7 @@ Query `ListItemsQuery`: `state` (`unread`*default*|`archived`|`favorites`|`all`)
 - `q`: FTS5 over title, excerpt, siteName, tags. Each whitespace-separated term is quoted and prefix-matched (`"term"*`), terms ANDed; FTS syntax characters in user input are neutralized (never 400/500 for odd input). Ordering still follows `sort`.
 - `domain`: matches the item host or any subdomain; leading `www.` ignored on both sides (`displayDomain`). E.g. `domain=nytimes.com` matches `www.nytimes.com`, `cooking.nytimes.com`.
 - `url`: **exact lookup** — server `normalizeUrl(url)` and matches `canonicalUrl` among live items, ignoring `state`/`tag`/`q`/`domain`. Returns 0 or 1 item, `nextCursor:null`. Invalid URL → `400 invalid_url`. (Extension badge.)
-- `sort`: newest = `savedAt DESC, id DESC`; oldest = `savedAt ASC, id ASC`; shortest = `wordCount ASC NULLS LAST, id ASC`; longest = `wordCount DESC NULLS LAST, id DESC`.
+- `sort`: newest = `savedAt DESC, id DESC`; oldest = `savedAt ASC, id ASC`; shortest = `wordCount ASC NULLS LAST, id ASC`; longest = `wordCount DESC NULLS LAST, id DESC`; archived ("recently archived") = `COALESCE(archivedAt, savedAt) DESC, id DESC`.
 - Paging: keyset. `nextCursor` = opaque (`encodeListCursor({k: sortValueOfLastRow, id})`), `null` when no more rows. A cursor is only valid with the same filters/sort; undecodable → `400 invalid_request` (`message:"bad_cursor"`).
 - Response `200 ListItemsResponse` `{"items":[Item…],"nextCursor":"eyJrIjoxNzYwNDAw…"|null}`.
 

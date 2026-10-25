@@ -102,7 +102,7 @@ export function PdfViewer({ item, blobUrl, error, onRetry }: { item: Item; blobU
   if (error) {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
-        <h2 className="font-serif text-xl font-semibold">Could not load the PDF</h2>
+        <h2 className="text-xl font-semibold">Could not load the PDF</h2>
         <p className="text-ink2">The saved file did not load. Check your connection and try again.</p>
         <button className="btn btn-primary" onClick={onRetry}>Try again</button>
       </div>
@@ -112,7 +112,7 @@ export function PdfViewer({ item, blobUrl, error, onRetry }: { item: Item; blobU
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
         <span className="spinner" aria-hidden />
-        <h2 className="font-serif text-xl font-semibold">Loading PDF</h2>
+        <h2 className="text-xl font-semibold">Loading PDF</h2>
       </div>
     );
   }

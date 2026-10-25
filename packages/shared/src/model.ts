@@ -21,7 +21,7 @@ export type ItemSource = z.infer<typeof ItemSource>;
 export const ItemState = z.enum(["unread", "archived", "favorites", "all"]);
 export type ItemState = z.infer<typeof ItemState>;
 
-export const ItemSort = z.enum(["newest", "oldest", "shortest", "longest"]);
+export const ItemSort = z.enum(["newest", "oldest", "shortest", "longest", "archived"]);
 export type ItemSort = z.infer<typeof ItemSort>;
 
 /**

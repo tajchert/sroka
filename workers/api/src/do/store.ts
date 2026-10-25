@@ -1099,8 +1099,9 @@ export class LibraryStore {
     }
 
     const byWords = q.sort === "shortest" || q.sort === "longest";
+    const byArchived = q.sort === "archived";
     const asc = q.sort === "oldest" || q.sort === "shortest";
-    const col = byWords ? "i.word_count" : "i.saved_at";
+    const col = byWords ? "i.word_count" : byArchived ? "COALESCE(i.archived_at, i.saved_at)" : "i.saved_at";
     const cmp = asc ? ">" : "<";
     if (q.cursor !== undefined) {
       const c = decodeListCursor(q.cursor);
@@ -1131,7 +1132,7 @@ export class LibraryStore {
     if (more) rows = rows.slice(0, q.limit);
     const last = rows[rows.length - 1];
     const nextCursor =
-      more && last ? encodeListCursor({ k: byWords ? last.word_count : last.saved_at, id: last.id }) : null;
+      more && last ? encodeListCursor({ k: byWords ? last.word_count : byArchived ? (last.archived_at ?? last.saved_at) : last.saved_at, id: last.id }) : null;
     return { items: this.toItems(rows), nextCursor };
   }
 

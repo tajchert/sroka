@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { Item, UpdateItemRequest } from "@sroka/shared";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
 import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
@@ -210,4 +211,37 @@ export function useParsePolling(item: Item | undefined): { gaveUp: boolean } {
 export function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+}
+
+/**
+ * List keyboard shortcuts: j/k move the selection, Enter opens, a archives, f favourites.
+ * `resetKey` resets the selection to the top when the list changes.
+ */
+export function useListKeyboard(items: Item[], resetKey: string): [number, (i: number) => void] {
+  const navigate = useNavigate();
+  const actions = useItemActions();
+  const [sel, setSel] = useState(0);
+  useEffect(() => setSel(0), [resetKey]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const cur = items[sel];
+      const move = (n: number) => {
+        const i = Math.max(0, Math.min(items.length - 1, n));
+        setSel(i);
+        document.querySelector(`[data-item-id="${items[i]?.id}"]`)?.scrollIntoView({ block: "nearest" });
+      };
+      switch (e.key) {
+        case "j": move(sel + 1); break;
+        case "k": move(sel - 1); break;
+        case "Enter": if (cur && !(e.target as HTMLElement | null)?.closest?.("button,a") && !cur.id.startsWith("tmp-")) navigate(`/item/${cur.id}`); break;
+        case "a": if (cur) void actions.setArchived(cur, cur.status !== "archived"); break;
+        case "f": if (cur) void actions.toggleFavorite(cur); break;
+        default: return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [items, sel, actions, navigate]);
+  return [sel, setSel];
 }

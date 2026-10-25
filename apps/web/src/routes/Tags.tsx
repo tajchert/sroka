@@ -40,7 +40,7 @@ export default function Tags() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-8">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">Tags</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight">Tags</h1>
       <p className="mt-2 text-sm text-ink2">Renaming to an existing tag merges the two.</p>
       {tags.isPending ? (
         <div className="flex justify-center py-16"><span className="spinner" /></div>

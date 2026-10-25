@@ -75,7 +75,7 @@ export default function SignIn() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
           <LogoMark size={40} />
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">Sign in to Sroka</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight">Sign in to Sroka</h1>
         </div>
 
         {step === "email" ? (

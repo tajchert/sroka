@@ -252,7 +252,7 @@ export const EXPORT_CSV_COLUMNS = ["title", "url", "time_added", "tags", "status
 
 /** Keyset cursor: last row's sort key + id. Encoded as base64url JSON. */
 export interface ListCursor {
-  /** Sort value of the last row (savedAt for newest/oldest, wordCount for shortest/longest). */
+  /** Sort value of the last row (savedAt for newest/oldest, wordCount for shortest/longest, archivedAt ?? savedAt for archived). */
   k: number | null;
   id: string;
 }

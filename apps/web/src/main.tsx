@@ -10,6 +10,7 @@ import { ToastProvider } from "./lib/store.tsx";
 import Admin from "./routes/Admin.tsx";
 import Library from "./routes/Library.tsx";
 import Reader from "./routes/Reader.tsx";
+import Search from "./routes/Search.tsx";
 import Settings from "./routes/Settings.tsx";
 import Share from "./routes/Share.tsx";
 import Tags from "./routes/Tags.tsx";
@@ -24,6 +25,7 @@ const router = createBrowserRouter(
         { path: "/favorites", element: <Library state="favorites" /> },
         { path: "/all", element: <Library state="all" /> },
         { path: "/tag/:name", element: <Library state="all" /> },
+        { path: "/search", element: <Search /> },
         { path: "/tags", element: <Tags /> },
         { path: "/item/:id", element: <Reader /> },
         { path: "/settings", element: <Settings /> },

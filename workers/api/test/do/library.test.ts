@@ -397,6 +397,20 @@ describe("list / search", () => {
     const nulls = [ids[1]!, ids[4]!, ids[5]!].sort();
     expect(await all("shortest")).toEqual([ids[2], ids[3], ids[0], ...nulls]);
     expect(await all("longest")).toEqual([ids[0], ids[3], ids[2], ...[...nulls].reverse()]);
+    await lib.applyOps("d", [setStatus(ids[1]!, "archived", T0 + 30), setStatus(ids[0]!, "archived", T0 + 20)]);
+    const archived = async () => {
+      const out: string[] = [];
+      let cursor: string | undefined;
+      for (;;) {
+        const r = await lib.listItems(q({ state: "archived", sort: "archived", limit: 2, ...(cursor ? { cursor } : {}) }));
+        if (!r.ok) throw new Error();
+        out.push(...r.items.map((i) => i.id));
+        if (!r.nextCursor) break;
+        cursor = r.nextCursor;
+      }
+      return out;
+    };
+    expect(await archived()).toEqual([ids[1], ids[0], ids[4]]);
     expect(await lib.listItems(q({ cursor: "garbage" }))).toEqual({ ok: false, error: "bad_cursor" });
   });
 });

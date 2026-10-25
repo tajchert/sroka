@@ -163,7 +163,7 @@ Body = the raw file bytes (`Content-Type: application/pdf`; `application/octet-s
 ### 5.9 `PUT /v1/items/:id/thumbnail` — PDF first-page preview
 The uploading client renders page 1 of the PDF (≈480 px wide, height ≤ 2× width, white background) and sends it after `POST /v1/items/pdf` returned an item whose `leadImageKey` is `null`. Best effort: clients never fail or retry the upload because of it. Body = raw image bytes, `Content-Type` `image/webp` or `image/jpeg`, `Content-Length` required.
 - Errors: `411 length_required`, `413 payload_too_large` (> 512 KiB, `LIMITS.maxThumbnailBytes`), `415 unsupported_media_type` (other type, or the bytes don't start with `RIFF....WEBP` / `FF D8 FF`), `404 not_found` (unknown/deleted item, or deleted while uploading), `409 not_pdf` (not a `kind:"pdf"` item), `401`.
-- Flow: written to `private/{userId}/{contentId}/thumb.webp` (or `thumb.jpg`), then DO `setPdfThumbnail(itemId, contentId, key)` sets `leadImageKey` and bumps `seq` (the next pull carries it). Replacing is allowed; a previous preview with the other extension is deleted. A PDF parse result never changes `leadImageKey`.
+- Flow: written to `private/{userId}/{contentId}/thumb.webp` (or `thumb.jpg`), then DO `setPdfThumbnail(itemId, contentId, key)` sets `leadImageKey` and bumps `seq` (the next pull carries it). Replacing is allowed; a previous preview with the other extension is deleted. A PDF parse result never changes `leadImageKey`. `repointPdf` (§5.8, a duplicate adopting a new copy) clears `leadImageKey`, so the `created:false` response asks the client for a fresh preview.
 - `200 {"item": Item}` with a freshly signed `leadImageUrl`.
 
 ### `GET /pdf/:sha256` (app host)

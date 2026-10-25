@@ -261,6 +261,19 @@ describe("review fixes", () => {
     expect(await sqlRows(user, "SELECT * FROM pdf_uploads")).toEqual([]);
   });
 
+  it("a re-pointed duplicate drops its old preview key so the client renders a new one", async () => {
+    const { raw, user, env } = makeApp();
+    const b = pdfBytes("lost-thumb");
+    const first = (await raw("POST", "/v1/items/pdf?name=a.pdf", b, hdr(b))).json.item;
+    await env.LIBRARY.getByName(user).setPdfThumbnail(first.id, first.contentId, "thumb.webp");
+    await env.CONTENT.delete(r2Keys.contentDir(first.contentId, user) + PDF_FILE);
+    const again = (await raw("POST", "/v1/items/pdf?name=a.pdf", b, hdr(b))).json;
+    expect(again.created).toBe(false);
+    expect(again.item.contentId).not.toBe(first.contentId);
+    expect(again.item.leadImageKey).toBeNull();
+    expect(again.item.leadImageUrl).toBeNull();
+  });
+
   it("item.add of a /pdf/{sha} url is rejected unless the pdf item exists", async () => {
     const { raw, call, env } = makeApp();
     const b = pdfBytes("junk");

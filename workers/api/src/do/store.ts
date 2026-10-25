@@ -926,7 +926,9 @@ export class LibraryStore {
       const row = this.itemRow(a.itemId);
       if (!row || row.deleted_at !== null || row.content_id !== a.expectContentId) return null;
       this.exec(
-        `UPDATE items SET kind = 'pdf', content_id = ?, content_private = 1, file_name = ?, file_size = ?, site_name = 'PDF'
+        // lead_image_key pointed into the old dir (or at article content): cleared so the client sends a new preview.
+        `UPDATE items SET kind = 'pdf', content_id = ?, content_private = 1, file_name = ?, file_size = ?, site_name = 'PDF',
+           lead_image_key = NULL
          WHERE id = ?`,
         a.contentId,
         a.fileName,

@@ -28,7 +28,7 @@
     <string name="feature_reader_refreshed">Article refreshed</string>
     <string name="feature_reader_refreshed_partial">Refreshed, still only part of the page</string>
     <string name="feature_reader_refresh_failed">Couldn\u2019t refresh the article</string>
-    <string name="feature_reader_continued">Continued from where you left off</string>
+    <string name="feature_reader_continued">Resumed at %1$d%%</string>
     <string name="feature_reader_start_over">Start over</string>
     <string name="feature_reader_min_read_prefix">"%1$d min read \u00b7 "</string>
     <string name="feature_reader_partial_warning">Only part of this page was saved</string>

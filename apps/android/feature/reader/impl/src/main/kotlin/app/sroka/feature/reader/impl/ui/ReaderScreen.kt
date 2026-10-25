@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import kotlinx.coroutines.delay
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.foundation.background
@@ -161,7 +162,7 @@ internal fun ReaderScreen(
     val msgRefreshed = stringResource(R.string.feature_reader_refreshed)
     val msgRefreshedPartial = stringResource(R.string.feature_reader_refreshed_partial)
     val msgRefreshFailed = stringResource(R.string.feature_reader_refresh_failed)
-    val msgContinued = stringResource(R.string.feature_reader_continued)
+    val resources = LocalResources.current
     val msgStartOver = stringResource(R.string.feature_reader_start_over)
     val msgPartial = stringResource(R.string.feature_reader_partial_warning)
     val msgMinRead = item?.readingMinutes?.let { stringResource(R.string.feature_reader_min_read_prefix, it) }.orEmpty()
@@ -177,7 +178,7 @@ internal fun ReaderScreen(
                 )
                 is ReaderEvent.ResumedFromProgress -> {
                     val result = snackbarHost.showSnackbar(
-                        message = msgContinued,
+                        message = resources.getString(R.string.feature_reader_continued, (event.progress * 100).roundToInt()),
                         actionLabel = msgStartOver,
                         duration = SnackbarDuration.Long,
                     )

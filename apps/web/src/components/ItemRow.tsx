@@ -1,5 +1,5 @@
 import type { Item } from "@sroka/shared";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { formatSize } from "../lib/pdf.ts";
 import { hostOf, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
@@ -16,6 +16,7 @@ export interface ItemRowProps {
 export function ItemRow({ item, selected, onSelect, onDomain, onTag }: ItemRowProps) {
   const actions = useItemActions();
   const [editing, setEditing] = useState(false);
+  const pointerType = useRef("");
   useParsePolling(item);
   const temp = item.id.startsWith("tmp-");
   const archived = item.status === "archived";
@@ -26,7 +27,9 @@ export function ItemRow({ item, selected, onSelect, onDomain, onTag }: ItemRowPr
     <li
       data-item-id={item.id}
       aria-current={selected ? "true" : undefined}
-      onClick={onSelect}
+      // Touch taps and long presses must not highlight the row; only mouse/pen clicks select it.
+      onPointerDown={(e) => { pointerType.current = e.pointerType; }}
+      onClick={() => { if (pointerType.current !== "touch") onSelect?.(); }}
       className={`group flex gap-3 rounded-xl border-b border-rule/60 px-2 py-4 hover:bg-paper2 sm:gap-4 sm:px-3.5 ${selected ? "bg-paper2 shadow-[inset_3px_0_0_var(--wing)]" : ""}`}
     >
       <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-paper3 sm:h-[76px] sm:w-[120px]">

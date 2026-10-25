@@ -215,13 +215,14 @@ export function isTyping(e: KeyboardEvent): boolean {
 
 /**
  * List keyboard shortcuts: j/k move the selection, Enter opens, a archives, f favourites.
- * `resetKey` resets the selection to the top when the list changes.
+ * Nothing is selected until the user presses j/k (or clicks a row with a mouse);
+ * `resetKey` clears the selection when the list changes.
  */
 export function useListKeyboard(items: Item[], resetKey: string): [number, (i: number) => void] {
   const navigate = useNavigate();
   const actions = useItemActions();
-  const [sel, setSel] = useState(0);
-  useEffect(() => setSel(0), [resetKey]);
+  const [sel, setSel] = useState(-1);
+  useEffect(() => setSel(-1), [resetKey]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;

@@ -270,6 +270,51 @@ internal class PdfDataTest : DataTestBase() {
         assertEquals(2, server.requestCount)
     }
 
+    private val thumbBytes = byteArrayOf(0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4)
+
+    @Test fun pdfDownloadAlsoFetchesItsPreview() = runBlocking {
+        itemDao.upsertItem(entity("p", kind = ItemKind.PDF, leadImageKey = "thumb.webp"))
+        pdfUrls()
+        enqueueBytes(pdfBytes)
+        enqueueBytes(thumbBytes)
+        assertTrue(contentStore.ensurePdfFile("p") is PdfFileResult.Ready)
+        takeRequest()
+        takeRequest()
+        assertEquals("/p/c/thumb.webp", server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)?.url?.encodedPath)
+        val row = contentFileDao.get("p")!!
+        assertEquals(ContentState.DOWNLOADED, row.state)
+        assertEquals(paths.thumb("p").absolutePath, row.thumbPath)
+        assertEquals(thumbBytes.toList(), paths.thumb("p").readBytes().toList())
+    }
+
+    @Test fun previewArrivingAfterThePdfIsFetchedOnTheNextPass() = runBlocking {
+        itemDao.upsertItem(entity("p", kind = ItemKind.PDF))
+        pdfUrls()
+        enqueueBytes(pdfBytes)
+        contentStore.ensurePdfFile("p")
+        assertNull(contentFileDao.get("p")!!.thumbPath)
+        assertEquals(2, server.requestCount)
+
+        itemDao.upsertItem(entity("p", kind = ItemKind.PDF, leadImageKey = "thumb.webp"))
+        pdfUrls()
+        enqueueBytes(thumbBytes)
+        contentStore.download("p")
+        assertEquals(paths.thumb("p").absolutePath, contentFileDao.get("p")!!.thumbPath)
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test fun aFailedPreviewKeepsThePdfDownloaded() = runBlocking {
+        itemDao.upsertItem(entity("p", kind = ItemKind.PDF, leadImageKey = "thumb.webp"))
+        pdfUrls()
+        enqueueBytes(pdfBytes)
+        respond(500)
+        assertTrue(contentStore.ensurePdfFile("p") is PdfFileResult.Ready)
+        val row = contentFileDao.get("p")!!
+        assertEquals(ContentState.DOWNLOADED, row.state)
+        assertNull(row.thumbPath)
+        assertEquals(1, row.thumbAttempts)
+    }
+
     @Test fun expiredSignedUrlIsRefreshedOnce() = runBlocking {
         itemDao.upsertItem(entity("p", kind = ItemKind.PDF))
         pdfUrls()

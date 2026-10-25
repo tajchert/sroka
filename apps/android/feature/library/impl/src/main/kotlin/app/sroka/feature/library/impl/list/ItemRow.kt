@@ -128,8 +128,30 @@ internal fun ItemRow(
 private fun Thumbnail(item: ItemSummary) {
     val shape = RoundedCornerShape(8.dp)
     val path = item.thumbnailPath
-    if (item.kind == ItemKind.PDF) {
-        // PDFs have no lead image: an icon tile instead.
+    if (item.kind == ItemKind.PDF && path != null) {
+        // First-page preview: the top of the page, with a small PDF badge.
+        Box(Modifier.size(56.dp).clip(shape).background(Color.White)) {
+            AsyncImage(
+                model = File(path),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                modifier = Modifier.matchParentSize(),
+            )
+            Icon(
+                SrokaIcons.PictureAsPdf,
+                contentDescription = stringResource(R.string.feature_library_row_pdf_icon),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(2.dp)
+                    .size(18.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                    .padding(1.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    } else if (item.kind == ItemKind.PDF) {
+        // No preview (older uploads, or rendering failed): an icon tile instead.
         Box(
             Modifier.size(56.dp).clip(shape).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,

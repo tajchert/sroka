@@ -24,6 +24,7 @@ private fun summary(
     status: ItemStatus = ItemStatus.UNREAD,
     kind: ItemKind = ItemKind.ARTICLE,
     fileSize: Long? = null,
+    thumbnailPath: String? = null,
 ) = ItemSummary(
     id = id,
     displayTitle = title,
@@ -35,7 +36,7 @@ private fun summary(
     progress = 0f,
     parseStatus = parse,
     offline = offline,
-    thumbnailPath = null,
+    thumbnailPath = thumbnailPath,
     tags = emptyList(),
     savedAt = SavedAt,
     pendingChange = pending,
@@ -55,9 +56,13 @@ internal val sampleItems: List<ItemSummary> = listOf(
     summary("i8", "Available offline on this device", "saved.example.com", 8, offline = OfflineState.DOWNLOADED),
 )
 
-/** Library rows with PDFs: one downloaded, one waiting for its first sync. */
+/** Library rows with PDFs: one downloaded, one waiting for its first sync, one with a first-page preview. */
 internal val samplePdfItems: List<ItemSummary> = listOf(
     summary("p1", "Attention Is All You Need", "PDF", null, offline = OfflineState.DOWNLOADED, kind = ItemKind.PDF, fileSize = 2_411_724),
+    summary(
+        "p3", "Quarterly report Q3", "PDF", null, offline = OfflineState.DOWNLOADED, kind = ItemKind.PDF, fileSize = 512_000,
+        thumbnailPath = "/nonexistent/thumbs/p3.webp", // no image in screenshots: shows the white page + badge
+    ),
     summary("p2", "Tax return 2025.pdf", "PDF", null, kind = ItemKind.PDF, fileSize = 840_000, favorite = true),
     sampleItems[0],
     sampleItems[1],

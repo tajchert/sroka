@@ -207,7 +207,7 @@ class ContentStoreImpl @Inject internal constructor(
         val item = itemDao.getItem(itemId) ?: return DownloadOutcome.Failed(RemoteFailure.SERVER)
         val contentId = item.contentId ?: return DownloadOutcome.NotReady
         val previous = contentFileDao.get(itemId)
-        if (item.kind == ItemKind.PDF) return downloadPdfLocked(itemId, contentId, previous, gen)
+        if (item.kind == ItemKind.PDF) return downloadPdfLocked(itemId, contentId, item.leadImageKey, previous, gen)
         if (previous?.state == ContentState.DOWNLOADED && previous.contentId == contentId &&
             File(paths.articleDir(itemId), PackageInstaller.ARTICLE).isFile
         ) {
@@ -281,10 +281,17 @@ class ContentStoreImpl @Inject internal constructor(
     /**
      * PDF items: `documentUrl` of `/content` -> `articles/{id}.tmp` -> `%PDF-` + size check -> moved to
      * `articles/{id}/document.pdf` -> row DOWNLOADED. A 401/403/404/410 on the signed URL (expired)
-     * re-fetches the URLs once. No thumbnail, no FTS body.
+     * re-fetches the URLs once. Plus the first-page preview when the item has one ([leadImageKey]); no FTS body.
      */
-    private suspend fun downloadPdfLocked(itemId: String, contentId: String, previous: ContentFileEntity?, gen: Long): DownloadOutcome {
+    private suspend fun downloadPdfLocked(
+        itemId: String,
+        contentId: String,
+        leadImageKey: String?,
+        previous: ContentFileEntity?,
+        gen: Long,
+    ): DownloadOutcome {
         if (previous?.state == ContentState.DOWNLOADED && previous.contentId == contentId && paths.pdfFile(itemId).isFile) {
+            retryMissingThumbnail(leadImageKey, previous, gen)
             return DownloadOutcome.AlreadyCurrent
         }
         if (paths.usableBytes() < minFreeBytes) return DownloadOutcome.StorageFull
@@ -296,14 +303,16 @@ class ContentStoreImpl @Inject internal constructor(
                 state = ContentState.DOWNLOADING,
                 bytes = previous?.bytes ?: 0,
                 attempts = if (sameContent) previous.attempts else 0,
+                thumbPath = previous?.thumbPath,
                 downloadedAt = previous?.downloadedAt,
+                thumbAttempts = previous?.thumbAttempts ?: 0,
             ),
             gen,
         )
         if (!marked) return DownloadOutcome.NotReady
         val temp = paths.pdfTemp(itemId)
         return try {
-            fetchPdf(itemId, contentId, temp, previous, gen)
+            fetchPdf(itemId, contentId, leadImageKey, temp, previous, gen)
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
                 temp.delete()
@@ -319,7 +328,14 @@ class ContentStoreImpl @Inject internal constructor(
         }
     }
 
-    private suspend fun fetchPdf(itemId: String, contentId: String, temp: File, previous: ContentFileEntity?, gen: Long): DownloadOutcome {
+    private suspend fun fetchPdf(
+        itemId: String,
+        contentId: String,
+        leadImageKey: String?,
+        temp: File,
+        previous: ContentFileEntity?,
+        gen: Long,
+    ): DownloadOutcome {
         var refreshed = false
         while (true) {
             val urls = when (val r = api.contentUrls(itemId)) {
@@ -404,6 +420,15 @@ class ContentStoreImpl @Inject internal constructor(
                 temp.delete()
                 paths.deleteItemFiles(itemId)
                 return DownloadOutcome.NotReady
+            }
+            leadImageKey?.let { key ->
+                try {
+                    downloadThumbnail(itemId, urls.baseUrl, key, gen)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Non-fatal: the list keeps the PDF tile (retried later).
+                }
             }
             return DownloadOutcome.Downloaded
         }

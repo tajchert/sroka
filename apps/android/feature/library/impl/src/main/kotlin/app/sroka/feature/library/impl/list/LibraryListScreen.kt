@@ -74,6 +74,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.flow.drop
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -709,6 +713,13 @@ private fun SwipeableRow(
     val coroutineScope = rememberCoroutineScope()
     val state = rememberSwipeToDismissBoxState()
     val unarchive = archiveTab || item.status == ItemStatus.ARCHIVED
+    // Tick when the swipe crosses the archive threshold, so the user feels when letting go will act.
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(state) {
+        snapshotFlow { state.targetValue }
+            .drop(1)
+            .collect { if (it == SwipeToDismissBoxValue.EndToStart) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) }
+    }
     SwipeToDismissBox(
         state = state,
         modifier = if (inset) modifier.padding(horizontal = ROW_INSET).clip(rowShape) else modifier,

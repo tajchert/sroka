@@ -39,6 +39,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -193,8 +195,18 @@ internal fun ReaderScreen(
     val settledPartial = remember { booleanArrayOf(false) }
     item?.parseStatus?.takeIf { it != ParseStatus.PENDING }?.let { settledPartial[0] = it == ParseStatus.PARTIAL }
 
+    // Keep the screen on while reading; scrolling (or a PDF page change) moves the progress and restarts
+    // the timer, so a reader left open and untouched still lets the screen time out.
+    var keepAwake by remember { mutableStateOf(true) }
+    LaunchedEffect(progress) {
+        keepAwake = true
+        delay(KEEP_AWAKE_IDLE_MS)
+        keepAwake = false
+    }
+
     val cardArgb = MaterialTheme.colorScheme.surfaceContainerLow.toArgb()
     Scaffold(
+        modifier = if (keepAwake) Modifier.keepScreenOn() else Modifier,
         containerColor = if (detailPane) Color.Transparent else MaterialTheme.colorScheme.background,
         contentWindowInsets = if (detailPane) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         snackbarHost = { SnackbarHost(snackbarHost) },
@@ -599,3 +611,6 @@ private fun openPdfExternally(context: Context, file: java.io.File) {
         // No PDF viewer installed; nothing more to offer.
     }
 }
+
+/** Idle time (no scrolling) after which the reader stops holding the screen on. */
+private const val KEEP_AWAKE_IDLE_MS = 5 * 60_000L

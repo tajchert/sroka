@@ -300,6 +300,46 @@ itemsRoutes.post("/pdf", async (c) => {
   return c.json({ item: response.item, created: response.created }, 202);
 });
 
+// 5.9 PDF first-page preview (rendered by the uploading client)
+const THUMB_FILES: Record<string, string> = { "image/webp": "thumb.webp", "image/jpeg": "thumb.jpg" };
+
+function imageMatches(type: string, b: Uint8Array): boolean {
+  if (type === "image/jpeg") return b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.subarray(from, to));
+  return b.length >= 12 && ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP";
+}
+
+itemsRoutes.put("/:id/thumbnail", async (c) => {
+  const id = c.req.param("id");
+  const lenHeader = c.req.header("content-length");
+  if (lenHeader === undefined || !/^\d+$/.test(lenHeader)) return apiError(c, 411, "length_required");
+  if (Number(lenHeader) > LIMITS.maxThumbnailBytes) return apiError(c, 413, "payload_too_large");
+  const ctype = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+  const file = THUMB_FILES[ctype];
+  if (!file) return apiError(c, 415, "unsupported_media_type");
+  if (!validItemId(id)) return apiError(c, 404, "not_found");
+  const bytes = new Uint8Array(await c.req.arrayBuffer());
+  if (bytes.byteLength > LIMITS.maxThumbnailBytes) return apiError(c, 413, "payload_too_large");
+  if (!imageMatches(ctype, bytes)) return apiError(c, 415, "unsupported_media_type");
+
+  const stub = library(c);
+  const current = await stub.getItem(id);
+  if (!current) return apiError(c, 404, "not_found");
+  if (current.kind !== "pdf" || !current.contentId) return apiError(c, 409, "not_pdf");
+  const dir = r2Keys.contentDir(current.contentId, c.var.userId);
+  const remove = (k: string): Promise<void> =>
+    c.env.CONTENT.delete(k).catch((e) => log.exception("thumbnail cleanup failed", e, { event: "thumb_cleanup_failed" }));
+  await c.env.CONTENT.put(dir + file, bytes, { httpMetadata: { contentType: ctype } });
+  const r = await stub.setPdfThumbnail(id, current.contentId, file);
+  if (!r.ok) {
+    // Deleted or re-pointed between the read and the commit: nothing references the object.
+    await remove(dir + file);
+    return apiError(c, 404, "not_found");
+  }
+  if (r.previousKey && r.previousKey !== file) c.executionCtx.waitUntil(remove(dir + r.previousKey));
+  return c.json({ item: r.item });
+});
+
 // 5.2 list / search / lookup
 itemsRoutes.get("/", async (c) => {
   const parsed = ListItemsQuery.safeParse(c.req.query());

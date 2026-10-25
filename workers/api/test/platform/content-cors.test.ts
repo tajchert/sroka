@@ -96,4 +96,10 @@ describe("pdf content", () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
   });
+  it("serves thumb.jpg as image/jpeg", async () => {
+    await testEnv.CONTENT.put(`private/u1/${CID}/thumb.jpg`, new Uint8Array([0xff, 0xd8, 0xff, 0xe0]));
+    const res = await call(await url("u.u1", "thumb.jpg"), { headers: { origin: APP } }, CONTENT);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+  });
 });

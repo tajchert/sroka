@@ -160,6 +160,12 @@ Body = the raw file bytes (`Content-Type: application/pdf`; `application/octet-s
 - `202 {"item": Item, "created": boolean}` (`CreateItemResponse`).
 - `item.add` ops never create PDFs (see §8.2 step 3a); all other ops (status, favorite, tags, title, progress, delete) work unchanged on PDF items. `item.delete` removes the private content dir, i.e. the file.
 
+### 5.9 `PUT /v1/items/:id/thumbnail` — PDF first-page preview
+The uploading client renders page 1 of the PDF (≈480 px wide, height ≤ 2× width, white background) and sends it after `POST /v1/items/pdf` returned an item whose `leadImageKey` is `null`. Best effort: clients never fail or retry the upload because of it. Body = raw image bytes, `Content-Type` `image/webp` or `image/jpeg`, `Content-Length` required.
+- Errors: `411 length_required`, `413 payload_too_large` (> 512 KiB, `LIMITS.maxThumbnailBytes`), `415 unsupported_media_type` (other type, or the bytes don't start with `RIFF....WEBP` / `FF D8 FF`), `404 not_found` (unknown/deleted item, or deleted while uploading), `409 not_pdf` (not a `kind:"pdf"` item), `401`.
+- Flow: written to `private/{userId}/{contentId}/thumb.webp` (or `thumb.jpg`), then DO `setPdfThumbnail(itemId, contentId, key)` sets `leadImageKey` and bumps `seq` (the next pull carries it). Replacing is allowed; a previous preview with the other extension is deleted. A PDF parse result never changes `leadImageKey`.
+- `200 {"item": Item}` with a freshly signed `leadImageUrl`.
+
 ### `GET /pdf/:sha256` (app host)
 `/pdf/{sha256hex}` is the item URL of an uploaded PDF, made a working "open original" link: with a session (cookie or bearer) and a live PDF item of that hash: `302` to its signed `document.pdf` URL (§10); no session: `302 /app/`; unknown or malformed hash, or not owned: `404`. `Cache-Control: private, no-store`. `/pdf/*` reaches the Worker before static assets (`run_worker_first`).
 
@@ -356,7 +362,7 @@ URL: `{CONTENT_ORIGIN}/s/{exp}/{sig}/{scope}/{contentId}/{file}`
 - Build with `buildContentUrls` / `buildContentUrl`; verify with `verifyContentPath(secret, pathname)` → `{ok, r2Key, isPrivate, …}`. Pass `new URL(req.url).pathname` **unmodified**; never `decodeURIComponent` it first (`%2F` would become a separator and enable traversal — encoded forms are rejected as malformed).
 
 Route (content host only): `GET`/`HEAD` only (else `405`). Malformed → `403 forbidden message:malformed`; bad signature → `403 bad_signature`; expired → `403 expired`; R2 miss → `404`. Success headers:
-- `Content-Type` by extension: `.html` `text/html; charset=utf-8`, `.txt` `text/plain; charset=utf-8`, `.webp` `image/webp`, `.zip` `application/zip`, `.json` `application/json`, `.pdf` `application/pdf`, else R2 `httpMetadata.contentType` or `application/octet-stream`.
+- `Content-Type` by extension: `.html` `text/html; charset=utf-8`, `.txt` `text/plain; charset=utf-8`, `.webp` `image/webp`, `.jpg` `image/jpeg`, `.zip` `application/zip`, `.json` `application/json`, `.pdf` `application/pdf`, else R2 `httpMetadata.contentType` or `application/octet-stream`.
 - `.pdf` additionally: `Content-Type: application/pdf`, `Content-Disposition: inline; filename="document.pdf"`, and the CSP is `default-src 'none'; object-src 'none'; frame-ancestors 'none'` instead of the HTML CSP (no `sandbox`, which would stop Chrome's built-in PDF viewer when the signed URL is opened directly: "Open in new tab", `/pdf/:sha256`). **Needs a Chrome check**; if Chrome still refuses to render, loosen only as far as needed and update this line (the content host has no cookies and serves the file inert under `nosniff`). The web reader does not depend on it (blob URL).
 - `Access-Control-Allow-Origin`: the request `Origin` if it equals `APP_ORIGIN` or is in `DEV_ORIGINS`, else omitted; always `Vary: Origin`. `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox`.
 - Public: `Cache-Control: public, max-age=86400, immutable`. Private: `Cache-Control: private, no-store`.

@@ -388,3 +388,94 @@ describe("LibraryDO.setPdfThumbnail", () => {
     expect((await lib.getItem(item.id))!.leadImageKey).toBe("thumb.webp");
   });
 });
+
+describe("PUT /v1/items/:id/thumbnail", () => {
+  const webp = (n = 64) => {
+    const b = new Uint8Array(n);
+    b.set(new TextEncoder().encode("RIFF"), 0);
+    b.set(new TextEncoder().encode("WEBP"), 8);
+    return b;
+  };
+  const jpeg = (n = 64) => {
+    const b = new Uint8Array(n);
+    b.set([0xff, 0xd8, 0xff, 0xe0], 0);
+    return b;
+  };
+  const ih = (b: Uint8Array, type: string) => ({ "content-type": type, "content-length": String(b.byteLength) });
+
+  async function setup(tag: string, envOverride: Partial<Env> = {}) {
+    const app = makeApp(envOverride);
+    const b = pdfBytes(tag);
+    const item = (await app.raw("POST", `/v1/items/pdf?name=${tag}.pdf`, b, hdr(b))).json.item;
+    return { ...app, item, dir: r2Keys.contentDir(item.contentId, app.user) };
+  }
+
+  it("stores a webp preview and returns the item with a signed leadImageUrl", async () => {
+    const { raw, call, env, item, dir } = await setup("put-webp");
+    const body = webp();
+    const r = await raw("PUT", `/v1/items/${item.id}/thumbnail`, body, ih(body, "image/webp"));
+    expect(r.status).toBe(200);
+    expect(r.json.item).toMatchObject({ id: item.id, leadImageKey: "thumb.webp" });
+    expect(r.json.item.leadImageUrl).toMatch(/\/thumb\.webp$/);
+    const obj = await env.CONTENT.get(dir + "thumb.webp");
+    expect(obj!.httpMetadata?.contentType).toBe("image/webp");
+    expect(new Uint8Array(await obj!.arrayBuffer())).toEqual(body);
+    expect((await call("GET", `/v1/items/${item.id}`)).json.item.leadImageKey).toBe("thumb.webp");
+  });
+
+  it("jpeg goes to thumb.jpg; switching back to webp deletes the old object", async () => {
+    const { raw, item, dir } = await setup("put-jpeg");
+    const j = jpeg();
+    const r1 = await raw("PUT", `/v1/items/${item.id}/thumbnail`, j, ih(j, "image/jpeg"));
+    expect(r1.json.item.leadImageKey).toBe("thumb.jpg");
+    const w = webp();
+    const r2 = await raw("PUT", `/v1/items/${item.id}/thumbnail`, w, ih(w, "image/webp"));
+    expect(r2.json.item.leadImageKey).toBe("thumb.webp");
+    expect((await listPrefix(dir)).sort()).toEqual([dir + PDF_FILE, dir + "thumb.webp"].sort());
+  });
+
+  it("411 without Content-Length, 413 over 512 KiB, 415 for png or mismatched bytes", async () => {
+    const { raw, item, dir } = await setup("put-bad");
+    const path = `/v1/items/${item.id}/thumbnail`;
+    expect((await raw("PUT", path, webp(), { "content-type": "image/webp" })).status).toBe(411);
+    const big = webp(LIMITS.maxThumbnailBytes + 1);
+    expect((await raw("PUT", path, big, ih(big, "image/webp"))).status).toBe(413);
+    const w = webp();
+    expect((await raw("PUT", path, w, ih(w, "image/png"))).json.error).toBe("unsupported_media_type");
+    const j = jpeg();
+    expect((await raw("PUT", path, j, ih(j, "image/webp"))).status).toBe(415);
+    expect(await listPrefix(dir)).toEqual([dir + PDF_FILE]);
+  });
+
+  it("404 for an unknown item, 409 not_pdf for an article", async () => {
+    const { raw, call } = await setup("put-404");
+    const w = webp();
+    expect((await raw("PUT", `/v1/items/${uuidv7()}/thumbnail`, w, ih(w, "image/webp"))).status).toBe(404);
+    const art = (await call("POST", "/v1/items", { url: "https://example.com/thumb-art" })).json.item;
+    const r = await raw("PUT", `/v1/items/${art.id}/thumbnail`, w, ih(w, "image/webp"));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe("not_pdf");
+  });
+
+  it("an item deleted before the commit → 404 and no preview left in R2", async () => {
+    const real = testEnv.LIBRARY;
+    const racing = {
+      getByName: (n: string) => {
+        const stub = real.getByName(n);
+        return new Proxy(stub, {
+          get: (t, p) =>
+            p === "setPdfThumbnail"
+              ? async (id: string, ...rest: unknown[]) => {
+                  await (t as any).applyRest("d", [{ opId: uuidv7(), at: Date.now(), type: "item.delete", itemId: id }], { itemId: id });
+                  return (t as any).setPdfThumbnail(id, ...rest);
+                }
+              : (...a: unknown[]) => (t as any)[p](...a),
+        });
+      },
+    } as unknown as Env["LIBRARY"];
+    const { raw, item, user } = await setup("put-race", { LIBRARY: racing });
+    const w = webp();
+    expect((await raw("PUT", `/v1/items/${item.id}/thumbnail`, w, ih(w, "image/webp"))).status).toBe(404);
+    expect(await listPrefix(`private/${user}/`)).toEqual([]);
+  });
+});

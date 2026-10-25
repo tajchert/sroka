@@ -21,6 +21,8 @@ export const LIMITS = {
   maxPdfBytes: 50 * 1024 * 1024,
   /** Sum of fileSize over a user's live PDF items; an upload beyond it → 409 storage_full. */
   maxPdfStorageBytes: 2 * 1024 * 1024 * 1024,
+  /** PUT /v1/items/:id/thumbnail body (client-rendered first page of a PDF, webp or jpeg). */
+  maxThumbnailBytes: 512 * 1024,
   /** Uploaded file name length (characters); longer names are truncated, keeping the extension. */
   maxFileNameLength: 255,
   /** Import upload size. */

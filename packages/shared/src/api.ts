@@ -31,6 +31,7 @@ export const ErrorCode = z.enum([
   "not_found", // 404
   "method_not_allowed", // 405 (content route)
   "not_parsed", // 409 content requested before parse finished / failed
+  "not_pdf", // 409 PUT /v1/items/:id/thumbnail on an article
   "resync_required", // 410 sync cursor older than tombstone horizon
   "payload_too_large", // 413
   "unsupported_media_type", // 415

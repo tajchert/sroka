@@ -6,6 +6,7 @@ const TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8",
   txt: "text/plain; charset=utf-8",
   webp: "image/webp",
+  jpg: "image/jpeg",
   zip: "application/zip",
   json: "application/json",
   pdf: "application/pdf",

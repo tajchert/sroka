@@ -76,6 +76,10 @@ export default function Reader() {
     pushSettings(next);
   };
 
+  // Live position for the progress bar; the frame reports it every 150 ms while scrolling.
+  const [liveProgress, setLiveProgress] = useState<number | null>(null);
+  useEffect(() => setLiveProgress(null), [id]);
+
   // progress: iframe -> parent -> PATCH (throttled, flushed on leave)
   const pendingProgress = useRef<{ progress: number; anchor: number | null } | null>(null);
   const lastSent = useRef<number>(-1);
@@ -132,6 +136,7 @@ export default function Reader() {
         const anchor = typeof d.anchor === "number" ? d.anchor : null;
         if (anchor !== null) startAnchor.current = anchor; // a rebuilt frame resumes here, not at the first position
         pendingProgress.current = { progress: Math.min(1, Math.max(0, d.progress)), anchor };
+        setLiveProgress(pendingProgress.current.progress);
         flushTimer.current ??= setTimeout(flush, 3000);
       }
     };
@@ -173,6 +178,8 @@ export default function Reader() {
     ? ["PDF", item.fileSize ? formatSize(item.fileSize) : null, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ")
     : [item.siteName ?? domain, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ");
 
+  const percent = Math.round((liveProgress ?? item.progress) * 100);
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-rule px-4 py-3 sm:px-8">
@@ -185,6 +192,7 @@ export default function Reader() {
               <h1 className="font-serif text-xl font-semibold leading-snug sm:text-2xl">{itemTitle(item)}</h1>
               <p className="mt-0.5 text-sm text-ink2">
                 {subtitle}
+                {!isPdf && srcdoc && <span className="tabular-nums">{subtitle ? ", " : ""}{percent}% read</span>}
               </p>
             </div>
           </div>
@@ -233,6 +241,11 @@ export default function Reader() {
         </div>
       )}
       <div className="relative min-h-0 flex-1">
+        {!isPdf && srcdoc && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5" aria-hidden>
+            <div className="h-full bg-[var(--wing)] transition-[width] duration-150 ease-out" style={{ width: `${percent}%` }} />
+          </div>
+        )}
         {isPdf ? (
           contentId ? (
             <PdfViewer item={item} blobUrl={pdfBlob.url} error={pdfBlob.error} onRetry={pdfBlob.retry} />

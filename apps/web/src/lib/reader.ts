@@ -90,7 +90,7 @@ export function makeNonce(): string {
 /** The only script that runs in the sandboxed iframe. Talks to the parent via postMessage only. */
 export function readerScript(): string {
   return `(function(){
-var SEL=${JSON.stringify(PROGRESS_ANCHOR_SELECTOR)};var pending=null,user=false,timer=null,root=document.documentElement;
+var SEL=${JSON.stringify(PROGRESS_ANCHOR_SELECTOR)};var pending=null,user=false,timer=null,last=0,root=document.documentElement;
 function sc(){return document.scrollingElement||root}
 function anchors(){return document.body?document.body.querySelectorAll(SEL):[]}
 function post(m){parent.postMessage(m,"*")}
@@ -98,7 +98,7 @@ function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(
 for(var i=0;i<l.length;i++){if(l[i].getBoundingClientRect().bottom>1){a=i;break}}
 post({type:"sroka:metrics",progress:p,anchor:a})}
 function restore(){if(pending==null)return;var el=anchors()[pending];if(el){var s=sc();s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8}}
-addEventListener("scroll",function(){clearTimeout(timer);timer=setTimeout(report,500)},{passive:true});
+addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-last>=150){last=n;report()}else{timer=setTimeout(function(){last=Date.now();report()},150)}},{passive:true});
 ["wheel","touchstart","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("message",function(e){if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=="object")return;
 if(d.type==="sroka:scrollToAnchor"&&typeof d.anchor==="number"){pending=d.anchor;if(!user)restore()}

@@ -28,6 +28,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -121,6 +122,7 @@ class ReaderViewModel @AssistedInject constructor(
     private var reported: ProgressReport? = null
     private var lastSavedAt: Long? = null
     private var unsaved = false
+    private var trailingSave: Job? = null
     private var ready = false
 
     val item: StateFlow<Item?> = library.observeItem(itemId)
@@ -319,18 +321,34 @@ class ReaderViewModel @AssistedInject constructor(
         return RestorePoint(saved?.progressAnchor, saved?.progress ?: 0f)
     }
 
-    /** Called by the reader script (debounced in JS); persists at most every [SAVE_INTERVAL_MS]. */
+    /**
+     * Called by the reader script (throttled in JS, also while flinging). Persists at most every
+     * [SAVE_INTERVAL_MS], and once more [SAVE_DEBOUNCE_MS] after scrolling stops, so the final position is
+     * written (and synced) without waiting for the reader to close.
+     */
     fun onProgress(report: ProgressReport) {
         if (!ready) return
         reported = report
         _progress.value = report.progress
         unsaved = true
+        trailingSave?.cancel()
         val now = nowMillis()
         if (lastSavedAt.let { it == null || now - it >= SAVE_INTERVAL_MS }) {
-            lastSavedAt = now
-            unsaved = false
-            viewModelScope.launch { library.setProgress(itemId, report.progress, report.anchor) }
+            saveReported(now)
+        } else {
+            trailingSave = viewModelScope.launch {
+                delay(SAVE_DEBOUNCE_MS)
+                saveReported(nowMillis())
+            }
         }
+    }
+
+    private fun saveReported(now: Long) {
+        val report = reported ?: return
+        if (!ready || !unsaved) return
+        lastSavedAt = now
+        unsaved = false
+        viewModelScope.launch { library.setProgress(itemId, report.progress, report.anchor) }
     }
 
     /** Persist the latest position (and bump lastRead) when leaving or stopping. */
@@ -429,6 +447,7 @@ class ReaderViewModel @AssistedInject constructor(
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
         const val SAVE_INTERVAL_MS = 2_000L
+        const val SAVE_DEBOUNCE_MS = 1_000L
         const val RECENT_TAGS = 8
         const val REFRESH_TIMEOUT_MS = 90_000L
         const val REFRESH_POLL_MS = 4_000L

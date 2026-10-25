@@ -41,10 +41,11 @@
             android:label="@string/share_label"
             android:theme="@style/Theme.Sroka.Translucent"
             android:windowSoftInputMode="adjustResize">
+            <!-- Links: text/plain from most apps; some send text/x-uri, text/uri-list or text/html. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/*" />
             </intent-filter>
             <!-- PDF files: uploaded to the library. -->
             <intent-filter>

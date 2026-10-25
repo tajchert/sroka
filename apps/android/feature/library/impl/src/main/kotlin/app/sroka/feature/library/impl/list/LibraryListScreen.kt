@@ -74,6 +74,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -156,6 +157,8 @@ fun LibraryListRoute(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val currentOpenItem by rememberUpdatedState(onOpenItem)
+    val currentSort by rememberUpdatedState(state.sort)
+    listState.StayAtTopOnInsert(firstKey = if (items.itemCount > 0) items.peek(0)?.id else null)
     var dropState by remember { mutableStateOf(DropState.Idle) }
     val dropTarget = remember {
         object : DragAndDropTarget {
@@ -201,6 +204,10 @@ fun LibraryListRoute(
 
     LaunchedEffect(viewModel) {
         merge(viewModel.events, viewModel.uploadEvents).collect { event ->
+            // A new save is the newest item: scroll up so it is visible (newest-first sort only).
+            if (event.addsNewItem() && currentSort == SortOrder.NEWEST) {
+                coroutineScope.launch { listState.animateScrollToItem(0) }
+            }
             // collectLatest-like behavior: a newer message replaces the current one.
             snackbarHostState.currentSnackbarData?.dismiss()
             coroutineScope.launch {
@@ -447,7 +454,7 @@ fun LibraryListContent(
                     containerColor = brand.brand,
                     contentColor = brand.onBrand,
                     icon = { Icon(SrokaIcons.Add, contentDescription = null) },
-                    text = { Text(stringResource(R.string.feature_library_save_link)) },
+                    text = { Text(stringResource(R.string.feature_library_fab_save)) },
                 )
             }
         },
@@ -521,6 +528,22 @@ internal fun DropTargetCard(hovered: Boolean) {
         Text(label, style = MaterialTheme.typography.titleMedium, color = colors.onPrimaryContainer)
     }
 }
+
+/**
+ * An item inserted above the first visible one (a save, a sync pull) would land off-screen, because the list
+ * keeps its position by key. While the list sits at the very top, keep it there so the new row shows.
+ */
+@Composable
+private fun LazyListState.StayAtTopOnInsert(firstKey: Any?) {
+    val seen = remember { FirstKeyHolder() }
+    if (seen.key == firstKey) return
+    seen.key = firstKey
+    Snapshot.withoutReadObservation {
+        if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) requestScrollToItem(0)
+    }
+}
+
+private class FirstKeyHolder(var key: Any? = null)
 
 /** True at the top of the list or while the last scroll moved up (FAB expanded); false when scrolling down. */
 @Composable

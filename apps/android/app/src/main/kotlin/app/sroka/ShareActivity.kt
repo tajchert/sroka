@@ -20,7 +20,7 @@ import app.sroka.feature.library.impl.save.SaveSheetHost
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * Target of the system share sheet (ACTION_SEND text/plain). Translucent, so the save sheet
+ * Target of the system share sheet (ACTION_SEND links as any text type, and PDF files). Translucent, so the save sheet
  * appears over the app the user shared from; it saves locally and finishes on its own.
  */
 @AndroidEntryPoint
@@ -31,7 +31,7 @@ class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+        val sharedText = sharedLinkText(intent)
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
         val pdfUris = if (isPdfShare(intent)) sharedPdfUris(intent) else null
 
@@ -86,6 +86,20 @@ class ShareActivity : ComponentActivity() {
     }
 }
 
+/**
+ * The shared text that should contain the link: `EXTRA_TEXT` (a CharSequence for some senders), else the
+ * ClipData text/URI, else the intent data URI.
+ */
+internal fun sharedLinkText(intent: Intent): String? {
+    intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let { return it }
+    val clip = intent.clipData
+    for (i in 0 until (clip?.itemCount ?: 0)) {
+        val item = clip!!.getItemAt(i)
+        (item.text?.toString() ?: item.uri?.toString())?.takeIf { it.isNotBlank() }?.let { return it }
+    }
+    return intent.dataString
+}
+
 /** True when [intent] shares PDF file(s) rather than a link. */
 internal fun isPdfShare(intent: Intent): Boolean =
     (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE) && intent.type == "application/pdf"
@@ -109,7 +123,7 @@ internal fun sharedPdfUris(intent: Intent): List<Uri> {
 
 /**
  * Intent extra on the MainActivity launch from the save sheet ("Open Sroka" / "Continue reading"):
- * the item id whose reader should open. The nav host does not consume it yet (see LEDGER T4 note).
+ * the item id whose reader should open; MainActivity hands it to the nav host.
  */
 const val EXTRA_OPEN_ITEM_ID = "app.sroka.extra.OPEN_ITEM_ID"
 

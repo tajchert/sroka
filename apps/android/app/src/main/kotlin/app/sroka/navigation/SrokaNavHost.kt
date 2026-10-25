@@ -162,7 +162,7 @@ fun SrokaApp(
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     val layoutType = if (current != null && !shell.hideNavigation) adaptiveType else NavigationSuiteType.None
     val railShown = layoutType.isRail()
-    // The rail's "Save link" button asks the next list that is shown to open its add-link dialog.
+    // The rail's "Save" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
     val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
 

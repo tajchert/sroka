@@ -94,6 +94,13 @@ sealed interface ListEvent {
     data class PdfFailed(val error: PdfUploadError) : ListEvent
 }
 
+/** True for events that put a new item into the library (a saved link, dropped links, queued PDFs). */
+internal fun ListEvent.addsNewItem(): Boolean = when (this) {
+    is ListEvent.DropSaved, is ListEvent.PdfQueued -> true
+    is ListEvent.Info -> message == R.string.feature_library_snack_saved
+    else -> false
+}
+
 /** Snackbar text for archive/unarchive; offline adds "Syncs when you're online" (R6). */
 @StringRes
 internal fun archiveMessage(archived: Boolean, offline: Boolean): Int = when {

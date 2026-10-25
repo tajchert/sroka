@@ -67,3 +67,28 @@ fun SignInCodeStepLandscape() {
         )
     }
 }
+
+@PreviewTest
+@FoldablePreviews
+@Preview(name = "Tablet landscape", widthDp = 1280, heightDp = 800, apiLevel = 36, showBackground = true)
+@Composable
+fun SignInCodeStep() {
+    SrokaTheme(darkTheme = false) {
+        AuthScreen(
+            state = AuthUiState(
+                step = AuthStep.CODE,
+                email = "magpie@example.com",
+                code = "12",
+                serverUrl = "https://api.sroka.app",
+            ),
+            onEmailChange = {},
+            onSendCode = {},
+            onCodeChange = {},
+            onResend = {},
+            onChangeEmail = {},
+            onOpenServer = {},
+            onDismissServer = {},
+            onSaveServer = {},
+        )
+    }
+}

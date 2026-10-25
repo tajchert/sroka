@@ -37,7 +37,7 @@ data class RailDestination(
 )
 
 /**
- * The 96dp navigation rail for wide windows (R13, screen 17): the "Save link" FAB on top, the four
+ * The 96dp navigation rail for wide windows (R13, screen 17): the "Save" FAB on top, the four
  * tabs (56x32 indicator, filled icon when selected) and the account avatar at the bottom, which opens
  * Settings. Stateless: [selectedIndex] is the highlighted destination (or -1).
  */
@@ -95,7 +95,7 @@ fun SaveLinkButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         shadowElevation = 6.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(SrokaIcons.Add, contentDescription = stringResource(R.string.nav_save_link))
+            Icon(SrokaIcons.Add, contentDescription = stringResource(R.string.nav_save))
         }
     }
 }

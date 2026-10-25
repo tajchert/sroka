@@ -10,7 +10,7 @@
     <string name="feature_library_search_bar_favorites">Search Favourites</string>
     <string name="feature_library_search_bar_archive">Search Archive</string>
     <string name="feature_library_search_bar_tags">Search Tags</string>
-    <string name="feature_library_save_link">Save link</string>
+    <string name="feature_library_fab_save">Save</string>
     <string name="feature_library_card_downloading">Downloading for offline</string>
     <string name="feature_library_card_downloading_count">%1$d of %2$d</string>
     <plurals name="feature_library_card_offline_changes">

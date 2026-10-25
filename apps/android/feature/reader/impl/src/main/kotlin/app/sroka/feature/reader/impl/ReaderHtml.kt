@@ -197,7 +197,7 @@ object ReaderHtml {
     private val SCRIPT = """
 (function(){
 var SEL=__SEL__,START_A=__START_A__,START_P=__START_P__;
-var timer=null,user=false,root=document.documentElement;
+var timer=null,last=0,user=false,root=document.documentElement;
 function sc(){return document.scrollingElement||root}
 function anchors(){return document.body?document.body.querySelectorAll(SEL):[]}
 function send(m){try{if(window.__BRIDGE__&&window.__BRIDGE__.postMessage){window.__BRIDGE__.postMessage(m)}else if(window.__FALLBACK__){window.__FALLBACK__.post(m)}}catch(e){}}
@@ -205,7 +205,7 @@ function firstVisible(){var l=anchors();for(var i=0;i<l.length;i++){if(l[i].getB
 function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,a=firstVisible();var pe=document.getElementById("sk-pct");if(pe)pe.textContent=Math.round(p*100)+"%";send(p.toFixed(4)+"|"+(a==null?"":a))}
 function toAnchor(i){var el=anchors()[i];if(el){var s=sc();s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8;return true}return false}
 function restore(){if(user)return;if(START_A!==null&&toAnchor(START_A))return;if(START_P>0){var s=sc(),max=s.scrollHeight-s.clientHeight;if(max>0)s.scrollTop=START_P*max}}
-addEventListener("scroll",function(){clearTimeout(timer);timer=setTimeout(report,500)},{passive:true});
+addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-last>=150){last=n;report()}else{timer=setTimeout(function(){last=Date.now();report()},150)}},{passive:true});
 ["touchstart","wheel","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("load",function(){restore();setTimeout(restore,300)});
 window.__srokaSetAppearance=function(theme,scale){var a=firstVisible();root.setAttribute("data-theme",theme);root.style.setProperty("--scale",scale);if(a!==null)toAnchor(a)};

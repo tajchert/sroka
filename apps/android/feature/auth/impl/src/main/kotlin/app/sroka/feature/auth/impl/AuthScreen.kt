@@ -69,6 +69,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,12 +127,15 @@ private fun EmailStep(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoColumn = maxWidth > maxHeight && maxHeight < 480.dp
         val capped = maxWidth >= 600.dp && !twoColumn
+        val height = maxHeight
         Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             Column(
                 Modifier
                     .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = if (twoColumn) 24.dp else 64.dp),
+                    // Tablets: start the form a sixth of the way down instead of hugging the top edge.
+                    .padding(start = 24.dp, end = 24.dp, top = if (twoColumn) 24.dp else if (capped) height / 6 else 64.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (twoColumn) {
@@ -145,7 +149,8 @@ private fun EmailStep(
                     }
                 } else {
                     Column(
-                        Modifier.fillMaxWidth().then(if (capped) Modifier.widthIn(max = 400.dp) else Modifier),
+                        // widthIn before fillMaxWidth: the other order lets fillMaxWidth's fixed width win and the cap is ignored.
+                        Modifier.widthIn(max = if (capped) 400.dp else Dp.Unspecified).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(32.dp),
                     ) {
                         EmailHeader()
@@ -234,6 +239,7 @@ private fun CodeStep(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoColumn = maxWidth > maxHeight && maxHeight < 480.dp
         val capped = maxWidth >= 600.dp && !twoColumn
+        val height = maxHeight
         Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             TopAppBar(
                 title = {},
@@ -250,8 +256,9 @@ private fun CodeStep(
             Column(
                 Modifier
                     .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, top = 8.dp),
+                    .padding(start = 24.dp, end = 24.dp, top = if (capped) height / 8 else 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (twoColumn) {
@@ -265,7 +272,8 @@ private fun CodeStep(
                     }
                 } else {
                     Column(
-                        Modifier.fillMaxWidth().then(if (capped) Modifier.widthIn(max = 400.dp) else Modifier),
+                        // widthIn before fillMaxWidth: the other order lets fillMaxWidth's fixed width win and the cap is ignored.
+                        Modifier.widthIn(max = if (capped) 400.dp else Dp.Unspecified).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         CodeHeader(state)

@@ -225,6 +225,25 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun throttledPositionIsSavedOnceScrollingStops() = runTest(dispatcher) {
+        seed()
+        content.html.value = mapOf(id to "<p>x</p>")
+        val vm = vm().also { it.collect(backgroundScope) }
+        vm.onProgress(ProgressReport(0.1f, 1)) // saved
+        clock += 300
+        vm.onProgress(ProgressReport(0.2f, 2)) // throttled, trailing save scheduled
+        testScheduler.advanceTimeBy(500)
+        clock += 500
+        vm.onProgress(ProgressReport(0.4f, 4)) // restarts the trailing save
+        testScheduler.advanceTimeBy(900)
+        assertEquals(0.1f, library.items.value.single().progress)
+        testScheduler.advanceTimeBy(200)
+        val saved = library.items.value.single()
+        assertEquals(0.4f, saved.progress)
+        assertEquals(4, saved.progressAnchor)
+    }
+
+    @Test
     fun clearingTheViewModelFlushesLastPosition() = runTest(dispatcher) {
         seed()
         content.html.value = mapOf(id to "<p>x</p>")

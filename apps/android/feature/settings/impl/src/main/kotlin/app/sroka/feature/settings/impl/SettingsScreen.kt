@@ -1,5 +1,7 @@
 package app.sroka.feature.settings.impl
 
+import androidx.compose.foundation.layout.fillMaxSize
+import app.sroka.core.designsystem.component.readableWidth
 import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.Context
 import android.text.format.Formatter
@@ -180,7 +182,10 @@ fun SettingsScreen(
     ) { padding ->
         val downloadAllNow = rememberWithNotificationPermission(vm.downloadAllNow)
         // Two-pane: every row is inset the same, so the rounded highlight of the open row lines up with the rest (R13).
-        Column(Modifier.padding(padding).padding(horizontal = if (twoPane) 8.dp else 0.dp).verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier.padding(padding).padding(horizontal = if (twoPane) 8.dp else 0.dp).fillMaxSize()
+                .verticalScroll(rememberScrollState()).readableWidth(),
+        ) {
             SectionHeader(R.string.feature_settings_section_reading)
             SettingRow(
                 SrokaIcons.DarkMode,

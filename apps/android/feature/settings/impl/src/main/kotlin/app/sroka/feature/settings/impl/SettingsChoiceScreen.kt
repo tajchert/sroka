@@ -1,5 +1,6 @@
 package app.sroka.feature.settings.impl
 
+import app.sroka.core.designsystem.component.readableWidth
 import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +54,7 @@ fun SettingsChoiceScreen(
         onBack = {},
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).readableWidth()) {
             if (kind == SettingsChoiceKind.Server) {
                 var value by rememberSaveable { mutableStateOf(state.serverUrl) }
                 val switching = isServerSwitch(value, state.serverUrl)

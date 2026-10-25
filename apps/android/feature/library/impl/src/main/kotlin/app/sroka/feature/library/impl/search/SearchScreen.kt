@@ -1,5 +1,6 @@
 package app.sroka.feature.library.impl.search
 
+import app.sroka.core.designsystem.component.readableWidth
 import app.sroka.core.designsystem.icon.SrokaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -140,7 +141,7 @@ fun SearchContent(
     val focusManager = LocalFocusManager.current
 
     Scaffold(containerColor = MaterialTheme.colorScheme.surfaceContainer) { padding ->
-        Column(Modifier.padding(padding).imePadding().fillMaxSize()) {
+        Column(Modifier.padding(padding).imePadding().fillMaxSize().readableWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(SrokaIcons.ArrowBack, contentDescription = stringResource(R.string.feature_library_close_search))

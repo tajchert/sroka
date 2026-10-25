@@ -1,5 +1,7 @@
 package app.sroka.feature.settings.impl
 
+import androidx.compose.foundation.layout.fillMaxSize
+import app.sroka.core.designsystem.component.readableWidth
 import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -98,7 +100,7 @@ fun ExportScreen(
         onBack = onBack,
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).readableWidth()) {
             GroupLabel(stringResource(R.string.feature_settings_export_format))
             Column(Modifier.selectableGroup()) {
                 ExportFormat.entries.forEach { format ->

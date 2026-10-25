@@ -1,5 +1,7 @@
 package app.sroka.feature.settings.impl
 
+import androidx.compose.foundation.layout.fillMaxSize
+import app.sroka.core.designsystem.component.readableWidth
 import app.sroka.core.designsystem.icon.SrokaIcons
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -92,7 +94,7 @@ fun ImportScreen(
         detailPane = detailPane,
         onBack = onBack,
     ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).readableWidth()) {
             Text(
                 stringResource(R.string.feature_settings_import_intro),
                 style = MaterialTheme.typography.bodyMedium,

@@ -5,7 +5,7 @@ const para = "The quick brown fox jumps over the lazy dog while reading a long a
 const PAGE = `<!doctype html><html lang="en"><head><title>Doc Title</title><meta property="og:title" content="OG Title">
 <meta name="description" content="Desc"></head><body>
 <div class="promo">PROMO ${para.repeat(30)}</div>
-<article><h1>Hello</h1><p>${para.repeat(8)}</p><p class="ad">BUY NOW ${para}</p><p>${para.repeat(8)}</p></article>
+<article><h1>Hello</h1><p>${para.repeat(8)}</p><p class="aside-x">BUY NOW ${para}</p><p>${para.repeat(8)}</p></article>
 <section id="real"><p>REAL CONTENT ${para.repeat(3)}</p></section>
 </body></html>`;
 
@@ -13,7 +13,7 @@ describe("extractArticle options", () => {
   it("removeSelectors drops elements before extraction; invalid selectors are ignored", () => {
     const plain = extractArticle(PAGE, "https://example.com/a")!;
     expect(plain.text).toContain("BUY NOW");
-    const ex = extractArticle(PAGE, "https://example.com/a", { removeSelectors: [".ad", "[[invalid", ".promo"] })!;
+    const ex = extractArticle(PAGE, "https://example.com/a", { removeSelectors: [".aside-x", "[[invalid", ".promo"] })!;
     expect(ex.text).not.toContain("BUY NOW");
     expect(ex.text).not.toContain("PROMO");
     expect(ex.text).toContain("quick brown fox");

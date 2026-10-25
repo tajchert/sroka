@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
@@ -11,6 +13,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@sroka/shared": "*",
+    "defuddle": "0.19.6",
     "fflate": "^0.8.3",
     "linkedom": "^0.18.13",
     "sanitize-html": "^2.18.1"

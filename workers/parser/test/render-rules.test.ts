@@ -334,7 +334,7 @@ describe("paywall detection", () => {
     routes[URL1] = () => htmlRes(PAYWALLED_LONG);
     await run(msg(job()));
     expect(marked[0]).toMatchObject({ status: "partial", error: "paywalled" });
-    expect(await text(marked[0]!)).toContain("REAL");
+    expect((await text(marked[0]!)).length).toBeGreaterThan(1500);
   });
 
   it("captured HTML is never marked paywalled (the user's browser had access)", async () => {

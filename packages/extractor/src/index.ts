@@ -1,4 +1,4 @@
-// @sroka/extractor — pure extraction pipeline (fetch → Readability → sanitize → images → package).
+// @sroka/extractor — pure extraction pipeline (fetch → Defuddle/Readability → sanitize → images → package).
 export { PARSER_VERSION } from "@sroka/shared";
 export * from "./ssrf.ts";
 export * from "./safe-fetch.ts";

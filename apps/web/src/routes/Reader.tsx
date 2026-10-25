@@ -3,12 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { patchItem } from "../lib/cache.ts";
 import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
+import { ICONS, MenuItem, MenuLink, MenuSep, MoreMenu, Star } from "../components/MoreMenu.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
 import { useScreenWakeLock } from "../lib/wakeLock.ts";
-import { formatSize } from "../lib/pdf.ts";
-import { hostOf, isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
+import { isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import {
   DEFAULT_READER_SETTINGS,
   buildSrcdoc,
@@ -191,11 +191,14 @@ export default function Reader() {
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || !item) return;
       if (e.key === "a") void actions.setArchived(item, item.status !== "archived");
       else if (e.key === "f") void actions.toggleFavorite(item);
-      else if (e.key === "Escape") navigate(-1);
+      else if (e.key === "Escape") {
+        if (panel) setPanel("");
+        else navigate(-1);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [item, actions, navigate]);
+  }, [item, actions, navigate, panel]);
 
   if (itemQ.isPending) return <div className="flex justify-center py-24"><span className="spinner" aria-label="Loading" /></div>;
   if (itemQ.isError || !item) {
@@ -212,52 +215,106 @@ export default function Reader() {
   const isPdf = item.kind === "pdf";
   const waiting = item.parseStatus === "pending" && !contentId;
   const failed = !contentId && !waiting;
-  const domain = hostOf(item.canonicalUrl || item.url);
-  const subtitle = isPdf
-    ? ["PDF", item.fileSize ? formatSize(item.fileSize) : null, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ")
-    : [item.siteName ?? domain, item.author, item.readingMinutes ? `${item.readingMinutes} min read` : null].filter(Boolean).join(", ");
-
   const percent = Math.round((liveProgress ?? item.progress) * 100);
+  const togglePanel = (p: "settings" | "tags") => setPanel(panel === p ? "" : p);
+  // The title lives in the article header; the toolbar shows it once that has scrolled away (always for PDFs).
+  const miniTitle = isPdf || !srcdoc || (liveProgress ?? 0) > 0.03;
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-rule px-4 py-3 sm:px-8">
-        <div className="mx-auto flex max-w-4xl flex-col gap-2">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <Link to={archived ? "/archive" : "/"} className="text-xs text-ink2 hover:text-ink hover:underline">
-                Back to {archived ? "Archive" : "My List"}
-              </Link>
-              <h1 className="font-serif text-xl font-semibold leading-snug sm:text-2xl">{itemTitle(item)}</h1>
-              <p className="mt-0.5 text-sm text-ink2">
-                {subtitle}
-                {!isPdf && srcdoc && <span className="tabular-nums">{subtitle ? ", " : ""}{percent}% read</span>}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {isPdf ? (
+      <header className="relative z-20 flex h-14 shrink-0 items-center gap-3 border-b border-rule px-2 sm:px-4">
+        <Link
+          to={archived ? "/archive" : "/"}
+          title="Back (Esc)"
+          className="flex h-9 shrink-0 items-center gap-1 rounded-[9px] pr-3 pl-1.5 text-sm text-ink2 hover:bg-paper3 hover:text-ink"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+            <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>{archived ? "Archive" : "My List"}</span>
+        </Link>
+        <h1
+          aria-hidden={!miniTitle}
+          className={`min-w-0 flex-1 truncate text-center text-sm font-semibold transition-opacity duration-200 ${miniTitle ? "opacity-100" : "opacity-0"}`}
+        >
+          {itemTitle(item)}
+        </h1>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {isPdf ? (
+            <ToolLink href={pdfBlob.url} label="Open in new tab" icon={ICONS.external} />
+          ) : (
+            <ToolLink href={item.url} label="Open original" icon={ICONS.external} />
+          )}
+          <ToolBtn label={item.isFavorite ? "Remove from favorites (f)" : "Add to favorites (f)"} pressed={item.isFavorite} onClick={() => void actions.toggleFavorite(item)}>
+            <Star on={item.isFavorite} />
+          </ToolBtn>
+          <ToolBtn label="Tags" expanded={panel === "tags"} onClick={() => togglePanel("tags")}>
+            {ICONS.tag}
+          </ToolBtn>
+          {!isPdf && (
+            <button
+              type="button"
+              title="Reader settings"
+              aria-label="Reader settings"
+              aria-expanded={panel === "settings"}
+              onClick={() => togglePanel("settings")}
+              className={`flex size-9 cursor-pointer items-center justify-center rounded-[9px] font-serif text-[15px] font-semibold hover:bg-paper3 hover:text-ink ${panel === "settings" ? "bg-paper3 text-ink" : "text-ink2"}`}
+            >
+              Aa
+            </button>
+          )}
+          <ToolBtn label={archived ? "Move to My List (a)" : "Archive (a)"} onClick={() => void actions.setArchived(item, !archived)}>
+            {archived ? ICONS.unarchive : ICONS.archive}
+          </ToolBtn>
+          <MoreMenu className="size-9 rounded-[9px]">
+            {(close) => (
               <>
-                <a className="btn" aria-disabled={!pdfBlob.url} href={pdfBlob.url ?? undefined} download={item.fileName ?? "document.pdf"}>Download</a>
-                <a className="btn" aria-disabled={!pdfBlob.url} href={pdfBlob.url ?? undefined} target="_blank" rel="noopener noreferrer">Open in new tab</a>
+                {isPdf && pdfBlob.url && (
+                  <MenuLink href={pdfBlob.url} download={item.fileName ?? "document.pdf"} icon={ICONS.download} onClick={close}>
+                    Download
+                  </MenuLink>
+                )}
+                {!isPdf && (
+                  <MenuItem icon={ICONS.refresh} onClick={() => { close(); void actions.refresh(item); }}>
+                    Refresh content
+                  </MenuItem>
+                )}
+                <MenuSep />
+                <MenuItem icon={ICONS.trash} danger onClick={() => { close(); actions.remove(item, () => navigate(archived ? "/archive" : "/")); }}>
+                  Delete
+                </MenuItem>
               </>
-            ) : (
-              <a className="btn" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
             )}
-            <button className="btn" onClick={() => void actions.setArchived(item, !archived)}>{archived ? "Move to My List" : "Archive"}</button>
-            <button className="btn" aria-pressed={item.isFavorite} onClick={() => void actions.toggleFavorite(item)}>
-              {item.isFavorite ? "★ Favorite" : "☆ Favorite"}
-            </button>
-            <button className="btn" aria-expanded={panel === "tags"} onClick={() => setPanel(panel === "tags" ? "" : "tags")}>
-              Tags{item.tags.length ? ` (${item.tags.length})` : ""}
-            </button>
-            {!isPdf && <button className="btn" aria-expanded={panel === "settings"} onClick={() => setPanel(panel === "settings" ? "" : "settings")}>Reader settings</button>}
-            {!isPdf && <button className="btn" onClick={() => void actions.refresh(item)}>Refresh</button>}
-            <button className="btn btn-danger" onClick={() => actions.remove(item, () => navigate(archived ? "/archive" : "/"))}>Delete</button>
-          </div>
-          {panel === "tags" && <TagEditor tags={item.tags} onChange={(tags) => void actions.setTags(item, tags)} />}
-          {!isPdf && panel === "settings" && <SettingsPanel settings={settings} onChange={change} />}
+          </MoreMenu>
         </div>
+        {panel && (
+          <>
+            <div aria-hidden className="fixed inset-0 z-30" onClick={() => setPanel("")} />
+            <div
+              role="dialog"
+              aria-label={panel === "tags" ? "Tags" : "Reader settings"}
+              className="absolute top-[52px] right-2 z-31 flex w-[min(300px,calc(100vw-16px))] flex-col gap-3.5 rounded-xl border border-rule2 bg-paper3 p-3.5 shadow-[0_12px_34px_rgb(0_0_0/.35)] sm:right-4"
+            >
+              {panel === "tags" ? (
+                <>
+                  <PanelLabel>Tags</PanelLabel>
+                  <TagEditor tags={item.tags} onChange={(tags) => void actions.setTags(item, tags)} />
+                </>
+              ) : (
+                <SettingsPanel settings={settings} onChange={change} />
+              )}
+            </div>
+          </>
+        )}
+        {!isPdf && srcdoc && (
+          <div
+            className="pointer-events-none absolute -bottom-px left-0 h-0.5 bg-wing transition-[width] duration-150 ease-out"
+            style={{ width: `${percent}%` }}
+            role="progressbar"
+            aria-label="Reading progress"
+            aria-valuenow={percent}
+          />
+        )}
       </header>
 
       {!isPdf && contentId && item.parseStatus === "partial" && (
@@ -280,11 +337,6 @@ export default function Reader() {
         </div>
       )}
       <div className="relative min-h-0 flex-1">
-        {!isPdf && srcdoc && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5" aria-hidden>
-            <div className="h-full bg-[var(--wing)] transition-[width] duration-150 ease-out" style={{ width: `${percent}%` }} />
-          </div>
-        )}
         {isPdf ? (
           contentId ? (
             <PdfViewer item={item} blobUrl={pdfBlob.url} error={pdfBlob.error} onRetry={pdfBlob.retry} />
@@ -350,33 +402,97 @@ function Notice({ title, body, busy, actions }: { title: string; body: string; b
   );
 }
 
+const toolCls = "flex size-9 cursor-pointer items-center justify-center rounded-[9px] hover:bg-paper3 hover:text-ink";
+
+function ToolBtn({ label, onClick, pressed, expanded, children }: { label: string; onClick: () => void; pressed?: boolean; expanded?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={pressed}
+      aria-expanded={expanded}
+      onClick={onClick}
+      className={`${toolCls} ${expanded ? "bg-paper3 text-ink" : "text-ink2"}`}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+        {children}
+      </svg>
+    </button>
+  );
+}
+
+function ToolLink({ href, label, icon }: { href: string | null; label: string; icon: React.ReactNode }) {
+  return (
+    <a
+      href={href ?? undefined}
+      aria-disabled={!href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={label}
+      aria-label={label}
+      className={`${toolCls} text-ink2 aria-disabled:pointer-events-none aria-disabled:opacity-50`}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+        {icon}
+      </svg>
+    </a>
+  );
+}
+
+const PanelLabel = ({ children }: { children: React.ReactNode }) => (
+  <div className="text-[11px] font-medium tracking-[.1em] text-ink3 uppercase">{children}</div>
+);
+
+const WIDTHS = [
+  { v: 560, l: "Narrow" },
+  { v: 680, l: "Medium" },
+  { v: 840, l: "Wide" },
+];
+
 function SettingsPanel({ settings, onChange }: { settings: ReaderSettings; onChange: (p: Partial<ReaderSettings>) => void }) {
-  const seg = <T extends string>(label: string, value: T, options: { v: T; l: string }[], key: keyof ReaderSettings) => (
-    <fieldset className="flex flex-wrap items-center gap-2">
-      <legend className="sr-only">{label}</legend>
-      <span className="w-20 text-sm text-ink2" aria-hidden>{label}</span>
-      {options.map((o) => (
-        <button key={o.v} className="btn !py-1" aria-pressed={value === o.v} style={value === o.v ? { borderColor: "var(--wing)", color: "var(--wing)" } : undefined} onClick={() => onChange({ [key]: o.v })}>
-          {o.l}
-        </button>
-      ))}
+  const seg = <T extends string | number>(label: string, value: T, options: { v: T; l: string; font?: string }[], key: keyof ReaderSettings) => (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="contents"><PanelLabel>{label}</PanelLabel></legend>
+      <div className="grid gap-1 rounded-[9px] bg-paper p-[3px]" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+        {options.map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            aria-pressed={value === o.v}
+            onClick={() => onChange({ [key]: o.v })}
+            style={o.font ? { fontFamily: o.font } : undefined}
+            className={`h-8 cursor-pointer rounded-[7px] text-[13px] ${value === o.v ? "bg-paper3 text-ink shadow-[0_0_0_1px_var(--rule-2)]" : "text-ink2 hover:text-ink"}`}
+          >
+            {o.l}
+          </button>
+        ))}
+      </div>
     </fieldset>
   );
-  const range = (label: string, key: "size" | "lineHeight" | "width", min: number, max: number, step: number, fmt: (n: number) => string) => (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="w-20 text-ink2">{label}</span>
-      <input type="range" min={min} max={max} step={step} value={settings[key]} onChange={(e) => onChange({ [key]: Number(e.target.value) })} className="accent-[var(--wing)]" />
-      <span className="w-14 text-ink2">{fmt(settings[key])}</span>
-    </label>
-  );
+  const step = (label: string, key: "size" | "lineHeight", min: number, max: number, by: number, fmt: (n: number) => string, small: string, big: string) => {
+    const set = (n: number) => onChange({ [key]: Math.round(Math.min(max, Math.max(min, n)) * 100) / 100 });
+    return (
+      <div className="flex flex-col gap-1.5">
+        <PanelLabel>{label}</PanelLabel>
+        <div className="flex items-center gap-1 rounded-[9px] bg-paper p-[3px]">
+          <button type="button" aria-label={`Decrease ${label.toLowerCase()}`} disabled={settings[key] <= min} onClick={() => set(settings[key] - by)} className="h-8 flex-1 cursor-pointer rounded-[7px] font-serif text-[13px] hover:bg-paper3 disabled:cursor-default disabled:opacity-40">{small}</button>
+          <div className="w-12 text-center font-mono text-xs text-ink2" aria-live="polite">{fmt(settings[key])}</div>
+          <button type="button" aria-label={`Increase ${label.toLowerCase()}`} disabled={settings[key] >= max} onClick={() => set(settings[key] + by)} className="h-8 flex-1 cursor-pointer rounded-[7px] font-serif text-lg hover:bg-paper3 disabled:cursor-default disabled:opacity-40">{big}</button>
+        </div>
+      </div>
+    );
+  };
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-rule bg-paper2 p-4">
-      {seg("Theme", settings.theme, [{ v: "system", l: "System" }, { v: "light", l: "Light" }, { v: "dark", l: "Dark" }, { v: "sepia", l: "Sepia" }], "theme")}
-      {seg("Font", settings.font, [{ v: "serif", l: "Serif" }, { v: "sans", l: "Sans" }, { v: "mono", l: "Mono" }], "font")}
-      {range("Size", "size", 14, 28, 1, (n) => `${n}px`)}
-      {range("Line height", "lineHeight", 1.3, 2.1, 0.05, (n) => n.toFixed(2))}
-      {range("Width", "width", 480, 960, 20, (n) => `${n}px`)}
-      <button className="btn w-fit !py-1" onClick={() => onChange(DEFAULT_READER_SETTINGS)}>Reset to defaults</button>
-    </div>
+    <>
+      {seg("Theme", settings.theme, [{ v: "system", l: "Auto" }, { v: "light", l: "Light" }, { v: "dark", l: "Dark" }, { v: "sepia", l: "Sepia" }], "theme")}
+      {seg("Typeface", settings.font, [{ v: "serif", l: "Serif", font: "var(--font-read)" }, { v: "sans", l: "Sans", font: "var(--font-ui)" }, { v: "mono", l: "Mono", font: "var(--font-mono)" }], "font")}
+      {step("Size", "size", 14, 28, 1, (n) => `${n}px`, "A−", "A+")}
+      {step("Line spacing", "lineHeight", 1.3, 2.1, 0.1, (n) => n.toFixed(1), "−", "+")}
+      {seg("Line width", settings.width, WIDTHS, "width")}
+      <button type="button" className="w-fit cursor-pointer text-xs text-link hover:underline" onClick={() => onChange(DEFAULT_READER_SETTINGS)}>
+        Reset to defaults
+      </button>
+    </>
   );
 }

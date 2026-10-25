@@ -16,6 +16,7 @@
   --color-tag: var(--tag);
   --color-tagink: var(--tag-ink);
   --color-beak: var(--beak);
+  --color-danger: var(--danger);
   --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-read);
@@ -140,6 +141,12 @@ button.chip:hover {
   font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
+}
+a.menu-item:hover {
+  color: var(--ink);
+}
+.menu-item.text-danger {
+  color: var(--danger);
 }
 .menu-item:hover,
 .menu-item:focus-visible {

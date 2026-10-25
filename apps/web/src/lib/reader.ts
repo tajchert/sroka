@@ -128,8 +128,13 @@ pre,code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.
 pre{overflow-x:auto;padding:.9em 1em;border:1px solid var(--rule);border-radius:6px}
 hr{border:0;border-top:1px solid var(--rule);margin:2em 0}
 table{border-collapse:collapse;display:block;overflow-x:auto}td,th{border:1px solid var(--rule);padding:.35em .6em}
+${HEAD_CSS}
 ${POST_CARD_CSS}`;
 }
+
+/** Article title + byline written by the extractor (`package.ts`), styled as the reader header. */
+const HEAD_CSS = `article>h1:first-child{margin:.2em 0 .5em;font-size:clamp(1.75rem,1.1rem + 2.4vw,2.6rem);line-height:1.15;letter-spacing:-.015em}
+article>h1:first-child+.byline{margin:0 0 2.25rem;padding:0 0 2rem;border-bottom:1px solid var(--rule);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--muted)}`;
 
 /**
  * X / Twitter post cards (extractor `twitter.ts`, classes allowlisted in `sanitize.ts` POST_CLASSES): one card per

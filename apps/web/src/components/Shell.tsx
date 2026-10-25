@@ -76,22 +76,28 @@ export default function Shell() {
   if (!me.data) return <><SignIn /><Toasts /></>;
 
   const stats = me.data.stats;
+  // Clicking the link of the page already shown scrolls it back to the top (and closes the mobile menu).
+  const toTopIfCurrent = (to: string) => () => {
+    if (decodeURIComponent(loc.pathname) !== decodeURIComponent(to)) return;
+    setOpen(false);
+    document.getElementById("scroll-root")?.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const nav = (
     <nav className="flex h-full flex-col gap-6 overflow-y-auto p-4" aria-label="Library">
       <NavLink to="/" className="px-2 pt-1 pb-2" end>
         <Wordmark />
       </NavLink>
       <div className="flex flex-col gap-0.5">
-        <NavLink to="/" end className={linkCls}>
+        <NavLink to="/" end className={linkCls} onClick={toTopIfCurrent("/")}>
           My List <span className="text-xs text-ink2">{stats.unread}</span>
         </NavLink>
-        <NavLink to="/archive" className={linkCls}>
+        <NavLink to="/archive" className={linkCls} onClick={toTopIfCurrent("/archive")}>
           Archive <span className="text-xs text-ink2">{stats.archived}</span>
         </NavLink>
-        <NavLink to="/favorites" className={linkCls}>
+        <NavLink to="/favorites" className={linkCls} onClick={toTopIfCurrent("/favorites")}>
           Favorites <span className="text-xs text-ink2">{stats.favorites}</span>
         </NavLink>
-        <NavLink to="/all" className={linkCls}>
+        <NavLink to="/all" className={linkCls} onClick={toTopIfCurrent("/all")}>
           All
         </NavLink>
       </div>
@@ -104,7 +110,7 @@ export default function Shell() {
         </div>
         {tags.data?.length === 0 && <p className="px-3 text-sm text-ink2">No tags yet.</p>}
         {tags.data?.map((t) => (
-          <NavLink key={t.id} to={`/tag/${encodeURIComponent(t.name)}`} className={linkCls}>
+          <NavLink key={t.id} to={`/tag/${encodeURIComponent(t.name)}`} className={linkCls} onClick={toTopIfCurrent(`/tag/${encodeURIComponent(t.name)}`)}>
             <span className="truncate">{t.name}</span> <span className="text-xs text-ink2">{t.count}</span>
           </NavLink>
         ))}

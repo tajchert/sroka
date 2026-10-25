@@ -41,6 +41,8 @@ interface ReqOpts<T> {
   query?: Record<string, string | number | undefined | null>;
   body?: unknown;
   form?: FormData;
+  /** Raw body (its type becomes Content-Type). */
+  blob?: Blob;
   schema?: Schema<T>;
   headers?: Record<string, string>;
 }
@@ -72,6 +74,10 @@ async function request<T = void>(path: string, opts: ReqOpts<T> = {}): Promise<T
   const headers: Record<string, string> = { Accept: "application/json", "X-Sroka-Device": "web", ...opts.headers };
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
+  else if (opts.blob) {
+    headers["Content-Type"] = opts.blob.type;
+    body = opts.blob;
+  }
   else if (opts.body !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opts.body);
@@ -156,6 +162,9 @@ export const api = {
   updateItem: async (id: string, patch: UpdateItemRequest): Promise<Item> =>
     (await request(`/v1/items/${id}`, { method: "PATCH", body: patch, schema: ItemResponse })).item,
   deleteItem: (id: string) => request(`/v1/items/${id}`, { method: "DELETE" }),
+  /** PDF first-page preview (webp or jpeg), api.md §5.9. */
+  putThumbnail: async (id: string, image: Blob): Promise<Item> =>
+    (await request(`/v1/items/${id}/thumbnail`, { method: "PUT", blob: image, schema: ItemResponse })).item,
   refreshItem: async (id: string): Promise<Item> =>
     (await request(`/v1/items/${id}/refresh`, { method: "POST", body: {}, schema: ItemResponse })).item,
   getContent: (id: string) => request(`/v1/items/${id}/content`, { schema: ContentUrlsResponse }),

@@ -1,7 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { RunQueue } from "./runQueue.ts";
-import { promoteItem } from "./cache.ts";
+import type { Item } from "@sroka/shared";
+import { api } from "./api.ts";
+import { patchItem, promoteItem } from "./cache.ts";
+import { reportClientError } from "./error-reporting.ts";
+import { renderPdfThumbnail } from "./pdf-thumb.ts";
 import { UploadError, checkFiles, checkMessages, mapUploadError, uploadPdf, type UploadHandle } from "./pdf.ts";
 import { useToasts } from "./store.tsx";
 
@@ -15,6 +19,18 @@ export interface UploadRow {
 }
 
 export const MAX_CONCURRENT_UPLOADS = 2;
+
+/** Best-effort first-page preview of a just-uploaded PDF; never reaches the user (api.md §5.9). */
+async function addPreview(qc: QueryClient, file: File, item: Item): Promise<void> {
+  if (item.leadImageKey) return; // a duplicate that already has one
+  const image = await renderPdfThumbnail(file);
+  if (!image) return;
+  try {
+    patchItem(qc, await api.putThumbnail(item.id, image));
+  } catch (e) {
+    reportClientError(e, "pdf thumbnail upload");
+  }
+}
 
 /** Upload queue for PDFs: validates, uploads at most 2 at a time (the rest wait), tracks per-file rows. */
 export function usePdfUploads() {
@@ -48,6 +64,7 @@ export function usePdfUploads() {
         void qc.invalidateQueries({ queryKey: ["tags"] });
         if (!created) toasts.push({ message: "Already saved. Moved to the top of My List." });
         dropRow(key);
+        void addPreview(qc, file, item);
       } catch (e) {
         const error = e instanceof UploadError ? e.message : mapUploadError({ status: 0, code: "network" });
         if (e instanceof UploadError && e.failure.code === "aborted") dropRow(key);

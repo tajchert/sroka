@@ -45,8 +45,19 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
       className={`group flex gap-3 rounded-xl ${temp ? "" : "cursor-pointer"} border-b border-rule/60 px-2 py-4 hover:bg-paper2 sm:gap-4 sm:px-3.5 ${selected ? "bg-paper2 shadow-[inset_3px_0_0_var(--wing)]" : ""}`}
     >
       <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-paper3 sm:h-[76px] sm:w-[120px]">
-        {pdf ? (
-          <div className="flex h-full w-full items-center justify-center text-lg font-semibold tracking-wide text-link" aria-hidden>
+        {pdf && item.leadImageUrl ? (
+          <>
+            <img src={item.leadImageUrl} alt="" loading="lazy" className="h-full w-full bg-white object-cover object-top" />
+            <span
+              data-testid="pdf-badge"
+              className="absolute top-1 left-1 rounded bg-[rgb(10_11_14/.7)] px-1 py-px text-[10px] leading-tight font-semibold tracking-wide text-white"
+              aria-hidden
+            >
+              PDF
+            </span>
+          </>
+        ) : pdf ? (
+          <div data-testid="pdf-tile" className="flex h-full w-full items-center justify-center text-lg font-semibold tracking-wide text-link" aria-hidden>
             PDF
           </div>
         ) : item.leadImageUrl ? (

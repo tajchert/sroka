@@ -6,6 +6,7 @@ import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
+import { useScreenWakeLock } from "../lib/wakeLock.ts";
 import { formatSize } from "../lib/pdf.ts";
 import { hostOf, isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import {
@@ -89,6 +90,8 @@ export default function Reader() {
   // Live position for the progress bar; the frame reports it every 150 ms while scrolling.
   const [liveProgress, setLiveProgress] = useState<number | null>(null);
   useEffect(() => setLiveProgress(null), [id]);
+  // Keep the screen on while reading; scrolling restarts the 5-minute idle timer.
+  useScreenWakeLock(true, liveProgress);
 
   // progress: iframe -> parent -> PATCH (throttled, flushed on leave)
   const pendingProgress = useRef<{ progress: number; anchor: number | null } | null>(null);

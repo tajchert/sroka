@@ -19,6 +19,20 @@ describe("extractArticle options", () => {
     expect(ex.text).toContain("quick brown fox");
   });
 
+  it("drops role=menu widgets (header dropdowns) even inside the article", () => {
+    const menu = `<nav class="dropdown-menu" role="menu"><ul role="none"><li role="none"><a role="menuitem" href="/login">CAIS Login</a></li></ul></nav>`;
+    const html = PAGE.replace("<article><h1>Hello</h1>", `<article>${menu}<h1>Hello</h1><div role="menubar"><a href="/x">Wealth Professionals</a></div>`);
+    const ex = extractArticle(html, "https://example.com/a", { contentSelector: "article" })!;
+    expect(ex.text).toContain("quick brown fox");
+    expect(ex.text).not.toContain("CAIS Login");
+    expect(ex.text).not.toContain("Wealth Professionals");
+    // Short page: Readability's flag-less retry keeps role=menu on its own.
+    const short = `<html><body><header>${menu}</header><article><p>A short post that is about seventy characters long, no more.</p></article></body></html>`;
+    const sx = extractArticle(short, "https://example.com/b")!;
+    expect(sx.text).toContain("seventy characters");
+    expect(sx.text).not.toContain("CAIS Login");
+  });
+
   it("contentSelector uses the matched element instead of Readability", () => {
     const ex = extractArticle(PAGE, "https://example.com/a", { contentSelector: "#real" })!;
     expect(ex.text.startsWith("REAL CONTENT")).toBe(true);

@@ -81,6 +81,8 @@ function safeQueryAll(doc: Doc, sel: string): El[] {
   }
 }
 
+const NEVER_CONTENT = '[role="menu"], [role="menubar"]';
+
 /** Run Readability over `html`. Returns null if no article content could be extracted. */
 export function extractArticle(html: string, url: string, opts: ExtractOptions = {}): Extracted | null {
   // Site-specific extractors first (they return null when the page doesn't look as expected).
@@ -100,7 +102,9 @@ export function extractArticle(html: string, url: string, opts: ExtractOptions =
   const ogDesc = meta(document, "og:description", "description");
   const published = meta(document, "article:published_time", "og:article:published_time", "date", "pubdate");
 
-  for (const sel of opts.removeSelectors ?? []) for (const el of safeQueryAll(document, sel)) el.remove();
+  // Dropdown/menu widgets (site switchers, login menus) are never article content; in captured DOM the page's
+  // scripts may have dropped the aria-hidden that would otherwise make Readability skip them.
+  for (const sel of [NEVER_CONTENT, ...(opts.removeSelectors ?? [])]) for (const el of safeQueryAll(document, sel)) el.remove();
 
   let host: string | null = null;
   try {

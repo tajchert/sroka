@@ -11,6 +11,7 @@ import Admin from "./routes/Admin.tsx";
 import Library from "./routes/Library.tsx";
 import Reader from "./routes/Reader.tsx";
 import Settings from "./routes/Settings.tsx";
+import Share from "./routes/Share.tsx";
 import Tags from "./routes/Tags.tsx";
 
 const router = createBrowserRouter(
@@ -26,6 +27,7 @@ const router = createBrowserRouter(
         { path: "/tags", element: <Tags /> },
         { path: "/item/:id", element: <Reader /> },
         { path: "/settings", element: <Settings /> },
+        { path: "/share", element: <Share /> },
         { path: "/admin", element: <Admin /> },
         { path: "*", element: <Library state="unread" /> },
       ],

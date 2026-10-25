@@ -47,6 +47,8 @@ write("docs/brand/glyph.svg", glyphSvg);
 write("apps/web/public/icon.svg", svg("rounded"));
 await png(svg("rounded"), 32, "apps/web/public/favicon-32.png");
 await png(svg("square"), 180, "apps/web/public/apple-touch-icon.png");
+// PWA install icons (apps/web/public/manifest.webmanifest).
+for (const n of [192, 512]) await png(svg("rounded"), n, `apps/web/public/icon-${n}.png`);
 
 // Chrome extension: Chrome does not mask icons, so corners are baked in.
 write("apps/extension/assets/icon.svg", svg("rounded"));

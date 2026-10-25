@@ -333,6 +333,20 @@ export class LibraryDO extends DurableObject<Env> {
     return { ok: true, item, parseJobs };
   }
 
+  /** Sets the client-uploaded first-page preview of a pdf item (`PUT /v1/items/:id/thumbnail`). */
+  async setPdfThumbnail(
+    itemId: string,
+    contentId: string,
+    key: string,
+  ): Promise<{ ok: true; item: Item; previousKey: string | null } | { ok: false }> {
+    this.ensureSchema();
+    const r = this.store.setPdfThumbnail(itemId, contentId, key);
+    if (!r.ok) return r;
+    const item = await this.signOne(this.store.getItem(itemId));
+    if (!item) throw new Error("setPdfThumbnail: item vanished");
+    return { ok: true, item, previousKey: r.previousKey };
+  }
+
   /** Alarm: deletes R2 dirs of upload reservations older than 1 hour that no live item references, then the rows. */
   async sweepPdfUploads(now: number = Date.now()): Promise<number> {
     this.ensureSchema();

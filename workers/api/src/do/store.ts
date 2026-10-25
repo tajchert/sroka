@@ -830,16 +830,16 @@ export class LibraryStore {
         this.exec("UPDATE items SET parse_status = 'failed', parse_error = ? WHERE id = ?", result.error ?? null, row.id);
       } else {
         // The file name stays the provisional title unless the PDF carries a real one; a user title always wins.
+        // lead_image_key is the client-uploaded preview (PUT /v1/items/:id/thumbnail), never set by the parser.
         this.exec(
           `UPDATE items SET title = COALESCE(?, title), excerpt = ?, site_name = 'PDF', author = ?, lang = ?, word_count = ?,
-             reading_minutes = ?, lead_image_key = ?, parse_status = ?, parse_error = ? WHERE id = ?`,
+             reading_minutes = ?, parse_status = ?, parse_error = ? WHERE id = ?`,
           result.title,
           result.excerpt,
           result.author,
           result.lang,
           result.wordCount,
           result.readingMinutes,
-          result.leadImageKey ?? null,
           result.status,
           result.error ?? null,
           row.id,
@@ -942,6 +942,20 @@ export class LibraryStore {
       return true;
     }, now);
     return res.value === null ? null : { jobs: res.ctx.jobs };
+  }
+
+  /**
+   * PUT /v1/items/:id/thumbnail commit: points `lead_image_key` of a live pdf item at the preview the route just wrote
+   * into its content dir. Refused when the item is gone, not a pdf, or its content id changed since the route read it.
+   */
+  setPdfThumbnail(itemId: string, contentId: string, key: string): { ok: true; previousKey: string | null } | { ok: false } {
+    return this.withCtx((ctx): { ok: true; previousKey: string | null } | { ok: false } => {
+      const row = this.itemRow(itemId);
+      if (!row || row.deleted_at !== null || row.kind !== "pdf" || row.content_id !== contentId) return { ok: false };
+      this.exec("UPDATE items SET lead_image_key = ? WHERE id = ?", key, row.id);
+      ctx.touchItem(row.id);
+      return { ok: true, previousKey: row.lead_image_key };
+    }).value;
   }
 
   // ---------- PDF upload reservations ----------

@@ -336,3 +336,55 @@ describe("review fixes", () => {
     expect(await listPrefix(`private/${user}/`)).toEqual([]);
   });
 });
+
+describe("LibraryDO.setPdfThumbnail", () => {
+  async function pdfItem(tag: string) {
+    const { raw, call, user, env } = makeApp();
+    const b = pdfBytes(tag);
+    const item = (await raw("POST", `/v1/items/pdf?name=${tag}.pdf`, b, hdr(b))).json.item;
+    return { call, user, env, item, lib: env.LIBRARY.getByName(user) };
+  }
+
+  it("sets leadImageKey, signs leadImageUrl and makes the item sync-visible", async () => {
+    const { call, item, lib } = await pdfItem("thumb-set");
+    const cursor = (await call("GET", "/v1/sync/pull?cursor=0")).json.cursor;
+    const r = await lib.setPdfThumbnail(item.id, item.contentId, "thumb.webp");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.previousKey).toBeNull();
+    expect(r.item.leadImageKey).toBe("thumb.webp");
+    expect(r.item.leadImageUrl).toMatch(/\/thumb\.webp$/);
+    expect((await lib.getItem(item.id))!.leadImageKey).toBe("thumb.webp");
+    const pull = await call("GET", `/v1/sync/pull?cursor=${cursor}`);
+    expect(pull.json.items.map((i: { id: string }) => i.id)).toContain(item.id);
+  });
+
+  it("returns the previous key when replacing", async () => {
+    const { item, lib } = await pdfItem("thumb-replace");
+    await lib.setPdfThumbnail(item.id, item.contentId, "thumb.jpg");
+    const r = await lib.setPdfThumbnail(item.id, item.contentId, "thumb.webp");
+    expect(r).toMatchObject({ ok: true, previousKey: "thumb.jpg" });
+  });
+
+  it("refuses an article, a deleted item, a wrong content id and an unknown id", async () => {
+    const { call, item, lib } = await pdfItem("thumb-refuse");
+    expect(await lib.setPdfThumbnail(item.id, uuidv7(), "thumb.webp")).toEqual({ ok: false });
+    expect(await lib.setPdfThumbnail(uuidv7(), item.contentId, "thumb.webp")).toEqual({ ok: false });
+    const art = await call("POST", "/v1/items", { url: "https://example.com/a" });
+    const artId = art.json.item.id;
+    expect(await lib.setPdfThumbnail(artId, item.contentId, "thumb.webp")).toEqual({ ok: false });
+    expect((await call("DELETE", `/v1/items/${item.id}`)).status).toBe(204);
+    expect(await lib.setPdfThumbnail(item.id, item.contentId, "thumb.webp")).toEqual({ ok: false });
+  });
+
+  it("a later pdf parse result keeps the uploaded thumbnail", async () => {
+    const { item, lib } = await pdfItem("thumb-parse");
+    await lib.setPdfThumbnail(item.id, item.contentId, "thumb.webp");
+    const ok = await lib.markParsed(item.id, {
+      status: "ok", parseGen: 1, contentId: item.contentId, contentPrivate: true, title: null, excerpt: "x", siteName: "PDF",
+      author: null, lang: null, wordCount: 1, readingMinutes: 1, parserVersion: 1,
+    });
+    expect(ok).toEqual({ ok: true });
+    expect((await lib.getItem(item.id))!.leadImageKey).toBe("thumb.webp");
+  });
+});

@@ -6,6 +6,7 @@ import {
   detectBotWall,
   detectPaywall,
   extractArticle,
+  extractHackerNews,
   extractTweet,
   FetchError,
   PARTIAL_BELOW_CHARS,
@@ -15,6 +16,7 @@ import {
   type ImageTransform,
   type SafeFetchOptions,
   safeFetch,
+  hnItemId,
   tweetRef,
 } from "@sroka/extractor";
 import { displayDomain, hashId, log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
@@ -286,9 +288,14 @@ export async function processJob(
   const fetchOptions: SafeFetchOptions = { fetch: deps.fetch, ownHosts: ownHosts(env) };
   const pageUrl = isPrivate ? job.url : stripParams(job.url, rule?.stripParams);
 
-  // 0. X / Twitter posts: the JSON APIs beat both the JS-app page and a capture of it (captures too: a post the API
-  // returns is public). A post is complete however short it is, so it is never `partial` and never rendered.
-  const apiArticle = tweetRef(job.url) ? await extractTweet(job.url, fetchOptions) : null;
+  // 0. X / Twitter posts and Hacker News items: the JSON APIs beat both the page and a capture of it (captures too:
+  // what the API returns is public). A post is complete however short it is, so it is never `partial` and never
+  // rendered. Hacker News: the story with its comment tree (D13).
+  const apiArticle = tweetRef(job.url)
+    ? await extractTweet(job.url, fetchOptions)
+    : hnItemId(job.url)
+      ? await extractHackerNews(job.url, fetchOptions)
+      : null;
   if (apiArticle) {
     stats.method = "api";
     extractOptions.minTextChars = 1;

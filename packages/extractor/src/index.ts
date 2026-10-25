@@ -11,3 +11,5 @@ export * from "./bot-wall.ts";
 export * from "./reddit.ts";
 export { detectPaywall } from "@sroka/shared";
 export * from "./twitter.ts";
+export * from "./hackernews.ts";
+export { renderThread, type DiscussionSite, type Thread, type ThreadComment, type ThreadPost } from "./discussion.ts";

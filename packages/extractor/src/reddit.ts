@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import type { Extracted } from "./extract.ts";
 import { normalizeText } from "./extract.ts";
-import { formatTweetDate } from "./twitter.ts";
+import { htmlText, MAX_COMMENTS, renderThread, type DiscussionSite, type ThreadComment as RComment, type ThreadPost as RPost, type Thread as RThread } from "./discussion.ts";
 
 /**
  * Reddit from the extension's capture (Reddit serves servers a "Prove your humanity" challenge). Readability keeps
@@ -13,9 +13,6 @@ import { formatTweetDate } from "./twitter.ts";
  * replies. Returns null when neither source is there (callers fall back to Readability).
  */
 
-const MAX_COMMENTS = 200;
-/** Reply levels shown below a top-level comment (or below the saved comment); deeper ones become a link. */
-const MAX_DEPTH = 3;
 
 type Doc = ReturnType<typeof parseHTML>["document"];
 /** Minimal linkedom element surface (works under DOM lib and workers-types). */
@@ -29,44 +26,6 @@ interface El {
   querySelector(sel: string): El | null;
   querySelectorAll(sel: string): Iterable<El>;
   closest(sel: string): El | null;
-}
-
-interface RPost {
-  title: string | null;
-  author: string | null;
-  sub: string | null;
-  flair: string | null;
-  score: number | null;
-  comments: number | null;
-  created: string | null;
-  permalink: string | null;
-  bodyHtml: string;
-  images: string[];
-  /** External link of a link post. */
-  link: string | null;
-  video: boolean;
-}
-
-interface RComment {
-  id: string | null;
-  author: string | null;
-  score: number | null;
-  created: string | null;
-  permalink: string | null;
-  bodyHtml: string;
-  deleted: boolean;
-  op: boolean;
-  children: RComment[];
-  /** Replies Reddit didn't send ("load more"). */
-  more: number;
-}
-
-interface RThread {
-  post: RPost;
-  comments: RComment[];
-  /** Top-level comments Reddit didn't send. */
-  more: number;
-  focusId: string | null;
 }
 
 export function isRedditUrl(url: string): boolean {
@@ -103,24 +62,14 @@ function plural(n: number, one: string) {
   return `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
 }
 
+const REDDIT: DiscussionSite = {
+  name: "Reddit",
+  user: (u) => ({ href: `https://www.reddit.com/user/${encodeURIComponent(u)}`, label: `u/${u}` }),
+};
+
 function num(el: El, name: string): number | null {
   const v = Number(attr(el, name));
   return Number.isFinite(v) && attr(el, name) !== null ? v : null;
-}
-
-/** Plain text of a small HTML fragment (comment/post bodies). */
-function htmlText(html: string): string {
-  return normalizeText(
-    html
-      .replace(/<(br|\/p|\/li|\/h\d|\/blockquote|\/pre)\b[^>]*>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;|&#x27;/g, "'")
-      .replace(/&amp;/g, "&"),
-  );
 }
 
 function isRemovedText(html: string): boolean {
@@ -308,113 +257,6 @@ function threadFromDom(doc: Doc, post: El, url: string): RThread {
   return { post: p, comments: roots, more: 0, focusId: redditCommentId(url) };
 }
 
-// ---- rendering --------------------------------------------------------------------------------------------------
-
-function dateHtml(iso: string | null, href: string | null): string {
-  if (!iso) return "";
-  const t = `<time datetime="${esc(iso)}">${esc(formatTweetDate(iso))}</time>`;
-  return `<span class="sr-post-date"> · ${href ? `<a href="${esc(href)}">${t}</a>` : t}</span>`;
-}
-
-const userLink = (u: string) => `<a href="https://www.reddit.com/user/${esc(u)}">u/${esc(u)}</a>`;
-
-function postCard(p: RPost, text: string[]): string {
-  const who = [p.sub ? `<strong>${esc(p.sub)}</strong>` : null, p.author ? userLink(p.author) : null].filter(Boolean).join(" · ");
-  const head = `<p class="sr-post-head"><span class="sr-post-who">${who}</span>${dateHtml(p.created, p.permalink)}</p>`;
-  const body: string[] = [];
-  if (p.flair) body.push(`<p><small>${esc(p.flair)}</small></p>`);
-  if (p.bodyHtml) {
-    body.push(`<div>${p.bodyHtml}</div>`);
-    text.push(htmlText(p.bodyHtml));
-  }
-  for (const src of p.images) body.push(`<figure><img src="${esc(src)}" alt=""></figure>`);
-  if (p.link) body.push(`<p><a href="${esc(p.link)}">${esc(p.link)}</a></p>`);
-  if (p.video && p.permalink) body.push(`<p><a href="${esc(p.permalink)}">Watch the video on Reddit</a></p>`);
-  const stats = [p.score !== null ? plural(p.score, "point") : null, p.comments !== null ? plural(p.comments, "comment") : null].filter(Boolean);
-  const statsHtml = stats.length ? `<p class="sr-post-stats"><small>${esc(stats.join(" · "))}</small></p>` : "";
-  return `<div class="sr-post">${head}<div class="sr-post-body">${body.join("\n")}</div>${statsHtml}</div>`;
-}
-
-const countAll = (cs: RComment[]): number => cs.reduce((n, c) => n + 1 + c.more + countAll(c.children), 0);
-
-function hasFocus(c: RComment, focusId: string): boolean {
-  return c.id === focusId || c.children.some((k) => hasFocus(k, focusId));
-}
-
-interface RenderCtx {
-  focusId: string | null;
-  text: string[];
-  focusText: string | null;
-  focusAuthor: string | null;
-}
-
-/** One comment (card at depth 0, nested reply below), its replies down to `limit`. */
-function commentHtml(c: RComment, depth: number, limit: number, ctx: RenderCtx): string {
-  const focus = !!ctx.focusId && c.id === ctx.focusId;
-  // Below the saved comment, depth restarts so its replies get the full MAX_DEPTH levels.
-  const childLimit = focus ? depth + MAX_DEPTH : limit;
-  const replies: string[] = [];
-  let hidden = c.more;
-  if (depth < childLimit) for (const k of c.children) replies.push(commentHtml(k, depth + 1, childLimit, ctx));
-  else hidden += countAll(c.children);
-  if (hidden && c.permalink) {
-    replies.push(`<p class="sr-post-stats"><small><a href="${esc(c.permalink)}">${esc(`${hidden.toLocaleString("en-US")} more ${hidden === 1 ? "reply" : "replies"}`)} on Reddit</a></small></p>`);
-  }
-  const repliesHtml = replies.length ? `<div class="sr-replies">${replies.join("\n")}</div>` : "";
-  const cls = `${depth === 0 ? "sr-post" : "sr-reply"}${focus ? " sr-post-focus" : ""}`;
-  if (c.deleted) {
-    // Keep a placeholder only when it holds the thread together.
-    return repliesHtml ? `<div class="${cls}"><p class="sr-post-head"><span class="sr-post-who">[deleted]</span></p>${repliesHtml}</div>` : "";
-  }
-  const t = htmlText(c.bodyHtml);
-  ctx.text.push(t);
-  if (focus) {
-    ctx.focusText = t;
-    ctx.focusAuthor = c.author;
-  }
-  const who = `<strong>${c.author ? userLink(c.author) : "[deleted]"}</strong>${c.op ? " <small>OP</small>" : ""}`;
-  const head = `<p class="sr-post-head"><span class="sr-post-who">${who}</span>${dateHtml(c.created, c.permalink)}</p>`;
-  const stats = c.score !== null ? `<p class="sr-post-stats"><small>${esc(plural(c.score, "point"))}</small></p>` : "";
-  return `<div class="${cls}">${head}<div class="sr-post-body">${c.bodyHtml}</div>${stats}${repliesHtml}</div>`;
-}
-
-function renderThread(th: RThread, lang: string | null, ogImage: string | null): Extracted | null {
-  const { post } = th;
-  const postText: string[] = [];
-  const ctx: RenderCtx = { focusId: th.focusId, text: [], focusText: null, focusAuthor: null };
-  // On a comment permalink the parents chain is context: show it whole, then MAX_DEPTH levels below the comment.
-  const focused = !!th.focusId && th.comments.some((c) => hasFocus(c, th.focusId!));
-  if (!focused) ctx.focusId = null;
-  const limit = focused ? Number.MAX_SAFE_INTEGER : MAX_DEPTH;
-  const cards = th.comments.map((c) => commentHtml(c, 0, limit, ctx)).filter(Boolean);
-
-  const parts = [`<div class="sr-thread">\n${postCard(post, postText)}\n</div>`];
-  if (cards.length) parts.push(`<h2>Comments</h2>\n<div class="sr-comments">\n${cards.join("\n")}\n</div>`);
-  const shown = ctx.text.length;
-  const total = post.comments ?? shown + th.more;
-  const foot: string[] = [];
-  if (post.permalink) {
-    const label = focused ? `View all ${plural(total, "comment")} on Reddit` : total > shown ? `${plural(total, "comment")} · View all on Reddit` : "View on Reddit";
-    foot.push(`<a href="${esc(post.permalink)}">${esc(label)}</a>`);
-  }
-  if (foot.length) parts.push(`<p class="sr-thread-foot"><small>${foot.join(" · ")}</small></p>`);
-
-  const text = normalizeText([post.title ?? "", ...postText, ...ctx.text].filter(Boolean).join("\n\n"));
-  if (text.length < 20 && !post.images.length) return null;
-  const author = focused ? ctx.focusAuthor : post.author;
-  return {
-    title: post.title,
-    byline: [author ? `u/${author}` : null, post.sub ? `in ${post.sub}` : null].filter(Boolean).join(" ") || null,
-    siteName: "Reddit",
-    lang,
-    publishedTime: post.created,
-    excerpt: ((focused ? ctx.focusText : null) || postText[0] || ctx.text[0] || "").slice(0, 300) || null,
-    contentHtml: parts.join("\n"),
-    text,
-    leadImage: post.images[0] ?? ogImage,
-  };
-}
-
 /** Listing page (front page, subreddit): link list of the visible posts. */
 function listingHtml(posts: El[], base: string): { html: string; text: string } {
   const items: string[] = [];
@@ -443,7 +285,7 @@ export function extractReddit(html: string, url: string): Extracted | null {
 
   if (isThread && hasJson) {
     const th = threadFromJson(embeddedJson(document), url);
-    const ex = th && renderThread(th, lang, ogImage);
+    const ex = th && renderThread(th, REDDIT, lang, ogImage);
     if (ex) return ex;
   }
 
@@ -456,5 +298,5 @@ export function extractReddit(html: string, url: string): Extracted | null {
     return { title: docTitle, byline: null, siteName: "Reddit", lang, publishedTime: null, excerpt: null, contentHtml: list.html, text: list.text, leadImage: ogImage };
   }
   // A thread page has one post (plus, sometimes, "related" posts after the comments).
-  return renderThread(threadFromDom(document, posts[0]!, url), lang, ogImage);
+  return renderThread(threadFromDom(document, posts[0]!, url), REDDIT, lang, ogImage);
 }

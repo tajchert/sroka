@@ -220,7 +220,7 @@ window.__srokaScrollToFraction=function(f){user=true;var s=sc(),max=s.scrollHeig
 """.trimIndent()
 
     /**
-     * X / Twitter post cards (repo decisions D11; same classes and look as the web reader's `POST_CARD_CSS`):
+     * X / Twitter and Reddit post cards (repo decisions D11, D13; same classes and look as the web reader's `POST_CARD_CSS`):
      * one card per post, a thread line joining the avatars of consecutive cards, quoted posts as nested cards.
      */
     private val POST_CARD_CSS = """
@@ -239,6 +239,11 @@ window.__srokaScrollToFraction=function(f){user=true;var s=sc(),max=s.scrollHeig
 blockquote.sr-post-quote{margin:0 0 1.1em;padding:.7rem .85rem;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--fg);font-size:.92em}
 blockquote.sr-post-quote .sr-avatar{width:22px;height:22px}
 blockquote.sr-note{padding:.6rem .85rem;border:1px solid var(--rule);border-radius:10px;color:var(--fg);font-size:.9em}
+.sr-comments{display:flex;flex-direction:column;gap:.75rem;margin:0 0 1.1em}
+.sr-replies{margin:.7rem 0 0;padding:0 0 0 .85rem;border-left:2px solid var(--rule)}
+.sr-reply{padding:.55rem 0 0}.sr-reply:first-child{padding-top:0}
+.sr-reply.sr-post-focus{margin:0 0 0 -.85rem;padding:.55rem .85rem;border-left:2px solid var(--link);background:var(--bg);background:color-mix(in srgb,var(--link) 6%,var(--bg))}
+.sr-reply>.sr-post-head{margin-bottom:.35rem}.sr-reply>.sr-post-stats{margin-top:.35rem}
 .sr-thread-foot{color:var(--muted);text-align:center}
 """.trimIndent().replace("\n", "")
 

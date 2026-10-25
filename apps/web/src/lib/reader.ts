@@ -137,7 +137,7 @@ const HEAD_CSS = `article>h1:first-child{margin:.2em 0 .5em;font-size:clamp(1.75
 article>h1:first-child+.byline{margin:0 0 2.25rem;padding:0 0 2rem;border-bottom:1px solid var(--rule);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--muted)}`;
 
 /**
- * X / Twitter post cards (extractor `twitter.ts`, classes allowlisted in `sanitize.ts` POST_CLASSES): one card per
+ * X / Twitter and Reddit post cards (extractor `twitter.ts`, `reddit.ts`; classes allowlisted in `sanitize.ts` POST_CLASSES): one card per
  * post, a thread line joining the avatars of consecutive cards, quoted posts as nested cards.
  */
 const POST_CARD_CSS = `.sr-thread{display:flex;flex-direction:column;gap:1rem;margin:0 0 1.1em}
@@ -155,6 +155,11 @@ const POST_CARD_CSS = `.sr-thread{display:flex;flex-direction:column;gap:1rem;ma
 blockquote.sr-post-quote{margin:0 0 1.1em;padding:.7rem .85rem;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--fg);font-size:.92em}
 blockquote.sr-post-quote .sr-avatar{width:22px;height:22px}
 blockquote.sr-note{padding:.6rem .85rem;border:1px solid var(--rule);border-radius:10px;color:var(--fg);font-size:.9em}
+.sr-comments{display:flex;flex-direction:column;gap:.75rem;margin:0 0 1.1em}
+.sr-replies{margin:.7rem 0 0;padding:0 0 0 .85rem;border-left:2px solid var(--rule)}
+.sr-reply{padding:.55rem 0 0}.sr-reply:first-child{padding-top:0}
+.sr-reply.sr-post-focus{margin:0 0 0 -.85rem;padding:.55rem .85rem;border-left:2px solid var(--link);background:color-mix(in srgb,var(--link) 6%,var(--bg))}
+.sr-reply>.sr-post-head{margin-bottom:.35rem}.sr-reply>.sr-post-stats{margin-top:.35rem}
 .sr-thread-foot{color:var(--muted);text-align:center}`;
 
 export interface SrcdocInput {

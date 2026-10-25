@@ -94,7 +94,7 @@ export interface SanitizeResult {
 
 /** Classes of the X / Twitter post cards (twitter.ts), styled by the readers. Everything else loses its class. */
 export const POST_CLASSES = {
-  div: ["sr-thread", "sr-post", "sr-post-focus", "sr-post-body"],
+  div: ["sr-thread", "sr-post", "sr-post-focus", "sr-post-body", "sr-comments", "sr-replies", "sr-reply"],
   blockquote: ["sr-post", "sr-post-quote", "sr-note"],
   p: ["sr-post-head", "sr-post-stats", "sr-thread-foot"],
   span: ["sr-post-who", "sr-post-date"],

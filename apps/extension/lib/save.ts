@@ -19,8 +19,39 @@ export function isSavableUrl(url: string | undefined): url is string {
  * Runs in the page (self-contained, passed to executeScript): the rendered DOM without what the parser never uses
  * (scripts except JSON-LD, styles, stylesheet/preload links, SVG, templates), typically 60-80% smaller.
  * Copied into an inert document so nothing in the copy loads or runs.
+ * On a Reddit thread it also embeds the thread's JSON (`<script type="application/json" id="sroka-reddit-json">`,
+ * fetched here: same origin, the user's session) pruned to what the extractor reads: the rendered page lazy-loads
+ * comments, the JSON has the whole tree. Any failure just leaves it out.
  */
-export function pageHtmlForCapture(): string {
+export async function pageHtmlForCapture(): Promise<string> {
+  let redditJson: string | null = null;
+  if (/(^|\.)reddit\.com$/i.test(location.hostname) && /^\/(r|u|user)\/[^/]+\/comments\//.test(location.pathname)) {
+    const KEEP = new Set([
+      "kind", "data", "children", "id", "name", "title", "author", "subreddit_name_prefixed", "score", "num_comments",
+      "created_utc", "selftext_html", "body_html", "url", "permalink", "is_video", "is_self", "is_gallery", "post_hint",
+      "gallery_data", "items", "media_id", "media_metadata", "s", "u", "gif", "preview", "images", "source", "replies",
+      "count", "depth", "is_submitter", "stickied", "distinguished", "over_18", "spoiler", "link_flair_text",
+    ]);
+    // media_metadata is keyed by media id: keep every key one level below it.
+    const prune = (v: unknown, keepAll = false): unknown => {
+      if (Array.isArray(v)) return v.map((x) => prune(x));
+      if (!v || typeof v !== "object") return v;
+      const out: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) if (keepAll || KEEP.has(k)) out[k] = prune(x, k === "media_metadata");
+      return out;
+    };
+    try {
+      const isComment = /\/comments\/[^/]+\/[^/]*\/[^/]+\/?$/.test(location.pathname);
+      const path = location.pathname.replace(/\/+$/, "");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(`${path}.json?raw_json=1&limit=200&depth=8${isComment ? "&context=3" : ""}`, { credentials: "include", signal: ctrl.signal });
+      clearTimeout(timer);
+      if (res.ok) redditJson = JSON.stringify(prune(await res.json())).replace(/</g, "\\u003c");
+    } catch {
+      redditJson = null;
+    }
+  }
   const root = document.implementation.createHTMLDocument("").importNode(document.documentElement, true);
   const drop = [
     'script:not([type="application/ld+json"])',
@@ -33,6 +64,13 @@ export function pageHtmlForCapture(): string {
     "svg",
   ].join(",");
   for (const el of Array.from(root.querySelectorAll(drop))) el.remove();
+  if (redditJson) {
+    const s = root.ownerDocument.createElement("script");
+    s.type = "application/json";
+    s.id = "sroka-reddit-json";
+    s.textContent = redditJson;
+    (root.querySelector("body") ?? root).append(s);
+  }
   return `<!doctype html>${root.outerHTML}`;
 }
 

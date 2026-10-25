@@ -48,10 +48,11 @@ describe("extractReddit", () => {
     expect(ex.siteName).toBe("Reddit");
     expect(ex.publishedTime).toBe("2026-10-22T18:01:02.000000+0000");
     expect(ex.excerpt).toBe("Looking for intros you never skip.");
-    expect(ex.contentHtml).toContain("r/AskReddit · u/songfan · 5,120 points · 3,400 comments");
+    expect(ex.contentHtml).toContain("<strong>r/AskReddit</strong>");
+    expect(ex.contentHtml).toContain("5,120 points · 3,400 comments");
     expect(ex.contentHtml).toContain("<h2>Comments</h2>");
     // reply nesting: bob inside alice, carol kept under a [deleted] placeholder
-    expect(ex.contentHtml).toMatch(/u\/alice[\s\S]*<blockquote><p><small><strong>u\/bob<\/strong>[\s\S]*\[deleted\][\s\S]*u\/carol/);
+    expect(ex.contentHtml).toMatch(/<div class="sr-post">[^]*u\/alice[^]*<div class="sr-replies"><div class="sr-reply">[^]*u\/bob[^]*\[deleted\][^]*u\/carol/);
     // a deleted leaf comment is dropped entirely; community icon is not a post image
     expect(ex.contentHtml).not.toContain("[removed]");
     expect(ex.contentHtml).not.toContain("communityIcon");
@@ -63,7 +64,8 @@ describe("extractReddit", () => {
     const ex = extractReddit(threadHtml, THREAD)!;
     const san = sanitizeArticle(ex.contentHtml, THREAD);
     expect(san.html).toContain('href="https://www.reddit.com/r/cowboybebop"');
-    expect(san.html).toContain("<blockquote>");
+    expect(san.html).toContain('<div class="sr-replies">');
+    expect(san.html).toContain('<div class="sr-reply">');
   });
 
   it("is used by extractArticle ahead of Readability", () => {
@@ -92,6 +94,114 @@ describe("extractReddit", () => {
 
   it("returns null without shreddit markup", () => {
     expect(extractReddit("<html><body><p>hi</p></body></html>", THREAD)).toBeNull();
+  });
+});
+
+// Reddit's `.json` of a thread, as the extension embeds it (pruned, `<` escaped).
+const POST_URL = "https://www.reddit.com/r/ClaudeCode/comments/1xf2lur/i_pointed_claude_code/";
+type C = { id: string; author?: string; body?: string; replies?: C[]; more?: number; extra?: Record<string, unknown> };
+const t1 = (c: C, depth = 0): unknown => ({
+  kind: "t1",
+  data: {
+    id: c.id,
+    author: c.author ?? `user_${c.id}`,
+    score: 10,
+    created_utc: 1792000000,
+    body_html: `<div class="md"><p>${c.body ?? `Comment ${c.id} with enough words.`}</p></div>`,
+    permalink: `/r/ClaudeCode/comments/1xf2lur/i_pointed_claude_code/${c.id}/`,
+    depth,
+    ...c.extra,
+    replies: c.replies || c.more
+      ? { kind: "Listing", data: { children: [...(c.replies ?? []).map((r) => t1(r, depth + 1)), ...(c.more ? [{ kind: "more", data: { count: c.more } }] : [])] } }
+      : "",
+  },
+});
+const threadJson = (comments: C[], post: Record<string, unknown> = {}, topMore = 0) => [
+  {
+    kind: "Listing",
+    data: {
+      children: [
+        {
+          kind: "t3",
+          data: {
+            title: "I pointed Claude Code at the cheap Chinese headphones",
+            author: "op_user",
+            subreddit_name_prefixed: "r/ClaudeCode",
+            score: 1234,
+            num_comments: 321,
+            created_utc: 1791990000,
+            selftext_html: '<div class="md"><p>So I reverse engineered the BLE protocol.</p></div>',
+            url: POST_URL,
+            permalink: "/r/ClaudeCode/comments/1xf2lur/i_pointed_claude_code/",
+            is_self: true,
+            ...post,
+          },
+        },
+      ],
+    },
+  },
+  { kind: "Listing", data: { children: [...comments.map((c) => t1(c)), ...(topMore ? [{ kind: "more", data: { count: topMore } }] : [])] } },
+];
+const captured = (json: unknown) =>
+  `<!doctype html><html lang="en"><head><title>x</title></head><body><shreddit-app></shreddit-app>` +
+  `<script type="application/json" id="sroka-reddit-json">${JSON.stringify(json).replace(/</g, "\\u003c")}</script></body></html>`;
+
+describe("extractReddit from embedded thread JSON", () => {
+  const deep: C = { id: "a", author: "op_user", extra: { is_submitter: true }, replies: [{ id: "b", replies: [{ id: "c", replies: [{ id: "d", replies: [{ id: "e", replies: [{ id: "f" }] }] }] }] }] };
+
+  it("renders post card and comment cards with replies up to 3 levels", () => {
+    const ex = extractReddit(captured(threadJson([deep, { id: "z", author: "AutoModerator", extra: { stickied: true } }], {}, 40)), POST_URL)!;
+    expect(ex.title).toBe("I pointed Claude Code at the cheap Chinese headphones");
+    expect(ex.byline).toBe("u/op_user in r/ClaudeCode");
+    expect(ex.publishedTime).toBe(new Date(1791990000 * 1000).toISOString());
+    expect(ex.excerpt).toBe("So I reverse engineered the BLE protocol.");
+    const h = ex.contentHtml;
+    expect(h).toContain('<div class="sr-thread">\n<div class="sr-post">');
+    expect(h).toContain("1,234 points · 321 comments");
+    expect(h).toContain(" <small>OP</small>");
+    // a (top) > b > c > d shown; e and f collapsed into a link on d
+    for (const id of ["a", "b", "c", "d"]) expect(h).toContain(`Comment ${id} with`);
+    expect(h).not.toContain("Comment e with");
+    expect(h).toContain('<a href="https://www.reddit.com/r/ClaudeCode/comments/1xf2lur/i_pointed_claude_code/d/">2 more replies on Reddit</a>');
+    expect(h).not.toContain("AutoModerator");
+    expect(h).toContain("321 comments · View all on Reddit");
+    expect(ex.text).toContain("Comment d with");
+  });
+
+  it("highlights the saved comment and shows its parents and replies", () => {
+    const url = `${POST_URL}c/`;
+    const ex = extractReddit(captured(threadJson([deep])), url)!;
+    const h = ex.contentHtml;
+    expect(h).toContain('<div class="sr-reply sr-post-focus">');
+    expect(h).toMatch(/sr-post-focus[^]*Comment c with/);
+    // c is at depth 2: its replies d, e, f are all within 3 levels below it
+    for (const id of ["a", "b", "c", "d", "e", "f"]) expect(h).toContain(`Comment ${id} with`);
+    expect(ex.byline).toBe("u/user_c in r/ClaudeCode");
+    expect(ex.excerpt).toBe("Comment c with enough words.");
+    expect(h).toContain("View all 321 comments on Reddit");
+  });
+
+  it("keeps gallery images and external links; survives sanitizing", () => {
+    const json = threadJson([{ id: "a", body: 'see <a href="/r/other">r/other</a>' }], {
+      is_self: false,
+      selftext_html: null,
+      url: "https://example.org/story",
+      gallery_data: { items: [{ media_id: "m2" }, { media_id: "m1" }] },
+      media_metadata: { m1: { s: { u: "https://preview.redd.it/one.jpg?width=640&s=1" } }, m2: { s: { u: "https://i.redd.it/two.png" } } },
+    });
+    const ex = extractReddit(captured(json), POST_URL)!;
+    expect(ex.leadImage).toBe("https://i.redd.it/two.png");
+    expect(ex.contentHtml.match(/<img /g)).toHaveLength(2);
+    expect(ex.contentHtml).toContain('<a href="https://example.org/story">');
+    const san = sanitizeArticle(ex.contentHtml, POST_URL);
+    expect(san.html).toContain('href="https://www.reddit.com/r/other"');
+    expect(san.html).toContain('<div class="sr-comments">');
+    expect(san.html).toContain('<div class="sr-post">');
+  });
+
+  it("falls back to shreddit markup when the JSON is broken", () => {
+    const html = threadHtml.replace("</body>", '<script type="application/json" id="sroka-reddit-json">{oops</script></body>');
+    expect(extractReddit(html, THREAD)?.contentHtml).toContain("u/alice");
   });
 });
 

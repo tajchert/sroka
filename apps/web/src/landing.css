@@ -278,6 +278,27 @@ h1 .sizer {
   flex-wrap: wrap;
   gap: 12px;
 }
+/* Signed-in visitors (landing.ts sets html.signed-in): the hero and nav CTAs open the app instead. */
+.signed-in.btn,
+.signed-in.cta,
+html.signed-in .signed-out.btn,
+html.signed-in .signed-out.cta {
+  display: none;
+}
+html.signed-in .signed-in.btn,
+html.signed-in .signed-in.cta {
+  display: flex;
+}
+html.signed-in .signed-in.btn {
+  display: inline-flex;
+}
+.btn-arrow {
+  margin-left: 10px;
+  transition: transform 0.15s ease;
+}
+.btn:hover .btn-arrow {
+  transform: translateX(3px);
+}
 
 /* Hero animation: browser → save → phone. Coordinates are the design's 520×580 artboard. */
 .stage-wrap {

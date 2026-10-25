@@ -37,3 +37,26 @@ if (typed && emoji && caret && !reduced) {
   setTimeout(() => caret.classList.add("on"), 5000);
   setTimeout(tick, 6200);
 }
+
+// Signed-in visitors get "Open library" CTAs. A localStorage hint flips them before the session probe answers.
+const HINT = "sroka.signedIn";
+const setSignedIn = (on: boolean) => {
+  document.documentElement.classList.toggle("signed-in", on);
+  try {
+    if (on) localStorage.setItem(HINT, "1");
+    else localStorage.removeItem(HINT);
+  } catch {
+    // storage blocked: the probe alone decides
+  }
+};
+try {
+  if (localStorage.getItem(HINT)) document.documentElement.classList.add("signed-in");
+} catch {
+  // storage blocked
+}
+fetch("/api/auth/get-session", { credentials: "same-origin" })
+  .then((res) => (res.ok ? res.json() : null))
+  .then((body: { user?: unknown } | null) => setSignedIn(Boolean(body?.user)))
+  .catch(() => {
+    // offline or API down: keep whatever the hint said
+  });

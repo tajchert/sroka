@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
-    "zip": "SROKA_STORE_BUILD=1 wxt zip",
+    "zip": "SROKA_STORE_BUILD=1 wxt zip && wxt build",
     "postinstall": "wxt prepare",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests"

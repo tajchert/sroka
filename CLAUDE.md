@@ -19,7 +19,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - One workspace: `npm test -w @sroka/shared`, `npm run typecheck -w @sroka/api`, etc.
 - Local stack: `npm run dev:setup` once (.dev.vars, local D1 migrations, web build), then `npm run dev -w @sroka/api` (wrangler dev :8787, api + parser in one process) + optionally `npm run dev -w @sroka/web` (vite :5173, proxies /api,/v1). Details: `workers/api/CLAUDE.md` "Local stack".
 - Local e2e: `DEV_LOG=<wrangler dev log> npm run e2e:local` (`scripts/e2e-local.sh`, curl + jq + node; non-zero exit on failure).
-- Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`
+- Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`. Release: `npm run zip -w @sroka/extension` (Web Store zip, no manifest `key`; it then rebuilds the keyed `chrome-mv3`). An unpacked build without `key` gets a different extension id, which signs the user out and makes sign-in fail with "Invalid origin" (API `EXT_ID` trusts only `gmfnkkciofcaafddbcgphofiikmplema`). The Web Store id differs too, so `EXT_ID` must also trust the store id before store users can sign in.
 - Android: in `apps/android` with JDK 21, `./gradlew testDebugUnitTest lintDebug assembleDebug` (details: `apps/android/CLAUDE.md`)
 - Each workspace has its own CLAUDE.md with specifics.
 

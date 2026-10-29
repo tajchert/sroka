@@ -4,7 +4,7 @@ Popup (sign-in email → 6-box code, saving → success → saved with tags/favo
 
 ## Commands
 - `npm run dev -w @sroka/extension` · `npm run build -w @sroka/extension` → `.output/chrome-mv3` · `npm run zip -w @sroka/extension`
-- Manifest `key` pins the unpacked id to `gmfnkkciofcaafddbcgphofiikmplema` (= API `EXT_ID`); `zip` sets `SROKA_STORE_BUILD=1` to omit it (Web Store rejects `key`).
+- Manifest `key` pins the unpacked id to `gmfnkkciofcaafddbcgphofiikmplema` (= API `EXT_ID`); `zip` sets `SROKA_STORE_BUILD=1` to omit it (Web Store rejects `key`), then rebuilds `.output/chrome-mv3` with the key: a keyless unpacked build gets another id, which the API rejects ("Invalid origin").
 - `npm run typecheck -w @sroka/extension` (runs `wxt prepare` first) · `npm test -w @sroka/extension`
 
 ## Key files

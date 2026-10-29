@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { refreshBadge } from "./badge.ts";
+import { RECHECK_SAVED, refreshBadge } from "./badge.ts";
 import { getCached, invalidate, setCached, TTL_SAVED, TTL_UNSAVED } from "./badge-cache.ts";
 import { setSettings } from "./settings.ts";
 import { installChrome, jsonRes } from "./test-chrome.ts";
@@ -39,6 +39,16 @@ describe("refreshBadge", () => {
     expect(f).toHaveBeenCalledTimes(1);
     await refreshBadge(5, "https://a.com/x", { force: true });
     expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-checks a cached ✓ after RECHECK_SAVED and clears it when the item was removed elsewhere", async () => {
+    await setCached("https://a.com/r", { saved: true, id: "i1" }, Date.now() - RECHECK_SAVED - 1);
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonRes(200, { items: [], nextCursor: null }));
+    await refreshBadge(6, "https://a.com/r");
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(c.action.setBadgeText).toHaveBeenNthCalledWith(1, { tabId: 6, text: "✓" });
+    expect(c.action.setBadgeText).toHaveBeenLastCalledWith({ tabId: 6, text: "" });
+    expect(await getCached("https://a.com/r")).toMatchObject({ saved: false });
   });
 
   it("clears badge when not saved, for restricted urls, and when signed out", async () => {

@@ -32,26 +32,36 @@ export async function syncItemMenu(tabId: number, saved: boolean) {
   }
 }
 
-/** Cached lookup → badge. Network only on cache miss; failures leave badge blank. */
+/** A cached ✓ older than this is re-checked: the item may have been removed elsewhere (web, Android). */
+export const RECHECK_SAVED = 10_000;
+
+/** Cached lookup → badge. Network on cache miss, and to re-check a cached ✓ (painted first); failures leave the badge as is. */
 export async function refreshBadge(tabId: number, url: string | undefined, opts: { force?: boolean } = {}) {
-  try {
-    if (!isSavableUrl(url)) return await paintBadge(tabId, false);
-    const s = await getSettings();
-    if (s.signedOut) return await paintBadge(tabId, false);
-    let entry = opts.force ? null : await getCached(url);
-    if (!entry) {
-      const item = await lookupUrl(url);
-      await setCached(url, { saved: !!item, id: item?.id });
-      entry = { saved: !!item, id: item?.id, at: Date.now() };
-    }
-    // A slow lookup may finish after navigation; only paint if the tab still shows this URL.
+  // A slow lookup may finish after navigation; only paint if the tab still shows this URL.
+  const paintIfCurrent = async (saved: boolean) => {
     try {
       const cur = await ext().tabs?.get(tabId);
       if (cur && cur.url !== url) return;
     } catch {
       return; // tab gone
     }
-    await paintBadge(tabId, entry.saved);
+    await paintBadge(tabId, saved);
+  };
+  try {
+    if (!isSavableUrl(url)) return await paintBadge(tabId, false);
+    const s = await getSettings();
+    if (s.signedOut) return await paintBadge(tabId, false);
+    let entry = opts.force ? null : await getCached(url);
+    if (entry?.saved && Date.now() - entry.at > RECHECK_SAVED) {
+      await paintIfCurrent(true);
+      entry = null;
+    }
+    if (!entry) {
+      const item = await lookupUrl(url);
+      await setCached(url, { saved: !!item, id: item?.id });
+      entry = { saved: !!item, id: item?.id, at: Date.now() };
+    }
+    await paintIfCurrent(entry.saved);
   } catch {
     /* offline or 401: leave as is */
   }

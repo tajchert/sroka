@@ -1,5 +1,6 @@
 import { refreshBadge, paintBadge } from "../lib/badge.ts";
 import type { Msg } from "../lib/messages.ts";
+import { MENU_OPEN_ITEM, MENU_REMOVE_ITEM, openSavedItem, removeSavedItem } from "../lib/item-menu.ts";
 import { openApp } from "../lib/open-app.ts";
 import { ALARM, processQueue, releaseQueue, removeQueuedUrl } from "../lib/queue.ts";
 import { saveLink, saveTab, type SaveResult } from "../lib/save.ts";
@@ -23,6 +24,9 @@ export default defineBackground(() => {
       chrome.contextMenus.create({ id: "save-page", title: "Save page to Sroka", contexts: ["page"] });
       // Right-click on the toolbar icon.
       chrome.contextMenus.create({ id: "open-app", title: "Open Sroka", contexts: ["action"] });
+      // Shown only while the active tab's page is saved (`syncItemMenu` in lib/badge.ts).
+      chrome.contextMenus.create({ id: MENU_OPEN_ITEM, title: "Open in Sroka", contexts: ["action"], visible: false });
+      chrome.contextMenus.create({ id: MENU_REMOVE_ITEM, title: "Remove from Sroka", contexts: ["action"], visible: false });
     });
   });
 
@@ -35,6 +39,10 @@ export default defineBackground(() => {
       await flash(tab.id, await saveTab(tab));
     } else if (info.menuItemId === "open-app") {
       await openApp();
+    } else if (info.menuItemId === MENU_OPEN_ITEM && tab?.url) {
+      await openSavedItem(tab.url);
+    } else if (info.menuItemId === MENU_REMOVE_ITEM && tab?.id != null && tab.url) {
+      await removeSavedItem(tab.id, tab.url);
     }
   });
 
@@ -45,6 +53,12 @@ export default defineBackground(() => {
     } catch {
       /* tab gone */
     }
+  });
+  // Menus are global: re-sync them to the active tab when switching windows.
+  chrome.windows.onFocusChanged.addListener(async (windowId) => {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+    const [tab] = await chrome.tabs.query({ active: true, windowId });
+    if (tab?.id != null) await refreshBadge(tab.id, tab.url);
   });
   chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
     if (change.status === "loading" || change.status === "complete" || change.url) void refreshBadge(tabId, change.url ?? tab.url);

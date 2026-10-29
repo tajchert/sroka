@@ -4,12 +4,31 @@ import { ext } from "./chrome.ts";
 import { isSavableUrl } from "./save.ts";
 import { getSettings } from "./settings.ts";
 
+/** Toolbar-icon menu entries shown only while the active tab's page is saved; handlers in `lib/item-menu.ts`. */
+export const MENU_OPEN_ITEM = "open-item";
+export const MENU_REMOVE_ITEM = "remove-item";
+
 export async function paintBadge(tabId: number, saved: boolean) {
   const a = ext().action;
   await a.setBadgeText({ tabId, text: saved ? "✓" : "" });
   if (saved) {
     await a.setBadgeBackgroundColor({ tabId, color: "#1e6f8f" });
     await a.setBadgeTextColor?.({ tabId, color: "#ffffff" });
+  }
+  await syncItemMenu(tabId, saved);
+}
+
+/** Shows "Open in Sroka"/"Remove from Sroka" on the toolbar icon's menu while the page is saved.
+ * Menus are global, so only the active tab of its window decides. */
+export async function syncItemMenu(tabId: number, saved: boolean) {
+  const c = ext();
+  if (!c.contextMenus) return;
+  try {
+    if (!(await c.tabs.get(tabId)).active) return;
+    await c.contextMenus.update(MENU_OPEN_ITEM, { visible: saved });
+    await c.contextMenus.update(MENU_REMOVE_ITEM, { visible: saved });
+  } catch {
+    /* tab gone or menus not created yet */
   }
 }
 

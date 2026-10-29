@@ -7,7 +7,7 @@ import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSug
 import { invalidate, setCached } from "../../lib/badge-cache.ts";
 import type { Msg } from "../../lib/messages.ts";
 import { openApp } from "../../lib/open-app.ts";
-import type { SaveResult } from "../../lib/save.ts";
+import { isSavableUrl, type SaveResult } from "../../lib/save.ts";
 import { getPendingOtp, getSettings, setPendingOtp } from "../../lib/settings.ts";
 
 type Tab = { id?: number; url?: string; title?: string };
@@ -20,6 +20,7 @@ type Phase =
   | { k: "tags"; item: Item; created: boolean }
   | { k: "queued"; message: string }
   | { k: "failed"; message: string }
+  | { k: "unsupported"; signedIn: boolean }
   | { k: "removed" };
 
 const SUCCESS_MS = 1400;
@@ -37,7 +38,9 @@ export function App() {
   const [phase, setPhase] = useState<Phase>({ k: "loading" });
   const [tab, setTab] = useState<Tab>({});
 
-  const save = useCallback(async (t: Tab) => {
+  const save = useCallback(async (t: Tab, signedIn = false) => {
+    // chrome://, the new tab page, the Web Store…: nothing to save, and not an error (e.g. signing in on chrome://extensions).
+    if (!isSavableUrl(t.url)) return setPhase({ k: "unsupported", signedIn });
     setPhase({ k: "saving" });
     const r = await send<SaveResult>({ type: "save-tab", tab: t });
     if (r.ok) setPhase(r.created ? { k: "success", item: r.item } : { k: "saved", item: r.item, created: false });
@@ -70,7 +73,7 @@ export function App() {
   const onSignedIn = async () => {
     // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
     await send({ type: "release-queue", skipUrl: tab.url });
-    await save(tab);
+    await save(tab, true);
   };
 
   return (
@@ -110,6 +113,22 @@ export function App() {
                 Try again
               </button>
             ) : null}
+          </div>
+        </Notice>
+      )}
+      {phase.k === "unsupported" && (
+        <Notice
+          tone="muted"
+          title={phase.signedIn ? "You’re signed in" : "Nothing to save here"}
+          message="Sroka saves web pages. Open an article and click the Sroka icon to save it."
+        >
+          <div className="pair">
+            <button className="btn btn-ghost" onClick={() => window.close()}>
+              Close
+            </button>
+            <button className="btn btn-primary" onClick={() => void openApp().then(() => window.close())}>
+              Open Sroka
+            </button>
           </div>
         </Notice>
       )}

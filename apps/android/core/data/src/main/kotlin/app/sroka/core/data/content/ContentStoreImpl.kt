@@ -170,7 +170,7 @@ class ContentStoreImpl @Inject internal constructor(
                     (!ContentPaths.isSafeId(it.itemId) || !hasLocalContent(it.itemId))
             }
             val missingIds = missing.mapTo(HashSet()) { it.itemId }
-            missing to rows.filter { it.itemId !in missingIds && it.thumbPath != null && it.thumbPath.let { path -> !File(path).isFile } }
+            missing to rows.filter { it.itemId !in missingIds && it.thumbPath?.let { path -> !File(path).isFile } == true }
         }
         if (missing.isEmpty() && staleThumbs.isEmpty()) return
         Log.w(TAG, "reconcile: ${missing.size} packages and ${staleThumbs.size} thumbnails missing on disk")

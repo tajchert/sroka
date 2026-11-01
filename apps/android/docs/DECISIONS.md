@@ -6,7 +6,7 @@ If a ruling here turns out wrong, change it HERE first (one commit), then code.
 
 ## A1 Identity & toolchain
 - Location `apps/android` (own Gradle root, not an npm workspace). Package/namespace root `app.sroka`; applicationId `app.sroka`, debug `app.sroka.debug`.
-- Gradle needs JDK 21: `export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`. Run `./gradlew` from `apps/android`.
+- Gradle needs JDK 21: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)`. Run `./gradlew` from `apps/android`.
 - Template baseline kept: Kotlin 2.4.20, AGP 9.4.1, compose BOM 2026.09.00, Navigation 3 1.2.0, Hilt 2.60.1, Room 3.0.3 (`androidx.room3`), DataStore 1.2.1, minSdk 26, target/compile 37.
 - Added (stable only; check `https://dl.google.com/android/maven2/<group path>/group-index.xml` or Maven Central metadata for the latest stable):
   `androidx.room3:room3-paging` (= room version), `androidx.paging:paging-compose` 3.5.x, `androidx.work:work-runtime-ktx` 2.11.x, `androidx.hilt:hilt-work` + `androidx.hilt:hilt-compiler` (ksp),

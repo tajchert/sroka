@@ -72,7 +72,7 @@ every `core:domain` interface.
 JDK 21 and the Android SDK (platform 37) are required. Run everything from `apps/android`:
 
 ```bash
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./gradlew testDebugUnitTest lintDebug assembleDebug :app:assembleRelease   # full gate
 ./gradlew :core:data:testDebugUnitTest                                      # one module
 ./gradlew :app:installDebug                                                 # install on emulator/device

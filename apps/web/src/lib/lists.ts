@@ -41,6 +41,28 @@ export function useInfiniteScroll(query: ReturnType<typeof useItemList>["query"]
   return sentinel;
 }
 
+/** True when the old first row is still in the list but no longer first: new rows were inserted above it. */
+export function insertedAbove(previousFirstId: string | undefined, ids: readonly string[]): boolean {
+  return previousFirstId !== undefined && ids.indexOf(previousFirstId) > 0;
+}
+
+/**
+ * In a newest-first list, scrolls back to the top when items arrive above the first row (a save, or a refetch
+ * picking up saves from another device) so the new rows are visible. Deletes, sort/filter changes and first
+ * loads don't move the page; `listKey` identifies the list so switching lists never counts as an insert.
+ */
+export function useFollowNewItems(items: readonly Item[], listKey: string, enabled: boolean) {
+  const seen = useRef<{ key: string; first: string | undefined }>({ key: listKey, first: undefined });
+  const first = items[0]?.id;
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = { key: listKey, first };
+    if (!enabled || before.key !== listKey || before.first === first) return;
+    if (!insertedAbove(before.first, items.map((i) => i.id))) return;
+    document.getElementById("scroll-root")?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [items, first, listKey, enabled]);
+}
+
 /** Library stats from the signed-in session (already loaded by the shell). */
 export function useStats() {
   const me = useQuery({ queryKey: ["me"], queryFn: api.meOrNull, retry: false, staleTime: 60_000 });

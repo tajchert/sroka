@@ -12,11 +12,14 @@ import app.sroka.feature.library.impl.list.RowStatus
 import app.sroka.feature.library.impl.list.StatusCard
 import app.sroka.feature.library.impl.list.archiveMessage
 import app.sroka.feature.library.impl.list.avatarLetter
+import app.sroka.feature.library.impl.list.insertedAbove
 import app.sroka.feature.library.impl.list.rowStatus
 import app.sroka.feature.library.impl.list.selectStatusCard
 import app.sroka.feature.library.impl.search.highlightSnippet
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ListLogicTest {
@@ -76,5 +79,15 @@ class ListLogicTest {
         val text = highlightSnippet("hello world", listOf(0..4, 6..40, 50..60), Color.Red, Color.Black)
         assertEquals("hello world", text.text)
         assertEquals(listOf(0 to 5, 6 to 11), text.spanStyles.map { it.start to it.end })
+    }
+
+    @Test
+    fun insertedAboveOnlyWhenOldFirstRowMovedDown() {
+        val after = listOf("new2", "new1", "old")
+        val indexOf: (Any) -> Int = { after.indexOf(it) }
+        assertTrue(insertedAbove("old", indexOf)) // sync pulled two saves above it
+        assertFalse(insertedAbove("gone", indexOf)) // first row archived/deleted, or the list was replaced
+        assertFalse(insertedAbove("new2", indexOf)) // unchanged first row
+        assertFalse(insertedAbove(null, indexOf)) // first load
     }
 }

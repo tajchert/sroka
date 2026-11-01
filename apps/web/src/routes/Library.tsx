@@ -7,7 +7,7 @@ import { ListHeader, articles } from "../components/ListHeader.tsx";
 import { api } from "../lib/api.ts";
 import type { ListParams } from "../lib/cache.ts";
 import { useListKeyboard } from "../lib/hooks.ts";
-import { useInfiniteScroll, useItemList, useStats } from "../lib/lists.ts";
+import { useFollowNewItems, useInfiniteScroll, useItemList, useStats } from "../lib/lists.ts";
 import { sortOptions, useListSort, type SortList } from "../lib/sort.ts";
 
 const TITLES: Record<ItemState, string> = { unread: "My List", archived: "Archive", favorites: "Favorites", all: "All items" };
@@ -40,7 +40,9 @@ export default function Library({ state: baseState }: { state: ItemState }) {
 
   const { query, items } = useItemList(params);
   const sentinel = useInfiniteScroll(query, items.length);
-  const [sel] = useListKeyboard(items, `${state}|${tag}|${sort}|${domain}`);
+  const listKey = `${state}|${tag}|${sort}|${domain}`;
+  const [sel] = useListKeyboard(items, listKey);
+  useFollowNewItems(items, listKey, sort === "newest" || sort === "archived");
 
   const title = tag ? `#${tag}` : TITLES[state];
   const total = domain

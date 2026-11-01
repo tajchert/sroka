@@ -164,7 +164,11 @@ fun LibraryListRoute(
     val currentOpenItem by rememberUpdatedState(onOpenItem)
     val currentSort by rememberUpdatedState(state.sort)
     ScrollToTopOn(scrollToTopSignal, listState)
-    listState.StayAtTopOnInsert(firstKey = if (items.itemCount > 0) items.peek(0)?.id else null)
+    listState.FollowNewItemsToTop(
+        firstKey = if (items.itemCount > 0) items.peek(0)?.id else null,
+        newestFirst = state.sort == SortOrder.NEWEST,
+        indexOfKey = { key -> (0 until minOf(items.itemCount, INSERT_SCAN_LIMIT)).firstOrNull { items.peek(it)?.id == key } ?: -1 },
+    )
     var dropState by remember { mutableStateOf(DropState.Idle) }
     val dropTarget = remember {
         object : DragAndDropTarget {
@@ -544,19 +548,36 @@ internal fun ScrollToTopOn(signal: Int, state: LazyListState) {
 
 /**
  * An item inserted above the first visible one (a save, a sync pull) would land off-screen, because the list
- * keeps its position by key. While the list sits at the very top, keep it there so the new row shows.
+ * keeps its position by key. At the very top, pin the list there before the next measure so the new row shows.
+ * Scrolled down in newest-first order, rows that arrive above the previous first row (sync pulled new saves)
+ * bring the list back to the top so the user sees what is syncing — unless they are dragging the list.
  */
 @Composable
-private fun LazyListState.StayAtTopOnInsert(firstKey: Any?) {
+private fun LazyListState.FollowNewItemsToTop(firstKey: Any?, newestFirst: Boolean, indexOfKey: (Any) -> Int) {
     val seen = remember { FirstKeyHolder() }
-    if (seen.key == firstKey) return
-    seen.key = firstKey
-    Snapshot.withoutReadObservation {
-        if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) requestScrollToItem(0)
+    if (seen.key != firstKey) {
+        val previous = seen.key
+        seen.key = firstKey
+        val atTop = Snapshot.withoutReadObservation {
+            val top = firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0
+            if (top) requestScrollToItem(0)
+            top
+        }
+        seen.follow = !atTop && newestFirst && insertedAbove(previous, indexOfKey)
+    }
+    LaunchedEffect(firstKey) {
+        if (seen.follow && !isScrollInProgress) animateScrollToItem(0)
     }
 }
 
-private class FirstKeyHolder(var key: Any? = null)
+/** True when the old first row is still in the list but no longer first: new rows were inserted above it. */
+internal fun insertedAbove(previousFirstKey: Any?, indexOfKey: (Any) -> Int): Boolean =
+    previousFirstKey != null && indexOfKey(previousFirstKey) > 0
+
+/** How many loaded rows to search for the old first row; a bigger jump than this is a reload, not an insert. */
+private const val INSERT_SCAN_LIMIT = 200
+
+private class FirstKeyHolder(var key: Any? = null, var follow: Boolean = false)
 
 /** True at the top of the list or while the last scroll moved up (FAB expanded); false when scrolling down. */
 @Composable

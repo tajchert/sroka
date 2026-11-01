@@ -22,7 +22,7 @@ describe("pageHtmlForCapture", () => {
   it("embeds the pruned Reddit thread JSON on a comment permalink", async () => {
     at("https://www.reddit.com/r/a/comments/1x/slug/c9/");
     const json = [{ kind: "Listing", data: { children: [{ kind: "t3", data: { title: "T</script>", secret_field: 1 } }] } }, { kind: "Listing", data: { children: [] } }];
-    const fetch = vi.fn(async () => new Response(JSON.stringify(json)));
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify(json)));
     vi.stubGlobal("fetch", fetch);
     const html = await pageHtmlForCapture();
     expect(fetch.mock.calls[0]![0]).toBe("/r/a/comments/1x/slug/c9.json?raw_json=1&limit=200&depth=8&context=3");

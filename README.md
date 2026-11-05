@@ -15,3 +15,7 @@ npm test
 npm run dev -w @sroka/api   # wrangler dev on :8787
 npm run dev -w @sroka/web   # vite on :5173
 ```
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE). Redistributions and derivative works must keep the attribution in [NOTICE](NOTICE) (License section 4(d)).

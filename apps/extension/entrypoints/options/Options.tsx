@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Mark } from "../../components/Mark.tsx";
 import { describeError, signOut } from "../../lib/api.ts";
 import { clearCache } from "../../lib/badge-cache.ts";
+import { analyticsConfig, getConsent, PRIVACY_URL, setConsent as saveConsent, TERMS_URL, type Consent } from "../../lib/consent.ts";
 import { DEFAULT_SERVER, getSettings, normalizeServerUrl, setSettings, clearSession, type Settings } from "../../lib/settings.ts";
 
 export function Options() {
   const [s, setS] = useState<Settings | null>(null);
   const [server, setServer] = useState("");
+  const [consent, setConsent] = useState<Consent>({ analytics: null, errors: true });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -16,6 +18,8 @@ export function Options() {
     setServer(cur.serverUrl);
   };
   useEffect(() => void load(), []);
+  useEffect(() => void getConsent().then(setConsent), []);
+  const update = async (patch: Partial<Consent>) => setConsent(await saveConsent(patch));
 
   if (!s) return null;
 
@@ -85,6 +89,46 @@ export function Options() {
             </span>
           </span>
         </label>
+      </div>
+
+      <div className="section">
+        {analyticsConfig() && (
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={consent.analytics === true}
+              onChange={(e) => void update({ analytics: e.target.checked })}
+            />
+            <span>
+              Share usage analytics
+              <span className="hint" style={{ display: "block" }}>
+                Anonymous statistics about which features are used, never what you read, via Google Analytics. Off by default.
+              </span>
+            </span>
+          </label>
+        )}
+        <label className="toggle" style={analyticsConfig() ? { marginTop: 12 } : undefined}>
+          <input
+            type="checkbox"
+            checked={consent.errors}
+            onChange={(e) => void update({ errors: e.target.checked })}
+          />
+          <span>
+            Send crash reports
+            <span className="hint" style={{ display: "block" }}>
+              Sends the error message and stack trace to the Sroka server when something breaks. Never page addresses or saved content.
+            </span>
+          </span>
+        </label>
+        <p className="hint">
+          <a href={PRIVACY_URL} target="_blank" rel="noreferrer">
+            Privacy policy
+          </a>
+          {" · "}
+          <a href={TERMS_URL} target="_blank" rel="noreferrer">
+            Terms
+          </a>
+        </p>
       </div>
 
       <div className="section">

@@ -11,3 +11,6 @@ coverage/
 .env.*
 .claude/worktrees/
 wrangler.dev.jsonc
+
+# Extension analytics config (D15)
+apps/extension/analytics.config.json

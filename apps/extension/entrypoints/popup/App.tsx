@@ -6,6 +6,8 @@ import { Glyph, Mark } from "../../components/Mark.tsx";
 import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSuggestions } from "../../lib/api.ts";
 import { invalidate, setCached } from "../../lib/badge-cache.ts";
 import type { Msg } from "../../lib/messages.ts";
+import { track } from "../../lib/analytics.ts";
+import { getConsent, PRIVACY_URL, setConsent, shouldShowConsentPrompt } from "../../lib/consent.ts";
 import { openApp } from "../../lib/open-app.ts";
 import { isSavableUrl, type SaveResult } from "../../lib/save.ts";
 import { getPendingOtp, getSettings, setPendingOtp } from "../../lib/settings.ts";
@@ -50,6 +52,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    track({ name: "popup_open" });
     (async () => {
       const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
       const tb = { id: t?.id, url: t?.url, title: t?.title };
@@ -78,6 +81,7 @@ export function App() {
 
   return (
     <div className="popup-card">
+      <ConsentCard />
       {phase.k === "loading" && <div className="body hint">Loading…</div>}
       {phase.k === "signin" && <SignIn onDone={onSignedIn} />}
       {phase.k === "saving" && <Saving tab={tab} />}
@@ -144,6 +148,36 @@ export function App() {
           </div>
         </Notice>
       )}
+    </div>
+  );
+}
+
+/** First-run analytics opt-in (D15). Inline, never blocks the save running alongside. */
+function ConsentCard() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    void getConsent().then((c) => setShow(shouldShowConsentPrompt(c)));
+  }, []);
+  if (!show) return null;
+  const decide = (analytics: boolean) => {
+    setShow(false);
+    void setConsent({ analytics });
+  };
+  return (
+    <div className="consent" role="region" aria-label="Usage statistics">
+      <strong>Help improve Sroka?</strong>
+      <p>Share anonymous usage statistics (which features are used, never what you read) via Google Analytics. You can change this anytime in Settings.</p>
+      <div className="consent-actions">
+        <button className="btn btn-primary" onClick={() => decide(true)}>
+          Allow
+        </button>
+        <button className="btn btn-ghost" onClick={() => decide(false)}>
+          No thanks
+        </button>
+        <button className="link" onClick={() => void chrome.tabs.create({ url: PRIVACY_URL })}>
+          Privacy policy
+        </button>
+      </div>
     </div>
   );
 }
@@ -226,6 +260,7 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
     run(async () => {
       await signIn(email.trim(), c);
       await setPendingOtp(null);
+      track({ name: "login", params: { method: "email_otp" } });
       await onDone();
     });
 

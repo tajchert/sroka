@@ -66,7 +66,7 @@ Better Auth recommends not awaiting the send, to avoid timing side channels. Use
 - Transactional email only. Do not use it for marketing or bulk sends.
 
 ## Onboarding sroka.app (exact commands, not run)
-Requires `wrangler login` as mtajchert@gmail.com, or a `CLOUDFLARE_API_TOKEN` with Email Sending and DNS edit permission. The zone is already on this account.
+Requires `wrangler login` with the owner's Cloudflare account, or a `CLOUDFLARE_API_TOKEN` with Email Sending and DNS edit permission. The zone is already on this account.
 
 ```bash
 npx wrangler email sending list                      # see what's onboarded (all subdomains in the account)
@@ -74,7 +74,7 @@ npx wrangler email sending enable sroka.app --zone-id 7e814786800e88ac74b5acc903
 npx wrangler email sending dns get sroka.app         # shows SPF/DKIM records that were / must be added
 npx wrangler email sending settings sroka.app        # verify status
 # smoke test (sends a real mail; use an address you control):
-npx wrangler email sending send --from noreply@sroka.app --to mtajchert@gmail.com --subject "test" --text "hi"
+npx wrangler email sending send --from noreply@sroka.app --to you@example.com --subject "test" --text "hi"
 ```
 
 - Dashboard equivalent: Compute & AI > Email Service > Email Sending > Onboard Domain > choose domain > "Add records and onboard". It auto-adds the SPF TXT and DKIM records, and propagation takes about 5-15 minutes.

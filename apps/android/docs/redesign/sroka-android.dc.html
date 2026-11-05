@@ -43,7 +43,7 @@
           </div>
           <div style="position:relative;height:56px;box-sizing:border-box;border-radius:4px;border:2px solid #7cc0da;padding:0 14px;display:flex;align-items:center;font-size:16px">
             <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#15171c;font-size:12px;color:#7cc0da">Email</div>
-            mtajchert@gmail.com<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
+            you@example.com<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
           </div>
           <div style="height:48px;border-radius:24px;background:#7cc0da;color:#06323f;font-size:15px;font-weight:500;display:flex;align-items:center;justify-content:center">Send code</div>
           <div style="flex:1"></div>
@@ -69,7 +69,7 @@
         <div style="padding:8px 24px 0;display:flex;flex-direction:column;gap:24px">
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="font-size:28px;font-weight:600;line-height:1.2">Check your inbox</div>
-            <div style="font-size:16px;line-height:1.5;color:#a5a8ae">Enter the code sent to <span style="color:#f1efe9;font-weight:500">mtajchert@gmail.com</span></div>
+            <div style="font-size:16px;line-height:1.5;color:#a5a8ae">Enter the code sent to <span style="color:#f1efe9;font-weight:500">you@example.com</span></div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">
             <sc-for list="{{ otp }}" as="b" hint-placeholder-count="6">
@@ -547,7 +547,7 @@
             <div style="font-size:24px;text-align:center">Delete your account?</div>
             <div style="font-size:14px;line-height:1.5;color:#a5a8ae;text-wrap:pretty">This permanently deletes your library, tags and reading progress on every device. Export first if you want a copy.</div>
             <div style="position:relative;height:56px;box-sizing:border-box;border-radius:4px;border:2px solid #7cc0da;padding:0 14px;display:flex;align-items:center;font-size:16px;margin-top:6px">
-              <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#262a31;font-size:12px;color:#7cc0da">Type your email to confirm</div>mtajchert@gmail<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
+              <div style="position:absolute;top:-9px;left:10px;padding:0 4px;background:#262a31;font-size:12px;color:#7cc0da">Type your email to confirm</div>you@example<span style="width:2px;height:22px;background:#7cc0da;margin-left:1px"></span>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:8px">
               <div style="height:40px;padding:0 12px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#7cc0da">Cancel</div>
@@ -845,7 +845,7 @@ class Component extends DCLogic {
         setRow('', 'dns', 'Server', 'sroka.app'),
         setRow('', 'upload_file', 'Export library', 'HTML, CSV or JSON', { isNew: true }),
         setRow('', 'move_to_inbox', 'Import', 'From Pocket and others', { isNew: true }),
-        setRow('Account', 'logout', 'Sign out', 'mtajchert@gmail.com'),
+        setRow('Account', 'logout', 'Sign out', 'you@example.com'),
         setRow('', 'delete_forever', 'Delete account', '', { color: '#f08f7f', iconColor: '#f08f7f' })
       ],
       sources: radio([['Pocket'], ['Instapaper'], ['Browser bookmarks (HTML)'], ['CSV or list of URLs']], 0),

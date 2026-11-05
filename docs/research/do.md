@@ -131,7 +131,7 @@ Consumer, in the separate parser Worker's wrangler config. Docs say each produce
 - Custom domains take exact hostnames only, with no wildcards and no paths in the pattern.
 - Deploy fails if the hostname already has a CNAME DNS record. Delete the record first.
 - Branch on `new URL(req.url).hostname` in Hono, or use `app.route` with a host check.
-- Account selection: log in with `wrangler login` as mtajchert@gmail.com, or set `account_id` in the config. Unverified, since I did not deploy.
+- Account selection: log in with `wrangler login` with the owner's Cloudflare account, or set `account_id` in the config. Unverified, since I did not deploy.
 
 ## 8. Vitest (docs)
 ```

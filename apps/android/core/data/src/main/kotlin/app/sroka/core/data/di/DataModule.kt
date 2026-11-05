@@ -7,6 +7,8 @@ import app.sroka.core.data.content.ContentStoreImpl
 import app.sroka.core.data.content.DownloadCanceller
 import app.sroka.core.data.repository.AccountRepositoryImpl
 import app.sroka.core.data.repository.AuthRepositoryImpl
+import app.sroka.core.data.repository.ConsentRepositoryImpl
+import app.sroka.core.domain.ConsentRepository
 import app.sroka.core.data.repository.LibraryRepositoryImpl
 import app.sroka.core.data.repository.SettingsRepositoryImpl
 import app.sroka.core.data.repository.TagRepositoryImpl
@@ -55,6 +57,7 @@ internal abstract class DataModule {
     @Binds abstract fun auth(impl: AuthRepositoryImpl): AuthRepository
     @Binds abstract fun settings(impl: SettingsRepositoryImpl): SettingsRepository
     @Binds abstract fun account(impl: AccountRepositoryImpl): AccountRepository
+    @Binds abstract fun consent(impl: ConsentRepositoryImpl): ConsentRepository
     @Binds abstract fun sessionProvider(impl: SessionProviderImpl): SessionProvider
     @Binds abstract fun dataTransfer(impl: DataTransferRepositoryImpl): DataTransferRepository
     @Binds abstract fun importScheduler(impl: WorkImportScheduler): ImportScheduler

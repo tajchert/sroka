@@ -17,7 +17,11 @@ import android.net.Uri
 import androidx.core.content.IntentCompat
 import app.sroka.feature.library.impl.save.PdfShareHost
 import app.sroka.feature.library.impl.save.SaveSheetHost
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.domain.TelemetryEvent
+import app.sroka.core.domain.TelemetryScreen
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Target of the system share sheet (ACTION_SEND links as any text type, and PDF files). Translucent, so the save sheet
@@ -28,9 +32,13 @@ class ShareActivity : ComponentActivity() {
 
     private val viewModel: MainActivityViewModel by viewModels()
 
+    @Inject
+    lateinit var telemetry: Telemetry
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) telemetry.logEvent(TelemetryEvent.ScreenView(TelemetryScreen.SHARE))
         val sharedText = sharedLinkText(intent)
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
         val pdfUris = if (isPdfShare(intent)) sharedPdfUris(intent) else null

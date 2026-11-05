@@ -28,6 +28,7 @@ fun SettingsPopulated() {
                 email = "magpie@example.com",
                 storageBytes = 48_000_000,
                 serverUrl = "https://api.sroka.app",
+                telemetryAvailable = true,
             ),
             vm = SettingsActions(),
             snackbar = remember { SnackbarHostState() },

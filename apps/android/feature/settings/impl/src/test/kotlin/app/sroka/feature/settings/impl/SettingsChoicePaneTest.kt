@@ -37,7 +37,7 @@ class SettingsChoicePaneTest {
     private val auth = FakeAuthRepository(SessionState.SignedIn("me@x.io"))
     private val settings = FakeSettingsRepository()
 
-    private fun vm() = SettingsViewModel(settings, auth, FakeAccountRepository(auth), FakeContentStore(), FakeSyncController())
+    private fun vm() = SettingsViewModel(settings, auth, FakeAccountRepository(auth), FakeContentStore(), FakeSyncController(), app.sroka.core.testing.fake.FakeConsentRepository(), app.sroka.core.testing.fake.FakeTelemetry())
 
     private fun showChoice(kind: SettingsChoiceKind) {
         val vm = vm()

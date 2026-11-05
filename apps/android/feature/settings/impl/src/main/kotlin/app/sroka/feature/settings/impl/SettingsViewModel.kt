@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.sroka.core.domain.AccountRepository
 import app.sroka.core.domain.AuthRepository
+import app.sroka.core.domain.ConsentRepository
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.model.Consent
 import app.sroka.core.domain.ContentStore
 import app.sroka.core.domain.DeleteAccountResult
 import app.sroka.core.domain.SettingsRepository
@@ -37,6 +40,9 @@ data class SettingsUiState(
     val serverUrl: String = "",
     val serverUrlInvalid: Boolean = false,
     val busy: Boolean = false,
+    val consent: Consent = Consent(),
+    /** False in builds without telemetry (foss): the analytics/crash switches are hidden. */
+    val telemetryAvailable: Boolean = false,
 )
 
 @HiltViewModel
@@ -46,6 +52,8 @@ class SettingsViewModel @Inject constructor(
     private val account: AccountRepository,
     private val content: ContentStore,
     private val sync: SyncController,
+    private val consent: ConsentRepository,
+    private val telemetry: Telemetry,
 ) : ViewModel() {
 
     private val storage = MutableStateFlow(0L)
@@ -60,7 +68,8 @@ class SettingsViewModel @Inject constructor(
         auth.session,
         storage,
         local,
-    ) { prefs, session, bytes, loc ->
+        consent.consent,
+    ) { prefs, session, bytes, loc, consent ->
         SettingsUiState(
             preferences = prefs,
             email = when (session) {
@@ -72,6 +81,8 @@ class SettingsViewModel @Inject constructor(
             serverUrl = prefs.serverUrl ?: settings.defaultServerUrl,
             serverUrlInvalid = loc.serverUrlInvalid,
             busy = loc.busy,
+            consent = consent,
+            telemetryAvailable = telemetry.isAvailable,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -84,6 +95,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setDownloadPolicy(policy: DownloadPolicy) = viewModelScope.launch { settings.setDownloadPolicy(policy) }
+
+    /** Applied to Telemetry by the app-wide consent applier. */
+    fun setAnalytics(enabled: Boolean) = viewModelScope.launch { consent.setAnalytics(enabled) }
+
+    fun setCrashReports(enabled: Boolean) = viewModelScope.launch { consent.setCrashReports(enabled) }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settings.setThemeMode(mode) }
 

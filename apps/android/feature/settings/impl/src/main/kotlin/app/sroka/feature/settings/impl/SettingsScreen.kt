@@ -38,7 +38,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.selection.toggleable
+import app.sroka.core.ui.LegalLinks
+import app.sroka.core.ui.openExternalLink
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -131,6 +135,8 @@ class SettingsActions(
     val signOut: () -> Unit = {},
     val deleteAccount: () -> Unit = {},
     val saveServerUrl: (String, () -> Unit) -> Unit = { _, _ -> },
+    val setAnalytics: (Boolean) -> Unit = {},
+    val setCrashReports: (Boolean) -> Unit = {},
 ) {
     companion object {
         fun of(vm: SettingsViewModel) = SettingsActions(
@@ -144,6 +150,8 @@ class SettingsActions(
             signOut = { vm.signOut() },
             deleteAccount = { vm.deleteAccount() },
             saveServerUrl = { url, done -> vm.saveServerUrl(url, done) },
+            setAnalytics = { vm.setAnalytics(it) },
+            setCrashReports = { vm.setCrashReports(it) },
         )
     }
 }
@@ -252,6 +260,36 @@ fun SettingsScreen(
                 onClick = onOpenImport,
             )
 
+            SectionHeader(R.string.feature_settings_section_privacy)
+            if (state.telemetryAvailable) {
+                SwitchRow(
+                    SrokaIcons.Info,
+                    stringResource(R.string.feature_settings_analytics),
+                    stringResource(R.string.feature_settings_analytics_sub),
+                    checked = state.consent.analyticsEnabled,
+                    onCheckedChange = vm.setAnalytics,
+                )
+                SwitchRow(
+                    SrokaIcons.Warning,
+                    stringResource(R.string.feature_settings_crash_reports),
+                    stringResource(R.string.feature_settings_crash_reports_sub),
+                    checked = state.consent.crashReports,
+                    onCheckedChange = vm.setCrashReports,
+                )
+            }
+            SettingRow(
+                SrokaIcons.Lock,
+                stringResource(R.string.feature_settings_privacy_policy),
+                null,
+                trailing = { Icon(SrokaIcons.OpenInNew, contentDescription = null) },
+            ) { openExternalLink(context, LegalLinks.PRIVACY_POLICY) }
+            SettingRow(
+                SrokaIcons.Description,
+                stringResource(R.string.feature_settings_terms),
+                null,
+                trailing = { Icon(SrokaIcons.OpenInNew, contentDescription = null) },
+            ) { openExternalLink(context, LegalLinks.TERMS) }
+
             SectionHeader(R.string.feature_settings_section_account)
             SettingRow(
                 SrokaIcons.Logout,
@@ -352,6 +390,24 @@ private fun SettingRow(
         trailingContent = trailing,
         modifier = (if (selected) Modifier.clip(RoundedCornerShape(16.dp)) else Modifier)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier),
+    )
+}
+
+@Composable
+private fun SwitchRow(
+    icon: ImageVector,
+    title: String,
+    sub: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    ListItem(
+        leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(sub) },
+        // The whole row toggles; the switch itself is not a second tap target.
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
     )
 }
 

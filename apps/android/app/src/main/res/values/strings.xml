@@ -10,4 +10,9 @@
     <string name="share_label">Save to Sroka</string>
     <string name="reader_archived">Archived</string>
     <string name="reader_archived_undo">Undo</string>
+    <string name="consent_title">Help improve Sroka?</string>
+    <string name="consent_body">Share anonymous usage statistics (which features are used, never what you read) via Google Analytics. You can change this anytime in Settings.</string>
+    <string name="consent_privacy_policy">Privacy policy</string>
+    <string name="consent_allow">Allow</string>
+    <string name="consent_decline">No thanks</string>
 </resources>

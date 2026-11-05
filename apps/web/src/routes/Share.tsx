@@ -29,7 +29,7 @@ export default function Share() {
     started.current = true;
     const link = sharedLink(params);
     navigate("/", { replace: true });
-    if (link) void actions.add(link);
+    if (link) void actions.add(link, "share");
     else toasts.push({ message: "There was no link to save in what you shared.", tone: "error" });
   }, [params, navigate, actions, toasts]);
 

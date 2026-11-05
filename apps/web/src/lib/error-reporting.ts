@@ -1,5 +1,7 @@
 /** Client error reporting → POST /v1/client-errors (docs/api.md §12, docs/observability.md). Best effort, never throws. */
 
+import { getConsent } from "./consent.ts";
+
 const MAX_PER_SESSION = 10;
 const seen = new Set<string>();
 let sent = 0;
@@ -20,6 +22,7 @@ function release(): string {
 /** Reports once per distinct message+stack-head, at most MAX_PER_SESSION per page session. Returns whether sent. */
 export function reportClientError(err: unknown, extra?: string): boolean {
   try {
+    if (!getConsent().errors) return false; // D15: user opted out of crash reports
     const e = err instanceof Error ? err : new Error(typeof err === "string" ? err : safeString(err));
     const message = (extra ? `${extra}: ` : "") + e.message;
     const stack = e.stack ?? "";

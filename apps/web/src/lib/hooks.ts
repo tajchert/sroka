@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Item, UpdateItemRequest } from "@sroka/shared";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { track } from "./analytics.ts";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
 import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
@@ -72,16 +73,30 @@ export function useItemActions() {
   const setArchived = useCallback(
     (item: Item, archived: boolean) =>
       patch(item, { status: archived ? "archived" : "unread" }, { status: archived ? "archived" : "unread" }).then((r) => {
-        if (r) toasts.push({ message: archived ? "Archived" : "Moved to My List" });
+        if (r) {
+          track({ name: archived ? "archive_item" : "unarchive_item" });
+          toasts.push({ message: archived ? "Archived" : "Moved to My List" });
+        }
         return r;
       }),
     [patch, toasts],
   );
   const toggleFavorite = useCallback(
-    (item: Item) => patch(item, { isFavorite: !item.isFavorite }, { isFavorite: !item.isFavorite }),
+    (item: Item) =>
+      patch(item, { isFavorite: !item.isFavorite }, { isFavorite: !item.isFavorite }).then((r) => {
+        if (r) track({ name: "favorite_item", params: { on: !item.isFavorite } });
+        return r;
+      }),
     [patch],
   );
-  const setTags = useCallback((item: Item, tags: string[]) => patch(item, { tags }, { tags }), [patch]);
+  const setTags = useCallback(
+    (item: Item, tags: string[]) =>
+      patch(item, { tags }, { tags }).then((r) => {
+        if (r && tags.length > item.tags.length) track({ name: "add_tag" });
+        return r;
+      }),
+    [patch],
+  );
 
   const remove = useCallback(
     (item: Item, onDone?: () => void) => {
@@ -95,6 +110,7 @@ export function useItemActions() {
           pendingDeletes.delete(entry);
         try {
           await api.deleteItem(item.id);
+          track({ name: "delete_item" });
           removeItem(qc, item.id);
           refreshCounts();
         } catch (e) {
@@ -142,7 +158,7 @@ export function useItemActions() {
   );
 
   const add = useCallback(
-    async (url: string): Promise<boolean> => {
+    async (url: string, source: "web_add" | "share" = "web_add"): Promise<boolean> => {
       const trimmed = url.trim();
       if (!trimmed) return false;
       const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
@@ -151,6 +167,7 @@ export function useItemActions() {
       try {
         const { item, created } = await api.createItem(withScheme);
         replaceItem(qc, temp.id, item);
+        if (created) track({ name: "save_item", params: { source, kind: "article" } });
         if (!created) toasts.push({ message: "Already saved. Moved to the top of My List." });
         refreshCounts();
         return true;

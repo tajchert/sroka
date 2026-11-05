@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { setConsent } from "./consent.ts";
 import { reportClientError, resetErrorReporting } from "./error-reporting.ts";
 
 describe("reportClientError", () => {
@@ -20,6 +21,13 @@ describe("reportClientError", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body).toMatchObject({ message: "boom", url: "/app/item/1", userAgent: "test-ua" });
     expect(body.stack.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("does nothing when the user opted out of crash reports", () => {
+    setConsent({ errors: false });
+    expect(reportClientError(new Error("boom"))).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    setConsent({ errors: true });
   });
 
   it("caps reports per session", () => {

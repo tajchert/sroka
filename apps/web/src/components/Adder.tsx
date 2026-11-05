@@ -33,7 +33,7 @@ export function Adder() {
       e.preventDefault();
       dragDepth.current = 0;
       setDragging(false);
-      uploads.addFiles(Array.from(e.dataTransfer?.files ?? []));
+      uploads.addFiles(Array.from(e.dataTransfer?.files ?? []), "drag");
     };
     window.addEventListener("dragenter", enter);
     window.addEventListener("dragover", over);

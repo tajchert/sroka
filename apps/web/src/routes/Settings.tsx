@@ -2,6 +2,9 @@ import { cancelPendingDeletes, flushPendingDeletes } from "../lib/hooks.ts";
 import type { ImportFormat, Job } from "@sroka/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { track } from "../lib/analytics.ts";
+import { useConsent, setConsent } from "../lib/consent.ts";
+import { hasAnalyticsConfig } from "../lib/firebase-config.ts";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
 
@@ -48,6 +51,7 @@ export default function Settings() {
     setUploading(true);
     try {
       const j = await api.createImport(file, format);
+      track({ name: "import_start", params: { source: format } });
       setJobId(j.id);
       qc.setQueryData(["import", j.id], j);
     } catch (e) {
@@ -117,8 +121,8 @@ export default function Settings() {
       <Section title="Export">
         <p className="text-sm text-ink2">Download everything you have saved.</p>
         <div className="mt-3 flex gap-2">
-          <a className="btn" href={api.exportUrl("csv")} download>CSV (Pocket compatible)</a>
-          <a className="btn" href={api.exportUrl("json")} download>JSON</a>
+          <a className="btn" href={api.exportUrl("csv")} download onClick={() => track({ name: "export", params: { format: "csv" } })}>CSV (Pocket compatible)</a>
+          <a className="btn" href={api.exportUrl("json")} download onClick={() => track({ name: "export", params: { format: "json" } })}>JSON</a>
         </div>
       </Section>
 
@@ -126,6 +130,8 @@ export default function Settings() {
         <p className="text-sm text-ink2">Save any page with one click or Alt+Shift+S.</p>
         <a className="btn mt-3" href="https://sroka.app/#extension" target="_blank" rel="noopener noreferrer">Get the Chrome extension</a>
       </Section>
+
+      <PrivacySection />
 
       <Section title="Delete account">
         <p className="text-sm text-ink2">This permanently deletes your account, saved pages and tags. It cannot be undone. Export first if you want a copy.</p>
@@ -164,5 +170,45 @@ function ImportProgress({ job }: { job: Job }) {
         </div>
       )}
     </div>
+  );
+}
+
+export function PrivacySection() {
+  const consent = useConsent();
+  return (
+    <Section title="Privacy">
+      <div className="flex flex-col gap-3">
+        {hasAnalyticsConfig() && (
+          <Toggle
+            label="Share usage analytics"
+            hint="Anonymous statistics about which features are used, never what you read. Off unless you allow it."
+            checked={consent.analytics === true}
+            onChange={(v) => setConsent({ analytics: v })}
+          />
+        )}
+        <Toggle
+          label="Send crash reports"
+          hint="Technical error details (no page content) so problems can be fixed."
+          checked={consent.errors}
+          onChange={(v) => setConsent({ errors: v })}
+        />
+        <p className="flex gap-4 text-sm">
+          <a className="text-link hover:underline" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>
+          <a className="text-link hover:underline" href="/terms" target="_blank" rel="noopener noreferrer">Terms of service</a>
+        </p>
+      </div>
+    </Section>
+  );
+}
+
+function Toggle({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-sm">
+      <input type="checkbox" className="mt-1 size-4 accent-[var(--wing)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        {label}
+        <span className="block text-xs text-ink2">{hint}</span>
+      </span>
+    </label>
   );
 }

@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { track } from "../lib/analytics.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { patchItem } from "../lib/cache.ts";
@@ -36,6 +37,11 @@ export default function Reader() {
   const qc = useQueryClient();
   const { gaveUp } = useParsePolling(item);
   const pdfBlob = usePdfBlob(id, item?.kind === "pdf" ? item.contentId : null);
+
+  const openedKind = item?.kind === "pdf" ? "pdf" : item ? "article" : null;
+  useEffect(() => {
+    if (openedKind) track({ name: "open_item", params: { kind: openedKind } });
+  }, [id, openedKind]);
 
   const contentId = item?.contentId;
   const contentQ = useQuery({

@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { LogoMark } from "../components/Logo.tsx";
 import { Turnstile, type TurnstileHandle } from "../components/Turnstile.tsx";
+import { track } from "../lib/analytics.ts";
 import { ApiRequestError, api, describeAuthError } from "../lib/api.ts";
 
 export default function SignIn() {
@@ -59,6 +60,7 @@ export default function SignIn() {
     setError(null);
     try {
       await api.verifyOtp(email.trim(), value);
+      track({ name: "login", params: { method: "email_otp" } });
       qc.clear();
       await qc.invalidateQueries({ queryKey: ["me"] });
     } catch (e) {

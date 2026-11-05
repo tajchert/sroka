@@ -1,5 +1,6 @@
 import type { Item, ItemState } from "@sroka/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { track } from "../lib/analytics.ts";
 import { useNavigate, useSearchParams } from "react-router";
 import { Adder } from "../components/Adder.tsx";
 import { ItemRow } from "../components/ItemRow.tsx";
@@ -19,6 +20,9 @@ export default function Search() {
   const navigate = useNavigate();
   const q = (sp.get("q") ?? "").trim();
   const [sort, setSort] = useListSort("search");
+  useEffect(() => {
+    if (q) track({ name: "search_used" });
+  }, [q]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const unread = useItemList({ state: "unread", q, sort }, !!q);

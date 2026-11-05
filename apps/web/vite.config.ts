@@ -16,7 +16,8 @@ const spaAppFallback: Plugin = {
   },
 };
 
-// Multi-page build (decisions D8): index.html = landing at "/", app/index.html = SPA at "/app/".
+// Multi-page build (decisions D8): index.html = landing at "/", app/index.html = SPA at "/app/",
+// privacy.html / terms.html = legal pages at "/privacy" and "/terms" (D15; Workers Assets drops the .html).
 export default defineConfig({
   // base "/" (not "/app/") on purpose: landing and SPA share /assets/*, served directly by Workers Assets (D8).
   // Differs from D3's "/app/"; integrator must keep /assets/* out of run_worker_first.
@@ -28,6 +29,8 @@ export default defineConfig({
       input: {
         landing: resolve(import.meta.dirname, "index.html"),
         app: resolve(import.meta.dirname, "app/index.html"),
+        privacy: resolve(import.meta.dirname, "privacy.html"),
+        terms: resolve(import.meta.dirname, "terms.html"),
       },
     },
   },

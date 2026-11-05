@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="How Sroka collects, uses and protects your data." />
+    <title>Privacy Policy · Sroka</title>
+    <link rel="canonical" href="https://sroka.app/privacy" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/legal.css" />
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <!-- Icon 6a. Source of truth: scripts/make-icons.mjs -->
+        <symbol id="ic" viewBox="0 0 100 100">
+          <rect width="100" height="100" fill="#ffffff" />
+          <path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c" />
+          <polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f" />
+          <polygon points="69,27 83,33 69,39" fill="#f2c84b" />
+          <circle cx="58" cy="32" r="4" fill="#ffffff" />
+        </symbol>
+        <symbol id="gl" viewBox="26 16 60 70">
+          <path fill-rule="evenodd" d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z M30 56 L70 46 L70 58 L30 68 Z M54 32 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z" fill="currentColor" />
+          <polygon points="69,27 83,33 69,39" fill="#f2c84b" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <div class="stripe" aria-hidden="true"></div>
+    <header class="nav wrap">
+      <a class="brand" href="/" aria-label="Sroka home">
+        <span class="tile"><svg viewBox="0 0 100 100"><use href="#ic" /></svg></span>
+        <span>Sroka</span>
+      </a>
+      <a class="back" href="/">Back to sroka.app</a>
+    </header>
+
+    <main class="wrap">
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: 6 November 2026</p>
+
+      <div class="summary">
+        <ul>
+          <li>We keep what you save so you can read it on your devices. We don't sell it, and we show no ads.</li>
+          <li>Usage analytics (Google Analytics for Firebase) are <strong>off until you allow them</strong>.</li>
+          <li>Crash reports are on by default and can be turned off in Settings.</li>
+          <li>You can export your library and delete your account at any time.</li>
+        </ul>
+      </div>
+
+      <h2 id="who">Who we are</h2>
+      <p>Sroka (the website sroka.app, the Android app and the browser extension) is run by Michal Tajchert, Poland, who is the data controller. Contact: <a href="mailto:hello@sroka.app">hello@sroka.app</a>.</p>
+
+      <h2 id="data">What we collect</h2>
+      <ul>
+        <li><strong>Account:</strong> your email address and the one-time sign-in codes we send to it.</li>
+        <li><strong>Your library:</strong> the links, articles, PDFs and pages you save (including the page copy the browser extension captures), tags, favorites, archive status, reading progress, and files you import.</li>
+        <li><strong>Sign-in sessions:</strong> the IP address and device/browser type of each signed-in session, to keep your account secure.</li>
+        <li><strong>Server logs:</strong> technical request data (time, route, status, approximate location derived by our hosting provider). Your user id appears in logs only as a one-way hash, and logs never contain article content or your full email.</li>
+        <li><strong>Crash and error reports:</strong> on Android via Firebase Crashlytics (device model, OS version, app version, stack trace); on the web and in the extension we send them to our own server. Reports never contain what you saved or read.</li>
+        <li><strong>Usage analytics, only if you allow them:</strong> which screens and features are used (for example "an item was saved from the share sheet"), with an app-generated identifier, via Google Analytics for Firebase. We never send links, titles, search terms, tag names or your email to analytics, and advertising identifiers are disabled.</li>
+      </ul>
+
+      <h2 id="use">How we use it and why</h2>
+      <ul>
+        <li>To run the service you asked for: store and sync your library, fetch and clean up articles, send sign-in codes (performance of a contract).</li>
+        <li>To keep it secure and working: sessions, logs, abuse protection, crash and error reports (our legitimate interest in a reliable, safe service).</li>
+        <li>To understand how Sroka is used and improve it: usage analytics (your consent, which you can withdraw at any time in Settings).</li>
+      </ul>
+      <p>We don't sell your data, use it for advertising, or train AI models on your library.</p>
+
+      <h2 id="processing">How saving an article works</h2>
+      <p>When you save a link, our servers download the page to make a readable copy. The website sees a request from our servers, not from you. For some sites we use public APIs instead: for X/Twitter posts only the post id is sent to FxTwitter or X's embed service, and for Hacker News threads to Algolia and the Hacker News API. A clean copy of a public article may be cached and reused when other people save the same link; it is never linked to who saved it. Pages captured by the extension and uploaded PDFs stay private to your account.</p>
+
+      <h2 id="processors">Who processes data for us</h2>
+      <ul>
+        <li><strong>Cloudflare, Inc.</strong>: hosting, database and file storage, email delivery, bot protection (Turnstile) on sign-in, page rendering.</li>
+        <li><strong>Google LLC</strong> (Firebase): Crashlytics crash reports on Android, and Google Analytics for Firebase if you allow analytics.</li>
+      </ul>
+      <p>Both may process data outside the European Economic Area, under the EU–US Data Privacy Framework and the European Commission's standard contractual clauses.</p>
+
+      <h2 id="retention">How long we keep it</h2>
+      <ul>
+        <li>Your account and library: until you delete them or your account.</li>
+        <li>Server logs: up to 30 days. Aggregated usage counters: up to 3 months.</li>
+        <li>Crash reports: up to 90 days. Analytics: up to 2 months.</li>
+      </ul>
+
+      <h2 id="rights">Your choices and rights</h2>
+      <ul>
+        <li>Turn usage analytics and crash reports on or off in the Settings of each app.</li>
+        <li>Export your library (CSV or JSON) from Settings.</li>
+        <li>Under the GDPR you can ask us for access to, correction, deletion, restriction or a copy of your data, and object to processing based on legitimate interest. Write to <a href="mailto:hello@sroka.app">hello@sroka.app</a>.</li>
+        <li>You can complain to a data protection authority; in Poland this is the President of the Personal Data Protection Office (UODO, uodo.gov.pl).</li>
+      </ul>
+
+      <h2 id="delete-account">Deleting your account</h2>
+      <p>In the Android app or on <a href="/app/">sroka.app/app</a>, open <strong>Settings → Delete account</strong>. This immediately deletes your account, your whole library, your uploaded files and your sign-in sessions. If you can't sign in, email <a href="mailto:hello@sroka.app">hello@sroka.app</a> from the address of your account and we'll delete it within 30 days. Server logs and crash reports expire on the schedule above.</p>
+
+      <h2 id="storage">Storage on your device</h2>
+      <p>The website uses a sign-in cookie and stores your preferences in your browser. If you allow analytics, Google Analytics sets its own cookies. The apps keep a copy of your library on your device for offline reading; signing out removes it.</p>
+
+      <h2 id="children">Children</h2>
+      <p>Sroka isn't meant for children under 16, and we don't knowingly collect their data.</p>
+
+      <h2 id="changes">Changes</h2>
+      <p>If we change this policy, we'll update the date at the top. For important changes we'll let you know in the app or by email.</p>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner wrap">
+        <a class="foot-brand" href="/"><svg viewBox="0 0 60 70"><use href="#gl" /></svg><span>Sroka</span></a>
+        <nav class="foot-links" aria-label="Legal">
+          <a href="/privacy" aria-current="page">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="mailto:hello@sroka.app">Contact</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

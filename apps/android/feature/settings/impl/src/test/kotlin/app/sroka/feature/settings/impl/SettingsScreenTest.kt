@@ -18,6 +18,8 @@ import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.SessionState
 import app.sroka.core.testing.fake.FakeAccountRepository
 import app.sroka.core.testing.fake.FakeAuthRepository
+import app.sroka.core.testing.fake.FakeConsentRepository
+import app.sroka.core.testing.fake.FakeTelemetry
 import app.sroka.core.testing.fake.FakeContentStore
 import app.sroka.core.testing.fake.FakeSettingsRepository
 import app.sroka.core.testing.fake.FakeSyncController
@@ -40,9 +42,11 @@ class SettingsScreenTest {
     private val settings = FakeSettingsRepository()
     private val content = FakeContentStore().apply { usageBytes = 2048 }
     private val sync = FakeSyncController()
+    private val consent = FakeConsentRepository()
+    private var telemetry = FakeTelemetry()
 
     private fun show() {
-        val vm = SettingsViewModel(settings, auth, account, content, sync)
+        val vm = SettingsViewModel(settings, auth, account, content, sync, consent, telemetry)
         compose.setContent { SettingsRoute(onBack = {}, viewModel = vm) }
     }
 
@@ -115,5 +119,31 @@ class SettingsScreenTest {
         assertEquals(0L, content.usageBytes)
         tap("Download all now")
         assertEquals(1, sync.fetchRequests)
+    }
+
+    @Test
+    fun privacySwitchesRecordConsent() {
+        show()
+        assertEquals(null, consent.consentFlow.value.analytics)
+        tap("Share usage analytics")
+        compose.waitForIdle()
+        assertEquals(true, consent.consentFlow.value.analytics)
+        assertEquals(true, consent.consentFlow.value.crashReports)
+        tap("Send crash reports")
+        compose.waitForIdle()
+        assertEquals(false, consent.consentFlow.value.crashReports)
+        tap("Share usage analytics")
+        compose.waitForIdle()
+        assertEquals(false, consent.consentFlow.value.analytics)
+    }
+
+    @Test
+    fun withoutTelemetryOnlyTheLegalLinksAreShown() {
+        telemetry = FakeTelemetry(isAvailable = false)
+        show()
+        compose.onNodeWithText("Share usage analytics").assertDoesNotExist()
+        compose.onNodeWithText("Send crash reports").assertDoesNotExist()
+        compose.onNodeWithText("Privacy policy").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Terms of service").performScrollTo().assertIsDisplayed()
     }
 }

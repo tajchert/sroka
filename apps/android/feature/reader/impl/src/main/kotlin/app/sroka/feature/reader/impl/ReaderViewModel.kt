@@ -6,6 +6,9 @@ import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.domain.ContentStore
 import app.sroka.core.domain.DownloadResult
 import app.sroka.core.domain.LibraryRepository
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.domain.TelemetryEvent
+import kotlinx.coroutines.flow.firstOrNull
 import app.sroka.core.domain.PdfFileResult
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.domain.SettingsRepository
@@ -95,6 +98,7 @@ class ReaderViewModel @AssistedInject constructor(
     syncStatus: SyncStatusRepository,
     private val syncController: SyncController,
     @ApplicationScope private val appScope: CoroutineScope,
+    private val telemetry: Telemetry = Telemetry.None,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -161,6 +165,10 @@ class ReaderViewModel @AssistedInject constructor(
     private var refreshTimeout: kotlinx.coroutines.Job? = null
 
     init {
+        viewModelScope.launch {
+            // open_item: once per opened reader, with the kind only.
+            library.observeItem(itemId).firstOrNull { it != null }?.let { telemetry.logEvent(TelemetryEvent.OpenItem(it.kind)) }
+        }
         viewModelScope.launch {
             library.observeItem(itemId).map { it?.parseStatus }.distinctUntilChanged().collect { status ->
                 when {

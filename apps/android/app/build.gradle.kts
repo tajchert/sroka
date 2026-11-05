@@ -52,6 +52,16 @@ fun requiredReleaseSigningValue(property: String, envVar: String): String =
 
 val releaseStorePath = releaseSigningValue("storeFile", "SROKA_KEYSTORE_PATH")
 
+// Firebase config (DECISIONS repo-root D15). The file is gitignored; without it the play flavor
+// builds without the google-services/Crashlytics plugins (telemetry is a no-op) and only the
+// distributable play release tasks refuse to run.
+val googleServicesFile = file("google-services.json")
+val hasGoogleServices = googleServicesFile.exists()
+if (hasGoogleServices) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 android {
     namespace = "app.sroka"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -70,6 +80,14 @@ android {
         }
         // Server used until the user overrides it in Settings (DECISIONS A5).
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://api.sroka.app\"")
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        // Published to Google Play: Firebase Analytics + Crashlytics, behind user consent.
+        create("play") { dimension = "distribution" }
+        // No Google/Firebase dependency at all (F-Droid, forks).
+        create("foss") { dimension = "distribution" }
     }
 
     signingConfigs {
@@ -161,6 +179,24 @@ baselineProfile {
     mergeIntoMain = true
 }
 
+// The distributable play build must carry the Firebase config.
+val requireGoogleServicesJson by tasks.registering {
+    val present = hasGoogleServices
+    val path = googleServicesFile.path
+    doLast {
+        check(present) {
+            "app/google-services.json is missing: the play release needs the Firebase config " +
+                "($path). Copy the real file from the Firebase console " +
+                "(see app/google-services.example.json and docs/RELEASING.md), or build the foss flavor."
+        }
+    }
+}
+tasks.configureEach {
+    if (name == "assemblePlayRelease" || name == "bundlePlayRelease") {
+        dependsOn(requireGoogleServicesJson)
+    }
+}
+
 dependencies {
     baselineProfile(projects.benchmark)
     implementation(libs.androidx.profileinstaller)
@@ -212,6 +248,11 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Firebase: play flavor only (the foss flavor has no Google dependency)
+    "playImplementation"(platform(libs.firebase.bom))
+    "playImplementation"(libs.firebase.analytics)
+    "playImplementation"(libs.firebase.crashlytics)
 
     // Testing
     screenshotTestImplementation(libs.screenshot.validation.api)

@@ -7,6 +7,8 @@ import app.sroka.core.data.content.ContentStoreImpl
 import app.sroka.core.data.content.DownloadCanceller
 import app.sroka.core.data.repository.AccountRepositoryImpl
 import app.sroka.core.data.repository.AuthRepositoryImpl
+import app.sroka.core.data.repository.ConsentRepositoryImpl
+import app.sroka.core.domain.ConsentRepository
 import app.sroka.core.data.repository.LibraryRepositoryImpl
 import app.sroka.core.data.repository.SettingsRepositoryImpl
 import app.sroka.core.data.repository.TagRepositoryImpl
@@ -30,6 +32,10 @@ import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.domain.SyncController
 import app.sroka.core.domain.SyncStatusRepository
 import app.sroka.core.domain.TagRepository
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.data.telemetry.TelemetryDataTransferRepository
+import app.sroka.core.data.telemetry.TelemetryLibraryRepository
+import app.sroka.core.data.telemetry.TelemetryPdfUploader
 import app.sroka.core.network.NetworkConfig
 import app.sroka.core.network.SessionProvider
 import dagger.Binds
@@ -47,7 +53,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal abstract class DataModule {
-    @Binds abstract fun library(impl: LibraryRepositoryImpl): LibraryRepository
     @Binds abstract fun tags(impl: TagRepositoryImpl): TagRepository
     @Binds abstract fun syncController(impl: SyncControllerImpl): SyncController
     @Binds abstract fun syncStatus(impl: SyncStatusRepositoryImpl): SyncStatusRepository
@@ -55,14 +60,29 @@ internal abstract class DataModule {
     @Binds abstract fun auth(impl: AuthRepositoryImpl): AuthRepository
     @Binds abstract fun settings(impl: SettingsRepositoryImpl): SettingsRepository
     @Binds abstract fun account(impl: AccountRepositoryImpl): AccountRepository
+    @Binds abstract fun consent(impl: ConsentRepositoryImpl): ConsentRepository
     @Binds abstract fun sessionProvider(impl: SessionProviderImpl): SessionProvider
-    @Binds abstract fun dataTransfer(impl: DataTransferRepositoryImpl): DataTransferRepository
     @Binds abstract fun importScheduler(impl: WorkImportScheduler): ImportScheduler
-    @Binds abstract fun pdfUploader(impl: PdfUploaderImpl): PdfUploader
     @Binds abstract fun pdfThumbnails(impl: AndroidPdfThumbnailRenderer): PdfThumbnailRenderer
     @Binds abstract fun downloadCanceller(impl: WorkDownloadCanceller): DownloadCanceller
 
     companion object {
+        // Decorated so user actions report D15 telemetry events (enums only).
+        @Provides
+        @Singleton
+        fun library(impl: LibraryRepositoryImpl, telemetry: Telemetry): LibraryRepository =
+            TelemetryLibraryRepository(impl, telemetry)
+
+        @Provides
+        @Singleton
+        fun dataTransfer(impl: DataTransferRepositoryImpl, telemetry: Telemetry): DataTransferRepository =
+            TelemetryDataTransferRepository(impl, telemetry)
+
+        @Provides
+        @Singleton
+        fun pdfUploader(impl: PdfUploaderImpl, telemetry: Telemetry): PdfUploader =
+            TelemetryPdfUploader(impl, telemetry)
+
         @Provides
         @Singleton
         fun contentPaths(@ApplicationContext context: Context): ContentPaths =

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import app.sroka.core.domain.LibraryRepository
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.domain.TelemetryEvent
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.SearchResult
 import app.sroka.core.model.SearchScope
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val library: LibraryRepository,
+    private val telemetry: Telemetry = Telemetry.None,
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -46,8 +49,15 @@ class SearchViewModel @Inject constructor(
         _scope.value = tab.toSearchScope()
     }
 
+    private var searchLogged = false
+
     fun onQueryChange(text: String) {
         _query.value = text
+        // One search_used per search session; never the text itself.
+        if (!searchLogged && text.isNotBlank()) {
+            searchLogged = true
+            telemetry.logEvent(TelemetryEvent.SearchUsed)
+        }
     }
 
     fun onScopeChange(scope: SearchScope) {

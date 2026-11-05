@@ -76,6 +76,10 @@ import app.sroka.feature.settings.api.ImportKey
 import app.sroka.feature.settings.api.SettingsChoiceKey
 import app.sroka.feature.settings.api.SettingsKey
 import app.sroka.feature.settings.impl.navigation.settingsEntries
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import app.sroka.consent.ConsentPromptHost
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /**
@@ -100,6 +104,16 @@ fun SrokaApp(
     val startKey = if (signedOut) AuthKey else TopLevelDestination.MY_LIST.key
     val backStack = rememberNavBackStack(startKey)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Analytics screen_view for the screen on top (route pattern only), and the first-run consent prompt.
+    val screenTracker: ScreenTrackerViewModel = hiltViewModel()
+    LaunchedEffect(backStack) {
+        snapshotFlow { backStack.lastOrNull()?.telemetryScreen() }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect(screenTracker::screenShown)
+    }
+    if (!signedOut) ConsentPromptHost()
 
     // Signed out: only sign-in. Signed in: drop any sign-in screen (also the one opened from the
     // Expired banner, which keeps the library underneath). Expired: leave the stack alone.

@@ -73,9 +73,9 @@ JDK 21 and the Android SDK (platform 37) are required. Run everything from `apps
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-./gradlew testDebugUnitTest lintDebug assembleDebug :app:assembleRelease   # full gate
+./gradlew testDebugUnitTest :app:testPlayDebugUnitTest lintDebug :app:lintPlayDebug :app:assemblePlayDebug :app:assembleFossRelease   # full gate (flavors: see CLAUDE.md)
 ./gradlew :core:data:testDebugUnitTest                                      # one module
-./gradlew :app:installDebug                                                 # install on emulator/device
+./gradlew :app:installPlayDebug                                               # install on emulator/device
 ```
 
 Debug builds (`app.sroka.debug`) talk to `http://localhost:8787` (cleartext allowed for localhost, 127.0.0.1 and

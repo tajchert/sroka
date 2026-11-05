@@ -81,4 +81,7 @@ enum class SaveSource(val wire: String) {
 
     /** Typed or pasted in the app's "Add" dialog. */
     MANUAL("web"),
+
+    /** Links dragged into the list (R15.1); sent to the server as a share. */
+    DRAG("share"),
 }

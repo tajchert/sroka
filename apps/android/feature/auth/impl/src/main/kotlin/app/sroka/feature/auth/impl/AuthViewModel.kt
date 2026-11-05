@@ -7,6 +7,8 @@ import app.sroka.core.domain.AuthError
 import app.sroka.core.domain.AuthRepository
 import app.sroka.core.domain.AuthResult
 import app.sroka.core.domain.SettingsRepository
+import app.sroka.core.domain.Telemetry
+import app.sroka.core.domain.TelemetryEvent
 import app.sroka.core.model.SessionState
 import app.sroka.core.model.UrlNormalizer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,6 +48,7 @@ class AuthViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val settings: SettingsRepository,
     private val savedState: SavedStateHandle,
+    private val telemetry: Telemetry = Telemetry.None,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -127,7 +130,10 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = auth.signIn(s.email, s.code)) {
                 // The app observes the session and leaves this screen.
-                AuthResult.Success -> _state.update { it.copy(loading = false) }
+                AuthResult.Success -> {
+                    telemetry.logEvent(TelemetryEvent.Login)
+                    _state.update { it.copy(loading = false) }
+                }
                 is AuthResult.Failure -> {
                     val clear = result.error !is AuthError.Network && result.error !is AuthError.Server
                     _state.update {

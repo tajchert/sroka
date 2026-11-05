@@ -25,7 +25,7 @@ Run the [verification commands](TESTING.md#commands), then start an AVD in Andro
 
 ```bash
 adb devices
-./gradlew :app:installDebug
+./gradlew :app:installPlayDebug
 adb shell am start -n app.sroka.debug/app.sroka.MainActivity
 ```
 

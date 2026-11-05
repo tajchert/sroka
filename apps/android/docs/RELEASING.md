@@ -4,6 +4,12 @@
 
 Release builds are minified and signed with the Sroka release key. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants. There is no publishing automation yet.
 
+## Flavors and Firebase config
+
+`app` has a `distribution` flavor dimension: `play` (Firebase Analytics + Crashlytics behind user consent, repo-root D15) and `foss` (no Google/Firebase dependency; same applicationId). Only `play` is published to Google Play.
+
+The play release needs the Firebase config file `apps/android/app/google-services.json` (gitignored; clients for `app.sroka` and `app.sroka.debug`; `app/google-services.example.json` shows the shape). `:app:assemblePlayRelease` and `:app:bundlePlayRelease` fail with a clear message when it is missing; `playDebug` and all `foss` tasks build without it (telemetry is then a no-op). Debug builds never send analytics or crashes. Crashlytics mapping files are uploaded by the Crashlytics plugin on play release builds. Verify the merged manifest of `playRelease` has the `firebase_analytics_collection_enabled=false` / `google_analytics_default_allow_*=false` flags and no `com.google.android.gms.permission.AD_ID`.
+
 ## Signing setup
 
 Release signing is wired in `app/build.gradle.kts`. Local builds read the gitignored file `apps/android/keystore.properties`:
@@ -29,9 +35,9 @@ SHA-256: 74ee30adc67a9c03be7d329d6d68154f1ca75ecba6ef13914c6923536863f74a
 Verify a build with:
 
 ```bash
-./gradlew :app:assembleRelease
+./gradlew :app:assemblePlayRelease
 APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)
-"$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+"$APKSIGNER" verify --print-certs app/build/outputs/apk/play/release/app-play-release.apk
 ```
 
 ## Prepare a product release
@@ -46,12 +52,12 @@ See the official [app-signing guide](https://developer.android.com/studio/publis
 ## Produce and retain artifacts
 
 ```bash
-./gradlew :app:bundleRelease
+./gradlew :app:bundlePlayRelease
 ```
 
-The bundle is under `app/build/outputs/bundle/release/`. An AAB is not directly installable with `adb install`; use your channel's test delivery or generate device APKs with the official [bundletool](https://developer.android.com/tools/bundletool).
+The bundle is under `app/build/outputs/bundle/playRelease/`. An AAB is not directly installable with `adb install`; use your channel's test delivery or generate device APKs with the official [bundletool](https://developer.android.com/tools/bundletool).
 
-Retain the exact distributed artifact, version, source commit, and signing-certificate identity. Archive the release R8 mapping from `app/build/outputs/mapping/release/mapping.txt` with that version for crash retracing. The included CI verifies assembly; it does not publish or archive release mappings.
+Retain the exact distributed artifact, version, source commit, and signing-certificate identity. Archive the release R8 mapping from `app/build/outputs/mapping/playRelease/mapping.txt` with that version for crash retracing. The included CI verifies assembly; it does not publish or archive release mappings.
 
 ## Check the distributed build
 

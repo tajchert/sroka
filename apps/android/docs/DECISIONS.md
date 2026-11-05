@@ -120,5 +120,5 @@ Triggers: app start/foreground (ProcessLifecycleOwner), after local writes (2 s 
 
 ## A12 Testing & verification (per module, keep output short)
 - Unit tests (JVM/Robolectric) for: UrlNormalizer (port shared url.test.ts cases), uuidv7, tagKey, op building + coalescing, SyncEngine (push/aliases/rejects/rebase/410) against MockWebServer + in-memory Room, ContentStore unzip safety + sha verify, DAO queries (Robolectric in-memory Room), ViewModels with fakes.
-- Commands: `./gradlew :core:data:testDebugUnitTest` etc. Full gate before merge: `./gradlew testDebugUnitTest lintDebug assembleDebug :app:assembleRelease`.
+- Commands: `./gradlew :core:data:testDebugUnitTest` etc. Full gate before merge: see `CLAUDE.md` (flavor-aware: play + foss, repo-root D15).
 - Commit per agent task with conventional messages scoped `android` (e.g. `feat(android): sync engine`), only your own paths (`git add <paths>`; retry if `index.lock` exists).

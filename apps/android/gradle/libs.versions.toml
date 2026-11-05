@@ -52,6 +52,13 @@ navigation3 = "1.2.0"
 # Dependency Injection
 # -----------------------------------------------------------------------------
 hilt = "2.60.1"
+
+# -----------------------------------------------------------------------------
+# Firebase (play flavor only; DECISIONS repo-root D15)
+# -----------------------------------------------------------------------------
+firebaseBom = "35.1.0"
+googleServices = "4.5.0"
+firebaseCrashlyticsPlugin = "3.0.8"
 hiltLifecycleViewmodelCompose = "1.4.0"
 
 # -----------------------------------------------------------------------------
@@ -129,6 +136,13 @@ androidx-compose-material3-adaptive = { module = "androidx.compose.material3.ada
 androidx-compose-material3-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "material3Adaptive" }
 androidx-compose-material3-adaptive-navigation3 = { module = "androidx.compose.material3.adaptive:adaptive-navigation3", version.ref = "material3Adaptive" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
+
+# -----------------------------------------------------------------------------
+# Firebase (play flavor only)
+# -----------------------------------------------------------------------------
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
 # -----------------------------------------------------------------------------
 # Hilt - Dependency Injection
@@ -289,6 +303,8 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 room = { id = "androidx.room3", version.ref = "room" }
 
 # Kotlin-aware test coverage

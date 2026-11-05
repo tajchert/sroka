@@ -12,6 +12,8 @@ android {
         minSdk = 28 // Macrobenchmark requires API 28; the app still supports 26.
         targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // :app has a `distribution` flavor dimension; measure the play build.
+        missingDimensionStrategy("distribution", "play")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

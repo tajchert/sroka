@@ -42,3 +42,6 @@ google-services.json
 
 # Python helper caches
 __pycache__/
+
+# Firebase config (D15); app/google-services.example.json is the committed template
+app/google-services.json

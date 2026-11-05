@@ -25,6 +25,10 @@ plugins {
     // Symbol processing (for Room, Hilt)
     alias(libs.plugins.ksp) apply false
 
+    // Firebase (play flavor); :app applies them only when app/google-services.json exists.
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
+
     // Data persistence
     alias(libs.plugins.room) apply false
 

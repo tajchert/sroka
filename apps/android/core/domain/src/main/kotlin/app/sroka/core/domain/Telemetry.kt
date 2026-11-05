@@ -1,5 +1,8 @@
 package app.sroka.core.domain
 
+import app.sroka.core.model.ExportFormat
+import app.sroka.core.model.ItemKind
+
 /**
  * Analytics and crash reporting seam (repo-root D15). The `play` flavor implements it with
  * Firebase, the `foss` flavor (and debug builds) with a no-op.
@@ -21,6 +24,17 @@ interface Telemetry {
 
     /** Records a handled error. The throwable's message must not contain user content. */
     fun recordNonFatal(throwable: Throwable)
+
+    companion object {
+        /** Does nothing; the foss flavor binds it and tests use it as a default. */
+        val None: Telemetry = object : Telemetry {
+            override val isAvailable: Boolean = false
+            override fun logEvent(event: TelemetryEvent) = Unit
+            override fun setAnalyticsEnabled(enabled: Boolean) = Unit
+            override fun setCrashReportingEnabled(enabled: Boolean) = Unit
+            override fun recordNonFatal(throwable: Throwable) = Unit
+        }
+    }
 }
 
 enum class TelemetryScreen(val value: String) {
@@ -40,16 +54,9 @@ enum class TelemetrySource(val value: String) {
     PDF("pdf"),
     DRAG("drag"),
     IMPORT("import"),
-}
 
-enum class ItemKind(val value: String) {
-    ARTICLE("article"),
-    PDF("pdf"),
-}
-
-enum class ExportFormat(val value: String) {
-    CSV("csv"),
-    JSON("json"),
+    /** Typed or pasted into the add-link dialog (D15 lists no Android value; closest is web_add). */
+    WEB_ADD("web_add"),
 }
 
 /** GA4 events (snake_case names; params only from the enums above). */
@@ -57,8 +64,8 @@ sealed class TelemetryEvent(val name: String, val params: Map<String, String> = 
     class ScreenView(screen: TelemetryScreen) : TelemetryEvent("screen_view", mapOf("screen_name" to screen.value))
     data object Login : TelemetryEvent("login", mapOf("method" to "email_otp"))
     class SaveItem(source: TelemetrySource, kind: ItemKind) :
-        TelemetryEvent("save_item", mapOf("source" to source.value, "kind" to kind.value))
-    class OpenItem(kind: ItemKind) : TelemetryEvent("open_item", mapOf("kind" to kind.value))
+        TelemetryEvent("save_item", mapOf("source" to source.value, "kind" to kind.wire()))
+    class OpenItem(kind: ItemKind) : TelemetryEvent("open_item", mapOf("kind" to kind.wire()))
     data object ArchiveItem : TelemetryEvent("archive_item")
     data object UnarchiveItem : TelemetryEvent("unarchive_item")
     class FavoriteItem(on: Boolean) : TelemetryEvent("favorite_item", mapOf("on" to on.toString()))
@@ -67,5 +74,7 @@ sealed class TelemetryEvent(val name: String, val params: Map<String, String> = 
     data object SearchUsed : TelemetryEvent("search_used")
     class ImportStart(source: TelemetrySource = TelemetrySource.IMPORT) :
         TelemetryEvent("import_start", mapOf("source" to source.value))
-    class Export(format: ExportFormat) : TelemetryEvent("export", mapOf("format" to format.value))
+    class Export(format: ExportFormat) : TelemetryEvent("export", mapOf("format" to format.wire))
 }
+
+private fun ItemKind.wire(): String = name.lowercase()

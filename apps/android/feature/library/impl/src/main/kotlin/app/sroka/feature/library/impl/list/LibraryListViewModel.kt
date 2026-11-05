@@ -323,7 +323,7 @@ class LibraryListViewModel @Inject constructor(
             val created = mutableListOf<String>()
             var duplicate: String? = null
             for (url in urls) {
-                when (val result = library.save(url, source = SaveSource.SHARE)) {
+                when (val result = library.save(url, source = SaveSource.DRAG)) {
                     is SaveResult.Saved ->
                         if (result.alreadySaved) {
                             if (duplicate == null) duplicate = result.itemId

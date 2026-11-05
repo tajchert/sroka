@@ -221,6 +221,14 @@ svg {
   color: var(--fg);
 }
 
+/* First-run analytics consent card (D15) */
+.consent { margin: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--raise); font-size: 13px; line-height: 1.45; color: var(--fg-2); }
+.consent strong { color: var(--fg); font-size: 14px; }
+.consent p { margin: 4px 0 10px; }
+.consent-actions { display: flex; align-items: center; gap: 8px; }
+.consent-actions .btn { height: 34px; padding: 0 14px; font-size: 13px; }
+.consent-actions .link { margin-left: auto; }
+
 /* Buttons */
 .btn {
   height: 46px;

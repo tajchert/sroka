@@ -1,3 +1,4 @@
+import { track } from "./analytics.ts";
 import { getConfig } from "./api.ts";
 import { DEFAULT_SERVER, getSettings } from "./settings.ts";
 
@@ -15,5 +16,6 @@ export async function appOrigin(): Promise<string> {
 
 /** Opens the web app (or a path inside it) in a new tab. */
 export async function openApp(path = ""): Promise<void> {
+  if (path === "") track({ name: "open_library" });
   await chrome.tabs.create({ url: `${await appOrigin()}/app/${path}` });
 }

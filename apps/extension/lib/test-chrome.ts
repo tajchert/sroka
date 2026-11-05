@@ -18,6 +18,7 @@ export function installChrome() {
   const session = mkArea();
   const chromeMock = {
     storage: { local, session },
+    runtime: { getManifest: vi.fn(() => ({ version: "9.9.9" })), sendMessage: vi.fn(async () => undefined) },
     alarms: { create: vi.fn(async () => {}), clear: vi.fn(async () => true) },
     action: {
       setBadgeText: vi.fn(async () => {}),

@@ -1,3 +1,5 @@
+import { setTrackSink, track, trackEvent } from "../lib/analytics.ts";
+import { installGlobalErrorHandlers } from "../lib/error-reporting.ts";
 import { refreshBadge, paintBadge } from "../lib/badge.ts";
 import type { Msg } from "../lib/messages.ts";
 import { MENU_OPEN_ITEM, MENU_REMOVE_ITEM, openSavedItem, removeSavedItem } from "../lib/item-menu.ts";
@@ -17,7 +19,14 @@ async function flash(tabId: number | undefined, r: SaveResult) {
   }
 }
 
+/** save_item only when a new item was created. kind is "article": SaveResult carries no kind and the extension never saves PDFs itself. */
+function trackSave(r: SaveResult, source: "extension" | "context_menu") {
+  if (r.ok && r.created) track({ name: "save_item", params: { source, kind: "article" } });
+}
+
 export default defineBackground(() => {
+  installGlobalErrorHandlers();
+  setTrackSink(trackEvent);
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({ id: "save-link", title: "Save link to Sroka", contexts: ["link"] });
@@ -33,10 +42,13 @@ export default defineBackground(() => {
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === "save-link" && info.linkUrl) {
       const r = await saveLink(info.linkUrl);
+      trackSave(r, "context_menu");
       // Link isn't the current tab's page; only badge the tab when it is the same URL.
       if (tab?.id != null && tab.url === info.linkUrl) await flash(tab.id, r);
     } else if (info.menuItemId === "save-page" && tab) {
-      await flash(tab.id, await saveTab(tab));
+      const r = await saveTab(tab);
+      trackSave(r, "context_menu");
+      await flash(tab.id, r);
     } else if (info.menuItemId === "open-app") {
       await openApp();
     } else if (info.menuItemId === MENU_OPEN_ITEM && tab?.url) {
@@ -71,9 +83,14 @@ export default defineBackground(() => {
 
   chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
     const fail = (e: unknown) => sendResponse({ ok: false, queued: false, reason: "error", message: String(e) });
+    if (msg.type === "track") {
+      void trackEvent(msg.event);
+      return false;
+    }
     if (msg.type === "save-tab") {
       saveTab(msg.tab)
         .then(async (r) => {
+          trackSave(r, "extension");
           await flash(msg.tab.id, r).catch(() => undefined);
           sendResponse(r);
         })

@@ -11,3 +11,6 @@ coverage/
 .env.*
 .claude/worktrees/
 wrangler.dev.jsonc
+
+# Firebase web config (D15): local only, see apps/web/firebase.config.example.json
+apps/web/firebase.config.json

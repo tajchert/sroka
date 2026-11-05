@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router";
 import "./index.css";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
+import { startAnalytics } from "./lib/analytics.ts";
 import { installGlobalErrorHandlers } from "./lib/error-reporting.ts";
 import Shell from "./components/Shell.tsx";
 import { ToastProvider } from "./lib/store.tsx";
@@ -43,6 +44,7 @@ const queryClient = new QueryClient({
 });
 
 installGlobalErrorHandlers();
+startAnalytics();
 
 const el = document.getElementById("root");
 if (el) {

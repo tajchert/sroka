@@ -6,6 +6,8 @@ import { api, setUnauthorizedHandler } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
 import SignIn from "../routes/SignIn.tsx";
 import { isTyping } from "../lib/hooks.ts";
+import { SIGN_IN_SCREEN, screenForPath, setScreen } from "../lib/analytics.ts";
+import { ConsentBanner } from "./ConsentBanner.tsx";
 import { Wordmark } from "./Logo.tsx";
 
 function Toasts() {
@@ -147,6 +149,12 @@ export default function Shell() {
     return () => setUnauthorizedHandler(null);
   }, [qc]);
   useEffect(() => setOpen(false), [loc.pathname, loc.search]);
+  // D15: screen_view per route pattern (pathname only; the query string never reaches analytics)
+  const signedIn = !!me.data;
+  useEffect(() => {
+    if (me.isPending || me.isError) return;
+    setScreen(signedIn ? screenForPath(loc.pathname) : SIGN_IN_SCREEN);
+  }, [loc.pathname, signedIn, me.isPending, me.isError]);
   // "/" focuses the search box (whichever one is visible)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -273,6 +281,7 @@ export default function Shell() {
           <Outlet />
         </main>
       </div>
+      <ConsentBanner />
       <Toasts />
     </div>
   );

@@ -2,6 +2,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { RunQueue } from "./runQueue.ts";
 import type { Item } from "@sroka/shared";
+import { track } from "./analytics.ts";
 import { api } from "./api.ts";
 import { patchItem, promoteItem } from "./cache.ts";
 import { reportClientError } from "./error-reporting.ts";
@@ -38,6 +39,7 @@ export function usePdfUploads() {
   const toasts = useToasts();
   const [rows, setRows] = useState<UploadRow[]>([]);
   const files = useRef(new Map<string, File>());
+  const sources = useRef(new Map<string, "pdf" | "drag">());
   const handles = useRef(new Map<string, UploadHandle>());
 
   const queue = useRef<RunQueue | null>(null);
@@ -46,6 +48,7 @@ export function usePdfUploads() {
   const dropRow = (key: string) => {
     queue.current?.remove(key);
     files.current.delete(key);
+    sources.current.delete(key);
     handles.current.delete(key);
     setRows((r) => r.filter((x) => x.key !== key));
   };
@@ -60,6 +63,7 @@ export function usePdfUploads() {
       try {
         const { item, created } = await h.promise;
         promoteItem(qc, item);
+        if (created) track({ name: "save_item", params: { source: sources.current.get(key) ?? "pdf", kind: "pdf" } });
         void qc.invalidateQueries({ queryKey: ["me"] });
         void qc.invalidateQueries({ queryKey: ["tags"] });
         if (!created) toasts.push({ message: "Already saved. Moved to the top of My List." });
@@ -84,12 +88,13 @@ export function usePdfUploads() {
   };
 
   const addFiles = useCallback(
-    (list: Iterable<File>) => {
+    (list: Iterable<File>, source: "pdf" | "drag" = "pdf") => {
       const check = checkFiles(list);
       for (const m of checkMessages(check)) toasts.push({ message: m, tone: "error" });
       for (const f of check.accepted) {
         const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         files.current.set(key, f);
+        sources.current.set(key, source);
         setRows((r) => [...r, { key, name: f.name, size: f.size, loaded: 0, state: "queued" }]);
         getQueue().add(key);
       }

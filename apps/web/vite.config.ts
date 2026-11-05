@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -16,12 +17,17 @@ const spaAppFallback: Plugin = {
   },
 };
 
+// D15: the Firebase web config is gitignored; without the file the build has no analytics at all.
+const firebaseConfigPath = resolve(import.meta.dirname, "firebase.config.json");
+const firebaseConfig: unknown = existsSync(firebaseConfigPath) ? JSON.parse(readFileSync(firebaseConfigPath, "utf8")) : null;
+
 // Multi-page build (decisions D8): index.html = landing at "/", app/index.html = SPA at "/app/",
 // privacy.html / terms.html = legal pages at "/privacy" and "/terms" (D15; Workers Assets drops the .html).
 export default defineConfig({
   // base "/" (not "/app/") on purpose: landing and SPA share /assets/*, served directly by Workers Assets (D8).
   // Differs from D3's "/app/"; integrator must keep /assets/* out of run_worker_first.
   base: "/",
+  define: { __FIREBASE_CONFIG__: JSON.stringify(firebaseConfig) },
   plugins: [spaAppFallback, react(), tailwindcss()],
   build: {
     outDir: "dist",

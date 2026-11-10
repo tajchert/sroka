@@ -24,6 +24,23 @@ describe("assets fallback", () => {
   it("does not over-match /apple-touch-icon.png", async () => {
     expect((await call("/apple-touch-icon.png", {}, APP, fakeAssets())).status).toBe(404);
   });
+  it("the SPA shell cannot be framed and carries basic security headers", async () => {
+    const res = await call("/app/some/deep/path", {}, APP, fakeAssets());
+    expect(res.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    expect(res.headers.get("x-frame-options")).toBe("DENY");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+  });
+  it("a direct HTML asset gets the same headers", async () => {
+    const res = await call("/app/", {}, APP, fakeAssets());
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+  });
+  it("non-HTML responses get nosniff but no frame policy", async () => {
+    const res = await call("/apple-touch-icon.png", {}, APP, fakeAssets());
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toBeNull();
+  });
 });
 
 describe("account delete verification rows", () => {

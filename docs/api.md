@@ -28,6 +28,8 @@ Contents: 1 Conventions · 2 Hosts, auth, CORS · 3 Errors · 4 Objects · 5 Ite
 The API Worker picks the behaviour by `new URL(req.url).host`: equal to `new URL(CONTENT_ORIGIN).host` → content route only (everything else 404). Otherwise the normal app (`/api/auth/*`, `/v1/*`, `/app/*` SPA fallback, assets).
 In dev, `localhost:8787` acts as both `sroka.app` and `api.sroka.app`.
 
+Static web assets (landing, /app) are served with X-Content-Type-Options: nosniff and Referrer-Policy: strict-origin-when-cross-origin; HTML documents also get Content-Security-Policy: frame-ancestors 'none' and X-Frame-Options: DENY. No script/style CSP is set yet.
+
 Dev-only var `DEV_ORIGINS` (comma-separated; `.dev.vars`: `http://localhost:5173`, unset in production) lists extra web origins (vite dev server): they are added to Better Auth `trustedOrigins` and to the content-route CORS allow-list. (Through the vite proxy, `/api` and `/v1` requests are same-origin for the browser but keep `Origin: http://localhost:5173`.)
 
 **CORS for `/api/*` and `/v1/*`** (Hono `cors`): `origin` echoed only if it equals `APP_ORIGIN` (or is in `DEV_ORIGINS`), or starts with `chrome-extension://` or `moz-extension://`; otherwise no CORS headers. `allowMethods: GET,POST,PATCH,DELETE,OPTIONS`; `allowHeaders: Content-Type, Authorization, X-Sroka-Device`; `exposeHeaders: set-auth-token, Retry-After, X-Retry-After, Content-Disposition`; `credentials: false`; `maxAge: 600`. (The MV3 service worker with host_permissions bypasses CORS anyway.)

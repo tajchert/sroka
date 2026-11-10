@@ -46,6 +46,9 @@ export function createAuth(env: Env, ctx?: WaitUntil) {
     secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, { provider: "sqlite", schema }),
     trustedOrigins,
+    // Password-reset OTP senders: unused (sign-in is passwordless; no client calls them) but reachable and they
+    // email a code, without the Turnstile gate. Disabled paths 404 before any hook or email send.
+    disabledPaths: ["/forget-password/email-otp", "/email-otp/request-password-reset"],
     session: {
       expiresIn: 60 * 60 * 24 * 90,
       updateAge: 60 * 60 * 24,

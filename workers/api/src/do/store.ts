@@ -785,7 +785,8 @@ export class LibraryStore {
     if (row.kind === "pdf") return this.markParsedPdf(row, result);
     this.withCtx((ctx) => {
       // The previous private content of this item is superseded (a new private dir, or now public content).
-      if (row.content_private === 1 && row.content_id && row.content_id !== result.contentId) {
+      // A failed result keeps the old content attached (api.md §9), so nothing is cleaned up for it.
+      if (result.status !== "failed" && row.content_private === 1 && row.content_id && row.content_id !== result.contentId) {
         ctx.cleanup.push(r2Keys.contentDir(row.content_id, this.userId()));
       }
       if (result.status === "failed") {

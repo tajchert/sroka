@@ -131,6 +131,21 @@ describe("security hardening (LibraryDO)", () => {
     expect(await testEnv.CONTENT.head(`private/${userId}/${cid}/article.html`)).toBeNull();
   });
 
+  it("a failed re-parse keeps the previous private content in R2", async () => {
+    const { lib, userId } = freshLibrary();
+    const a = uuidv7();
+    await lib.applyOps("d", [add(a, "https://priv3.example/", T0)]);
+    const j1 = await lib.requestParse(a, { rawKey: `raw/${userId}/${a}.html.gz`, force: true });
+    const cid1 = uuidv7();
+    const key = `private/${userId}/${cid1}/article.html`;
+    await testEnv.CONTENT.put(key, "x");
+    await lib.markParsed(a, ok({ parseGen: j1!.parseGen, contentId: cid1, contentPrivate: true }));
+    const r = await lib.applyOps("d", [refresh(a, T0 + 1)]);
+    const failed = { ...ok({ parseGen: r.parseJobs[0]!.parseGen }), status: "failed" as const, contentId: undefined, error: "bot_wall" };
+    expect(await lib.markParsed(a, failed)).toEqual({ ok: true });
+    expect(await testEnv.CONTENT.head(key)).not.toBeNull();
+    expect((await lib.getItem(a))!).toMatchObject({ contentId: cid1, contentPrivate: true, parseStatus: "failed", parseError: "bot_wall" });
+  });
   it("a re-parse supersedes the previous private content and refresh drops the captured HTML", async () => {
     const { lib, userId } = freshLibrary();
     const a = uuidv7();

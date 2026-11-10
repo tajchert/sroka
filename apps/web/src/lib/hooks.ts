@@ -29,6 +29,8 @@ function errMessage(e: unknown): string {
 interface PendingDelete {
   run: () => Promise<void>;
   cancel: () => void;
+  /** Page is going away: send the delete with a keepalive request, without waiting for the result. */
+  leave: () => void;
 }
 const pendingDeletes = new Set<PendingDelete>();
 /** Sign-out: run deletes the user already confirmed (while the session is still valid). */
@@ -42,6 +44,14 @@ export function cancelPendingDeletes(): void {
   const all = [...pendingDeletes];
   pendingDeletes.clear();
   for (const p of all) p.cancel();
+}
+/** Tab close / reload inside the undo window: the user already confirmed these deletes, so send them now. */
+export function installPendingDeleteFlush(): void {
+  window.addEventListener("pagehide", () => {
+    const all = [...pendingDeletes];
+    pendingDeletes.clear();
+    for (const p of all) p.leave();
+  });
 }
 
 export function useItemActions() {
@@ -129,6 +139,22 @@ export function useItemActions() {
           done = true;
           clearTimeout(timer);
           unhideItem(item.id);
+        },
+        leave: () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          removeItem(qc, item.id);
+          try {
+            void fetch(`/v1/items/${item.id}`, {
+              method: "DELETE",
+              keepalive: true,
+              credentials: "same-origin",
+              headers: { "X-Sroka-Device": "web" },
+            }).catch(() => undefined);
+          } catch {
+            /* ignore */
+          }
         },
       };
       const timer = setTimeout(() => void entry.run(), 6000);

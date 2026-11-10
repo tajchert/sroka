@@ -45,4 +45,19 @@ internal class SettingsRepositoryTest : DataTestBase() {
         assertTrue(settings.setServerUrl("https://mirror.example"))
         assertEquals(0, auth.signOutCount)
     }
+
+    @Test fun rejectsCleartextHttpBeforeSigningOut() = runBlocking {
+        val (settings, prefs) = repo()
+        assertFalse(settings.setServerUrl("http://mirror.example"))
+        assertEquals(0, auth.signOutCount)
+        assertEquals(null, prefs.userPreferences.first().serverUrl)
+        assertTrue(settings.setServerUrl("http://10.0.2.2:8787"))
+        assertEquals(1, auth.signOutCount)
+    }
+
+    @Test fun normalizeServerUrlHttpRules() {
+        assertEquals(null, app.sroka.core.data.repository.normalizeServerUrl("http://example.com"))
+        assertEquals("http://localhost:8787", app.sroka.core.data.repository.normalizeServerUrl("http://localhost:8787/"))
+        assertEquals("https://example.com", app.sroka.core.data.repository.normalizeServerUrl(" https://example.com/ "))
+    }
 }

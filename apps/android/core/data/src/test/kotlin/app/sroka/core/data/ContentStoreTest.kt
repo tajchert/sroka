@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -105,6 +106,15 @@ internal class ContentStoreTest : DataTestBase() {
         itemDao.upsertItem(entity("archivedFav", savedAt = 2, status = ItemStatus.ARCHIVED, favorite = true))
         itemDao.upsertItem(entity("noContent", savedAt = 5, contentId = null))
         assertEquals(listOf("new", "archivedFav", "old"), contentFileDao.eligibleForDownload().map { it.itemId })
+    }
+
+    @Test fun keepsOldArchivedPackageDownloadedRecently() = runBlocking {
+        itemDao.upsertItem(entity("a", status = ItemStatus.ARCHIVED, archivedAt = now - 31L * 86_400_000))
+        contentFileDao.upsert(ContentFileEntity("a", "c-a", ContentState.DOWNLOADED, downloadedAt = now - 1_000))
+        paths.articleDir("a").mkdirs()
+        contentStore.evict()
+        assertNotNull(contentFileDao.get("a"))
+        assertTrue(paths.articleDir("a").exists())
     }
 
     @Test fun evictsOldArchivedPackages() = runBlocking {

@@ -30,6 +30,12 @@ class SessionStore @Inject constructor(
     @SessionDataStore private val dataStore: DataStore<Preferences>,
     private val cipher: TokenCipher,
 ) {
+    /** Decrypted token keyed by the ciphertext it came from, so the Keystore decrypt runs once per stored token. */
+    private class CachedToken(val encoded: String, val token: String)
+
+    @Volatile private var cachedToken: CachedToken? = null
+    @Volatile private var cachedDeviceId: String? = null
+
     /** The stored session, or null when signed out / undecryptable. */
     val session: Flow<StoredSession?> = dataStore.data
         .catch { throwable ->
@@ -45,6 +51,7 @@ class SessionStore @Inject constructor(
     /** Stores a fresh session (also clears the expired flag). */
     suspend fun save(token: String, email: String) {
         val encrypted = Base64.getEncoder().encodeToString(cipher.encrypt(token.toByteArray(Charsets.UTF_8)))
+        cachedToken = null
         dataStore.edit {
             it[TOKEN] = encrypted
             it[EMAIL] = email
@@ -59,6 +66,7 @@ class SessionStore @Inject constructor(
 
     /** Signs out. The device id is kept. */
     suspend fun clear() {
+        cachedToken = null
         dataStore.edit {
             it.remove(TOKEN)
             it.remove(EMAIL)
@@ -68,6 +76,11 @@ class SessionStore @Inject constructor(
 
     /** `"and_" + uuidv7`, generated once per install and never changed. */
     suspend fun deviceId(): String {
+        cachedDeviceId?.let { return it }
+        return loadDeviceId().also { cachedDeviceId = it }
+    }
+
+    private suspend fun loadDeviceId(): String {
         dataStore.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }
             .first()[DEVICE_ID]?.let { return it }
         var result = ""
@@ -85,7 +98,11 @@ class SessionStore @Inject constructor(
         } catch (_: IllegalArgumentException) {
             return null
         }
-        val token = cipher.decrypt(bytes)?.toString(Charsets.UTF_8) ?: return null
+        // The cache is keyed by the stored ciphertext: any write (or external change) that alters the
+        // token misses the cache, and a removed token returns above before it is consulted.
+        val token = cachedToken?.takeIf { it.encoded == encoded }?.token
+            ?: (cipher.decrypt(bytes)?.toString(Charsets.UTF_8) ?: return null)
+                .also { cachedToken = CachedToken(encoded, it) }
         return StoredSession(token, email, p[EXPIRED] ?: false)
     }
 

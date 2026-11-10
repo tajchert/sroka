@@ -192,7 +192,7 @@ class ContentStoreImpl @Inject internal constructor(
         return itemLocks.getOrPut(itemId) { Mutex() }.withLock { withContext(io) { downloadLocked(itemId, gen) } }
     }
 
-    /** A9 eviction: packages of archived, non-favorite items archived more than 30 days ago. */
+    /** A9 eviction: packages of archived, non-favorite items archived more than 30 days ago and not downloaded or read since. */
     suspend fun evict() {
         val before = clock.now() - EVICT_AFTER_MS
         while (true) {

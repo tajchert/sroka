@@ -69,9 +69,16 @@ internal class SettingsRepositoryImpl @Inject constructor(
     }
 }
 
-/** `http(s)://host[:port][/path]` without query/fragment, no trailing slash; null if invalid. */
+private val CLEARTEXT_HOSTS = setOf("localhost", "127.0.0.1", "10.0.2.2")
+
+/**
+ * `https://host[:port][/path]` without query/fragment, no trailing slash; null if invalid.
+ * `http` is accepted only for the loopback/emulator hosts the debug network security config allows
+ * (release builds block all cleartext, so any other http URL would only lock the user out).
+ */
 internal fun normalizeServerUrl(input: String): String? {
     val url = input.trim().toHttpUrlOrNull() ?: return null
+    if (!url.isHttps && url.host !in CLEARTEXT_HOSTS) return null
     if (url.host.isEmpty() || url.query != null || url.fragment != null || url.username.isNotEmpty()) return null
     return url.toString().trimEnd('/')
 }

@@ -97,4 +97,14 @@ class OpsAndContentDaoTest : DatabaseTestBase() {
         files.deleteAll()
         assertEquals(0L, files.totalBytes())
     }
+
+    @Test fun evictionSkipsRecentlyDownloadedOrRead() = runBlocking {
+        items.upsertItem(item("oldArch", status = ItemStatus.ARCHIVED, archivedAt = 100))
+        items.upsertItem(item("freshDownload", status = ItemStatus.ARCHIVED, archivedAt = 100))
+        items.upsertItem(item("freshRead", status = ItemStatus.ARCHIVED, archivedAt = 100).copy(lastReadAt = 900))
+        files.upsert(ContentFileEntity("oldArch", "c-oldArch", ContentState.DOWNLOADED, downloadedAt = 50))
+        files.upsert(ContentFileEntity("freshDownload", "c-freshDownload", ContentState.DOWNLOADED, downloadedAt = 900))
+        files.upsert(ContentFileEntity("freshRead", "c-freshRead", ContentState.DOWNLOADED, downloadedAt = 50))
+        assertEquals(listOf("oldArch"), files.evictionCandidates(archivedBefore = 500))
+    }
 }

@@ -19,8 +19,12 @@ import org.junit.rules.TemporaryFolder
 /** Reversible fake cipher; [broken] simulates a lost/invalidated Keystore key. */
 private class FakeCipher : TokenCipher {
     var broken = false
+    var decryptCalls = 0
     override fun encrypt(plain: ByteArray) = plain.reversedArray()
-    override fun decrypt(data: ByteArray) = if (broken) null else data.reversedArray()
+    override fun decrypt(data: ByteArray): ByteArray? {
+        decryptCalls++
+        return if (broken) null else data.reversedArray()
+    }
 }
 
 class SessionStoreTest {
@@ -96,5 +100,46 @@ class SessionStoreTest {
         assertTrue(Regex("^[A-Za-z0-9_.:-]{1,64}$").matches(id))
         assertEquals(id, store.deviceId())
         assertEquals(id, SessionStore(dataStore, cipher).deviceId())
+    }
+
+    @Test
+    fun tokenIsDecryptedOnceAcrossReads() = scope.runTest {
+        store.save("t", "a@b.c")
+        repeat(5) { assertEquals("t", store.token()) }
+        assertEquals(1, cipher.decryptCalls)
+    }
+
+    @Test
+    fun cacheFollowsTokenChange() = scope.runTest {
+        store.save("t1", "a@b.c")
+        assertEquals("t1", store.token())
+        store.save("t2", "a@b.c")
+        assertEquals("t2", store.token())
+        assertEquals("t2", store.token())
+    }
+
+    @Test
+    fun noTokenAfterClearEvenWhenCached() = scope.runTest {
+        store.save("t", "a@b.c")
+        assertEquals("t", store.token())
+        store.clear()
+        assertNull(store.token())
+        assertNull(store.current())
+    }
+
+    @Test
+    fun noTokenWhenStoredTokenRemovedBehindTheCache() = scope.runTest {
+        store.save("t", "a@b.c")
+        assertEquals("t", store.token())
+        dataStore.edit { it.remove(stringPreferencesKey("token_enc")) }
+        assertNull(store.token())
+    }
+
+    @Test
+    fun markExpiredKeepsCachedTokenAndFlag() = scope.runTest {
+        store.save("t", "a@b.c")
+        store.token()
+        store.markExpired()
+        assertEquals(StoredSession("t", "a@b.c", true), store.current())
     }
 }

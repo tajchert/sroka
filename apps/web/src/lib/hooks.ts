@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { track } from "./analytics.ts";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
-import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
+import { patchItem, placeholderItem, prependItem, removeItem, replaceItem, snapshotItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
 
 export const itemTitle = (i: Item) => i.title || i.fileName || i.siteName || hostOf(i.canonicalUrl || i.url);
@@ -55,6 +55,7 @@ export function useItemActions() {
 
   const patch = useCallback(
     async (item: Item, body: UpdateItemRequest, optimistic?: Partial<Item>): Promise<Item | null> => {
+      const restore = optimistic ? snapshotItem(qc, item.id) : null;
       if (optimistic) patchItem(qc, { ...item, ...optimistic });
       try {
         const next = await api.updateItem(item.id, body);
@@ -62,7 +63,11 @@ export function useItemActions() {
         refreshCounts();
         return next;
       } catch (e) {
-        patchItem(qc, item);
+        if (restore) {
+          restore();
+          // Another change may have landed while this one was in flight; let the lists re-sync.
+          void qc.invalidateQueries({ queryKey: ["items"] });
+        }
         toasts.push({ message: errMessage(e), tone: "error" });
         return null;
       }

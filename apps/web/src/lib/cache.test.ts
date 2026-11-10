@@ -1,7 +1,7 @@
 import type { Item } from "@sroka/shared";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import { itemsKey, patchItem, placeholderItem, prependItem, removeItem, replaceItem, type ItemsData, type ListParams } from "./cache.ts";
+import { itemsKey, patchItem, placeholderItem, prependItem, removeItem, replaceItem, snapshotItem, type ItemsData, type ListParams } from "./cache.ts";
 
 const unread: ListParams = { state: "unread", sort: "newest" };
 const archived: ListParams = { state: "archived", sort: "newest" };
@@ -19,6 +19,25 @@ function setup() {
 }
 
 describe("cache helpers", () => {
+  it("snapshot restore puts an optimistically removed item back", () => {
+    const { qc, ids } = setup();
+    const restore = snapshotItem(qc, "a");
+    patchItem(qc, { ...a, status: "archived" });
+    expect(ids(unread)).toEqual([]);
+    restore();
+    expect(ids(unread)).toEqual(["a"]);
+    expect(qc.getQueryData<Item>(["item", "a"])).toBeUndefined();
+  });
+
+  it("snapshot restore keeps the cached single item", () => {
+    const { qc } = setup();
+    qc.setQueryData(["item", "a"], a);
+    const restore = snapshotItem(qc, "a");
+    patchItem(qc, { ...a, isFavorite: true });
+    restore();
+    expect(qc.getQueryData<Item>(["item", "a"])!.isFavorite).toBe(false);
+  });
+
   it("drops an archived item from the unread list", () => {
     const { qc, ids } = setup();
     patchItem(qc, { ...a, status: "archived" });

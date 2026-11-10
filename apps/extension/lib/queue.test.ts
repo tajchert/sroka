@@ -1,5 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ALARM, backoffMs, enqueue, MAX_QUEUED_HTML, processQueue, readFailed, readQueue, releaseQueue, removeQueuedUrl } from "./queue.ts";
+import {
+  ALARM,
+  backoffMs,
+  clearFailed,
+  enqueue,
+  MAX_QUEUE_AGE,
+  MAX_QUEUE_LENGTH,
+  MAX_QUEUED_HTML,
+  MIN_ATTEMPTS_BEFORE_EXPIRY,
+  processQueue,
+  QueueFullError,
+  readFailed,
+  readQueue,
+  releaseQueue,
+  removeQueuedUrl,
+} from "./queue.ts";
 import { saveWithFallback } from "./save.ts";
 import { setSettings } from "./settings.ts";
 import { installChrome, jsonRes, requestJson } from "./test-chrome.ts";
@@ -169,6 +184,67 @@ describe("review fixes", () => {
     await enqueue({ url: "https://b.com/" });
     await removeQueuedUrl("https://a.com/");
     expect((await readQueue()).map((e) => e.body.url)).toEqual(["https://b.com/"]);
+  });
+});
+
+describe("queue bounds", () => {
+  const offline = () => vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+
+  it("gives up on a retryable save only after MAX_QUEUE_AGE and enough attempts, and records it", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    offline();
+    // Retried hourly for 7 days: kept.
+    let t = now;
+    while (t < now + MAX_QUEUE_AGE) {
+      await processQueue(t);
+      t += 3_600_000;
+    }
+    expect(await readQueue()).toHaveLength(1);
+    t += 1; // now strictly older than MAX_QUEUE_AGE
+    await processQueue(t);
+    expect(await readQueue()).toHaveLength(0);
+    expect(await readFailed()).toEqual([{ url: "https://a.com/", reason: "expired", at: t }]);
+  });
+
+  it("an old entry that was barely tried (browser closed) gets its attempts first", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    offline();
+    let t = now + MAX_QUEUE_AGE + 1;
+    for (let i = 1; i < MIN_ATTEMPTS_BEFORE_EXPIRY; i++) {
+      await processQueue(t);
+      t += 3_600_000;
+    }
+    expect((await readQueue())[0]!.attempts).toBe(MIN_ATTEMPTS_BEFORE_EXPIRY - 1);
+    await processQueue(t);
+    expect(await readQueue()).toHaveLength(0);
+    expect((await readFailed())[0]!.reason).toBe("expired");
+  });
+
+  it("entries waiting for sign-in never expire", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    await setSettings({ signedOut: true });
+    await processQueue(now + 30 * MAX_QUEUE_AGE);
+    expect(await readQueue()).toHaveLength(1);
+    expect(await readFailed()).toEqual([]);
+  });
+
+  it("refuses new saves beyond MAX_QUEUE_LENGTH, visibly, keeping the queued ones", async () => {
+    const full = Array.from({ length: MAX_QUEUE_LENGTH }, (_, i) => ({ id: `q${i}`, body: { url: `https://a.com/${i}` }, attempts: 0, nextAt: 0, addedAt: 0 }));
+    c.storage.local.data.queue = full;
+    await expect(enqueue({ url: "https://new.com/" })).rejects.toBeInstanceOf(QueueFullError);
+    expect(await readQueue()).toHaveLength(MAX_QUEUE_LENGTH);
+    expect((await readFailed()).at(-1)).toMatchObject({ url: "https://new.com/", reason: "queue_full" });
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+    expect(await saveWithFallback({ url: "https://new2.com/" })).toMatchObject({ ok: false, queued: false, reason: "error", message: expect.stringContaining("Too many saves") });
+  });
+
+  it("clearFailed dismisses the record", async () => {
+    c.storage.local.data.failedSaves = [{ url: "https://a.com/", reason: "expired", at: 1 }];
+    await clearFailed();
+    expect(await readFailed()).toEqual([]);
   });
 });
 

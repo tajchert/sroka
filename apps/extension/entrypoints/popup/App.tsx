@@ -9,6 +9,7 @@ import type { Msg } from "../../lib/messages.ts";
 import { track } from "../../lib/analytics.ts";
 import { getConsent, PRIVACY_URL, setConsent, shouldShowConsentPrompt } from "../../lib/consent.ts";
 import { openApp } from "../../lib/open-app.ts";
+import { clearFailed, readFailed, type FailedSave } from "../../lib/queue.ts";
 import { isSavableUrl, type SaveResult } from "../../lib/save.ts";
 import { getPendingOtp, getSettings, setPendingOtp } from "../../lib/settings.ts";
 
@@ -78,6 +79,7 @@ export function App() {
   return (
     <div className="popup-card">
       <ConsentCard />
+      <FailedSavesCard />
       {phase.k === "loading" && <div className="body hint">Loading…</div>}
       {phase.k === "signin" && <SignIn onDone={onSignedIn} />}
       {phase.k === "saving" && <Saving tab={tab} />}
@@ -172,6 +174,47 @@ function ConsentCard() {
         </button>
         <button className="link" onClick={() => void chrome.tabs.create({ url: PRIVACY_URL })}>
           Privacy policy
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const FAILED_REASON: Record<string, string> = {
+  expired: "gave up after a week offline",
+  queue_full: "too many saves were waiting",
+  invalid_url: "page can't be saved",
+};
+
+/** Saves the retry queue dropped (lib/queue.ts `failedSaves`), so none are lost silently. */
+function FailedSavesCard() {
+  const [failed, setFailed] = useState<FailedSave[]>([]);
+  useEffect(() => {
+    void readFailed().then(setFailed);
+  }, []);
+  if (!failed.length) return null;
+  const shown = failed.slice(-3).reverse();
+  return (
+    <div className="consent" role="region" aria-label="Saves not sent">
+      <strong>{failed.length === 1 ? "1 save couldn’t be sent" : `${failed.length} saves couldn’t be sent`}</strong>
+      <p>
+        {shown.map((f, i) => (
+          <span key={i}>
+            {hostOf(f.url) || "a page"} ({FAILED_REASON[f.reason] ?? f.reason})
+            <br />
+          </span>
+        ))}
+        {failed.length > shown.length ? `and ${failed.length - shown.length} more. ` : ""}Save them again to keep them.
+      </p>
+      <div className="consent-actions">
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            setFailed([]);
+            void clearFailed();
+          }}
+        >
+          Dismiss
         </button>
       </div>
     </div>

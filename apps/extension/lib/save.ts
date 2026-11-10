@@ -1,7 +1,7 @@
 import { alwaysCapture, detectPaywall, LIMITS, type Item } from "@sroka/shared";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
 import { ext } from "./chrome.ts";
-import { enqueue } from "./queue.ts";
+import { enqueue, QueueFullError } from "./queue.ts";
 import { addSaved } from "./saved-set.ts";
 import { getSettings } from "./settings.ts";
 
@@ -101,7 +101,8 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
         try {
           await enqueue(body);
         } catch (qe) {
-          return { ok: false, queued: false, reason: "error", message: `Could not queue save: ${qe instanceof Error ? qe.message : String(qe)}` };
+          const message = qe instanceof QueueFullError ? qe.message : `Could not queue save: ${qe instanceof Error ? qe.message : String(qe)}`;
+          return { ok: false, queued: false, reason: "error", message };
         }
         return { ok: false, queued: true, reason: e.unauthorized ? "signed_out" : "offline", message: e.message };
       }

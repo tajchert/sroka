@@ -65,6 +65,15 @@ describe("auth + /v1 middleware", () => {
     expect(statuses[4]).toBe(429);
   });
 
+  it("password-reset OTP send endpoints are disabled and send nothing", async () => {
+    await migrate();
+    for (const path of ["/api/auth/email-otp/request-password-reset", "/api/auth/forget-password/email-otp"]) {
+      const res = await call(path, json({ email: "pwreset@example.com" }));
+      expect(res.status).toBe(404);
+    }
+    expect(otpSink.get("pwreset@example.com")).toBeUndefined();
+  });
+
   it("per-email OTP send limit holds across IPs (email bombing)", async () => {
     await migrate();
     const statuses: number[] = [];

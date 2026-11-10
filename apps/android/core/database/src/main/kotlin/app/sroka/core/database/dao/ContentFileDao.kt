@@ -94,11 +94,17 @@ interface ContentFileDao {
     @Query("SELECT thumb_path FROM content_files WHERE thumb_path IS NOT NULL")
     suspend fun thumbPaths(): List<String>
 
-    /** Downloaded packages of archived, non-favorite items archived before [archivedBefore] (A9 eviction). */
+    /**
+     * Downloaded packages of archived, non-favorite items archived before [archivedBefore] that were neither
+     * downloaded nor read since then (A9 eviction). Without the last two checks, opening an old archived
+     * article would download its package and the next sync would delete it again.
+     */
     @Query(
         """SELECT cf.item_id FROM content_files cf JOIN items i ON i.id = cf.item_id
            WHERE cf.state = 'DOWNLOADED' AND i.status = 'ARCHIVED' AND i.is_favorite = 0
              AND i.archived_at IS NOT NULL AND i.archived_at < :archivedBefore
+             AND (cf.downloaded_at IS NULL OR cf.downloaded_at < :archivedBefore)
+             AND (i.last_read_at IS NULL OR i.last_read_at < :archivedBefore)
            LIMIT :limit""",
     )
     suspend fun evictionCandidates(archivedBefore: Long, limit: Int = 500): List<String>

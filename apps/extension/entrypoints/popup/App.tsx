@@ -4,7 +4,7 @@ import type { Item } from "@sroka/shared";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Glyph, Mark } from "../../components/Mark.tsx";
 import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSuggestions } from "../../lib/api.ts";
-import { invalidate, setCached } from "../../lib/badge-cache.ts";
+import { removeSaved } from "../../lib/saved-set.ts";
 import type { Msg } from "../../lib/messages.ts";
 import { track } from "../../lib/analytics.ts";
 import { getConsent, PRIVACY_URL, setConsent, shouldShowConsentPrompt } from "../../lib/consent.ts";
@@ -68,10 +68,6 @@ export function App() {
     const t = setTimeout(() => setPhase({ k: "saved", item: phase.item, created: true }), SUCCESS_MS);
     return () => clearTimeout(t);
   }, [phase]);
-
-  useEffect(() => {
-    if ((phase.k === "saved" || phase.k === "success") && tab.url) void setCached(tab.url, { saved: true, id: phase.item.id });
-  }, [phase, tab.url]);
 
   const onSignedIn = async () => {
     // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
@@ -523,7 +519,7 @@ function Saved({
             onClick={() =>
               void act("remove", async () => {
                 await deleteItem(item.id);
-                if (tab.url) await invalidate(tab.url);
+                await removeSaved(item.id, [tab.url, item.url, item.canonicalUrl]).catch(() => undefined);
                 if (tab.id != null) await send({ type: "refresh-badge", tabId: tab.id, url: tab.url });
                 onRemoved();
               })

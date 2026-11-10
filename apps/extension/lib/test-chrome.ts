@@ -44,3 +44,25 @@ export async function requestJson(init: RequestInit | undefined): Promise<Record
   }
   return JSON.parse(String(b));
 }
+
+type PullItem = { id: string; url: string; canonicalUrl?: string };
+
+/** One `GET /v1/sync/pull` page. */
+export function pullPage(items: PullItem[], opts: { cursor?: number; hasMore?: boolean; deleted?: string[] } = {}) {
+  return jsonRes(200, {
+    cursor: opts.cursor ?? 1,
+    hasMore: opts.hasMore ?? false,
+    items: items.map((i) => ({ canonicalUrl: i.url, ...i })),
+    tags: [],
+    deleted: { items: opts.deleted ?? [], tags: [] },
+  });
+}
+
+/** Loads the local saved set (lib/saved-set.ts) from one mocked pull page. */
+export async function loadSavedSet(items: PullItem[], cursor = 1) {
+  const { refreshSavedSet } = await import("./saved-set.ts");
+  const f = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(pullPage(items, { cursor }));
+  const ok = await refreshSavedSet();
+  f.mockRestore();
+  if (!ok) throw new Error("saved set did not load");
+}

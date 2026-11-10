@@ -1,8 +1,8 @@
 import { alwaysCapture, detectPaywall, LIMITS, type Item } from "@sroka/shared";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
-import { setCached } from "./badge-cache.ts";
 import { ext } from "./chrome.ts";
 import { enqueue } from "./queue.ts";
+import { addSaved } from "./saved-set.ts";
 import { getSettings } from "./settings.ts";
 
 export const MAX_CAPTURE_BYTES = 5 * 1024 * 1024;
@@ -91,7 +91,7 @@ export async function captureHtml(tabId: number): Promise<string | null> {
 export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
   try {
     const r = await saveItem(body);
-    await setCached(body.url, { saved: true, id: r.item.id });
+    await addSaved(r.item).catch(() => undefined);
     return { ok: true, item: r.item, created: r.created };
   } catch (e) {
     if (e instanceof ApiFailure) {

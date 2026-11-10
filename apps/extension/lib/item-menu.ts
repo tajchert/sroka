@@ -1,16 +1,18 @@
 import { deleteItem, lookupUrl } from "./api.ts";
 import { paintBadge } from "./badge.ts";
-import { getCached, setCached } from "./badge-cache.ts";
 import { openApp } from "./open-app.ts";
+import { lookupSaved, removeSaved } from "./saved-set.ts";
 
 export { MENU_OPEN_ITEM, MENU_REMOVE_ITEM } from "./badge.ts";
 
-/** Saved item id for this URL: badge cache first, then a lookup (which refreshes the cache). */
+/**
+ * Saved item id for this URL: the local saved set first; otherwise a server lookup. The lookup sends the URL,
+ * which is fine here: it only runs after the user picked "Open in Sroka"/"Remove from Sroka" on this page.
+ */
 async function savedItemId(url: string): Promise<string | null> {
-  const e = await getCached(url);
-  if (e?.saved && e.id) return e.id;
+  const local = await lookupSaved(url);
+  if (local?.saved && local.id) return local.id;
   const item = await lookupUrl(url);
-  await setCached(url, { saved: !!item, id: item?.id });
   return item?.id ?? null;
 }
 
@@ -24,8 +26,10 @@ export async function openSavedItem(url: string): Promise<void> {
 export async function removeSavedItem(tabId: number, url: string): Promise<void> {
   try {
     const id = await savedItemId(url);
-    if (id) await deleteItem(id);
-    await setCached(url, { saved: false });
+    if (id) {
+      await deleteItem(id);
+      await removeSaved(id, [url]);
+    }
     await paintBadge(tabId, false);
   } catch {
     await chrome.action.setBadgeText({ tabId, text: "!" });

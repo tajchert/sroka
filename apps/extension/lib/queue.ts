@@ -1,5 +1,6 @@
 import { ext } from "./chrome.ts";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
+import { addSaved } from "./saved-set.ts";
 import { getSettings, type Settings } from "./settings.ts";
 
 export const QUEUE_KEY = "queue";
@@ -135,7 +136,8 @@ export function processQueue(now = Date.now()): Promise<{ sent: number; remainin
       if (e.nextAt > now) continue;
       if (!ownedBy(e, s)) continue; // another account's / server's saves wait for their own session
       try {
-        await saveItem(e.body);
+        const r = await saveItem(e.body);
+        await addSaved(r.item).catch(() => undefined);
         q = q.filter((x) => x.id !== e.id);
         sent++;
       } catch (err) {

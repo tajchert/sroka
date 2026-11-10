@@ -731,7 +731,7 @@ The web app and the extension mostly use `/v1/items`; native apps mostly use `sy
 - Store name **"Sroka — Save for later"**. Toolbar button + context menu ("Save link to Sroka", "Save page to Sroka") + shortcut (e.g. `Alt+Shift+S`).
 - Popup: saved state, tag input with suggestions, "Open in app/web".
 - Options: server URL (default `https://api.sroka.app`; **self-hosters** set their own), "always capture page as rendered", sign in (OTP in the popup; token in `chrome.storage.local`).
-- Retry queue for offline saves; badge shows saved state for the current tab (check via `GET /v1/items?url=`).
+- Retry queue for offline saves; badge shows saved state for the current tab, computed locally from hashes of saved URLs kept in sync via `GET /v1/sync/pull` (visited URLs are not sent; decisions D8, 2026-11-10).
 - Targets: Chrome Web Store (covers Edge/Brave/Opera/Vivaldi), Firefox AMO (incl. Firefox for Android). Safari via `safari-web-extension-converter` in 2.0.
 
 ### 12.5 Web app (1.0, minimal)

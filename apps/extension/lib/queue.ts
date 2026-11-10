@@ -1,5 +1,7 @@
+import { log } from "@sroka/shared";
 import { ext } from "./chrome.ts";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
+import { addSaved } from "./saved-set.ts";
 import { getSettings, type Settings } from "./settings.ts";
 
 export const QUEUE_KEY = "queue";
@@ -8,6 +10,22 @@ export const FAILED_KEY = "failedSaves";
 export const MAX_QUEUED_HTML = 1024 * 1024; // bytes per entry; server refetches otherwise
 export const MAX_QUEUED_HTML_TOTAL = 4 * 1024 * 1024; // bytes across the queue (storage.local is 10 MB)
 const MAX_FAILED = 50;
+/**
+ * Bounds (nothing retries forever). A retryable failure gives up only when the entry is older than MAX_QUEUE_AGE
+ * *and* has had at least MIN_ATTEMPTS_BEFORE_EXPIRY tries, so a browser closed for a week still gets several
+ * attempts first; entries waiting for sign-in or for their own account are not attempted and never expire.
+ * The queue holds at most MAX_QUEUE_LENGTH entries: a new save beyond that is refused (the user sees the failure
+ * right away) rather than evicting an older one. Every drop is recorded in `failedSaves`, shown by the popup.
+ */
+export const MAX_QUEUE_AGE = 7 * 24 * 60 * 60_000;
+export const MIN_ATTEMPTS_BEFORE_EXPIRY = 10;
+export const MAX_QUEUE_LENGTH = 500;
+
+export class QueueFullError extends Error {
+  constructor() {
+    super("Too many saves are waiting to be sent. Try again once you're back online.");
+  }
+}
 
 const byteLen = (s: string) => new TextEncoder().encode(s).length;
 
@@ -51,7 +69,8 @@ export async function readQueue(): Promise<QueueEntry[]> {
   return Array.isArray(r[QUEUE_KEY]) ? (r[QUEUE_KEY] as QueueEntry[]) : [];
 }
 
-/** Saves the server permanently rejected; kept so the UI can show them instead of dropping silently. */
+/** Saves dropped (permanently rejected, given up after MAX_QUEUE_AGE, or refused because the queue was full);
+ * kept so the popup can show them instead of dropping silently. */
 export interface FailedSave {
   url: string;
   reason: string;
@@ -61,9 +80,12 @@ export async function readFailed(): Promise<FailedSave[]> {
   const r = await ext().storage.local.get(FAILED_KEY);
   return Array.isArray(r[FAILED_KEY]) ? (r[FAILED_KEY] as FailedSave[]) : [];
 }
-async function recordFailed(e: QueueEntry, reason: string, now: number) {
+export async function clearFailed(): Promise<void> {
+  await ext().storage.local.remove(FAILED_KEY);
+}
+async function recordFailed(url: string, reason: string, now: number) {
   try {
-    const f = [...(await readFailed()), { url: e.body.url, reason, at: now }].slice(-MAX_FAILED);
+    const f = [...(await readFailed()), { url, reason, at: now }].slice(-MAX_FAILED);
     await ext().storage.local.set({ [FAILED_KEY]: f });
   } catch {
     /* best effort */
@@ -105,6 +127,11 @@ async function scheduleAlarm(all: QueueEntry[]) {
 export function enqueue(body: SaveBody, now = Date.now()): Promise<QueueEntry> {
   return locked(async () => {
     const q = await readQueue();
+    if (q.length >= MAX_QUEUE_LENGTH) {
+      await recordFailed(body.url, "queue_full", now);
+      log.warn("save queue full", { event: "ext_queue_full", size: q.length });
+      throw new QueueFullError();
+    }
     const b = { ...body };
     if (b.html) {
       const size = byteLen(b.html);
@@ -135,7 +162,8 @@ export function processQueue(now = Date.now()): Promise<{ sent: number; remainin
       if (e.nextAt > now) continue;
       if (!ownedBy(e, s)) continue; // another account's / server's saves wait for their own session
       try {
-        await saveItem(e.body);
+        const r = await saveItem(e.body);
+        await addSaved(r.item).catch(() => undefined);
         q = q.filter((x) => x.id !== e.id);
         sent++;
       } catch (err) {
@@ -155,12 +183,18 @@ export function processQueue(now = Date.now()): Promise<{ sent: number; remainin
         }
         if (err.retryable) {
           e.attempts++;
+          if (now - e.addedAt > MAX_QUEUE_AGE && e.attempts >= MIN_ATTEMPTS_BEFORE_EXPIRY) {
+            q = q.filter((x) => x.id !== e.id);
+            await recordFailed(e.body.url, "expired", now);
+            log.warn("queued save given up", { event: "ext_queue_expired", attempts: e.attempts, status: err.status });
+            continue;
+          }
           e.nextAt = now + backoffMs(e.attempts, err.retryAfter);
           continue;
         }
         // Permanent client error (e.g. invalid_url): retrying cannot help.
         q = q.filter((x) => x.id !== e.id);
-        await recordFailed(e, err.code, now);
+        await recordFailed(e.body.url, err.code, now);
       }
     }
     q = await writeQueue(q);

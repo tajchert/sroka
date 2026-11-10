@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Mark } from "../../components/Mark.tsx";
 import { describeError, signOut } from "../../lib/api.ts";
-import { clearCache } from "../../lib/badge-cache.ts";
 import { analyticsConfig, getConsent, PRIVACY_URL, setConsent as saveConsent, TERMS_URL, type Consent } from "../../lib/consent.ts";
 import { DEFAULT_SERVER, getSettings, normalizeServerUrl, setSettings, clearSession, type Settings } from "../../lib/settings.ts";
 
@@ -37,7 +36,6 @@ export function Options() {
       // A session belongs to one server; queued saves stay but are only sent to the server (and account)
       // that queued them (lib/queue.ts ownedBy).
       await clearSession();
-      await clearCache();
       await setSettings({ serverUrl: origin });
       setMsg("Server saved. Sign in again from the popup.");
       await load();
@@ -146,7 +144,6 @@ export function Options() {
               style={{ flex: "0 0 auto" }}
               onClick={async () => {
                 await signOut();
-                await clearCache();
                 await load();
               }}
             >

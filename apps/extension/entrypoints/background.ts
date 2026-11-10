@@ -6,6 +6,7 @@ import { MENU_OPEN_ITEM, MENU_REMOVE_ITEM, openSavedItem, removeSavedItem } from
 import { openApp } from "../lib/open-app.ts";
 import { ALARM, processQueue, releaseQueue, removeQueuedUrl } from "../lib/queue.ts";
 import { saveLink, saveTab, type SaveResult } from "../lib/save.ts";
+import { REFRESH_ALARM, refreshSavedSet, scheduleSavedSetRefresh } from "../lib/saved-set.ts";
 
 async function flash(tabId: number | undefined, r: SaveResult) {
   if (tabId == null) return;
@@ -24,10 +25,23 @@ function trackSave(r: SaveResult, source: "extension" | "context_menu") {
   if (r.ok && r.created) track({ name: "save_item", params: { source, kind: "article" } });
 }
 
+/** Re-badge the active tab of every window (after the saved set changed). */
+async function repaintActiveTabs() {
+  const tabs = await chrome.tabs.query({ active: true });
+  for (const t of tabs) if (t.id != null) await refreshBadge(t.id, t.url);
+}
+
+/** Refresh the local saved-URL set (D8: the badge is computed from it, no per-tab requests), then re-badge. */
+async function syncSavedSet() {
+  if (await refreshSavedSet()) await repaintActiveTabs().catch(() => undefined);
+}
+
 export default defineBackground(() => {
   installGlobalErrorHandlers();
   setTrackSink(trackEvent);
   chrome.runtime.onInstalled.addListener(() => {
+    void scheduleSavedSetRefresh();
+    void syncSavedSet();
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({ id: "save-link", title: "Save link to Sroka", contexts: ["link"] });
       chrome.contextMenus.create({ id: "save-page", title: "Save page to Sroka", contexts: ["page"] });
@@ -78,8 +92,17 @@ export default defineBackground(() => {
 
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === ALARM) void processQueue();
+    else if (a.name === REFRESH_ALARM) void syncSavedSet();
   });
-  chrome.runtime.onStartup.addListener(() => void processQueue());
+  chrome.runtime.onStartup.addListener(() => {
+    void processQueue();
+    void scheduleSavedSetRefresh();
+    void syncSavedSet();
+  });
+  // Sign-in (popup) stores a token → load the saved set; sign-out clears it in clearSession (lib/settings.ts).
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && changes.token?.newValue) void syncSavedSet();
+  });
 
   chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
     const fail = (e: unknown) => sendResponse({ ok: false, queued: false, reason: "error", message: String(e) });
@@ -98,7 +121,7 @@ export default defineBackground(() => {
       return true;
     }
     if (msg.type === "refresh-badge") {
-      refreshBadge(msg.tabId, msg.url, { force: false }).then(() => sendResponse(true), () => sendResponse(false));
+      refreshBadge(msg.tabId, msg.url).then(() => sendResponse(true), () => sendResponse(false));
       return true;
     }
     if (msg.type === "process-queue") {

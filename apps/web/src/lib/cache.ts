@@ -38,6 +38,21 @@ export function patchItem(qc: QueryClient, item: Item): void {
   }
 }
 
+/**
+ * Capture the cached state of one item (its single-item entry and every item list) and return a function
+ * that restores it. Used to undo an optimistic change: patchItem alone cannot re-insert an item it removed
+ * from a list.
+ */
+export function snapshotItem(qc: QueryClient, id: string): () => void {
+  const single = qc.getQueryData<Item>(["item", id]);
+  const lists = qc.getQueriesData<ItemsData>({ queryKey: ["items"] });
+  return () => {
+    if (single) qc.setQueryData(["item", id], single);
+    else qc.removeQueries({ queryKey: ["item", id], exact: true });
+    for (const [key, data] of lists) if (data) qc.setQueryData(key, data);
+  };
+}
+
 export function removeItem(qc: QueryClient, id: string): void {
   qc.removeQueries({ queryKey: ["item", id] });
   for (const [key, data] of qc.getQueriesData<ItemsData>({ queryKey: ["items"] })) {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { track } from "./analytics.ts";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
-import { patchItem, placeholderItem, prependItem, removeItem, replaceItem } from "./cache.ts";
+import { patchItem, placeholderItem, prependItem, removeItem, replaceItem, snapshotItem } from "./cache.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
 
 export const itemTitle = (i: Item) => i.title || i.fileName || i.siteName || hostOf(i.canonicalUrl || i.url);
@@ -29,6 +29,8 @@ function errMessage(e: unknown): string {
 interface PendingDelete {
   run: () => Promise<void>;
   cancel: () => void;
+  /** Page is going away: send the delete with a keepalive request, without waiting for the result. */
+  leave: () => void;
 }
 const pendingDeletes = new Set<PendingDelete>();
 /** Sign-out: run deletes the user already confirmed (while the session is still valid). */
@@ -43,6 +45,14 @@ export function cancelPendingDeletes(): void {
   pendingDeletes.clear();
   for (const p of all) p.cancel();
 }
+/** Tab close / reload inside the undo window: the user already confirmed these deletes, so send them now. */
+export function installPendingDeleteFlush(): void {
+  window.addEventListener("pagehide", () => {
+    const all = [...pendingDeletes];
+    pendingDeletes.clear();
+    for (const p of all) p.leave();
+  });
+}
 
 export function useItemActions() {
   const qc = useQueryClient();
@@ -55,6 +65,7 @@ export function useItemActions() {
 
   const patch = useCallback(
     async (item: Item, body: UpdateItemRequest, optimistic?: Partial<Item>): Promise<Item | null> => {
+      const restore = optimistic ? snapshotItem(qc, item.id) : null;
       if (optimistic) patchItem(qc, { ...item, ...optimistic });
       try {
         const next = await api.updateItem(item.id, body);
@@ -62,7 +73,11 @@ export function useItemActions() {
         refreshCounts();
         return next;
       } catch (e) {
-        patchItem(qc, item);
+        if (restore) {
+          restore();
+          // Another change may have landed while this one was in flight; let the lists re-sync.
+          void qc.invalidateQueries({ queryKey: ["items"] });
+        }
         toasts.push({ message: errMessage(e), tone: "error" });
         return null;
       }
@@ -124,6 +139,22 @@ export function useItemActions() {
           done = true;
           clearTimeout(timer);
           unhideItem(item.id);
+        },
+        leave: () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          removeItem(qc, item.id);
+          try {
+            void fetch(`/v1/items/${item.id}`, {
+              method: "DELETE",
+              keepalive: true,
+              credentials: "same-origin",
+              headers: { "X-Sroka-Device": "web" },
+            }).catch(() => undefined);
+          } catch {
+            /* ignore */
+          }
         },
       };
       const timer = setTimeout(() => void entry.run(), 6000);

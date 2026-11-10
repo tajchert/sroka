@@ -5,6 +5,7 @@ import { RouterProvider, createBrowserRouter } from "react-router";
 import "./index.css";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import { startAnalytics } from "./lib/analytics.ts";
+import { installPendingDeleteFlush } from "./lib/hooks.ts";
 import { installGlobalErrorHandlers } from "./lib/error-reporting.ts";
 import Shell from "./components/Shell.tsx";
 import { ToastProvider } from "./lib/store.tsx";
@@ -45,6 +46,7 @@ const queryClient = new QueryClient({
 
 installGlobalErrorHandlers();
 startAnalytics();
+installPendingDeleteFlush();
 
 const el = document.getElementById("root");
 if (el) {

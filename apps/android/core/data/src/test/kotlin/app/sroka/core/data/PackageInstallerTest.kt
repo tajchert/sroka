@@ -77,4 +77,14 @@ class PackageInstallerTest {
         val result = installer.install(TestPackages.validZip(tmp.newFile(), "<p>x</p>"), notADir, "i1")
         assertEquals(PackageInstaller.Result.IoError, result)
     }
+
+    @Test fun corruptZipIsInvalidNotIoError() {
+        // Flipped bytes inside the compressed data make ZipInputStream throw a ZipException (an IOException):
+        // that is the package's fault, not a full disk, so it must not stop the download batch.
+        val bytes = TestPackages.zip(mapOf("article.html" to "<p>hello hello hello hello</p>".toByteArray()))
+        for (i in 40 until 50) bytes[i] = (bytes[i].toInt() xor 0x5A).toByte()
+        val result = installer.install(tmp.newFile().also { it.writeBytes(bytes) }, articles, "i1")
+        assertEquals(PackageInstaller.Result.Invalid("bad_zip"), result)
+        assertFalse(File(articles, "i1.tmp").exists())
+    }
 }

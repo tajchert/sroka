@@ -9,9 +9,9 @@
 | Extractor + parser worker | done | feat/parser merged (a26e690); docs/handoff/parser.md |
 | Web app | done | feat/web merged (7e50801); docs/handoff/web.md |
 | Extension | done | feat/extension merged (114d059); docs/handoff/extension.md |
-| Import/export | in progress | separate agent (routes/imports.ts, exports.ts, src/import/**); e2e skips exports while the route is a stub |
+| Import/export | done | 511a6dc (imports Workflow, CSV/JSON exports), hardened in 21b33ae, merged 00b0c7a; `scripts/e2e-local.sh` "exports" section covers JSON/CSV export and re-import; Android import/export screens 7f8edc7 |
 | Integration + local e2e | done | fix/integration — dev launcher without routes (wrangler dev URL/Origin rewrite bug), dev-setup, `scripts/e2e-local.sh` all green; docs D3/D5/D6/D8 + api.md contract issues reconciled |
-| Cloudflare resources + deploy | todo | |
+| Cloudflare resources + deploy | done | Production deploy 2026-10-15 (custom domains, D1 migrations 0000/0001, secrets, parser cron); later deploys in the Deploy section below |
 | Review + fixes | todo | |
 | Security hardening (adversarial review) | done | "fix: security hardening" — DO tombstone on destroy, parse budget + refresh coalescing, parseWanted pre-checks, one result per gen, sweep keeps gen, R2 cleanup on delete/re-parse, bounded seq groups, stale tag ops, shared-cache key/partial rules, image memory budget, per-email OTP throttle (`auth_throttle`, migration 0001), session cookie refresh, atomic import reservation, owner-scoped extension queue, Reader re-sign reload, mailto links, weekly parser GC of deleted users' R2 data |
 

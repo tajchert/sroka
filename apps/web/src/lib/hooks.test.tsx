@@ -15,9 +15,10 @@ vi.mock("./api.ts", async (orig) => {
 });
 
 import { itemsKey, placeholderItem, type ItemsData } from "./cache.ts";
-import { installPendingDeleteFlush, useItemActions } from "./hooks.ts";
+import { flushPendingDeletes, installPendingDeleteFlush, useItemActions } from "./hooks.ts";
 
 const a: Item = { ...placeholderItem("https://example.com/a"), id: "a" };
+const b: Item = { ...placeholderItem("https://example.com/b"), id: "b" };
 const unread = { state: "unread", sort: "newest" } as const;
 
 function setup() {
@@ -56,5 +57,22 @@ describe("useItemActions", () => {
     expect(fetchMock).toHaveBeenCalledWith("/v1/items/a", expect.objectContaining({ method: "DELETE", keepalive: true }));
     vi.advanceTimersByTime(7000);
     expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  it("a delete queued while a flush is in flight is neither lost nor sent twice", async () => {
+    vi.useFakeTimers();
+    let finishA!: () => void;
+    deleteItem.mockImplementation((id: string) => (id === "a" ? new Promise<void>((r) => (finishA = r)) : Promise.resolve()));
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useItemActions(), { wrapper });
+    act(() => result.current.remove(a));
+    const flushing = flushPendingDeletes();
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    act(() => result.current.remove(b)); // enqueued while a's delete is still in flight
+    finishA();
+    await act(() => flushing);
+    expect(deleteItem).toHaveBeenCalledTimes(1); // the flush did not take b
+    await act(() => vi.advanceTimersByTimeAsync(7000));
+    expect(deleteItem.mock.calls.map((c) => c[0])).toEqual(["a", "b"]); // a's timer did not re-send it
   });
 });

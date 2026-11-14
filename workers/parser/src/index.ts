@@ -39,8 +39,8 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     msg.ack();
     return;
   }
+  let result: Awaited<ReturnType<typeof processJob>> | undefined;
   try {
-    let result;
     try {
       result = await processJob(env, job, deps, stillWanted, stats);
       if (result === null) {
@@ -69,10 +69,21 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     }
     msg.ack();
   } catch (e) {
-    // markParsed RPC failure etc. NOTE: the retry re-parses with a new contentId; a public dir from this
-    // attempt has a content row without refs and is collected by the shared-content GC (gc.ts); private ones
-    // are only swept once the account is deleted.
+    // markParsed RPC failure etc. The retry re-parses with a new contentId. A public dir from this attempt has
+    // a content row without refs and is collected by the shared-content GC (gc.ts). A private dir is deleted
+    // here, but only when the library says this generation is still pending: then no result was accepted and
+    // nothing references the dir. If the answer is "not wanted" or the check itself fails, the result may have
+    // been committed before the RPC failed, so the dir is kept.
     log.exception("markParsed failed", e, { event: "mark_parsed_failed", itemId: job.itemId, attempt: msg.attempts });
+    if (result?.contentPrivate && result.contentId && !job.pdf) {
+      try {
+        if (await lib.parseWanted(job.itemId, job.parseGen)) {
+          await deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId));
+        }
+      } catch (e2) {
+        log.warnException("private content cleanup failed", e2, { event: "private_cleanup_failed" });
+      }
+    }
     msg.retry({ delaySeconds: backoff(msg.attempts) });
   }
 }

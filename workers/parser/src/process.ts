@@ -21,6 +21,7 @@ import {
 } from "@sroka/extractor";
 import { displayDomain, hashId, log, normalizeUrl, PARSER_VERSION, r2Keys, urlHash, uuidv7, type ParseJob, type ParseResult } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
+import { deletePrefix } from "./gc.ts";
 import { processPdfJob } from "./pdf.ts";
 import { renderEnabled, renderPage, takeRenderBudget } from "./render.ts";
 import { loadSiteRule, stripParams } from "./site-rules.ts";
@@ -508,6 +509,13 @@ export async function processJob(
     for (const f of built.files) await env.CONTENT.put(dir + f.path, f.bytes, { httpMetadata: { contentType: f.contentType } });
     await env.CONTENT.put(`${dir}meta.json`, JSON.stringify(cached), { httpMetadata: { contentType: "application/json" } });
   } catch (e) {
+    // Fresh contentId per attempt: nothing references this dir yet, and the retry writes a new one. Public dirs
+    // are left to the shared-content GC (their content row exists); a private dir would otherwise stay forever.
+    if (isPrivate) {
+      await deletePrefix(env.CONTENT, dir).catch((e2) =>
+        log.warnException("private content cleanup failed", e2, { event: "private_cleanup_failed" }),
+      );
+    }
     throw new TransientError(`r2 put: ${e}`);
   }
 

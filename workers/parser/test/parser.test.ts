@@ -340,6 +340,60 @@ describe("parser queue consumer", () => {
     expect((await base.CONTENT.list({ prefix: r2Keys.contentDir(cid, "u9") })).objects).toEqual([]);
   });
 
+  const putUserCapture = async (userId: string) => {
+    const rawKey = r2Keys.raw(userId, ITEM);
+    const gz = await new Response(new Blob([PAGE]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+    await base.CONTENT.put(rawKey, gz);
+    stubWeb({ "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    return rawKey;
+  };
+
+  it("markParsed RPC failure on a capture leaves no private dir behind", async () => {
+    const rawKey = await putUserCapture("u10");
+    markFails = 1;
+    const m = msg(job({ userId: "u10", rawKey }), 1);
+    await run([m]);
+    expect(m.retry).toHaveBeenCalled();
+    expect((await base.CONTENT.list({ prefix: r2Keys.privatePrefix("u10") })).objects).toEqual([]);
+    expect(await base.CONTENT.head(rawKey)).not.toBeNull();
+  });
+
+  it("markParsed RPC failure keeps the private dir when the result may have been accepted", async () => {
+    const rawKey = await putUserCapture("u11");
+    markFails = 1;
+    // parseWanted calls: before the job, before the R2 writes, then the cleanup guard (gets false).
+    wanted = [true, true, false];
+    const m = msg(job({ userId: "u11", rawKey }), 1);
+    await run([m]);
+    expect(m.retry).toHaveBeenCalled();
+    expect((await base.CONTENT.list({ prefix: r2Keys.privatePrefix("u11") })).objects.length).toBeGreaterThan(0);
+  });
+
+  it("an R2 write failure on a capture removes the files already written", async () => {
+    const rawKey = await putUserCapture("u12");
+    const env = mkEnv();
+    const failing = {
+      put: (k: string, v: never, o: never) => (k.endsWith("meta.json") ? Promise.reject(new Error("r2 down")) : base.CONTENT.put(k, v, o)),
+      get: (k: string) => base.CONTENT.get(k),
+      head: (k: string) => base.CONTENT.head(k),
+      list: (o: never) => base.CONTENT.list(o),
+      delete: (k: never) => base.CONTENT.delete(k),
+    };
+    const m = msg(job({ userId: "u12", rawKey }), 1);
+    await run([m], "sroka-parse", { ...env, CONTENT: failing as never });
+    expect(m.retry).toHaveBeenCalled();
+    expect((await base.CONTENT.list({ prefix: r2Keys.privatePrefix("u12") })).objects).toEqual([]);
+  });
+
+  it("a public job is never cleaned up by these paths", async () => {
+    stubWeb({ "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });
+    markFails = 1;
+    const m = msg(job(), 1);
+    await run([m]);
+    expect(m.retry).toHaveBeenCalled();
+    expect((await base.CONTENT.list({ prefix: "content/" })).objects.length).toBeGreaterThan(0);
+  });
+
   it("never fills or reads the shared cache from a non-canonical fetch (tracking params echoed into the page)", async () => {
     const evil = "https://example.com/post?utm_campaign=Your+account+is+locked";
     stubWeb({ [evil]: () => html(), "https://example.com/post": () => html(), "https://example.com/a.png": png, "https://example.com/lead.jpg": png });

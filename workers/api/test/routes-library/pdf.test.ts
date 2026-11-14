@@ -372,6 +372,17 @@ describe("LibraryDO.setPdfThumbnail", () => {
     expect(pull.json.items.map((i: { id: string }) => i.id)).toContain(item.id);
   });
 
+  it("resolves an aliased item id like the other mutating methods", async () => {
+    const { item, lib } = await pdfItem("thumb-alias");
+    const alias = uuidv7();
+    await runInDurableObject(lib, (_inst: LibraryDO, state) => {
+      state.storage.sql.exec("INSERT INTO item_aliases (client_id, target_id) VALUES (?, ?)", alias, item.id);
+    });
+    const r = await lib.setPdfThumbnail(alias, item.contentId, "thumb.webp");
+    expect(r.ok).toBe(true);
+    expect((await lib.getItem(item.id))!.leadImageKey).toBe("thumb.webp");
+  });
+
   it("returns the previous key when replacing", async () => {
     const { item, lib } = await pdfItem("thumb-replace");
     await lib.setPdfThumbnail(item.id, item.contentId, "thumb.jpg");

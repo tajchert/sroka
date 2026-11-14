@@ -953,7 +953,7 @@ export class LibraryStore {
    */
   setPdfThumbnail(itemId: string, contentId: string, key: string): { ok: true; previousKey: string | null } | { ok: false } {
     return this.withCtx((ctx): { ok: true; previousKey: string | null } | { ok: false } => {
-      const row = this.itemRow(itemId);
+      const row = this.itemRow(this.resolveItemId(itemId));
       if (!row || row.deleted_at !== null || row.kind !== "pdf" || row.content_id !== contentId) return { ok: false };
       this.exec("UPDATE items SET lead_image_key = ? WHERE id = ?", key, row.id);
       ctx.touchItem(row.id);

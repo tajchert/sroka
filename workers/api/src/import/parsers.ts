@@ -31,12 +31,24 @@ const MAX_ZIP_ENTRY = 40 * 1024 * 1024;
 const MAX_ZIP_TOTAL = 50 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 20;
 
-/** unix seconds (or ms, if clearly ms) to epoch ms; undefined for empty/invalid/non-positive. */
-export function parseTimestamp(v: string | undefined): number | undefined {
+/** Earliest accepted import timestamp: 1995-01-01 UTC (before any read-later service existed). */
+const MIN_IMPORT_MS = Date.UTC(1995, 0, 1);
+const DAY_MS = 86_400_000;
+
+/**
+ * Epoch seconds, milliseconds or microseconds (depends on the source) to epoch ms. Each unit is tried in turn and
+ * the first reading inside [1995-01-01, now + 1 day] wins; the three windows are ~1000x apart so they never overlap.
+ * Undefined for empty, non-numeric, non-positive or out-of-range values (callers fall back to the import time).
+ */
+export function parseTimestamp(v: string | undefined, now: number = Date.now()): number | undefined {
   if (!v) return undefined;
   const n = Number(v.trim());
   if (!Number.isFinite(n) || n <= 0) return undefined;
-  return Math.floor(n >= 1e11 ? n : n * 1000);
+  const max = now + DAY_MS;
+  for (const ms of [n * 1000, n, n / 1000]) {
+    if (ms >= MIN_IMPORT_MS && ms <= max) return Math.floor(ms);
+  }
+  return undefined;
 }
 
 function cleanTags(raw: Iterable<string>): string[] {

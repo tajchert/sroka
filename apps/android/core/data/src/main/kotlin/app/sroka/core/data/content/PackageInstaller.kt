@@ -2,6 +2,7 @@ package app.sroka.core.data.content
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.EOFException
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -63,7 +64,7 @@ internal class PackageInstaller(
         ZipInputStream(zip.inputStream().buffered()).use { zis ->
             val buffer = ByteArray(BUFFER)
             while (true) {
-                val entry = zis.nextEntry ?: break
+                val entry = (try { zis.nextEntry } catch (e: EOFException) { truncated() }) ?: break
                 if (++entries > maxEntries) invalid("too_many_entries")
                 val name = safeRelativePath(entry.name) ?: invalid("unsafe_path")
                 if (!seen.add(name.lowercase())) invalid("duplicate_entry")
@@ -76,7 +77,9 @@ internal class PackageInstaller(
                 out.parentFile?.mkdirs()
                 out.outputStream().buffered().use { os ->
                     while (true) {
-                        val n = zis.read(buffer)
+                        // Only EOF raised by reading the zip stream means a truncated package; a write
+                        // failure (os.write below) stays an IOException -> IoError.
+                        val n = try { zis.read(buffer) } catch (e: EOFException) { truncated() }
                         if (n < 0) break
                         total += n
                         if (total > maxTotalBytes) invalid("too_large")
@@ -132,6 +135,8 @@ internal class PackageInstaller(
         private val JSON = Json { ignoreUnknownKeys = true }
 
         private fun invalid(reason: String): Nothing = throw InvalidPackageException(reason)
+
+        private fun truncated(): Nothing = invalid("bad_zip")
 
         /** Relative path with `/` separators, or null if it could escape the target directory. */
         fun safeRelativePath(name: String): String? {

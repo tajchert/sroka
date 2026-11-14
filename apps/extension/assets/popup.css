@@ -405,6 +405,65 @@ svg {
   animation: spBar 1.1s ease-in-out infinite;
 }
 
+/* Saving -> saved: one tree, state classes drive the crossfades */
+.bar-icon {
+  position: relative;
+  width: 22px;
+  height: 23px;
+  flex: none;
+}
+.bar-icon > * {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+.bar-icon-b {
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.is-done .bar-icon-a {
+  opacity: 0;
+}
+.is-done .bar-icon-b {
+  opacity: 1;
+  transform: scale(1);
+}
+.bar-swap {
+  display: grid;
+}
+.swap-a,
+.swap-b {
+  grid-area: 1 / 1;
+  transition: opacity 0.2s ease;
+}
+.swap-b,
+.is-done .swap-a {
+  opacity: 0;
+}
+.is-done .swap-b {
+  opacity: 1;
+}
+.progress {
+  transition: opacity 0.25s ease;
+}
+.is-done .progress {
+  opacity: 0;
+}
+.fade-ctl {
+  transition: opacity 0.2s ease;
+}
+.is-pending .fade-ctl {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.is-pending .btn-primary:disabled {
+  opacity: 0.45;
+}
+
 /* Item preview */
 .item {
   display: flex;
@@ -446,69 +505,6 @@ svg {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--raise);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: var(--fg-2);
-}
-
-/* Success */
-.success {
-  background: var(--blue);
-  color: var(--cream);
-  padding: 44px 18px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  text-align: center;
-}
-.badge {
-  position: relative;
-  width: 76px;
-  height: 76px;
-}
-.badge-ring,
-.badge-disc {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-.badge-ring {
-  border: 2px solid var(--cream);
-  animation: spRing 0.9s ease-out 0.2s both;
-}
-.badge-disc {
-  background: var(--cream);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: spPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
-}
-.badge-disc polyline {
-  fill: none;
-  stroke: var(--blue);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 24;
-  animation: spDraw 0.35s ease-out 0.3s both;
-}
-.success-title {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.success-sub {
-  margin-top: 6px;
-  font-size: 14px;
-  color: #e4eef2;
 }
 
 /* Tags */
@@ -623,12 +619,15 @@ svg {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .badge-ring {
-    display: none;
+  .bar-icon > *,
+  .swap-a,
+  .swap-b,
+  .progress,
+  .fade-ctl {
+    transition: none !important;
   }
-  .badge-disc,
-  .badge-disc polyline {
-    animation: none;
+  .bar-icon-b {
+    transform: none !important;
   }
   .progress span {
     animation-duration: 3s;
@@ -646,33 +645,5 @@ svg {
   }
   to {
     transform: translateX(260%);
-  }
-}
-@keyframes spPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@keyframes spDraw {
-  from {
-    stroke-dashoffset: 24;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes spRing {
-  from {
-    opacity: 0.6;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(2.2);
   }
 }

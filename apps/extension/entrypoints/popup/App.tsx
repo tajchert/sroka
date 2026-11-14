@@ -1,5 +1,6 @@
-// Popup — implements "Sroka Popup" / "Sroka Extension" from Claude Design (screens: email, otp, saving,
-// success, saved, tags, removed), plus queued/failed states in the same language.
+// Popup — implements "Sroka Popup" / "Sroka Extension" from Claude Design (screens: email, otp, saving →
+// saved, tags, removed), plus queued/failed states in the same language. Saving and saved are ONE screen (`SaveView`):
+// same DOM, so the bar icon/title crossfade and the controls un-dim instead of the popup blinking between screens.
 import type { Item } from "@sroka/shared";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Glyph, Mark } from "../../components/Mark.tsx";
@@ -18,7 +19,6 @@ type Phase =
   | { k: "loading" }
   | { k: "signin" }
   | { k: "saving" }
-  | { k: "success"; item: Item }
   | { k: "saved"; item: Item; created: boolean }
   | { k: "tags"; item: Item; created: boolean }
   | { k: "queued"; message: string }
@@ -26,7 +26,6 @@ type Phase =
   | { k: "unsupported"; signedIn: boolean }
   | { k: "removed" };
 
-const SUCCESS_MS = 1400;
 const send = <T,>(m: Msg) => chrome.runtime.sendMessage(m) as Promise<T>;
 const sameTag = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const hostOf = (url?: string) => {
@@ -46,7 +45,7 @@ export function App() {
     if (!isSavableUrl(t.url)) return setPhase({ k: "unsupported", signedIn });
     setPhase({ k: "saving" });
     const r = await send<SaveResult>({ type: "save-tab", tab: t });
-    if (r.ok) setPhase(r.created ? { k: "success", item: r.item } : { k: "saved", item: r.item, created: false });
+    if (r.ok) setPhase({ k: "saved", item: r.item, created: r.created });
     else if (r.reason === "signed_out") setPhase({ k: "signin" });
     else if (r.queued) setPhase({ k: "queued", message: "You’re offline. It will save as soon as the connection is back." });
     else setPhase({ k: "failed", message: r.message ?? "Could not save this page." });
@@ -63,13 +62,6 @@ export function App() {
     })().catch((e) => setPhase({ k: "failed", message: describeError(e) }));
   }, [save]);
 
-  // Success celebrates briefly, then hands over to the actions screen.
-  useEffect(() => {
-    if (phase.k !== "success") return;
-    const t = setTimeout(() => setPhase({ k: "saved", item: phase.item, created: true }), SUCCESS_MS);
-    return () => clearTimeout(t);
-  }, [phase]);
-
   const onSignedIn = async () => {
     // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
     await send({ type: "release-queue", skipUrl: tab.url });
@@ -82,15 +74,14 @@ export function App() {
       <FailedSavesCard />
       {phase.k === "loading" && <div className="body hint">Loading…</div>}
       {phase.k === "signin" && <SignIn onDone={onSignedIn} />}
-      {phase.k === "saving" && <Saving tab={tab} />}
-      {phase.k === "success" && <Success />}
-      {phase.k === "saved" && (
-        <Saved
-          item={phase.item}
-          created={phase.created}
+      {(phase.k === "saving" || phase.k === "saved") && (
+        <SaveView
+          // Same element type and position for both phases, so React keeps the nodes and the CSS transitions run.
+          item={phase.k === "saved" ? phase.item : undefined}
+          created={phase.k === "saved" ? phase.created : true}
           tab={tab}
-          onItem={(item) => setPhase({ ...phase, item })}
-          onTags={() => setPhase({ k: "tags", item: phase.item, created: phase.created })}
+          onItem={(item) => phase.k === "saved" && setPhase({ ...phase, item })}
+          onTags={() => phase.k === "saved" && setPhase({ k: "tags", item: phase.item, created: phase.created })}
           onRemoved={() => setPhase({ k: "removed" })}
         />
       )}
@@ -439,47 +430,8 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
   );
 }
 
-function Saving({ tab }: { tab: Tab }) {
-  return (
-    <>
-      <div className="bar bar-blue">
-        <Glyph />
-        <span className="bar-title">Saving to Sroka…</span>
-        <span className="progress" aria-hidden="true">
-          <span />
-        </span>
-      </div>
-      <div className="body">
-        <ItemCard tab={tab} meta={hostOf(tab.url)} />
-        <div className="status-row">
-          <Spinner tone="blue" />
-          <span>Downloading text and images for offline…</span>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function Success() {
-  return (
-    <div className="success" role="status">
-      <div className="badge">
-        <span className="badge-ring" />
-        <span className="badge-disc">
-          <svg viewBox="0 0 24 24" width="36" height="36">
-            <polyline points="5,12.5 10,17 19,7" />
-          </svg>
-        </span>
-      </div>
-      <div>
-        <div className="success-title">Saved to Sroka</div>
-        <div className="success-sub">Downloaded · ready to read offline</div>
-      </div>
-    </div>
-  );
-}
-
-function Saved({
+/** Saving (no `item` yet) and saved (`item`) share this tree: the controls are in their final spots, dimmed and inert until saved. */
+function SaveView({
   item,
   created,
   tab,
@@ -487,7 +439,7 @@ function Saved({
   onTags,
   onRemoved,
 }: {
-  item: Item;
+  item?: Item;
   created: boolean;
   tab: Tab;
   onItem: (i: Item) => void;
@@ -497,8 +449,9 @@ function Saved({
   const [busy, setBusy] = useState<"fav" | "remove" | "open" | null>(null);
   const [err, setErr] = useState("");
 
+  const ready = !!item;
   const act = async (k: NonNullable<typeof busy>, fn: () => Promise<void>) => {
-    if (busy) return;
+    if (busy || !item) return;
     setBusy(k);
     setErr("");
     try {
@@ -510,38 +463,58 @@ function Saved({
     }
   };
 
-  const meta = [item.siteName || hostOf(item.url), item.readingMinutes ? `${item.readingMinutes} min` : ""].filter(Boolean).join(" · ");
+  const meta = item
+    ? [item.siteName || hostOf(item.url), item.readingMinutes ? `${item.readingMinutes} min` : ""].filter(Boolean).join(" · ")
+    : hostOf(tab.url);
+  const savedTitle = created ? "Saved to Sroka" : "Already in Sroka";
+  const tags = item?.tags ?? [];
 
   return (
     <>
-      <div className="bar bar-blue">
-        <span className="tick" aria-hidden="true">
-          <svg viewBox="0 0 12 12" width="12" height="12">
-            <polyline points="2.5,6.3 5,8.6 9.5,3.6" />
-          </svg>
+      <div className={`bar bar-blue${ready ? " is-done" : ""}`}>
+        <span className="bar-icon">
+          <span className="bar-icon-a">
+            <Glyph />
+          </span>
+          <span className="tick bar-icon-b" aria-hidden="true">
+            <svg viewBox="0 0 12 12" width="12" height="12">
+              <polyline points="2.5,6.3 5,8.6 9.5,3.6" />
+            </svg>
+          </span>
         </span>
-        <span className="bar-title">{created ? "Saved to Sroka" : "Already in Sroka"}</span>
+        <span className="bar-title bar-swap" aria-live="polite">
+          <span className="swap-a" aria-hidden={ready}>
+            Saving to Sroka…
+          </span>
+          <span className="swap-b" aria-hidden={!ready}>
+            {savedTitle}
+          </span>
+        </span>
+        <span className="progress" aria-hidden="true">
+          <span />
+        </span>
       </div>
-      <div className="body">
+      <div className={`body${ready ? " is-ready" : " is-pending"}`}>
         <ItemCard item={item} tab={tab} meta={meta} />
-        <div className="field-group">
+        <div className="field-group fade-ctl">
           <span className="eyebrow">Tags</span>
           <div className="chips">
-            {item.tags.map((t) => (
-              <button key={t} className="chip chip-tag" onClick={onTags}>
+            {tags.map((t) => (
+              <button key={t} className="chip chip-tag" disabled={!ready} onClick={onTags}>
                 {t}
               </button>
             ))}
-            <button className="chip chip-add" onClick={onTags}>
-              {item.tags.length ? "+ Tag" : "+ Add tags"}
+            <button className="chip chip-add" disabled={!ready} onClick={onTags}>
+              {tags.length ? "+ Tag" : "+ Add tags"}
             </button>
           </div>
         </div>
-        <div className="grid2">
+        <div className="grid2 fade-ctl">
           <button
-            className={`btn-tile${item.isFavorite && busy !== "fav" ? " is-fav" : ""}`}
-            aria-pressed={item.isFavorite}
-            onClick={() => void act("fav", async () => onItem(await patchItem(item.id, { isFavorite: !item.isFavorite })))}
+            className={`btn-tile${item?.isFavorite && busy !== "fav" ? " is-fav" : ""}`}
+            aria-pressed={item?.isFavorite ?? false}
+            disabled={!ready}
+            onClick={() => void act("fav", async () => item && onItem(await patchItem(item.id, { isFavorite: !item.isFavorite })))}
           >
             {busy === "fav" ? (
               <>
@@ -553,14 +526,16 @@ function Saved({
                 <svg className="star" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
                   <polygon points="12,2.8 14.8,8.9 21.4,9.6 16.5,14.1 17.9,20.6 12,17.3 6.1,20.6 7.5,14.1 2.6,9.6 9.2,8.9" />
                 </svg>
-                {item.isFavorite ? "Favourited" : "Favourite"}
+                {item?.isFavorite ? "Favourited" : "Favourite"}
               </>
             )}
           </button>
           <button
             className="btn-tile btn-danger"
+            disabled={!ready}
             onClick={() =>
               void act("remove", async () => {
+                if (!item) return;
                 await deleteItem(item.id);
                 await removeSaved(item.id, [tab.url, item.url, item.canonicalUrl]).catch(() => undefined);
                 if (tab.id != null) await send({ type: "refresh-badge", tabId: tab.id, url: tab.url });
@@ -585,9 +560,11 @@ function Saved({
         </div>
         {err && <p className="err">{err}</p>}
         <button
-          className="btn btn-primary"
+          className="btn btn-primary fade-ctl"
+          disabled={!ready}
           onClick={() =>
             void act("open", async () => {
+              if (!item) return;
               await openApp(`item/${item.id}`);
               window.close();
             })

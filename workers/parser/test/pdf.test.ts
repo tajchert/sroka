@@ -1,5 +1,5 @@
 import { env as rawEnv } from "cloudflare:workers";
-import { ParseResultSchema, PDF_FILE, r2Keys, type ParseJob, type ParseResult } from "@sroka/shared";
+import { ParseResultSchema, PARSER_VERSION, PDF_FILE, r2Keys, type ParseJob, type ParseResult } from "@sroka/shared";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index.ts";
 import type { ParserEnv } from "../src/env.ts";
@@ -152,13 +152,18 @@ describe("pdf jobs", () => {
     expect(m.ack).toHaveBeenCalled();
   });
 
-  it("DLQ marks failed without touching R2", async () => {
+  it("DLQ keeps the PDF readable (ok + pdf_extract_failed, like an extraction failure) without touching R2", async () => {
     await put(buildPdf({ pages: ["hello world"] }));
     const m = msg(job(), 4);
     await run(m, "sroka-parse-dlq");
     expect(m.ack).toHaveBeenCalled();
-    expect(marked[0]).toMatchObject({ status: "failed", parseGen: 2 });
+    expect(ParseResultSchema.parse(marked[0])).toBeTruthy();
+    expect(marked[0]).toEqual({
+      status: "ok", parseGen: 2, contentId: CID, contentPrivate: true, title: null, excerpt: null, siteName: "PDF", author: null,
+      lang: null, wordCount: null, readingMinutes: null, error: "pdf_extract_failed", parserVersion: PARSER_VERSION,
+    });
     expect(await base.CONTENT.head(dir + PDF_FILE)).not.toBeNull();
-    expect((await attempts())[0]).toMatchObject({ method: "pdf", url: null, status: "failed" });
+    expect(await base.CONTENT.head(dir + "text.txt")).toBeNull();
+    expect((await attempts())[0]).toMatchObject({ method: "pdf", url: null, status: "ok", error_code: "pdf_extract_failed", error_detail: "dlq" });
   });
 });

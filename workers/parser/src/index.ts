@@ -1,5 +1,5 @@
 import { FetchError } from "@sroka/extractor";
-import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJob } from "@sroka/shared";
+import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJob, type ParseResult } from "@sroka/shared";
 import { reportParse } from "./attempts.ts";
 import { deletePrefix, runWeeklyGc } from "./gc.ts";
 import type { ParserEnv } from "./env.ts";
@@ -88,6 +88,24 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
   }
 }
 
+function dlqPdfResult(job: ParseJob): ParseResult {
+  return {
+    status: "ok",
+    parseGen: job.parseGen,
+    contentId: job.pdf!.contentId,
+    contentPrivate: true,
+    title: null,
+    excerpt: null,
+    siteName: "PDF",
+    author: null,
+    lang: null,
+    wordCount: null,
+    readingMinutes: null,
+    error: "pdf_extract_failed",
+    parserVersion: PARSER_VERSION,
+  };
+}
+
 async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise<void> {
   for (const msg of batch.messages) {
     const parsed = ParseJobSchema.safeParse(msg.body);
@@ -96,7 +114,9 @@ async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise
       continue;
     }
     log.warn("job reached the dead-letter queue", { event: "dlq", domain: displayDomain(parsed.data.url), itemId: parsed.data.itemId, attempts: msg.attempts, parserVersion: PARSER_VERSION });
-    const result = failedResult(parsed.data, "parse_failed");
+    // A PDF stays readable (the original is the content), so a dead-lettered PDF job answers like an ordinary
+    // extraction failure in pdf.ts: ok + pdf_extract_failed, null metadata (spec 2026-10-24-pdf-upload-design.md).
+    const result = parsed.data.pdf ? dlqPdfResult(parsed.data) : failedResult(parsed.data, "parse_failed");
     try {
       await env.LIBRARY.getByName(parsed.data.userId).markParsed(parsed.data.itemId, result);
       await reportParse(env, { job: parsed.data, result, stats: { errorDetail: "dlq" }, durationMs: 0, attempt: msg.attempts, source: "dlq" });

@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
 
 /**
@@ -44,6 +45,10 @@ internal class PackageInstaller(
         } catch (e: InvalidPackageException) {
             tmp.deleteRecursively()
             Result.Invalid(e.message ?: "invalid_package")
+        } catch (e: ZipException) {
+            // A corrupt zip is the package's fault (a ZipException is also an IOException, caught below).
+            tmp.deleteRecursively()
+            Result.Invalid("bad_zip")
         } catch (e: IOException) {
             tmp.deleteRecursively()
             Result.IoError

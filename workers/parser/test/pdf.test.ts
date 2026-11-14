@@ -131,6 +131,20 @@ describe("pdf jobs", () => {
     expect(marked[0]!.contentId).toBeUndefined();
   });
 
+  it("R2 read keeps failing until the last normal attempt: ok + pdf_extract_failed, not failed", async () => {
+    await put(buildPdf({ pages: ["hello world"] }));
+    getFails = true;
+    const m = msg(job(), 4);
+    await run(m);
+    expect(m.retry).not.toHaveBeenCalled();
+    expect(m.ack).toHaveBeenCalled();
+    expect(marked[0]).toEqual({
+      status: "ok", parseGen: 2, contentId: CID, contentPrivate: true, title: null, excerpt: null, siteName: "PDF", author: null,
+      lang: null, wordCount: null, readingMinutes: null, error: "pdf_extract_failed", parserVersion: PARSER_VERSION,
+    });
+    expect(await base.CONTENT.head(dir + PDF_FILE)).not.toBeNull();
+  });
+
   it("markParsed ok:false deletes nothing for a pdf job (text.txt of the accepted result survives)", async () => {
     await put(buildPdf({ pages: ["hello world"] }));
     await base.CONTENT.put(dir + "text.txt", "accepted text");

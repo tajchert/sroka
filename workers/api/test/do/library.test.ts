@@ -29,9 +29,26 @@ describe("LibraryDO schema", () => {
   it("migrates to the latest schema version with FTS table", async () => {
     const { lib } = freshLibrary();
     await runInDurableObject(lib, (_inst: LibraryDO, state) => {
-      expect(state.storage.sql.exec("SELECT version FROM _schema").one().version).toBe(5);
+      expect(state.storage.sql.exec("SELECT version FROM _schema").one().version).toBe(6);
       const names = state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type='table'").toArray().map((r) => r.name);
       expect(names).toEqual(expect.arrayContaining(["items", "tags", "item_tags", "applied_ops", "item_aliases", "tag_renames", "items_fts", "meta"]));
+    });
+  });
+});
+
+describe("sort=archived", () => {
+  it("is served by items_archived_sort without a temp sort", async () => {
+    const { lib } = freshLibrary();
+    await runInDurableObject(lib, (_inst: LibraryDO, state) => {
+      const plan = state.storage.sql
+        .exec(
+          `EXPLAIN QUERY PLAN SELECT i.* FROM items i WHERE i.deleted_at IS NULL AND i.status = 'archived'
+           ORDER BY COALESCE(i.archived_at, i.saved_at) DESC, i.id DESC LIMIT 31`,
+        )
+        .toArray()
+        .map((r) => String(r.detail));
+      expect(plan.join(" | ")).toContain("items_archived_sort");
+      expect(plan.join(" | ")).not.toContain("TEMP B-TREE");
     });
   });
 });
@@ -61,6 +78,21 @@ describe("applyOps item.add", () => {
     expect(pull.data.tags.every((t) => t.seq === 1)).toBe(true);
   });
 
+  it("clamps a client savedAt to [1995, op stamp] and keeps past (offline) values", async () => {
+    const { lib } = freshLibrary();
+    const [past, future, tiny, zero] = [uuidv7(), uuidv7(), uuidv7(), uuidv7()];
+    await lib.applyOps("devA", [
+      add(past, "https://a.example/past", T0, { savedAt: T0 - 86_400_000 }),
+      add(future, "https://a.example/future", T0, { savedAt: T0 + 10 * 365 * 86_400_000 }),
+      add(tiny, "https://a.example/tiny", T0, { savedAt: 5 }),
+      add(zero, "https://a.example/zero", T0, { savedAt: 0 }),
+    ]);
+    expect((await lib.getItem(past))!.savedAt).toBe(T0 - 86_400_000);
+    expect((await lib.getItem(future))!.savedAt).toBe(T0);
+    expect((await lib.getItem(tiny))!.savedAt).toBe(Date.UTC(1995, 0, 1));
+    expect((await lib.getItem(zero))!.savedAt).toBe(Date.UTC(1995, 0, 1));
+  });
+
   it("is idempotent per (deviceId, opId)", async () => {
     const { lib } = freshLibrary();
     const op = add(uuidv7(), "https://a.example/1", T0);
@@ -78,21 +110,6 @@ describe("applyOps item.add", () => {
     const { lib } = freshLibrary();
     const a = uuidv7();
     const b = uuidv7();
-  it("clamps a client savedAt to [1995, op stamp] and keeps past (offline) values", async () => {
-    const { lib } = freshLibrary();
-    const [past, future, tiny, zero] = [uuidv7(), uuidv7(), uuidv7(), uuidv7()];
-    await lib.applyOps("devA", [
-      add(past, "https://a.example/past", T0, { savedAt: T0 - 86_400_000 }),
-      add(future, "https://a.example/future", T0, { savedAt: T0 + 10 * 365 * 86_400_000 }),
-      add(tiny, "https://a.example/tiny", T0, { savedAt: 5 }),
-      add(zero, "https://a.example/zero", T0, { savedAt: 0 }),
-    ]);
-    expect((await lib.getItem(past))!.savedAt).toBe(T0 - 86_400_000);
-    expect((await lib.getItem(future))!.savedAt).toBe(T0);
-    expect((await lib.getItem(tiny))!.savedAt).toBe(Date.UTC(1995, 0, 1));
-    expect((await lib.getItem(zero))!.savedAt).toBe(Date.UTC(1995, 0, 1));
-  });
-
     await lib.applyOps("devA", [add(a, "https://a.example/x", T0, { tags: ["one"] }), setStatus(a, "archived", T0 + 10)]);
     const addB = add(b, "https://a.example/x?utm_medium=y", T0 + 20, { tags: ["two"], title: "ignored?" });
     const r = await lib.applyOps("devB", [addB]);

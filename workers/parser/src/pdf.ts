@@ -51,6 +51,14 @@ function okResult(job: ParseJob, over: Partial<ParseResult>): ParseResult {
   };
 }
 
+/**
+ * A PDF job that cannot produce text for any reason other than a missing original (extraction failure, retries
+ * exhausted, dead-lettered): the original is the content, so the item stays `ok` with `pdf_extract_failed`.
+ */
+export function pdfExtractFailedResult(job: ParseJob): ParseResult {
+  return okResult(job, { error: "pdf_extract_failed" });
+}
+
 async function extract(data: Uint8Array): Promise<Extraction> {
   const pdf = await getDocumentProxy(data);
   try {

@@ -162,7 +162,7 @@ export class LibraryDO extends DurableObject<Env> {
       try {
         await db.batch(stmts);
       } catch (e) {
-        console.error("LibraryDO: content_refs flush failed", e);
+        log.exception("LibraryDO content_refs flush failed", e, { event: "do_content_refs_flush_failed" });
         await this.scheduleSweepIn(REF_RETRY_MS).catch(() => undefined);
         return this.store.pendingRefCount();
       }
@@ -429,7 +429,7 @@ export class LibraryDO extends DurableObject<Env> {
     try {
       await this.env.DB.prepare("DELETE FROM content_refs WHERE user_id = ?1").bind(this.ctx.id.name ?? "").run();
     } catch (e) {
-      console.warn("LibraryDO: content_refs cleanup on destroy failed", e);
+      log.warnException("LibraryDO content_refs cleanup on destroy failed", e, { event: "do_content_refs_cleanup_failed" });
     }
   }
 

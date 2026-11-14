@@ -24,7 +24,13 @@ const RESUME_THRESHOLD = 0.02;
 
 const prefersDark = () => typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
 
+/** Remounted per article so scroll/progress refs never carry over from the previous one. */
 export default function Reader() {
+  const { id = "" } = useParams();
+  return <ReaderView key={id} />;
+}
+
+function ReaderView() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const actions = useItemActions();

@@ -4,6 +4,7 @@
  * requests (other Origin or none, bearer clients) stay exempt; the per-email throttle still bounds them.
  * Skipped entirely when TURNSTILE_SECRET_KEY is unset (local dev / self-host).
  */
+import { log } from "@sroka/shared";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { Env } from "./env.ts";
 
@@ -53,7 +54,7 @@ export async function checkTurnstile(env: TsEnv, req: Request, fetchImpl: Fetch 
     const res = await fetchImpl(SITEVERIFY, { method: "POST", body: form });
     data = (await res.json()) as typeof data;
   } catch (e) {
-    console.error("[sroka] turnstile siteverify failed", e);
+    log.exception("turnstile siteverify failed", e, { event: "turnstile_verify_failed" });
     return "verify_unavailable";
   }
   if (!data.success) return (data["error-codes"] ?? ["rejected"]).join(",");
@@ -71,7 +72,7 @@ export function turnstileBefore(env: TsEnv, fetchImpl: Fetch = fetch) {
     if (ctx.path !== TURNSTILE_PATH || !ctx.request) return;
     const reason = await checkTurnstile(env, ctx.request, fetchImpl);
     if (reason) {
-      console.warn("[sroka] turnstile rejected:", reason);
+      log.warn("turnstile rejected", { event: "turnstile_rejected", reason });
       throw new APIError("BAD_REQUEST", { code: "TURNSTILE_FAILED", message: "Verification failed. Please try again." });
     }
   });

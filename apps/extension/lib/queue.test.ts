@@ -266,3 +266,60 @@ describe("queue ownership", () => {
     expect(await processQueue()).toEqual({ sent: 1, remaining: 0 });
   });
 });
+
+describe("unexpected errors", () => {
+  const portal = () => new Response("<html>login</html>", { status: 200, headers: { "content-type": "text/html" } });
+
+  it("a 200 with a non-JSON body keeps the entry, backs off and re-arms the alarm", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    c.alarms.create.mockClear();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => portal());
+    await expect(processQueue(now)).resolves.toEqual({ sent: 0, remaining: 1 });
+    const [e] = await readQueue();
+    expect(e!.attempts).toBe(1);
+    expect(e!.nextAt).toBe(now + 30_000);
+    expect(c.alarms.create).toHaveBeenCalledWith(ALARM, expect.any(Object));
+  });
+
+  it("an error that is not an ApiFailure is handled like a network failure", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    c.alarms.create.mockClear();
+    const broken = { status: 200, get ok(): boolean { throw new RangeError("boom") } } as unknown as Response;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => broken);
+    await expect(processQueue(now)).resolves.toEqual({ sent: 0, remaining: 1 });
+    const [e] = await readQueue();
+    expect(e!.attempts).toBe(1);
+    expect(e!.nextAt).toBe(now + 30_000);
+    expect(c.alarms.create).toHaveBeenCalledWith(ALARM, expect.any(Object));
+  });
+
+  it("an unexpected error on one entry does not stop the pass or lose its progress", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    await enqueue({ url: "https://b.com/" }, now);
+    let n = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => (n++ === 0 ? portal() : ok()));
+    await expect(processQueue(now)).resolves.toEqual({ sent: 1, remaining: 1 });
+    const q = await readQueue();
+    expect(q).toHaveLength(1);
+    expect(q[0]!.body.url).toBe("https://a.com/");
+  });
+
+  it("an unexpected error still expires under the normal bounds", async () => {
+    const now = 1_000_000;
+    await enqueue({ url: "https://a.com/" }, now);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => portal());
+    let t = now;
+    while (t < now + MAX_QUEUE_AGE) {
+      await processQueue(t);
+      t += 3_600_000;
+    }
+    expect(await readQueue()).toHaveLength(1);
+    t += 1;
+    await processQueue(t);
+    expect(await readQueue()).toHaveLength(0);
+    expect(await readFailed()).toEqual([{ url: "https://a.com/", reason: "expired", at: t }]);
+  });
+});

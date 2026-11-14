@@ -9,7 +9,7 @@ import type {
 } from "@sroka/shared";
 import { clearSession, getDeviceId, getSettings, setSettings } from "./settings.ts";
 
-/** status 0 = network failure. */
+/** status 0 = network failure or an unreadable response body. */
 export class ApiFailure extends Error {
   constructor(
     public status: number,
@@ -87,7 +87,13 @@ export async function rawFetch(path: string, opts: FetchOpts = {}): Promise<Resp
 }
 
 async function json<T>(path: string, opts?: FetchOpts): Promise<T> {
-  return (await rawFetch(path, opts)).json() as Promise<T>;
+  const res = await rawFetch(path, opts);
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // A 2xx that is not JSON (captive portal, proxy page): treat like a network failure so callers retry.
+    throw new ApiFailure(0, "bad_response");
+  }
 }
 
 export type SaveBody = Pick<CreateItemRequest, "url" | "title" | "html" | "source" | "tags">;

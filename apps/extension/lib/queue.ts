@@ -167,34 +167,39 @@ export function processQueue(now = Date.now()): Promise<{ sent: number; remainin
         q = q.filter((x) => x.id !== e.id);
         sent++;
       } catch (err) {
-        if (!(err instanceof ApiFailure)) throw err;
-        if (err.unauthorized) break; // never drop; wait for sign-in
-        if (err.status === 413 && e.body.html) {
+        // Anything unexpected (a bug, a storage error) is handled like a network failure: the entry backs off,
+        // and the pass goes on so the queue is still written and the alarm re-armed below.
+        const failure = err instanceof ApiFailure ? err : new ApiFailure(0, "unexpected");
+        if (!(err instanceof ApiFailure)) {
+          log.warn("queued save failed unexpectedly", { event: "ext_queue_unexpected", name: err instanceof Error ? err.name : "unknown" });
+        }
+        if (failure.unauthorized) break; // never drop; wait for sign-in
+        if (failure.status === 413 && e.body.html) {
           e.body = { ...e.body };
           delete e.body.html; // fall back to URL-only save
           e.nextAt = now;
           continue;
         }
-        if (err.status === 400 && err.code !== "invalid_url" && e.body.title) {
+        if (failure.status === 400 && failure.code !== "invalid_url" && e.body.title) {
           e.body = { ...e.body };
           delete e.body.title; // e.g. title rejected: retry without it
           e.nextAt = now;
           continue;
         }
-        if (err.retryable) {
+        if (failure.retryable) {
           e.attempts++;
           if (now - e.addedAt > MAX_QUEUE_AGE && e.attempts >= MIN_ATTEMPTS_BEFORE_EXPIRY) {
             q = q.filter((x) => x.id !== e.id);
             await recordFailed(e.body.url, "expired", now);
-            log.warn("queued save given up", { event: "ext_queue_expired", attempts: e.attempts, status: err.status });
+            log.warn("queued save given up", { event: "ext_queue_expired", attempts: e.attempts, status: failure.status });
             continue;
           }
-          e.nextAt = now + backoffMs(e.attempts, err.retryAfter);
+          e.nextAt = now + backoffMs(e.attempts, failure.retryAfter);
           continue;
         }
         // Permanent client error (e.g. invalid_url): retrying cannot help.
         q = q.filter((x) => x.id !== e.id);
-        await recordFailed(e.body.url, err.code, now);
+        await recordFailed(e.body.url, failure.code, now);
       }
     }
     q = await writeQueue(q);

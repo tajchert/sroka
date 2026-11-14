@@ -1,4 +1,4 @@
-import { log, r2Keys } from "@sroka/shared";
+import { hashId, log, r2Keys } from "@sroka/shared";
 import { ATTEMPTS_RETENTION_MS } from "./attempts.ts";
 import type { ParserEnv } from "./env.ts";
 
@@ -102,7 +102,7 @@ export interface BackfillResult {
   state: "not_started" | "in_progress" | "done";
   users: number;
   refs: number;
-  /** User id whose library could not flush its refs (backfill stops there and resumes next run). */
+  /** `hashId` of the user id whose library could not flush its refs (backfill stops there and resumes next run; never the raw id). */
   blockedAt?: string;
 }
 
@@ -126,10 +126,10 @@ export async function backfillContentRefs(env: Pick<ParserEnv, "DB" | "LIBRARY">
     try {
       r = await env.LIBRARY.getByName(id).reemitContentRefs();
     } catch (e) {
-      log.exception("gc backfill: reemitContentRefs failed", e, { event: "gc_backfill_failed", userHash: id.slice(0, 8) });
-      return { state: "in_progress", users, refs, blockedAt: id };
+      log.exception("gc backfill: reemitContentRefs failed", e, { event: "gc_backfill_failed", userHash: await hashId(id) });
+      return { state: "in_progress", users, refs, blockedAt: await hashId(id) };
     }
-    if (r.pending > 0) return { state: "in_progress", users, refs, blockedAt: id };
+    if (r.pending > 0) return { state: "in_progress", users, refs, blockedAt: await hashId(id) };
     users++;
     refs += r.refs;
     await setState(env.DB, GC_KEYS.cursor, id);

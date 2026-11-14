@@ -2,7 +2,7 @@
 // LibraryDO class (test/entry.ts) and the real D1 migrations. api.md §9 "Content references / GC".
 import { runDurableObjectAlarm } from "cloudflare:test";
 import { env as rawEnv } from "cloudflare:workers";
-import { PARSER_VERSION, r2Keys, uuidv7, normalizeUrl, urlHash, type ParseResult } from "@sroka/shared";
+import { PARSER_VERSION, hashId, r2Keys, uuidv7, normalizeUrl, urlHash, type ParseResult } from "@sroka/shared";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LibraryDO } from "../../api/src/library-do.ts";
 import {
@@ -355,5 +355,23 @@ describe("orphaned user data sweep fails closed", () => {
     expect(second.deleted).toHaveLength(5);
     expect(second.capped).toBe(false);
     for (const id of live) expect(await exists(id)).toBe(true);
+  });
+});
+
+describe("backfill never exposes raw user ids", () => {
+  it("a blocked user is reported and logged by hash only", async () => {
+    await DB.exec("DELETE FROM user");
+    const id = "blocked_user_raw_id_0001";
+    await addUser(DB, id);
+    await DB.prepare("INSERT INTO gc_state (k, v) VALUES (?1, 'start')").bind(GC_KEYS.start).run();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((l: string) => void logs.push(String(l)));
+    const failing = { getByName: () => ({ reemitContentRefs: async () => { throw new Error("DO down"); } }) } as unknown as ParserEnv["LIBRARY"];
+    const r = await backfillContentRefs({ DB, LIBRARY: failing });
+    spy.mockRestore();
+    expect(r.blockedAt).toBe(await hashId(id));
+    expect(r.blockedAt).not.toContain(id.slice(0, 8));
+    expect(logs.join("\n")).not.toContain(id.slice(0, 8));
+    expect(logs.join("\n")).toContain(await hashId(id));
   });
 });

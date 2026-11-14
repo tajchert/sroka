@@ -95,6 +95,21 @@ describe("extractHackerNews", () => {
     expect(await extractHackerNews("https://example.com/", { fetch: api({}) })).toBeNull();
   });
 
+  it("a changed Algolia response shape gives null (caller falls back to the page) instead of throwing", async () => {
+    const bad: unknown[] = [
+      story([], { children: { not: "an array" } }),
+      story([], { children: [null] }),
+      story([], { text: 42 }),
+      story(tree(), { title: { en: "x" } }),
+      [],
+      "oops",
+    ];
+    for (const b of bad) expect(await extractHackerNews(STORY_URL, { fetch: api({ 100: b }) })).toBeNull();
+    // a comment whose story has the bad shape
+    const items = { 3: { ...(node(c(3)) as object), story_id: 100 }, 100: story([], { children: "x" }) };
+    expect(await extractHackerNews("https://news.ycombinator.com/item?id=3", { fetch: api(items) })).toBeNull();
+  });
+
   it("hnThread ignores a focus id that isn't in the tree", () => {
     const th = hnThread(story(tree()) as never, 999)!;
     expect(th.focusId).toBe("999");

@@ -45,6 +45,19 @@ interface AlgoliaItem {
   children?: AlgoliaItem[];
 }
 
+const optStr = (v: unknown) => v === undefined || v === null || typeof v === "string";
+const optNum = (v: unknown) => v === undefined || v === null || typeof v === "number";
+
+/** Shape check of an Algolia item tree (the response is untrusted JSON); false = not what we can render. */
+function isAlgoliaItem(v: unknown): v is AlgoliaItem {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id !== "number") return false;
+  if (![o.type, o.author, o.title, o.url, o.text, o.created_at].every(optStr) || !optNum(o.points) || !optNum(o.story_id)) return false;
+  if (o.children === undefined || o.children === null) return true;
+  return Array.isArray(o.children) && o.children.every(isAlgoliaItem);
+}
+
 const itemUrl = (id: number | string) => `https://news.ycombinator.com/item?id=${id}`;
 /** HN text is HTML whose first paragraph has no `<p>`. */
 const bodyHtml = (text: string | null | undefined) => (text?.trim() ? `<p>${text}` : "");
@@ -139,13 +152,15 @@ export async function extractHackerNews(url: string, opts: SafeFetchOptions = {}
   const id = hnItemId(url);
   if (!id) return null;
   try {
-    let item = (await getJson(`${ALGOLIA_ITEM}${id}`, opts, MAX_JSON_BYTES)) as AlgoliaItem | null;
-    if (!item || typeof item.id !== "number") return null;
+    const first = await getJson(`${ALGOLIA_ITEM}${id}`, opts, MAX_JSON_BYTES);
+    if (!isAlgoliaItem(first)) return null;
+    let item: AlgoliaItem = first;
     const focus = item.type === "comment" ? item.id : null;
     if (focus !== null) {
       if (typeof item.story_id !== "number") return null;
-      item = (await getJson(`${ALGOLIA_ITEM}${item.story_id}`, opts, MAX_JSON_BYTES)) as AlgoliaItem | null;
-      if (!item || typeof item.id !== "number") return null;
+      const storyItem = await getJson(`${ALGOLIA_ITEM}${item.story_id}`, opts, MAX_JSON_BYTES);
+      if (!isAlgoliaItem(storyItem)) return null;
+      item = storyItem;
     }
     let rank: number[] = [];
     try {

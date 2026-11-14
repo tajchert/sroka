@@ -19,8 +19,17 @@ describe("reportClientError", () => {
     const [url, init] = f.mock.calls[0]!;
     expect(url).toBe("/v1/client-errors");
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ message: "boom", url: "/app/item/1", userAgent: "test-ua" });
+    expect(body).toMatchObject({ message: "boom", url: "reader", userAgent: "test-ua" });
     expect(body.stack.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("sends the screen name, never tag names or item ids", () => {
+    vi.stubGlobal("location", { pathname: "/app/tag/secret-tag" });
+    reportClientError(new Error("one"));
+    vi.stubGlobal("location", { pathname: "/app/item/0190abcd" });
+    reportClientError(new Error("two"));
+    const urls = vi.mocked(fetch).mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string).url);
+    expect(urls).toEqual(["library", "reader"]);
   });
 
   it("does nothing when the user opted out of crash reports", () => {

@@ -87,4 +87,13 @@ class PackageInstallerTest {
         assertEquals(PackageInstaller.Result.Invalid("bad_zip"), result)
         assertFalse(File(articles, "i1.tmp").exists())
     }
+
+    @Test fun truncatedZipIsInvalidNotIoError() {
+        // A zip cut off mid-entry makes ZipInputStream throw EOFException while reading the stream: the
+        // package's fault (like a corrupt zip), not a full disk, so it must not stop the download batch.
+        val full = TestPackages.zip(mapOf("article.html" to ByteArray(4_000) { (it * 31 + it / 7).toByte() }))
+        val result = installer.install(tmp.newFile().also { it.writeBytes(full.copyOf(full.size / 2)) }, articles, "i1")
+        assertEquals(PackageInstaller.Result.Invalid("bad_zip"), result)
+        assertFalse(File(articles, "i1.tmp").exists())
+    }
 }

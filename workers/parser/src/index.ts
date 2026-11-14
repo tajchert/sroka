@@ -1,5 +1,5 @@
 import { FetchError } from "@sroka/extractor";
-import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJob } from "@sroka/shared";
+import { displayDomain, log, ParseJobSchema, PARSER_VERSION, r2Keys, type ParseJob, type ParseResult } from "@sroka/shared";
 import { reportParse } from "./attempts.ts";
 import { deletePrefix, runWeeklyGc } from "./gc.ts";
 import type { ParserEnv } from "./env.ts";
@@ -39,8 +39,8 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     msg.ack();
     return;
   }
+  let result: Awaited<ReturnType<typeof processJob>> | undefined;
   try {
-    let result;
     try {
       result = await processJob(env, job, deps, stillWanted, stats);
       if (result === null) {
@@ -69,12 +69,41 @@ async function handleMessage(msg: Message<ParseJob>, env: ParserEnv, deps: Deps)
     }
     msg.ack();
   } catch (e) {
-    // markParsed RPC failure etc. NOTE: the retry re-parses with a new contentId; a public dir from this
-    // attempt has a content row without refs and is collected by the shared-content GC (gc.ts); private ones
-    // are only swept once the account is deleted.
+    // markParsed RPC failure etc. The retry re-parses with a new contentId. A public dir from this attempt has
+    // a content row without refs and is collected by the shared-content GC (gc.ts). A private dir is deleted
+    // here, but only when the library says this generation is still pending: then no result was accepted and
+    // nothing references the dir. If the answer is "not wanted" or the check itself fails, the result may have
+    // been committed before the RPC failed, so the dir is kept.
     log.exception("markParsed failed", e, { event: "mark_parsed_failed", itemId: job.itemId, attempt: msg.attempts });
+    if (result?.contentPrivate && result.contentId && !job.pdf) {
+      try {
+        if (await lib.parseWanted(job.itemId, job.parseGen)) {
+          await deletePrefix(env.CONTENT, r2Keys.contentDir(result.contentId, job.userId));
+        }
+      } catch (e2) {
+        log.warnException("private content cleanup failed", e2, { event: "private_cleanup_failed" });
+      }
+    }
     msg.retry({ delaySeconds: backoff(msg.attempts) });
   }
+}
+
+function dlqPdfResult(job: ParseJob): ParseResult {
+  return {
+    status: "ok",
+    parseGen: job.parseGen,
+    contentId: job.pdf!.contentId,
+    contentPrivate: true,
+    title: null,
+    excerpt: null,
+    siteName: "PDF",
+    author: null,
+    lang: null,
+    wordCount: null,
+    readingMinutes: null,
+    error: "pdf_extract_failed",
+    parserVersion: PARSER_VERSION,
+  };
 }
 
 async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise<void> {
@@ -85,7 +114,9 @@ async function handleDlq(batch: MessageBatch<ParseJob>, env: ParserEnv): Promise
       continue;
     }
     log.warn("job reached the dead-letter queue", { event: "dlq", domain: displayDomain(parsed.data.url), itemId: parsed.data.itemId, attempts: msg.attempts, parserVersion: PARSER_VERSION });
-    const result = failedResult(parsed.data, "parse_failed");
+    // A PDF stays readable (the original is the content), so a dead-lettered PDF job answers like an ordinary
+    // extraction failure in pdf.ts: ok + pdf_extract_failed, null metadata (spec 2026-10-24-pdf-upload-design.md).
+    const result = parsed.data.pdf ? dlqPdfResult(parsed.data) : failedResult(parsed.data, "parse_failed");
     try {
       await env.LIBRARY.getByName(parsed.data.userId).markParsed(parsed.data.itemId, result);
       await reportParse(env, { job: parsed.data, result, stats: { errorDetail: "dlq" }, durationMs: 0, attempt: msg.attempts, source: "dlq" });

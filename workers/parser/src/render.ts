@@ -9,6 +9,38 @@ import { log } from "@sroka/shared";
 import type { ParserEnv } from "./env.ts";
 
 export const RENDER_TIMEOUT_MS = 30_000;
+/** Cap on the Browser Run JSON response (the HTML is a JSON string inside it). Plain fetches cap at 5 MB (D6). */
+export const MAX_RENDER_BYTES = 8 * 1024 * 1024;
+
+/** Reads a response body as text, stopping at `max` bytes. null = over the cap (the rest is cancelled). */
+async function readTextCapped(res: Response, max: number): Promise<string | null> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > max) {
+    await res.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
 const DAY = 24 * 60 * 60 * 1000;
 
 function intVar(v: string | undefined, dflt: number): number {
@@ -83,9 +115,17 @@ export async function renderPage(env: ParserEnv, url: string, o: RenderOptions):
       timer = setTimeout(() => rej(new Error("render_timeout")), RENDER_TIMEOUT_MS);
     });
     const res = await Promise.race([call, timeout]);
-    const body = (await res.json().catch(() => null)) as
-      | { success?: boolean; result?: unknown; meta?: { status?: number; finalUrl?: string }; errors?: { message?: string }[] }
-      | null;
+    const raw = await Promise.race([readTextCapped(res, MAX_RENDER_BYTES), timeout]);
+    if (raw === null) {
+      log.warn("browser render failed", { event: "render_failed", status: res.status, message: "render_too_large" });
+      return { ok: false, error: "render_too_large", httpStatus: null, ms: ms() };
+    }
+    let body: { success?: boolean; result?: unknown; meta?: { status?: number; finalUrl?: string }; errors?: { message?: string }[] } | null;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      body = null;
+    }
     const httpStatus = typeof body?.meta?.status === "number" ? body.meta.status : null;
     if (!res.ok || !body?.success || typeof body.result !== "string") {
       log.warn("browser render failed", { event: "render_failed", status: res.status, message: body?.errors?.[0]?.message?.slice(0, 200) });

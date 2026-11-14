@@ -1,4 +1,4 @@
-import { log, r2Keys } from "@sroka/shared";
+import { hashId, log, r2Keys } from "@sroka/shared";
 import { ATTEMPTS_RETENTION_MS } from "./attempts.ts";
 import type { ParserEnv } from "./env.ts";
 
@@ -18,14 +18,28 @@ export async function deletePrefix(bucket: R2Bucket, prefix: string): Promise<nu
 /** Per-user R2 roots (r2Keys.privatePrefix / rawPrefix / uploadsPrefix). */
 export const USER_ROOTS = ["private/", "raw/", "uploads/"] as const;
 
+/** Orphan sweep safety (the sweep deletes user data): at most this many user ids per run ... */
+export const ORPHAN_MAX_USERS_PER_RUN = 50;
+/** ... and a listing batch of at least this many ids where more than half look orphaned is a broken lookup, not cleanup. */
+export const ORPHAN_GUARD_MIN_BATCH = 10;
+export const ORPHAN_GUARD_MAX_MISSING_SHARE = 0.5;
+
 /**
  * Weekly GC (cron): deletes `private/{userId}/`, `raw/{userId}/` and `uploads/{userId}/` of user ids that no
  * longer exist in D1. Backstop for the account-deletion R2 wipe (runs once in waitUntil) and for writes that
  * were in flight while the account was deleted (parser results, captured HTML, uploads).
+ * Fails closed: a failing lookup throws (nothing more is deleted); a batch where an implausible share of ids is
+ * missing (see ORPHAN_GUARD_*) is skipped with an error log; at most ORPHAN_MAX_USERS_PER_RUN users per run.
  * Shared public content (`content/`) is collected by sweepSharedContent.
  */
-export async function sweepOrphanedUserData(env: Pick<ParserEnv, "DB" | "CONTENT">, now = Date.now()): Promise<{ deleted: string[] }> {
+export async function sweepOrphanedUserData(
+  env: Pick<ParserEnv, "DB" | "CONTENT">,
+  now = Date.now(),
+): Promise<{ deleted: string[]; skippedBatches: number; capped: boolean }> {
   const deleted: string[] = [];
+  const deletedUsers = new Set<string>();
+  let skippedBatches = 0;
+  let capped = false;
   for (const root of USER_ROOTS) {
     let cursor: string | undefined;
     do {
@@ -35,22 +49,34 @@ export async function sweepOrphanedUserData(env: Pick<ParserEnv, "DB" | "CONTENT
         const rows = await env.DB.prepare("SELECT id FROM user WHERE id IN (SELECT value FROM json_each(?1))")
           .bind(JSON.stringify(ids))
           .all<{ id: string }>();
-        const live = new Set((rows.results ?? []).map((r) => r.id));
-        for (const id of ids) {
-          if (live.has(id)) continue;
-          await deletePrefix(env.CONTENT, `${root}${id}/`);
-          deleted.push(`${root}${id}/`);
+        if (!Array.isArray(rows.results)) throw new Error("orphan sweep: user lookup returned no result list");
+        const live = new Set(rows.results.map((r) => r.id));
+        const missing = ids.filter((id) => !live.has(id));
+        if (ids.length >= ORPHAN_GUARD_MIN_BATCH && missing.length / ids.length > ORPHAN_GUARD_MAX_MISSING_SHARE) {
+          skippedBatches++;
+          log.error("orphan sweep skipped: implausible share of unknown user ids", { event: "gc_orphan_sweep_skipped", root, ids: ids.length, missing: missing.length });
+        } else {
+          for (const id of missing) {
+            if (!deletedUsers.has(id) && deletedUsers.size >= ORPHAN_MAX_USERS_PER_RUN) {
+              capped = true;
+              continue;
+            }
+            await deletePrefix(env.CONTENT, `${root}${id}/`);
+            deletedUsers.add(id);
+            deleted.push(`${root}${id}/`);
+          }
         }
       }
       cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
   }
+  if (capped) log.warn("orphan sweep hit the per-run user cap; the rest waits for the next run", { event: "gc_orphan_sweep_capped", cap: ORPHAN_MAX_USERS_PER_RUN });
   try {
     await env.DB.prepare("DELETE FROM auth_throttle WHERE expires_at < ?1").bind(now).run();
   } catch (e) {
     log.warnException("auth_throttle cleanup failed", e, { event: "gc_throttle_cleanup_failed" });
   }
-  return { deleted };
+  return { deleted, skippedBatches, capped };
 }
 
 // ---------- shared public content (api.md §9 "Content references / GC") ----------
@@ -76,7 +102,7 @@ export interface BackfillResult {
   state: "not_started" | "in_progress" | "done";
   users: number;
   refs: number;
-  /** User id whose library could not flush its refs (backfill stops there and resumes next run). */
+  /** `hashId` of the user id whose library could not flush its refs (backfill stops there and resumes next run; never the raw id). */
   blockedAt?: string;
 }
 
@@ -100,10 +126,10 @@ export async function backfillContentRefs(env: Pick<ParserEnv, "DB" | "LIBRARY">
     try {
       r = await env.LIBRARY.getByName(id).reemitContentRefs();
     } catch (e) {
-      log.exception("gc backfill: reemitContentRefs failed", e, { event: "gc_backfill_failed", userHash: id.slice(0, 8) });
-      return { state: "in_progress", users, refs, blockedAt: id };
+      log.exception("gc backfill: reemitContentRefs failed", e, { event: "gc_backfill_failed", userHash: await hashId(id) });
+      return { state: "in_progress", users, refs, blockedAt: await hashId(id) };
     }
-    if (r.pending > 0) return { state: "in_progress", users, refs, blockedAt: id };
+    if (r.pending > 0) return { state: "in_progress", users, refs, blockedAt: await hashId(id) };
     users++;
     refs += r.refs;
     await setState(env.DB, GC_KEYS.cursor, id);
@@ -198,7 +224,10 @@ export async function runWeeklyGc(env: ParserEnv, now = Date.now()): Promise<voi
       summary[name] = { error: String(e) };
     }
   };
-  await step("userData", async () => (await sweepOrphanedUserData(env, now)).deleted.length);
+  await step("userData", async () => {
+    const r = await sweepOrphanedUserData(env, now);
+    return { deleted: r.deleted.length, skippedBatches: r.skippedBatches, capped: r.capped };
+  });
   await step("backfill", () => backfillContentRefs(env));
   await step("sharedContent", () => sweepSharedContent(env, now));
   await step("parseAnalytics", () => purgeParseAnalytics(env.DB, now));

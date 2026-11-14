@@ -2,10 +2,19 @@
 // LibraryDO class (test/entry.ts) and the real D1 migrations. api.md §9 "Content references / GC".
 import { runDurableObjectAlarm } from "cloudflare:test";
 import { env as rawEnv } from "cloudflare:workers";
-import { PARSER_VERSION, r2Keys, uuidv7, normalizeUrl, urlHash, type ParseResult } from "@sroka/shared";
+import { PARSER_VERSION, hashId, r2Keys, uuidv7, normalizeUrl, urlHash, type ParseResult } from "@sroka/shared";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LibraryDO } from "../../api/src/library-do.ts";
-import { CONTENT_GC_GRACE_MS, GC_KEYS, backfillContentRefs, sweepSharedContent } from "../src/gc.ts";
+import {
+  CONTENT_GC_GRACE_MS,
+  GC_KEYS,
+  ORPHAN_MAX_USERS_PER_RUN,
+  USER_ROOTS,
+  backfillContentRefs,
+  deletePrefix,
+  sweepOrphanedUserData,
+  sweepSharedContent,
+} from "../src/gc.ts";
 import type { ParserEnv } from "../src/env.ts";
 import { processJob } from "../src/process.ts";
 import { addUser, migrateD1 } from "./d1.ts";
@@ -286,5 +295,83 @@ describe("shared-content GC (parser cron)", () => {
     expect(res?.contentId).toBe(c);
     expect(await sweepSharedContent(env)).toMatchObject({ rows: 0 });
     expect(await r2Count(c)).toBe(4);
+  });
+});
+
+describe("orphaned user data sweep fails closed", () => {
+  const ghosts = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag}_${i}`);
+  const putUserData = async (ids: string[]) => {
+    for (const id of ids) await env.CONTENT.put(`private/${id}/c1/a.html`, "x");
+  };
+  const cleanRoots = async () => {
+    for (const r of USER_ROOTS) await deletePrefix(env.CONTENT, r);
+  };
+  const exists = async (id: string) => (await env.CONTENT.head(`private/${id}/c1/a.html`)) !== null;
+  const liveUsers = async (ids: string[]) => {
+    for (const id of ids) await addUser(DB, id);
+  };
+
+  it("a failing user lookup aborts the sweep and deletes nothing", async () => {
+    await cleanRoots();
+    const ids = ghosts(3, "lookupfail");
+    await putUserData(ids);
+    const brokenDb = { prepare: () => ({ bind: () => ({ all: async () => { throw new Error("D1 down"); } }) }) } as unknown as D1Database;
+    await expect(sweepOrphanedUserData({ DB: brokenDb, CONTENT: env.CONTENT })).rejects.toThrow("D1 down");
+    for (const id of ids) expect(await exists(id)).toBe(true);
+  });
+
+  it("a lookup that finds (almost) nobody in a sizeable batch is not trusted: batch skipped, data kept", async () => {
+    await cleanRoots();
+    const ids = ghosts(12, "emptylookup"); // none in D1, as if the user table could not be read
+    await putUserData(ids);
+    const r = await sweepOrphanedUserData(env);
+    expect(r).toMatchObject({ deleted: [], skippedBatches: 1 });
+    for (const id of ids) expect(await exists(id)).toBe(true);
+  });
+
+  it("still cleans up a few deleted accounts next to many live ones", async () => {
+    await cleanRoots();
+    const live = ghosts(12, "fewlive");
+    const gone = ghosts(2, "fewgone");
+    await liveUsers(live);
+    await putUserData([...live, ...gone]);
+    const r = await sweepOrphanedUserData(env);
+    expect(r.skippedBatches).toBe(0);
+    expect(r.deleted.sort()).toEqual(gone.map((id) => `private/${id}/`).sort());
+    for (const id of live) expect(await exists(id)).toBe(true);
+    for (const id of gone) expect(await exists(id)).toBe(false);
+  });
+
+  it("deletes at most ORPHAN_MAX_USERS_PER_RUN users per run; the rest waits for the next run", async () => {
+    await cleanRoots();
+    const live = ghosts(ORPHAN_MAX_USERS_PER_RUN + 20, "caplive");
+    const gone = ghosts(ORPHAN_MAX_USERS_PER_RUN + 5, "capgone");
+    await liveUsers(live);
+    await putUserData([...live, ...gone]);
+    const first = await sweepOrphanedUserData(env);
+    expect(first.deleted).toHaveLength(ORPHAN_MAX_USERS_PER_RUN);
+    expect(first.capped).toBe(true);
+    const second = await sweepOrphanedUserData(env);
+    expect(second.deleted).toHaveLength(5);
+    expect(second.capped).toBe(false);
+    for (const id of live) expect(await exists(id)).toBe(true);
+  });
+});
+
+describe("backfill never exposes raw user ids", () => {
+  it("a blocked user is reported and logged by hash only", async () => {
+    await DB.exec("DELETE FROM user");
+    const id = "blocked_user_raw_id_0001";
+    await addUser(DB, id);
+    await DB.prepare("INSERT INTO gc_state (k, v) VALUES (?1, 'start')").bind(GC_KEYS.start).run();
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((l: string) => void logs.push(String(l)));
+    const failing = { getByName: () => ({ reemitContentRefs: async () => { throw new Error("DO down"); } }) } as unknown as ParserEnv["LIBRARY"];
+    const r = await backfillContentRefs({ DB, LIBRARY: failing });
+    spy.mockRestore();
+    expect(r.blockedAt).toBe(await hashId(id));
+    expect(r.blockedAt).not.toContain(id.slice(0, 8));
+    expect(logs.join("\n")).not.toContain(id.slice(0, 8));
+    expect(logs.join("\n")).toContain(await hashId(id));
   });
 });

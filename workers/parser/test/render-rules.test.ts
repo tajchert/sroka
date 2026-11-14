@@ -196,6 +196,34 @@ describe("Browser Run fallback", () => {
     expect((await attempts())[0]).toMatchObject({ status: "partial", method: "fetch", fallback_outcome: "failed", error_detail: "render_http_500" });
   });
 
+  it("an oversized render is refused: plain result kept, detail render_too_large", async () => {
+    routes[URL1] = () => htmlRes(SHORT);
+    renderHtml = "<article><p>" + "x".repeat(9 * 1024 * 1024) + "</p></article>";
+    await run(msg(job()));
+    expect(marked[0]).toMatchObject({ status: "partial" });
+    expect((await attempts())[0]).toMatchObject({ status: "partial", method: "fetch", fallback_outcome: "failed", error_detail: "render_too_large" });
+  });
+
+  it("a render that declares an oversized content-length is refused without reading it", async () => {
+    routes[URL1] = () => htmlRes(SHORT);
+    quickAction.mockImplementation(
+      async () => new Response("{}", { status: 200, headers: { "content-type": "application/json", "content-length": String(64 * 1024 * 1024) } }),
+    );
+    await run(msg(job()));
+    expect(marked[0]).toMatchObject({ status: "partial" });
+    expect((await attempts())[0]).toMatchObject({ status: "partial", method: "fetch", fallback_outcome: "failed", error_detail: "render_too_large" });
+  });
+
+  it("a render whose final URL is one of our own hosts is refused (blocked_url)", async () => {
+    routes[URL1] = () => htmlRes(SHORT);
+    quickAction.mockImplementation(async () =>
+      Response.json({ success: true, result: RENDERED, meta: { status: 200, finalUrl: "http://127.0.0.1:8787/x" } }),
+    );
+    await run(msg(job()));
+    expect(marked[0]).toMatchObject({ status: "partial" });
+    expect((await attempts())[0]).toMatchObject({ status: "partial", fallback_outcome: "failed", error_detail: "blocked_url" });
+  });
+
   it("render of a 503 bot wall that succeeds avoids the retry", async () => {
     routes[URL1] = () => htmlRes("busy", 503);
     const m = msg(job());

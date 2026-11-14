@@ -24,10 +24,13 @@ export default function Settings() {
     try {
       await flushPendingDeletes().catch(() => undefined);
       await api.signOut();
-    } finally {
-      qc.clear();
-      qc.setQueryData(["me"], null);
+    } catch {
+      // The server session is still alive: keep the signed-in state instead of pretending to be signed out.
+      toasts.push({ message: "Could not sign out. Try again.", tone: "error" });
+      return;
     }
+    qc.clear();
+    qc.setQueryData(["me"], null);
   };
 
   // import

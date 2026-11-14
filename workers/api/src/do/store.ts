@@ -30,6 +30,9 @@ import {
 import { buildMatchQuery, escapeLike, normalizeDomainFilter } from "./fts.ts";
 import { type ItemData, type ItemRow, type PairRow, type TagRow, compareTagNames, rowToItemData } from "./rows.ts";
 
+/** Floor for a client-supplied item.add `savedAt` (1995-01-01 UTC); the ceiling is the op stamp (never in the future). */
+const MIN_SAVED_AT = Date.UTC(1995, 0, 1);
+
 type SqlValue = ArrayBuffer | string | number | null;
 type Row = Record<string, SqlValue>;
 
@@ -562,7 +565,7 @@ export class LibraryStore {
       status,
       status === "archived" ? stamp.at : null,
       op.isFavorite ? 1 : 0,
-      op.savedAt ?? stamp.at,
+      op.savedAt === undefined ? stamp.at : Math.max(MIN_SAVED_AT, Math.min(op.savedAt, stamp.at)),
       op.source ?? null,
       JSON.stringify(clock),
       ftsRowid,
@@ -953,7 +956,7 @@ export class LibraryStore {
    */
   setPdfThumbnail(itemId: string, contentId: string, key: string): { ok: true; previousKey: string | null } | { ok: false } {
     return this.withCtx((ctx): { ok: true; previousKey: string | null } | { ok: false } => {
-      const row = this.itemRow(itemId);
+      const row = this.itemRow(this.resolveItemId(itemId));
       if (!row || row.deleted_at !== null || row.kind !== "pdf" || row.content_id !== contentId) return { ok: false };
       this.exec("UPDATE items SET lead_image_key = ? WHERE id = ?", key, row.id);
       ctx.touchItem(row.id);

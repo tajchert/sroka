@@ -114,6 +114,8 @@ export const MIGRATIONS: readonly string[][] = [
   // v5: PDF upload reservations (api.md §9 "R2 cleanup"): a row exists from before the R2 put until the item commits;
   // the alarm reclaims R2 objects of reservations older than an hour that no live item references.
   [`CREATE TABLE pdf_uploads (content_id TEXT PRIMARY KEY, at INTEGER NOT NULL)`],
+  // v6: backs `sort=archived` (ORDER BY COALESCE(archived_at, saved_at) DESC, id DESC), which otherwise scanned + sorted every item.
+  [`CREATE INDEX items_archived_sort ON items(COALESCE(archived_at, saved_at), id)`],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

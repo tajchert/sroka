@@ -1,7 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { parseCsv } from "../../src/import/csv.ts";
-import { ImportParseError, parseImport } from "../../src/import/parsers.ts";
+import { ImportParseError, parseImport, parseTimestamp } from "../../src/import/parsers.ts";
 import { INSTAPAPER_CSV, INSTAPAPER_CSV_OLD, NETSCAPE_HTML, POCKET_CSV, POCKET_HTML } from "./fixtures.ts";
 
 const b = (s: string) => new TextEncoder().encode(s);
@@ -38,13 +38,13 @@ describe("pocket_csv", () => {
     expect(p.rows[3]!.savedAt).toBeUndefined();
   });
   it("accepts the optional favorite column (own export round-trip)", () => {
-    const r = parseImport("pocket_csv", b("title,url,time_added,tags,status,favorite\nT,https://e.com/x,5,a|b,archive,1\n"));
-    expect(r.rows[0]).toMatchObject({ isFavorite: true, status: "archived", tags: ["a", "b"], savedAt: 5000 });
+    const r = parseImport("pocket_csv", b("title,url,time_added,tags,status,favorite\nT,https://e.com/x,1700000005,a|b,archive,1\n"));
+    expect(r.rows[0]).toMatchObject({ isFavorite: true, status: "archived", tags: ["a", "b"], savedAt: 1700000005_000 });
   });
   it("reads CSVs from a zip (2025 export)", () => {
     const zip = zipSync({
-      "part_000000.csv": strToU8("title,url,time_added,tags,status\nA,https://e.com/1,100,,unread\n"),
-      "part_000001.csv": strToU8("title,url,time_added,tags,status\nB,https://e.com/2,200,,archive\n"),
+      "part_000000.csv": strToU8("title,url,time_added,tags,status\nA,https://e.com/1,1700000100,,unread\n"),
+      "part_000001.csv": strToU8("title,url,time_added,tags,status\nB,https://e.com/2,1700000200,,archive\n"),
       "__MACOSX/._part.csv": strToU8("junk"),
     });
     const r = parseImport("pocket_csv", zip);
@@ -114,5 +114,24 @@ describe("hardening", () => {
     const big = new Uint8Array(45 * 1024 * 1024);
     const z = zipSync({ "a.csv": big });
     expect(() => parseImport("pocket_csv", z)).toThrow(/too large/);
+  });
+});
+
+describe("parseTimestamp", () => {
+  const NOW = Date.UTC(2026, 10, 14);
+  const MS = 1_700_000_000_000;
+  it("detects seconds, milliseconds and microseconds", () => {
+    expect(parseTimestamp("1700000000", NOW)).toBe(MS);
+    expect(parseTimestamp("1700000000000", NOW)).toBe(MS);
+    expect(parseTimestamp("1700000000000000", NOW)).toBe(MS);
+    expect(parseTimestamp(" 1700000000.5 ", NOW)).toBe(MS + 500);
+  });
+  it("rejects garbage and values outside 1995..now+1day", () => {
+    for (const v of [undefined, "", "abc", "0", "-5", "NaN", "5", "100", "631152000", "99999999999999999999"]) {
+      expect(parseTimestamp(v, NOW)).toBeUndefined();
+    }
+    expect(parseTimestamp(String(NOW / 1000 + 3600), NOW)).toBe(NOW + 3_600_000);
+    expect(parseTimestamp(String(NOW / 1000 + 2 * 86_400), NOW)).toBeUndefined();
+    expect(parseTimestamp(String(NOW + 2 * 86_400_000), NOW)).toBeUndefined();
   });
 });

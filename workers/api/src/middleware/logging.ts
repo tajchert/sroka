@@ -29,6 +29,15 @@ function routePattern(c: { req: { matchedRoutes: { path: string }[] } }): string
   return m.length ? m[m.length - 1]!.path : "(unmatched)";
 }
 
+/**
+ * Path for logs. Content-host paths `/s/{exp}/{sig}/{scope}/{contentId}/{file}` carry the credential (sig) and,
+ * for private content, the user id (scope `u.{userId}`): keep only the shape. Elsewhere mask UUIDs.
+ */
+export function maskPath(pathname: string): string {
+  if (pathname.startsWith("/s/")) return "/s/:exp/:sig/:scope/:id/:file";
+  return pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, ":id");
+}
+
 /** Request-level logging: sets `requestId` + `x-request-id`, logs one `http_request` line per request. */
 export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
   const start = Date.now();
@@ -78,7 +87,7 @@ export const onError: ErrorHandler<AppEnv> = async (err, c) => {
     requestId,
     method: c.req.method,
     route,
-    path: new URL(c.req.url).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, ":id"),
+    path: maskPath(new URL(c.req.url).pathname),
     colo: colo(c.req.raw),
     userHash: userId ? await hashId(userId) : undefined,
     ...errorFields(err),

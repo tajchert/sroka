@@ -6,6 +6,7 @@ import app.sroka.core.model.ReaderFont
 import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.UserPreferences
@@ -40,6 +41,12 @@ class FakeSettingsRepository(
     override suspend fun setReaderLineSpacing(spacing: ReaderLineSpacing) = preferencesFlow.update { it.copy(readerLineSpacing = spacing) }
 
     override suspend fun setSortOrder(order: SortOrder) = preferencesFlow.update { it.copy(sortOrder = order) }
+
+    override suspend fun setSwipeLeftAction(action: SwipeAction) = preferencesFlow.update { it.copy(swipeLeftAction = action) }
+
+    override suspend fun setSwipeRightAction(action: SwipeAction) = preferencesFlow.update { it.copy(swipeRightAction = action) }
+
+    override suspend fun setSwipeHintShown() = preferencesFlow.update { it.copy(swipeHintShown = true) }
 
     override suspend fun setServerUrl(url: String?): Boolean {
         if (url != null && !UrlNormalizer.isHttpUrl(url)) return false

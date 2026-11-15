@@ -16,6 +16,7 @@ import app.sroka.core.domain.DeleteAccountResult
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.SessionState
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.testing.fake.FakeAccountRepository
 import app.sroka.core.testing.fake.FakeAuthRepository
 import app.sroka.core.testing.fake.FakeConsentRepository
@@ -93,6 +94,33 @@ class SettingsScreenTest {
         compose.onNodeWithText("CSV or JSON").assertExists()
         compose.onNodeWithText("From Pocket and others").assertExists()
         compose.onNodeWithText("Default · 18 sp").assertExists()
+    }
+
+    @Test
+    fun swipeRowsShowTheCurrentChoiceAndDefaultsMatchToday() {
+        show()
+        tap("Swipe left")
+        // Today's behaviour: left archives, right does nothing.
+        compose.onNode(hasText("Archive") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        compose.onNode(hasText("Cancel")).performClick()
+        compose.onNodeWithText("Swipe right").performScrollTo()
+        compose.onNodeWithText("None").assertExists()
+    }
+
+    @Test
+    fun swipeChoicesAreStoredPerDirection() {
+        show()
+        tap("Swipe right")
+        compose.onNode(hasText("Favorite") and hasAnyAncestor(isDialog())).performClick()
+        assertEquals(SwipeAction.FAVORITE, settings.preferencesFlow.value.swipeRightAction)
+        assertEquals(SwipeAction.ARCHIVE, settings.preferencesFlow.value.swipeLeftAction)
+        compose.onNodeWithText("Favorite").assertExists()
+        tap("Swipe left")
+        compose.onNode(hasText("Tags") and hasAnyAncestor(isDialog())).performClick()
+        assertEquals(SwipeAction.TAGS, settings.preferencesFlow.value.swipeLeftAction)
+        tap("Swipe left")
+        compose.onNode(hasText("None") and hasAnyAncestor(isDialog())).performClick()
+        assertEquals(SwipeAction.NONE, settings.preferencesFlow.value.swipeLeftAction)
     }
 
     @Test

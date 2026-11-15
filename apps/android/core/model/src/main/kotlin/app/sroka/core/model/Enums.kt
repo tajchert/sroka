@@ -47,3 +47,9 @@ enum class ReaderFont { SANS, SERIF }
 
 /** Article line spacing in the reader; NORMAL is the original look. */
 enum class ReaderLineSpacing { TIGHT, NORMAL, LOOSE }
+
+/**
+ * What swiping a library row does (Settings, "Swipe actions"). [ARCHIVE] moves the row to the Archive,
+ * or back to My List when it is already archived; [TAGS] opens the tag editor; [NONE] disables the direction.
+ */
+enum class SwipeAction { ARCHIVE, FAVORITE, TAGS, NONE }

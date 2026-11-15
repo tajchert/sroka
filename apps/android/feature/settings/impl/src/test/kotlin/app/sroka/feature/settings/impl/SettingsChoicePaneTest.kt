@@ -11,6 +11,7 @@ import androidx.compose.ui.test.isDialog
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SessionState
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.testing.fake.FakeAccountRepository
 import app.sroka.core.testing.fake.FakeAuthRepository
@@ -57,6 +58,22 @@ class SettingsChoicePaneTest {
         showChoice(SettingsChoiceKind.ReaderTheme)
         compose.onNodeWithText("Sepia").performClick()
         assertEquals(ReaderTheme.SEPIA, settings.preferencesFlow.value.readerTheme)
+    }
+
+    @Test
+    fun swipePagesApplyChoicesPerDirection() {
+        showChoice(SettingsChoiceKind.SwipeRight)
+        compose.onNodeWithText("Tags").performClick()
+        assertEquals(SwipeAction.TAGS, settings.preferencesFlow.value.swipeRightAction)
+        assertEquals(SwipeAction.ARCHIVE, settings.preferencesFlow.value.swipeLeftAction)
+    }
+
+    @Test
+    fun swipeLeftPageMarksTheCurrentChoice() {
+        showChoice(SettingsChoiceKind.SwipeLeft)
+        compose.onNodeWithText("None").performClick()
+        assertEquals(SwipeAction.NONE, settings.preferencesFlow.value.swipeLeftAction)
+        assertEquals(SwipeAction.NONE, settings.preferencesFlow.value.swipeRightAction)
     }
 
     @Test

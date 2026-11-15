@@ -12,6 +12,7 @@ import app.sroka.core.model.ReaderFont
 import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,9 @@ class UserPreferencesDataSource @Inject constructor(
                 readerFont = p[READER_FONT]?.let { enumValueOrNull<ReaderFont>(it) } ?: defaults.readerFont,
                 readerLineSpacing = p[READER_LINE_SPACING]?.let { enumValueOrNull<ReaderLineSpacing>(it) } ?: defaults.readerLineSpacing,
                 sortOrder = p[SORT_ORDER]?.let { enumValueOrNull<SortOrder>(it) } ?: defaults.sortOrder,
+                swipeLeftAction = p[SWIPE_LEFT]?.let { enumValueOrNull<SwipeAction>(it) } ?: defaults.swipeLeftAction,
+                swipeRightAction = p[SWIPE_RIGHT]?.let { enumValueOrNull<SwipeAction>(it) } ?: defaults.swipeRightAction,
+                swipeHintShown = p[SWIPE_HINT_SHOWN] ?: defaults.swipeHintShown,
                 serverUrl = p[SERVER_URL],
             )
         }
@@ -68,6 +72,12 @@ class UserPreferencesDataSource @Inject constructor(
 
     suspend fun setSortOrder(value: SortOrder) = dataStore.edit { it[SORT_ORDER] = value.name }
 
+    suspend fun setSwipeLeftAction(value: SwipeAction) = dataStore.edit { it[SWIPE_LEFT] = value.name }
+
+    suspend fun setSwipeRightAction(value: SwipeAction) = dataStore.edit { it[SWIPE_RIGHT] = value.name }
+
+    suspend fun setSwipeHintShown() = dataStore.edit { it[SWIPE_HINT_SHOWN] = true }
+
     /** null clears the override (build default server). */
     suspend fun setServerUrl(value: String?) = dataStore.edit {
         if (value == null) it.remove(SERVER_URL) else it[SERVER_URL] = value
@@ -82,6 +92,9 @@ class UserPreferencesDataSource @Inject constructor(
         val READER_FONT = stringPreferencesKey("reader_font")
         val READER_LINE_SPACING = stringPreferencesKey("reader_line_spacing")
         val SORT_ORDER = stringPreferencesKey("sort_order")
+        val SWIPE_LEFT = stringPreferencesKey("swipe_left_action")
+        val SWIPE_RIGHT = stringPreferencesKey("swipe_right_action")
+        val SWIPE_HINT_SHOWN = booleanPreferencesKey("swipe_hint_shown")
         val SERVER_URL = stringPreferencesKey("server_url")
     }
 }

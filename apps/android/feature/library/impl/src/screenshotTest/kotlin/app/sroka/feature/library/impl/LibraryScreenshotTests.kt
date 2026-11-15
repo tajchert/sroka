@@ -62,7 +62,6 @@ private fun ListFixture(
             onAddLink = {},
             onOpenItem = {},
             onLongClick = {},
-            onArchive = {},
             selectedItemId = if (twoPane) "i2" else null,
             twoPane = twoPane,
             navRailShown = twoPane,

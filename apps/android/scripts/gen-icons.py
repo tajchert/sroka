@@ -18,6 +18,7 @@ ICONS = [
     ("ArchiveFilled", "archive", 1, False),
     ("ArrowBack", "arrow_back", 0, True),
     ("Article", "article", 0, True),
+    ("Block", "block", 0, False),
     ("BookmarkAdded", "bookmark_added", 0, False),
     ("Bookmarks", "bookmarks", 0, False),
     ("BookmarksFilled", "bookmarks", 1, False),

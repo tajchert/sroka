@@ -27,6 +27,7 @@ import app.sroka.core.model.PdfUploadState
 import app.sroka.core.model.SaveResult
 import app.sroka.core.model.SessionState
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.SyncErrorKind
 import app.sroka.core.model.SyncPhase
 import app.sroka.core.model.SyncStatus
@@ -146,6 +147,21 @@ internal fun archiveMessage(archived: Boolean, offline: Boolean): Int = when {
     else -> R.string.feature_library_snack_unarchived
 }
 
+/** The physical edge a row is swiped towards (not layout-direction relative: Settings says "left"/"right"). */
+enum class SwipeSide { LEFT, RIGHT }
+
+/**
+ * What the row swipes do and whether the one-time peek still has to play. [hintShown] is true until
+ * the stored preference has loaded, so returning users never see a flash of the hint.
+ */
+data class SwipeConfig(
+    val left: SwipeAction = SwipeAction.ARCHIVE,
+    val right: SwipeAction = SwipeAction.NONE,
+    val hintShown: Boolean = true,
+) {
+    fun actionFor(side: SwipeSide): SwipeAction = if (side == SwipeSide.LEFT) left else right
+}
+
 /** Reverts a swipe action. */
 sealed interface UndoAction {
     data class Status(val id: String, val previous: ItemStatus) : UndoAction
@@ -248,6 +264,31 @@ class LibraryListViewModel @Inject constructor(
 
     val events: Flow<ListEvent> = eventChannel.receiveAsFlow()
 
+    /** Row swipe settings (Settings > Swipe actions) and the one-time peek flag. */
+    val swipeConfig: StateFlow<SwipeConfig> = settings.preferences
+        .map { SwipeConfig(it.swipeLeftAction, it.swipeRightAction, it.swipeHintShown) }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SwipeConfig())
+
+    /**
+     * A row was swiped towards [side]: runs the configured action and returns it. [SwipeAction.TAGS]
+     * does nothing here; the screen opens the tag editor for [item]. The row itself always springs back.
+     */
+    fun swipe(side: SwipeSide, item: ItemSummary): SwipeAction {
+        val action = swipeConfig.value.actionFor(side)
+        when (action) {
+            SwipeAction.ARCHIVE -> toggleArchive(item.id, item.status)
+            SwipeAction.FAVORITE -> toggleFavorite(item.id, item.isFavorite)
+            SwipeAction.TAGS, SwipeAction.NONE -> Unit
+        }
+        return action
+    }
+
+    /** The swipe peek has played (or was skipped): never play it again. */
+    fun markSwipeHintShown() {
+        viewModelScope.launch { settings.setSwipeHintShown() }
+    }
+
     /** PDF uploads, oldest first (drives the "Uploading N PDFs" cards). */
     val uploads: StateFlow<List<PdfUpload>> = uploader.uploads
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -301,7 +342,7 @@ class LibraryListViewModel @Inject constructor(
         selectedId.value = null
     }
 
-    /** Swipe end to start: archive, or move back to My List when [ItemSummary.status] is archived. */
+    /** Archive, or move back to My List when [current] is archived (a swipe, the item sheet). */
     fun toggleArchive(id: String, current: ItemStatus) {
         val target = if (current == ItemStatus.UNREAD) ItemStatus.ARCHIVED else ItemStatus.UNREAD
         val offline = uiState.value.sync.phase is SyncPhase.Offline
@@ -316,7 +357,7 @@ class LibraryListViewModel @Inject constructor(
         }
     }
 
-    /** Swipe start to end: toggle favorite. */
+    /** Toggle favorite (a swipe, the item sheet). */
     fun toggleFavorite(id: String, current: Boolean) {
         viewModelScope.launch {
             library.setFavorite(id, !current)

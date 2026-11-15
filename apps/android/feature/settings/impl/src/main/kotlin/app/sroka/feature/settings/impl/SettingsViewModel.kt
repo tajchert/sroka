@@ -14,6 +14,7 @@ import app.sroka.core.domain.SyncController
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SessionState
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UrlNormalizer
 import app.sroka.core.model.UserPreferences
@@ -102,6 +103,12 @@ class SettingsViewModel @Inject constructor(
     fun setCrashReports(enabled: Boolean) = viewModelScope.launch { consent.setCrashReports(enabled) }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settings.setThemeMode(mode) }
+
+    /** Action of a row swipe towards the left edge of the screen. */
+    fun setSwipeLeftAction(action: SwipeAction) = viewModelScope.launch { settings.setSwipeLeftAction(action) }
+
+    /** Action of a row swipe towards the right edge of the screen. */
+    fun setSwipeRightAction(action: SwipeAction) = viewModelScope.launch { settings.setSwipeRightAction(action) }
 
     fun setReaderTheme(theme: ReaderTheme) = viewModelScope.launch { settings.setReaderTheme(theme) }
 

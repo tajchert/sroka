@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.ReaderFont
 import app.sroka.core.model.ReaderLineSpacing
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import kotlinx.coroutines.flow.first
@@ -13,6 +14,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -77,5 +80,42 @@ class UserPreferencesDataSourceTest {
     fun unknownEnumFallsBackToDefault() = scope.runTest {
         dataStore.edit { it[stringPreferencesKey("theme_mode")] = "NEON" }
         assertEquals(ThemeMode.SYSTEM, source.userPreferences.first().themeMode)
+    }
+
+    @Test
+    fun swipeActionsDefaultToTheOriginalBehaviour() = scope.runTest {
+        val prefs = source.userPreferences.first()
+        assertEquals(SwipeAction.ARCHIVE, prefs.swipeLeftAction)
+        assertEquals(SwipeAction.NONE, prefs.swipeRightAction)
+        assertFalse(prefs.swipeHintShown)
+    }
+
+    @Test
+    fun swipeActionsRoundTrip() = scope.runTest {
+        source.setSwipeLeftAction(SwipeAction.TAGS)
+        source.setSwipeRightAction(SwipeAction.FAVORITE)
+        val prefs = source.userPreferences.first()
+        assertEquals(SwipeAction.TAGS, prefs.swipeLeftAction)
+        assertEquals(SwipeAction.FAVORITE, prefs.swipeRightAction)
+        // Stored by name.
+        assertEquals("TAGS", dataStore.data.first()[stringPreferencesKey("swipe_left_action")])
+    }
+
+    @Test
+    fun unknownSwipeActionFallsBackToDefault() = scope.runTest {
+        dataStore.edit { it[stringPreferencesKey("swipe_left_action")] = "TELEPORT" }
+        dataStore.edit { it[stringPreferencesKey("swipe_right_action")] = "" }
+        val prefs = source.userPreferences.first()
+        assertEquals(SwipeAction.ARCHIVE, prefs.swipeLeftAction)
+        assertEquals(SwipeAction.NONE, prefs.swipeRightAction)
+    }
+
+    @Test
+    fun swipeHintShownPersistsAndStaysSet() = scope.runTest {
+        source.setSwipeHintShown()
+        source.setSwipeHintShown()
+        assertTrue(source.userPreferences.first().swipeHintShown)
+        // A second reader of the same file (a new process) sees it too.
+        assertTrue(UserPreferencesDataSource(dataStore).userPreferences.first().swipeHintShown)
     }
 }

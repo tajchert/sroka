@@ -71,24 +71,41 @@ class SaveSheetViewModel @Inject constructor(
     /** Turns true when the auto-dismiss timer elapsed without any interaction; the host then finishes. */
     val autoDismissed: StateFlow<Boolean> = _autoDismissed
 
+    private val _countingDown = MutableStateFlow(false)
+
+    /**
+     * True while the auto-dismiss timer runs: the sheet draws its countdown line from this. It turns false when
+     * the timer elapses or the user touches the sheet. Same timer as [autoDismissed], so the two cannot disagree.
+     */
+    val countingDown: StateFlow<Boolean> = _countingDown
+
     private var timer: Job? = null
+    private var timerEndsAtNanos = 0L
     private var started = false
     private var interacted = false
 
     private fun armTimer() {
         if (interacted) return
         timer?.cancel()
+        timerEndsAtNanos = System.nanoTime() + AUTO_DISMISS_MS * 1_000_000
+        _countingDown.value = true
         timer = viewModelScope.launch {
             delay(AUTO_DISMISS_MS)
+            _countingDown.value = false
             _autoDismissed.value = true
         }
     }
+
+    /** Share of [AUTO_DISMISS_MS] still left, so a recreated sheet (rotation) resumes the line where it was. */
+    fun remainingFraction(): Float =
+        ((timerEndsAtNanos - System.nanoTime()) / (AUTO_DISMISS_MS * 1_000_000f)).coerceIn(0f, 1f)
 
     /** Any touch on the sheet cancels the auto-dismiss for good. */
     fun onInteraction() {
         interacted = true
         timer?.cancel()
         timer = null
+        _countingDown.value = false
     }
 
     fun toggleFavorite() {
@@ -129,6 +146,8 @@ class SaveSheetViewModel @Inject constructor(
 
     private companion object {
         const val RECENT_TAGS = 20
-        const val AUTO_DISMISS_MS = 4_000L
     }
 }
+
+/** How long the share sheet stays up without a touch; its countdown line shrinks over exactly this long. */
+const val AUTO_DISMISS_MS = 4_000L

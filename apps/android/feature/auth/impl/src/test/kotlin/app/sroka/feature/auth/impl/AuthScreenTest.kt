@@ -84,11 +84,61 @@ class AuthScreenTest {
     }
 
     @Test
-    fun serverRowShowsHostAndOpensDialog() {
+    fun selfHostingLinkOpensDialogAndHidesDefaultHost() {
         val vm = setContent()
-        compose.onNodeWithText("Server").assertIsDisplayed()
-        compose.onNodeWithText("Change").performClick()
+        compose.onNodeWithText("Server").assertDoesNotExist()
+        compose.onNodeWithText("Change").assertDoesNotExist()
+        compose.onNodeWithText("Self-hosting?").performClick()
         assertEquals(true, vm.state.value.serverDialogOpen)
+    }
+
+    @Test
+    fun selfHostingLinkNamesCustomHost() {
+        settings.preferencesFlow.value = settings.preferencesFlow.value.copy(serverUrl = "https://read.example.org/")
+        setContent()
+        compose.waitForIdle()
+        compose.onNodeWithText("Self-hosting?").assertIsDisplayed()
+        compose.onNodeWithText("read.example.org").assertIsDisplayed()
+    }
+
+    @Test
+    fun codeStepHasNoServerRow() {
+        setContent()
+        toCodeStep()
+        compose.onNodeWithText("Self-hosting?").assertDoesNotExist()
+        compose.onNodeWithText("Use another email").assertIsDisplayed()
+    }
+
+    private fun codeScreen(code: String = "", pasteCode: String? = "481920", onCodeChange: (String) -> Unit = {}) {
+        compose.setContent {
+            AuthScreen(
+                state = AuthUiState(step = AuthStep.CODE, email = "a@b.co", code = code),
+                onEmailChange = {}, onSendCode = {}, onCodeChange = onCodeChange, onResend = {}, onChangeEmail = {},
+                onOpenServer = {}, onDismissServer = {}, onSaveServer = {},
+                pasteCode = pasteCode,
+            )
+        }
+    }
+
+    @Test
+    fun pasteChipFillsTheCode() {
+        var filled: String? = null
+        codeScreen(onCodeChange = { filled = it })
+        compose.onNodeWithText("Paste 481920").assertIsDisplayed()
+        compose.onNodeWithTag(PASTE_CHIP_TAG).performClick()
+        assertEquals("481920", filled)
+    }
+
+    @Test
+    fun pasteChipHiddenWithoutCodeOrOnceTyping() {
+        codeScreen(pasteCode = null)
+        compose.onNodeWithTag(PASTE_CHIP_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun pasteChipHiddenOnceFieldIsNotEmpty() {
+        codeScreen(code = "4")
+        compose.onNodeWithTag(PASTE_CHIP_TAG).assertDoesNotExist()
     }
 
     @Test

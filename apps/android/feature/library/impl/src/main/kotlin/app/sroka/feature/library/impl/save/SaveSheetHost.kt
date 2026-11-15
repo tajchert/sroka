@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -44,8 +46,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,26 +56,22 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sroka.core.designsystem.theme.srokaColors
 import app.sroka.core.model.Item
-import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.OfflineState
 import app.sroka.feature.library.impl.R
 import app.sroka.core.ui.tags.EditTagsSheet
 import coil3.compose.AsyncImage
 import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
 
 /**
  * Share-target UI (screens 07/08): a bottom sheet over the app the user shared from. Host it in the
  * translucent, `excludeFromRecents` ShareActivity inside the app theme and pass the `ACTION_SEND` extras.
- * It dismisses itself 4 s after showing unless the user touched it.
+ * It dismisses itself [AUTO_DISMISS_MS] after showing unless the user touched it; a thin line along its top edge
+ * counts that time down and disappears on the first touch.
  *
  * @param onFinish the sheet is done; finish the activity
  * @param onSignIn user chose "Sign in" while signed out; open the main activity
- * @param onOpenApp user chose "Open Sroka" / "Continue reading"; open the main activity, ideally on the
+ * @param onOpenApp user chose "Open" / "Continue reading"; open the main activity, ideally on the
  *   reader for [itemId], and finish
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +89,7 @@ fun SaveSheetHost(
     val item by viewModel.item.collectAsStateWithLifecycle()
     val recentTags by viewModel.recentTags.collectAsStateWithLifecycle()
     val autoDismissed by viewModel.autoDismissed.collectAsStateWithLifecycle()
+    val countingDown by viewModel.countingDown.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -102,20 +101,24 @@ fun SaveSheetHost(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onFinish, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onFinish,
+        sheetState = sheetState,
+        dragHandle = {
+            CountdownDragHandle(
+                running = countingDown,
+                durationMs = AUTO_DISMISS_MS,
+                startFraction = viewModel::remainingFraction,
+                onPress = viewModel::onInteraction,
+            )
+        },
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 8.dp)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.any { it.pressed }) viewModel.onInteraction()
-                        }
-                    }
-                },
+                .onAnyPress(viewModel::onInteraction),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             when (val s = state) {
@@ -128,9 +131,8 @@ fun SaveSheetHost(
                         JustSaved(
                             item = it,
                             onAddTags = { editing = true },
-                            onFavourite = viewModel::toggleFavorite,
+                            onFavorite = viewModel::toggleFavorite,
                             onOpen = { onOpenApp(s.itemId) },
-                            onDone = { closeSheet(scope, sheetState, onFinish) },
                         )
                     }
                     if (editing) {
@@ -183,19 +185,17 @@ private fun closeSheet(scope: kotlinx.coroutines.CoroutineScope, sheetState: She
 private fun JustSaved(
     item: Item?,
     onAddTags: () -> Unit,
-    onFavourite: () -> Unit,
+    onFavorite: () -> Unit,
     onOpen: () -> Unit,
-    onDone: () -> Unit,
 ) {
-    val downloaded = item?.offline == OfflineState.DOWNLOADED
     Header(
         icon = SrokaIcons.Check,
         circle = MaterialTheme.srokaColors.brand,
         iconTint = MaterialTheme.srokaColors.onBrand,
         title = stringResource(R.string.feature_library_share_saved),
-        sub = stringResource(
-            if (downloaded) R.string.feature_library_share_sub_saved else R.string.feature_library_share_sub_downloading,
-        ),
+        sub = null,
+        // Ring around the check while the offline copy is still on its way.
+        downloading = item != null && item.offline != OfflineState.DOWNLOADED,
     )
     if (item != null) {
         ItemCard(item) {
@@ -213,10 +213,10 @@ private fun JustSaved(
             )
         }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         AssistChip(
             onClick = onAddTags,
-            label = { Text(stringResource(R.string.feature_library_share_add_tags)) },
+            label = { Text(stringResource(R.string.feature_library_share_tags), maxLines = 1) },
             leadingIcon = {
                 Icon(SrokaIcons.NewLabel, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             },
@@ -226,8 +226,8 @@ private fun JustSaved(
         val fav = item?.isFavorite == true
         FilterChip(
             selected = fav,
-            onClick = onFavourite,
-            label = { Text(stringResource(R.string.feature_library_share_favourite)) },
+            onClick = onFavorite,
+            label = { Text(stringResource(R.string.feature_library_share_favorite), maxLines = 1) },
             leadingIcon = {
                 Icon(
                     if (fav) SrokaIcons.StarFilled else SrokaIcons.Star,
@@ -239,32 +239,19 @@ private fun JustSaved(
             enabled = item != null,
             colors = FilterChipDefaults.filterChipColors(),
         )
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+        Spacer(Modifier.weight(1f))
         TextButton(onClick = onOpen) { Text(stringResource(R.string.feature_library_share_open)) }
-        Button(onClick = onDone) { Text(stringResource(R.string.feature_library_share_done)) }
     }
 }
 
 @Composable
 private fun AlreadySaved(item: Item?, onClose: () -> Unit, onContinue: () -> Unit) {
-    val inArchive = item?.status == ItemStatus.ARCHIVED
-    val date = item?.let {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(Instant.ofEpochMilli(it.savedAt).atZone(ZoneId.systemDefault()))
-    }.orEmpty()
     Header(
         icon = SrokaIcons.BookmarkAdded,
         circle = MaterialTheme.colorScheme.surfaceContainerHighest,
         iconTint = MaterialTheme.colorScheme.onSurface,
         title = stringResource(R.string.feature_library_share_already_title),
-        sub = if (item == null) {
-            null
-        } else {
-            stringResource(
-                if (inArchive) R.string.feature_library_share_already_in_archive else R.string.feature_library_share_already_in_list,
-                date,
-            )
-        },
+        sub = null,
     )
     if (item != null) {
         val rp = readProgressOf(item)
@@ -301,11 +288,32 @@ private fun AlreadySaved(item: Item?, onClose: () -> Unit, onContinue: () -> Uni
     }
 }
 
+/**
+ * Round icon plus a title (and an optional second line). With [downloading] a progress ring circles the icon;
+ * the icon slot is the same size either way, so the sheet does not jump when the download ends.
+ */
 @Composable
-internal fun Header(icon: ImageVector, circle: Color, iconTint: Color, title: String, sub: String?) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(circle), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = iconTint)
+internal fun Header(
+    icon: ImageVector,
+    circle: Color,
+    iconTint: Color,
+    title: String,
+    sub: String?,
+    downloading: Boolean = false,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(circle), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = iconTint)
+            }
+            if (downloading) {
+                val label = stringResource(R.string.feature_library_share_downloading)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(46.dp).semantics { contentDescription = label },
+                    color = MaterialTheme.srokaColors.brand,
+                    strokeWidth = 2.dp,
+                )
+            }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge)

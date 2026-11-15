@@ -16,3 +16,6 @@ wrangler.dev.jsonc
 apps/extension/analytics.config.json
 # Firebase web config (D15): local only, see apps/web/firebase.config.example.json
 apps/web/firebase.config.json
+
+# Store upload binaries (zip/aab), staged locally
+store/upload/

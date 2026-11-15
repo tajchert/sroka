@@ -39,6 +39,8 @@ data class AuthUiState(
     val resendSeconds: Int = 0,
     /** Effective server URL shown in the advanced dialog. */
     val serverUrl: String = "",
+    /** A self-hosted server is configured, so the email step names its host next to "Self-hosting?". */
+    val customServer: Boolean = false,
     val serverDialogOpen: Boolean = false,
     val serverUrlInvalid: Boolean = false,
 )
@@ -70,7 +72,7 @@ class AuthViewModel @Inject constructor(
                 _state.update { if (it.email.isEmpty()) it.copy(email = s.email) else it }
             }
             val custom = settings.preferences.first().serverUrl
-            _state.update { it.copy(serverUrl = custom ?: settings.defaultServerUrl) }
+            _state.update { it.copy(serverUrl = custom ?: settings.defaultServerUrl, customServer = custom != null) }
         }
     }
 
@@ -181,6 +183,7 @@ class AuthViewModel @Inject constructor(
                         serverDialogOpen = false,
                         serverUrlInvalid = false,
                         serverUrl = url.ifEmpty { settings.defaultServerUrl },
+                        customServer = url.isNotEmpty(),
                     )
                 } else {
                     it.copy(serverUrlInvalid = true)

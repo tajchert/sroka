@@ -13,12 +13,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.Alignment
@@ -69,6 +69,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -78,8 +79,10 @@ import app.sroka.core.domain.AuthError
 @Composable
 fun AuthRoute(viewModel: AuthViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val clipboardCode = rememberClipboardCode(enabled = state.step == AuthStep.CODE)
     AuthScreen(
         state = state,
+        pasteCode = clipboardCode,
         onEmailChange = viewModel::onEmailChange,
         onSendCode = viewModel::sendCode,
         onCodeChange = viewModel::onCodeChange,
@@ -102,13 +105,27 @@ fun AuthScreen(
     onOpenServer: () -> Unit,
     onDismissServer: () -> Unit,
     onSaveServer: (String) -> Unit,
+    /** A 6-digit code found on the clipboard; offered as a "Paste 481920" chip while the field is empty. */
+    pasteCode: String? = null,
 ) {
+    // The code the user already pasted, so a wrong one is not offered again after the field clears.
+    var pastedCode by remember { mutableStateOf<String?>(null) }
     Surface(Modifier.fillMaxSize()) {
         when (state.step) {
             AuthStep.EMAIL -> EmailStep(state, onEmailChange, onSendCode, onOpenServer)
             AuthStep.CODE -> {
                 BackHandler(onBack = onChangeEmail)
-                CodeStep(state, onCodeChange, onResend, onChangeEmail)
+                CodeStep(
+                    state = state,
+                    pasteCode = pasteCode?.takeIf { it != pastedCode },
+                    onCodeChange = onCodeChange,
+                    onPaste = { code ->
+                        pastedCode = code
+                        onCodeChange(code)
+                    },
+                    onResend = onResend,
+                    onChangeEmail = onChangeEmail,
+                )
             }
         }
     }
@@ -158,23 +175,28 @@ private fun EmailStep(
                     }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ListItem(
-                modifier = Modifier.padding(horizontal = 8.dp),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                leadingContent = {
-                    Icon(
-                        SrokaIcons.Dns,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                headlineContent = { Text(stringResource(R.string.feature_auth_server_row)) },
-                supportingContent = { Text(serverHost(state.serverUrl)) },
-                trailingContent = {
-                    TextButton(onClick = onOpenServer) { Text(stringResource(R.string.feature_auth_change_server)) }
-                },
-            )
+            SelfHostingLink(state, onOpenServer)
+        }
+    }
+}
+
+/** Low-emphasis entry to the server dialog; names the host when a self-hosted server is already set. */
+@Composable
+private fun SelfHostingLink(state: AuthUiState, onOpenServer: () -> Unit) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(Modifier.fillMaxWidth().padding(bottom = 8.dp), contentAlignment = Alignment.Center) {
+        TextButton(onClick = onOpenServer, colors = ButtonDefaults.textButtonColors(contentColor = color)) {
+            Text(stringResource(R.string.feature_auth_self_hosting), style = MaterialTheme.typography.labelMedium)
+            if (state.customServer) {
+                Text(
+                    serverHost(state.serverUrl),
+                    modifier = Modifier.padding(start = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -232,7 +254,9 @@ internal fun serverHost(url: String): String =
 @Composable
 private fun CodeStep(
     state: AuthUiState,
+    pasteCode: String?,
     onCodeChange: (String) -> Unit,
+    onPaste: (String) -> Unit,
     onResend: () -> Unit,
     onChangeEmail: () -> Unit,
 ) {
@@ -267,7 +291,7 @@ private fun CodeStep(
                             CodeHeader(state)
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                            CodeForm(state, onCodeChange, onResend, onChangeEmail)
+                            CodeForm(state, pasteCode, onCodeChange, onPaste, onResend, onChangeEmail)
                         }
                     }
                 } else {
@@ -277,7 +301,7 @@ private fun CodeStep(
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         CodeHeader(state)
-                        CodeForm(state, onCodeChange, onResend, onChangeEmail)
+                        CodeForm(state, pasteCode, onCodeChange, onPaste, onResend, onChangeEmail)
                     }
                 }
             }
@@ -310,7 +334,9 @@ private fun CodeHeader(state: AuthUiState) {
 @Composable
 private fun CodeForm(
     state: AuthUiState,
+    pasteCode: String?,
     onCodeChange: (String) -> Unit,
+    onPaste: (String) -> Unit,
     onResend: () -> Unit,
     onChangeEmail: () -> Unit,
 ) {
@@ -322,6 +348,14 @@ private fun CodeForm(
             isError = state.error != null,
             refocusKey = state.error,
         )
+        if (pasteCode != null && state.code.isEmpty() && !state.loading) {
+            AssistChip(
+                onClick = { onPaste(pasteCode) },
+                label = { Text(stringResource(R.string.feature_auth_paste_code, pasteCode)) },
+                leadingIcon = { Icon(ClipboardIcon, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                modifier = Modifier.testTag(PASTE_CHIP_TAG),
+            )
+        }
         if (state.loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -412,6 +446,7 @@ internal fun OtpInput(
 }
 
 internal const val OTP_TAG = "otp_input"
+internal const val PASTE_CHIP_TAG = "paste_code_chip"
 
 @Composable
 private fun ErrorText(error: AuthError?) {

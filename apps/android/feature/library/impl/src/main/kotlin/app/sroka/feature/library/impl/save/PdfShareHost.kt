@@ -17,6 +17,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -45,17 +48,30 @@ fun PdfShareHost(
     LaunchedEffect(uris) { viewModel.start(uris) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    LaunchedEffect(state) {
-        if (state is PdfShareState.Queued || state is PdfShareState.Duplicate || state is PdfShareState.Saved) {
-            // Queued waits longer: the server's saved / duplicate answer replaces it and restarts this timer.
-            delay(if (state is PdfShareState.Queued) QUEUED_DISMISS_MS else AUTO_DISMISS_MS)
+    // Like the link sheet: the first touch keeps it open and removes the countdown line.
+    var touched by remember { mutableStateOf(false) }
+    val dismissMs = if (touched) null else dismissDelayMs(state)
+    LaunchedEffect(dismissMs, state) {
+        if (dismissMs != null) {
+            delay(dismissMs)
             sheetState.hide()
             onFinish()
         }
     }
-    ModalBottomSheet(onDismissRequest = onFinish, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onFinish,
+        sheetState = sheetState,
+        // Same countdown line as the link sheet, driven by the same delay that finishes this one.
+        dragHandle = {
+            CountdownDragHandle(running = dismissMs != null, durationMs = dismissMs ?: 0L, restartKey = state, onPress = { touched = true })
+        },
+    ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp),
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .onAnyPress { touched = true },
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             when (val s = state) {
@@ -117,6 +133,16 @@ fun PdfShareHost(
     }
 }
 
-private const val AUTO_DISMISS_MS = 2_500L
+/**
+ * How long the sheet stays after reaching [state], or null while it must stay. Queued waits longer: the server's
+ * saved / duplicate answer replaces it and restarts the timer.
+ */
+private fun dismissDelayMs(state: PdfShareState): Long? = when (state) {
+    is PdfShareState.Queued -> QUEUED_DISMISS_MS
+    is PdfShareState.Duplicate, is PdfShareState.Saved -> PDF_AUTO_DISMISS_MS
+    else -> null
+}
+
+private const val PDF_AUTO_DISMISS_MS = 2_500L
 private const val QUEUED_DISMISS_MS = 8_000L
 

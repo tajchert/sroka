@@ -58,7 +58,7 @@ class SaveSheetTest {
     }
 
     @Test
-    fun favouriteToggles() {
+    fun favoriteToggles() {
         val vm = vm()
         val job = vm.keepItemHot()
         vm.start("https://example.com/x", null)
@@ -80,6 +80,42 @@ class SaveSheetTest {
         dispatcher.scheduler.advanceTimeBy(200)
         dispatcher.scheduler.runCurrent()
         assertTrue(vm.autoDismissed.value)
+    }
+
+    @Test
+    fun countdownRunsWithTheTimerAndStopsWhenItElapses() {
+        val vm = vm()
+        assertFalse(vm.countingDown.value)
+        vm.start("https://example.com/x", null)
+        assertTrue(vm.countingDown.value)
+        dispatcher.scheduler.advanceTimeBy(3_900)
+        dispatcher.scheduler.runCurrent()
+        assertTrue(vm.countingDown.value)
+        dispatcher.scheduler.advanceTimeBy(200)
+        dispatcher.scheduler.runCurrent()
+        assertFalse(vm.countingDown.value)
+        assertTrue(vm.autoDismissed.value)
+    }
+
+    @Test
+    fun touchStopsTheCountdownForGood() {
+        val vm = vm()
+        vm.start("https://example.com/x", null)
+        assertTrue(vm.countingDown.value)
+        vm.onInteraction()
+        assertFalse(vm.countingDown.value)
+        dispatcher.scheduler.advanceTimeBy(10_000)
+        dispatcher.scheduler.runCurrent()
+        assertFalse(vm.countingDown.value)
+        assertFalse(vm.autoDismissed.value)
+    }
+
+    @Test
+    fun touchBeforeSaveFinishesNeverStartsTheCountdown() {
+        val vm = vm()
+        vm.onInteraction()
+        vm.start("https://example.com/x", null)
+        assertFalse(vm.countingDown.value)
     }
 
     @Test

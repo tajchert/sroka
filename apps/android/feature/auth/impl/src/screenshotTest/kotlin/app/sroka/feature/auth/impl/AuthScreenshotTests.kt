@@ -92,3 +92,42 @@ fun SignInCodeStep() {
         )
     }
 }
+
+@PreviewTest
+@Preview(name = "Phone", widthDp = 412, heightDp = 800, apiLevel = 36, showBackground = true)
+@Composable
+fun SignInEmailStepSelfHosted() {
+    SrokaTheme(darkTheme = false) {
+        AuthScreen(
+            state = AuthUiState(email = "magpie@example.com", serverUrl = "https://read.example.org", customServer = true),
+            onEmailChange = {},
+            onSendCode = {},
+            onCodeChange = {},
+            onResend = {},
+            onChangeEmail = {},
+            onOpenServer = {},
+            onDismissServer = {},
+            onSaveServer = {},
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Phone", widthDp = 412, heightDp = 800, apiLevel = 36, showBackground = true)
+@Composable
+fun SignInCodeStepPasteChip() {
+    SrokaTheme(darkTheme = true) {
+        AuthScreen(
+            state = AuthUiState(step = AuthStep.CODE, email = "magpie@example.com", serverUrl = "https://api.sroka.app"),
+            onEmailChange = {},
+            onSendCode = {},
+            onCodeChange = {},
+            onResend = {},
+            onChangeEmail = {},
+            onOpenServer = {},
+            onDismissServer = {},
+            onSaveServer = {},
+            pasteCode = "481920",
+        )
+    }
+}

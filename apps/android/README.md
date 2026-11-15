@@ -5,11 +5,14 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
 
 ## Features
 
-- **Sign in** with an email code (6 digits, autofill/paste, auto-submit, resend cooldown). The session token is
+- **Sign in** with an email code (6 digits, autofill, auto-submit, resend cooldown). When the clipboard holds exactly
+  a 6-digit code, a "Paste 481920" chip under the boxes fills and submits it. The server URL lives behind a
+  low-emphasis "Self-hosting?" link on the email step (it names the host once a custom server is set). The session token is
   encrypted with an AndroidKeyStore key and never backed up. An expired session keeps the library usable and shows a
   "Sign in again" banner.
-- **Save**: share any link to Sroka from another app (translucent "Save to Sroka" sheet with title and tag
-  suggestions), or tap *Add* (clipboard prefill). Saving works offline and syncs later; re-saving a URL moves it back
+- **Save**: share any link to Sroka from another app (a "Saved" bottom sheet with a Tags chip, a Favorite chip and
+  *Open*; a thin line along its top edge counts down the 4 s auto-dismiss and vanishes on the first touch; a progress
+  ring around the check shows the offline download), or tap *Add* (clipboard prefill). Saving works offline and syncs later; re-saving a URL moves it back
   to My List.
 - **Library**: My List · Archive · Favorites · Tags (bottom bar on phones, rail on larger windows). Paged lists with
   thumbnails and offline badges, swipe to archive or favorite (with undo), long-press actions (favorite, archive,

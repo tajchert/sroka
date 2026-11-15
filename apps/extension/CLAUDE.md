@@ -1,6 +1,6 @@
 # @sroka/extension — WXT MV3 Chrome extension
 
-Popup (sign-in email → 6-box code, saving → saved (one screen, crossfade) with tags/favourite/remove/open, tag editor, removed, queued/failed), context menus (save link/page; right-click the toolbar icon → "Open Sroka" opens `${appOrigin}/app/` in a new tab via `lib/open-app.ts`; while the active tab's page is saved it also shows "Open in Sroka" (`/app/item/:id`) and "Remove from Sroka" — visibility synced in `paintBadge`/`syncItemMenu` (`lib/badge.ts`), handlers in `lib/item-menu.ts`), per-tab badge, retry queue, options page.
+Popup (sign-in email → 6-box code, saving → saved (one screen, crossfade; header "Saved"/"Already saved", tags row, one row with Favorite toggle + "Open", Remove in the header "⋯" menu; closes itself after 3 s, see below), tag editor, removed, queued/failed), context menus (save link/page; right-click the toolbar icon → "Open Sroka" opens `${appOrigin}/app/` in a new tab via `lib/open-app.ts`; while the active tab's page is saved it also shows "Open in Sroka" (`/app/item/:id`) and "Remove from Sroka" — visibility synced in `paintBadge`/`syncItemMenu` (`lib/badge.ts`), handlers in `lib/item-menu.ts`), per-tab badge, retry queue, options page.
 
 ## Commands
 - `npm run dev -w @sroka/extension` · `npm run build -w @sroka/extension` → `.output/chrome-mv3` · `npm run zip -w @sroka/extension`
@@ -8,8 +8,10 @@ Popup (sign-in email → 6-box code, saving → saved (one screen, crossfade) wi
 - `npm run typecheck -w @sroka/extension` (runs `wxt prepare` first) · `npm test -w @sroka/extension`
 
 ## Key files
-- Popup implements Claude Design "Sroka Popup"/"Sroka Extension" (dark only, 340px): `entrypoints/popup/App.tsx` + `assets/popup.css`. Options page uses `assets/tailwind.css` (light/dark). Brand mark + glyph in `components/Mark.tsx`.
+- Popup implements Claude Design "Sroka Popup"/"Sroka Extension" (340px; light by default, dark under `prefers-color-scheme: dark`, tokens at the top of the CSS): `entrypoints/popup/App.tsx` + `assets/popup.css`. Options page uses `assets/tailwind.css` (light/dark). Brand mark + glyph in `components/Mark.tsx`.
 - `wxt.config.ts` (manifest, permissions, dev host permission for localhost:8787), `entrypoints/background.ts`, `entrypoints/popup/*`, `entrypoints/options/*`, `assets/tailwind.css`.
+
+Saved-popup behaviour: `lib/auto-close.ts` (pure timer: `start`/`hold`/`release`/`cancel`, vitest with fake timers) closes the popup 3 s after the saved state shows (new or already saved). Hover or keyboard focus pauses it; any click/keypress cancels it for good until the next save; it never runs in any other phase nor while the consent or failed-saves card shows; reduced-motion hides the shrinking line but still closes. Manifest `commands._execute_action` (suggested Alt+Shift+S) opens the popup; `lib/shortcut.ts` reads the real binding via `chrome.commands.getAll()` and the popup shows it once (`sroka.shortcutHint.v1`), only if bound. Failed-save wording lives in `lib/save-failure.ts` (body never repeats the title). US spelling "Favorite" everywhere.
 
 ## Decisions that apply
 D8 (features, server URL option default `https://api.sroka.app`; when the user saves a custom URL the options page must call `chrome.permissions.request({ origins: [new URL(url).origin + "/*"] })` — allowed by `optional_host_permissions` — and refuse to save if denied; "Open library" opens `${appOrigin}/app/` from `GET /v1/config`), D4 (bearer token from `set-auth-token` header, `chrome.storage.local`), D1.

@@ -57,8 +57,11 @@ internal enum class RowStatus {
     /** The server could not save the text: "Couldn't save the text" (the retry button shows too). */
     FAILED,
 
-    /** Partial copy of the page: "Partial copy". ("Preview only" needs the parse error, not on [ItemSummary].) */
+    /** Partial copy of the page: "Partial copy". */
     PARTIAL,
+
+    /** Partial copy because the page is for subscribers (`paywalled`): "Preview only". */
+    PREVIEW_ONLY,
 
     /** The server is still parsing the page: "Preparing…". */
     PREPARING,
@@ -74,12 +77,16 @@ internal enum class RowStatus {
 internal fun rowStatus(item: ItemSummary): RowStatus? = when {
     item.pendingChange != null -> RowStatus.SYNC_PENDING
     item.parseStatus == ParseStatus.FAILED -> RowStatus.FAILED
+    item.parseStatus == ParseStatus.PARTIAL && item.parseError == PAYWALLED -> RowStatus.PREVIEW_ONLY
     item.parseStatus == ParseStatus.PARTIAL -> RowStatus.PARTIAL
     item.parseStatus == ParseStatus.PENDING -> RowStatus.PREPARING
     item.offline == OfflineState.DOWNLOADING || item.offline == OfflineState.QUEUED -> RowStatus.DOWNLOADING
     item.offline == OfflineState.AVAILABLE_REMOTE -> RowStatus.NOT_DOWNLOADED
     else -> null
 }
+
+/** Server parse error of a subscriber-only page. */
+private const val PAYWALLED = "paywalled"
 
 /** Reading progress below this (2%) counts as unread; at or above [READ_FROM] as read. */
 internal const val IN_PROGRESS_FROM = 0.02f
@@ -218,12 +225,13 @@ private fun StatusBadge(status: RowStatus, ringColor: Color, modifier: Modifier 
         RowStatus.SYNC_PENDING -> SrokaIcons.Sync to R.string.feature_library_status_sync_waiting
         RowStatus.FAILED -> SrokaIcons.ErrorFilled to R.string.feature_library_status_failed
         RowStatus.PARTIAL -> SrokaIcons.WarningFilled to R.string.feature_library_status_partial
+        RowStatus.PREVIEW_ONLY -> SrokaIcons.Lock to R.string.feature_library_status_preview_only
         RowStatus.PREPARING -> SrokaIcons.Schedule to R.string.feature_library_status_preparing // not drawn: spinner
         RowStatus.DOWNLOADING -> SrokaIcons.Download to R.string.feature_library_status_downloading_badge
         RowStatus.NOT_DOWNLOADED -> SrokaIcons.CloudOff to R.string.feature_library_status_not_on_device
     }
     val (container: Color, content: Color) = when (status) {
-        RowStatus.SYNC_PENDING, RowStatus.PARTIAL, RowStatus.PREPARING -> extended.warningContainer to extended.warning
+        RowStatus.SYNC_PENDING, RowStatus.PARTIAL, RowStatus.PREVIEW_ONLY, RowStatus.PREPARING -> extended.warningContainer to extended.warning
         RowStatus.FAILED -> scheme.errorContainer to scheme.onErrorContainer
         RowStatus.DOWNLOADING -> scheme.primaryContainer to scheme.onPrimaryContainer
         RowStatus.NOT_DOWNLOADED -> scheme.surfaceContainerHighest to scheme.onSurfaceVariant

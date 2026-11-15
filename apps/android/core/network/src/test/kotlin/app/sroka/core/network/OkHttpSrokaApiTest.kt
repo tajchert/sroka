@@ -64,11 +64,19 @@ class OkHttpSrokaApiTest {
         val r = api.me() as ApiResult.Success
         assertEquals("a@b.c", r.value.user.email)
         assertEquals(2, r.value.stats.unread)
+        assertEquals(null, r.value.clients)
         val req = server.takeRequest()
         assertEquals("/v1/me", req.url.encodedPath)
         assertEquals("Bearer tok.en==", req.headers["Authorization"])
         assertEquals("and_dev1", req.headers["X-Sroka-Device"])
         assertEquals("Sroka-Android/1.0", req.headers["User-Agent"])
+    }
+
+    @Test
+    fun meDecodesConnectedClients() = runBlocking {
+        json("""{"user":{"id":"u","email":"a@b.c"},"clients":{"extension":true,"android":false}}""")
+        val r = api.me() as ApiResult.Success
+        assertEquals(MeClientsDto(extension = true, android = false), r.value.clients)
     }
 
     @Test

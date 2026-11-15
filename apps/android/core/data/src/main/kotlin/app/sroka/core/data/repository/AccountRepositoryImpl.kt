@@ -2,6 +2,7 @@ package app.sroka.core.data.repository
 
 import app.sroka.core.datastore.SessionStore
 import app.sroka.core.domain.AccountRepository
+import app.sroka.core.domain.ConnectedClients
 import app.sroka.core.domain.DeleteAccountResult
 import app.sroka.core.domain.RemoteFailure
 import app.sroka.core.network.ApiResult
@@ -15,6 +16,14 @@ internal class AccountRepositoryImpl @Inject constructor(
     private val sessionStore: SessionStore,
     private val auth: AuthRepositoryImpl,
 ) : AccountRepository {
+
+    override suspend fun connectedClients(): ConnectedClients? = when (val r = api.me()) {
+        is ApiResult.Success -> ConnectedClients(
+            extension = r.value.clients?.extension == true,
+            android = r.value.clients?.android == true,
+        )
+        else -> null
+    }
 
     override suspend fun deleteAccount(): DeleteAccountResult = when (val r = api.deleteAccount()) {
         is ApiResult.Success -> {

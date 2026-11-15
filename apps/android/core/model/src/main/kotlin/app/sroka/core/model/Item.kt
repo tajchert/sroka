@@ -71,6 +71,8 @@ data class ItemSummary(
     val pendingChange: PendingChange? = null,
     val kind: ItemKind = ItemKind.ARTICLE,
     val fileSize: Long? = null,
+    /** Server parse error code (`paywalled`, `bot_wall`, …), null if none. */
+    val parseError: String? = null,
 )
 
 /** Kind of local change waiting in `pending_ops` (R6). */
@@ -98,4 +100,5 @@ fun Item.toSummary(): ItemSummary = ItemSummary(
     pendingChange = pendingChange,
     kind = kind,
     fileSize = fileSize,
+    parseError = parseError,
 )

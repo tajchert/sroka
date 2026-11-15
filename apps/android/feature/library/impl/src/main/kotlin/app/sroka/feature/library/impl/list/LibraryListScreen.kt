@@ -85,6 +85,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -122,6 +124,9 @@ import kotlinx.coroutines.launch
  *   the list hides its own
  * @param detailCard the list is drawn inside the detail pane card (tag articles beside the tag list): transparent bars
  * @param addLinkRequested the rail's FAB was tapped: open the add-link dialog, then call [onAddLinkHandled]
+ * @param onTabChange home only: switches My List / Archive in place (the destination chips; on rail
+ *   layouts the rail switches and the chips are hidden)
+ * @param onOpenTags home only: the trailing Tags chip opens the Tags screen
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,9 +144,17 @@ fun LibraryListRoute(
     onAddLinkHandled: () -> Unit = {},
     detailCard: Boolean = false,
     scrollToTopSignal: Int = 0,
+    onTabChange: ((LibraryTab) -> Unit)? = null,
+    onOpenTags: (() -> Unit)? = null,
     viewModel: LibraryListViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(scope) { viewModel.setScope(scope) }
+    // Home filter chips: saved per entry, so they survive rotation, process death and tab switches.
+    var filters by rememberSaveable(stateSaver = ListFilters.Saver) { mutableStateOf(ListFilters()) }
+    LaunchedEffect(filters) { viewModel.setFilters(filters) }
+    val continueReading by viewModel.continueReading.collectAsStateWithLifecycle()
+    val topTags by viewModel.topTags.collectAsStateWithLifecycle()
+    val extensionConnected by viewModel.extensionConnected.collectAsStateWithLifecycle()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selected by viewModel.selectedItem.collectAsStateWithLifecycle()
     val recentTags by viewModel.recentTags.collectAsStateWithLifecycle()
@@ -164,6 +177,8 @@ fun LibraryListRoute(
     val currentOpenItem by rememberUpdatedState(onOpenItem)
     val currentSort by rememberUpdatedState(state.sort)
     ScrollToTopOn(scrollToTopSignal, listState)
+    // A new tab or filter is a different list: start it at the top.
+    ScrollToTopOnChange(scope to filters, listState)
     listState.FollowNewItemsToTop(
         firstKey = if (items.itemCount > 0) items.peek(0)?.id else null,
         newestFirst = state.sort == SortOrder.NEWEST,
@@ -295,6 +310,18 @@ fun LibraryListRoute(
     val isEmpty = items.loadState.refresh is LoadState.NotLoading && items.itemCount == 0
     val fetch = rememberWithNotificationPermission(viewModel::fetchNewArticles)
 
+    // Onboarding (empty My List): re-check the extension and the clipboard whenever it is shown or resumed.
+    val clipboardManager = remember(context) { context.getSystemService(android.content.ClipboardManager::class.java) }
+    var clipboardHasLink by remember { mutableStateOf(false) }
+    if (showsOnboarding(scope, filters, isEmpty)) {
+        LifecycleResumeEffect(Unit) {
+            viewModel.refreshConnectedClients()
+            clipboardHasLink = clipboardManager?.let(::clipboardMayHoldLink) == true
+            onPauseOrDispose {}
+        }
+    }
+    val uriHandler = LocalUriHandler.current
+
     LibraryListContent(
         scope = scope,
         state = state,
@@ -332,6 +359,21 @@ fun LibraryListRoute(
             pdfPicker.launch(arrayOf(PDF_MIME))
         },
         onDismissUploads = viewModel::dismissUploadFailures,
+        filters = filters,
+        onFiltersChange = { filters = it },
+        topTags = topTags,
+        onTabChange = onTabChange,
+        onOpenTags = onOpenTags,
+        continueReading = continueReading,
+        extensionDone = extensionConnected,
+        clipboardHasLink = clipboardHasLink,
+        onGetExtension = { runCatching { uriHandler.openUri(GET_EXTENSION_URL) } },
+        onSaveClipboard = {
+            coroutineScope.launch {
+                val url = clipboardManager?.let(::readClipboardLink)
+                if (url == null || !viewModel.addLink(url)) showAdd = true
+            }
+        },
     )
 
     selected?.let { item ->
@@ -418,29 +460,46 @@ fun LibraryListContent(
     uploadCards: List<UploadCard> = emptyList(),
     onRetryUpload: () -> Unit = {},
     onDismissUploads: () -> Unit = {},
+    filters: ListFilters = ListFilters(),
+    onFiltersChange: (ListFilters) -> Unit = {},
+    topTags: List<String> = emptyList(),
+    onTabChange: ((LibraryTab) -> Unit)? = null,
+    onOpenTags: (() -> Unit)? = null,
+    continueReading: List<ItemSummary> = emptyList(),
+    extensionDone: Boolean = false,
+    clipboardHasLink: Boolean = false,
+    onGetExtension: () -> Unit = {},
+    onSaveClipboard: () -> Unit = {},
 ) {
     val tab = (scope as? ListScope.Tab)?.tab
     val isTopLevel = tab != null
     val fabExpanded = isEmpty || listState.isScrollingUpOrAtTop()
+    val showStrip = tab == LibraryTab.MY_LIST && !filters.active && continueReading.isNotEmpty()
     Scaffold(
         modifier = dropModifier,
         containerColor = if (detailCard) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             if (tab != null) {
-                SearchPill(
-                    hint = stringResource(
-                        when (tab) {
-                            LibraryTab.MY_LIST -> R.string.feature_library_search_bar_my_list
-                            LibraryTab.FAVORITES -> R.string.feature_library_search_bar_favorites
-                            LibraryTab.ARCHIVE -> R.string.feature_library_search_bar_archive
-                        },
-                    ),
-                    email = state.email,
-                    sort = state.sort,
-                    onSortChange = onSortChange,
-                    onOpenSearch = { onOpenSearch?.invoke(tab) },
-                    onOpenSettings = onOpenSettings.takeUnless { navRailShown },
-                )
+                Column {
+                    SearchPill(
+                        hint = stringResource(
+                            if (tab == LibraryTab.ARCHIVE) R.string.feature_library_search_bar_archive else R.string.feature_library_search_bar_my_list,
+                        ),
+                        email = state.email,
+                        sort = state.sort,
+                        onSortChange = onSortChange,
+                        onOpenSearch = { onOpenSearch?.invoke(tab) },
+                        onOpenSettings = onOpenSettings.takeUnless { navRailShown },
+                    )
+                    HomeChipRow(
+                        tab = tab,
+                        filters = filters,
+                        topTags = topTags,
+                        onTabChange = onTabChange.takeUnless { navRailShown },
+                        onFiltersChange = onFiltersChange,
+                        onOpenTags = onOpenTags,
+                    )
+                }
             } else {
                 TopAppBar(
                     title = { Text(scopeTitle(scope)) },
@@ -482,7 +541,17 @@ fun LibraryListContent(
                 modifier = Modifier.fillMaxSize().alpha(if (dropState != DropState.Idle) 0.5f else 1f),
             ) {
                 if (isEmpty) {
-                    EmptyContent(scope)
+                    when {
+                        showsOnboarding(scope, filters, isEmpty = true) -> OnboardingContent(
+                            extensionDone = extensionDone,
+                            clipboardHasLink = clipboardHasLink,
+                            onGetExtension = onGetExtension,
+                            onPaste = onAddLink,
+                            onSaveClipboard = onSaveClipboard,
+                        )
+                        tab != null && filters.active -> FilteredEmptyContent(onClear = { onFiltersChange(ListFilters()) })
+                        else -> EmptyContent(scope)
+                    }
                 } else {
                     ItemList(
                         itemCount = itemCount,
@@ -498,6 +567,11 @@ fun LibraryListContent(
                         bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
                         selectedItemId = selectedItemId,
                         inset = twoPane,
+                        header = if (showStrip) {
+                            { ContinueReadingStrip(continueReading, onOpenItem = onOpenItem) }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -541,6 +615,20 @@ internal fun DropTargetCard(hovered: Boolean) {
         Text(label, style = MaterialTheme.typography.titleMedium, color = colors.onPrimaryContainer)
     }
 }
+
+/** Scrolls [state] to the top (without animation) when [key] changes after the list was first shown. */
+@Composable
+private fun ScrollToTopOnChange(key: Any, state: LazyListState) {
+    val initial = remember { key }
+    var seen by remember { mutableStateOf(initial) }
+    if (seen != key) {
+        seen = key
+        Snapshot.withoutReadObservation { state.requestScrollToItem(0) }
+    }
+}
+
+/** Key of the list header item (never an item id: ids are UUIDs). */
+private const val HEADER_KEY = "header:continue-reading"
 
 /** Scrolls [state] to the top whenever [signal] changes after this list was first shown (tab tapped again). */
 @Composable
@@ -603,17 +691,8 @@ private fun LazyListState.isScrollingUpOrAtTop(): Boolean {
     }.value
 }
 
-@Composable
-private fun scopeTitle(scope: ListScope): String = when (scope) {
-    is ListScope.Tag -> scope.name
-    is ListScope.Tab -> stringResource(
-        when (scope.tab) {
-            LibraryTab.MY_LIST -> R.string.feature_library_my_list
-            LibraryTab.ARCHIVE -> R.string.feature_library_archive
-            LibraryTab.FAVORITES -> R.string.feature_library_favorites
-        },
-    )
-}
+/** Title of the plain title bar, which only tag pages use (tabs show the search pill). */
+private fun scopeTitle(scope: ListScope): String = (scope as? ListScope.Tag)?.name.orEmpty()
 
 /** First letter of the account email, upper-cased; "?" when unknown. */
 internal fun avatarLetter(email: String): String =
@@ -652,24 +731,58 @@ private fun SortOrder.label(): Int = when (this) {
     SortOrder.LONGEST -> R.string.feature_library_sort_longest
 }
 
+/** The onboarding panel replaces the empty state on My List without filters (proposal 01). */
+internal fun showsOnboarding(scope: ListScope, filters: ListFilters, isEmpty: Boolean): Boolean =
+    isEmpty && scope == ListScope.Tab(LibraryTab.MY_LIST) && !filters.active
+
+@Composable
+private fun OnboardingContent(
+    extensionDone: Boolean,
+    clipboardHasLink: Boolean,
+    onGetExtension: () -> Unit,
+    onPaste: () -> Unit,
+    onSaveClipboard: () -> Unit,
+) {
+    // Scrollable so pull-to-refresh also works on an empty list.
+    LazyColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+        item {
+            OnboardingPanel(
+                extensionDone = extensionDone,
+                clipboardHasLink = clipboardHasLink,
+                onGetExtension = onGetExtension,
+                onPaste = onPaste,
+                onSaveClipboard = onSaveClipboard,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilteredEmptyContent(onClear: () -> Unit) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            app.sroka.core.designsystem.component.SrokaEmptyState(
+                icon = SrokaIcons.Search,
+                title = stringResource(R.string.feature_library_empty_filtered_title),
+                actionLabel = stringResource(R.string.feature_library_filters_clear),
+                onAction = onClear,
+                modifier = Modifier.fillParentMaxSize(),
+            )
+        }
+    }
+}
+
+/** Simple empty states: a tag page, or Archive. */
 @Composable
 private fun EmptyContent(scope: ListScope) {
-    data class Content(val icon: ImageVector, val title: Int, val body: Int?)
-    val content = when {
-        scope is ListScope.Tag -> Content(SrokaIcons.Label, R.string.feature_library_empty_tag_title, null)
-        scope is ListScope.Tab && scope.tab == LibraryTab.ARCHIVE ->
-            Content(SrokaIcons.Archive, R.string.feature_library_empty_archive_title, R.string.feature_library_empty_archive_body)
-        scope is ListScope.Tab && scope.tab == LibraryTab.FAVORITES ->
-            Content(SrokaIcons.Star, R.string.feature_library_empty_favorites_title, R.string.feature_library_empty_favorites_body)
-        else -> Content(SrokaIcons.Inbox, R.string.feature_library_empty_my_list_title, R.string.feature_library_empty_my_list_body)
-    }
+    val tagPage = scope is ListScope.Tag
     // Scrollable so pull-to-refresh also works on an empty list.
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             app.sroka.core.designsystem.component.SrokaEmptyState(
-                icon = content.icon,
-                title = stringResource(content.title),
-                description = content.body?.let { stringResource(it) },
+                icon = if (tagPage) SrokaIcons.Label else SrokaIcons.Archive,
+                title = stringResource(if (tagPage) R.string.feature_library_empty_tag_title else R.string.feature_library_empty_archive_title),
+                description = if (tagPage) null else stringResource(R.string.feature_library_empty_archive_body),
                 modifier = Modifier.fillParentMaxSize(),
             )
         }
@@ -701,6 +814,7 @@ private fun ItemList(
     bottomPadding: Dp,
     selectedItemId: String? = null,
     inset: Boolean = false,
+    header: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -708,6 +822,8 @@ private fun ItemList(
         contentPadding = PaddingValues(bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(if (inset) ROW_GAP else 0.dp),
     ) {
+        // First item, so it scrolls away with the list (Continue reading).
+        if (header != null) item(key = HEADER_KEY, contentType = HEADER_KEY) { header() }
         items(
             count = itemCount(),
             key = itemKey,

@@ -20,7 +20,7 @@ import app.sroka.feature.library.impl.search.SearchRoute
 import app.sroka.feature.library.impl.tags.TagsRoute
 
 /**
- * Library entries: the three list tabs, the Tags tab and per-tag lists.
+ * Library entries: the home list (My List / Archive), search, the Tags screen and per-tag lists.
  *
  * Features never reference other features' keys (DECISIONS A2), so cross-feature navigation goes
  * through callbacks that the app maps to keys.
@@ -37,6 +37,9 @@ import app.sroka.feature.library.impl.tags.TagsRoute
  * @param addLinkRequested the rail's FAB was tapped (read lazily); a list opens its add-link dialog and
  *   calls [onAddLinkHandled]
  * @param tabReselects counter bumped when the current tab is tapped again (read lazily); its list scrolls to the top
+ * @param onSelectTab the home destination chips (phones): show My List or Archive
+ * @param onOpenTags the home chip row's trailing Tags chip
+ * @param onCloseTags the Tags screen's back arrow (phones, where Tags is opened from the chip row)
  *
  * Two-pane / rail state is read live from [LocalPaneLayout] (entry content outlives window changes).
  */
@@ -55,6 +58,9 @@ fun EntryProviderScope<NavKey>.libraryEntries(
     addLinkRequested: () -> Boolean = { false },
     onAddLinkHandled: () -> Unit = {},
     tabReselects: () -> Int = { 0 },
+    onSelectTab: (LibraryTab) -> Unit = {},
+    onOpenTags: () -> Unit = {},
+    onCloseTags: () -> Unit = {},
 ) {
     // List pane: on wide windows the reader opens next to the list (ListDetailSceneStrategy).
     entry<LibraryKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
@@ -71,6 +77,8 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             addLinkRequested = addLinkRequested(),
             onAddLinkHandled = onAddLinkHandled,
             scrollToTopSignal = tabReselects(),
+            onTabChange = onSelectTab,
+            onOpenTags = onOpenTags,
         )
     }
     entry<SearchKey>(metadata = listPaneMetadata(onOpenItem)) { key ->
@@ -93,6 +101,7 @@ fun EntryProviderScope<NavKey>.libraryEntries(
             selectedTag = selectedTag(),
             navRailShown = layout.railShown,
             scrollToTopSignal = tabReselects(),
+            onBack = onCloseTags.takeUnless { layout.railShown },
         )
     }
     // Detail pane on wide windows (the opened article covers it); no back arrow beside the tag list.

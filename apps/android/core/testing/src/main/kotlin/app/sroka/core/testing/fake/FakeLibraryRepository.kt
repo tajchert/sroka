@@ -58,15 +58,16 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
         val terms = query.search?.lowercase()?.split(' ')?.filter { it.isNotBlank() }.orEmpty()
         return all
             .filter { item ->
-                if (tagKey != null) {
-                    item.tags.any { tagKey(it) == tagKey }
-                } else {
-                    when (query.tab) {
-                        LibraryTab.MY_LIST -> item.status == ItemStatus.UNREAD
-                        LibraryTab.ARCHIVE -> item.status == ItemStatus.ARCHIVED
-                        LibraryTab.FAVORITES -> item.isFavorite
-                    }
+                val inTab = when (query.tab) {
+                    LibraryTab.MY_LIST -> item.status == ItemStatus.UNREAD
+                    LibraryTab.ARCHIVE -> item.status == ItemStatus.ARCHIVED
+                    LibraryTab.FAVORITES -> item.isFavorite
+                    null -> true
                 }
+                inTab &&
+                    (tagKey == null || item.tags.any { tagKey(it) == tagKey }) &&
+                    (!query.favoritesOnly || item.isFavorite) &&
+                    (query.maxReadingMinutes == null || (item.readingMinutes ?: Int.MAX_VALUE) <= query.maxReadingMinutes!!)
             }
             .filter { item ->
                 val text = listOfNotNull(item.title, item.excerpt, item.siteName, item.url).joinToString(" ").lowercase() +
@@ -161,6 +162,13 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
 
     override fun observeNextUnread(excludeId: String?): Flow<ItemSummary?> = items.map { list ->
         list.filter { it.status == ItemStatus.UNREAD && it.id != excludeId }.maxByOrNull { it.savedAt }?.toSummary()
+    }
+
+    override fun observeContinueReading(limit: Int): Flow<List<ItemSummary>> = items.map { list ->
+        list.filter { it.status == ItemStatus.UNREAD && it.progress >= 0.05f && it.progress <= 0.95f }
+            .sortedByDescending { it.lastReadAt ?: Long.MIN_VALUE }
+            .take(limit)
+            .map(Item::toSummary)
     }
 
     override fun observeItem(id: String): Flow<Item?> = items.map { list -> list.firstOrNull { it.id == id } }

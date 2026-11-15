@@ -39,7 +39,7 @@ class PdfUploadTest {
 
     private val uploader = FakePdfUploader()
     private fun vm() = LibraryListViewModel(
-        FakeLibraryRepository(), FakeTagRepository(), FakeSyncController(), FakeSyncStatusRepository(),
+        FakeLibraryRepository(), FakeTagRepository(), app.sroka.core.testing.fake.FakeAccountRepository(), FakeSyncController(), FakeSyncStatusRepository(),
         FakeAuthRepository(SessionState.SignedIn("a@b.c")), FakeSettingsRepository(), uploader,
     )
 

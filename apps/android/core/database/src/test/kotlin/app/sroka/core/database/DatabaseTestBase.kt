@@ -41,13 +41,15 @@ abstract class DatabaseTestBase {
         excerpt: String? = null,
         archivedAt: Long? = null,
         siteName: String? = null,
+        progress: Float = 0f,
+        lastReadAt: Long? = null,
     ) = ItemEntity(
         id = id, url = "https://example.com/$id", canonicalUrl = "https://example.com/$id",
         title = title, excerpt = excerpt, siteName = siteName, author = null, lang = null, leadImageKey = null,
         wordCount = words, readingMinutes = words?.let { it / 200 }, contentId = contentId,
         contentPrivate = false, parseStatus = ParseStatus.OK, parseError = null, status = status,
-        isFavorite = favorite, progress = 0f, progressAnchor = null, savedAt = savedAt,
-        archivedAt = archivedAt, lastReadAt = null, source = "share", serverSeq = 1,
+        isFavorite = favorite, progress = progress, progressAnchor = null, savedAt = savedAt,
+        archivedAt = archivedAt, lastReadAt = lastReadAt, source = "share", serverSeq = 1,
     )
 
     protected suspend fun page(query: ItemQuery): List<ItemSummaryRow> {
@@ -59,9 +61,11 @@ abstract class DatabaseTestBase {
     protected suspend fun ids(query: ItemQuery) = page(query).map { it.id }
 
     protected fun q(
-        tab: LibraryTab = LibraryTab.MY_LIST,
+        tab: LibraryTab? = LibraryTab.MY_LIST,
         tag: String? = null,
         search: String? = null,
         sort: SortOrder = SortOrder.NEWEST,
-    ) = ItemQuery(tab, tag, search, sort)
+        favoritesOnly: Boolean = false,
+        maxReadingMinutes: Int? = null,
+    ) = ItemQuery(tab, tag, search, sort, favoritesOnly, maxReadingMinutes)
 }

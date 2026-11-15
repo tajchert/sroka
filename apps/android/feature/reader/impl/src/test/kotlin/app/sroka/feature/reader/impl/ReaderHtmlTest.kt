@@ -1,5 +1,7 @@
 package app.sroka.feature.reader.impl
 
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -58,6 +60,14 @@ class ReaderHtmlTest {
     }
 
     @Test
+    fun resizeObserverWatchesTheRootNotTheBodyThatDoesNotExistYet() {
+        // The script runs in <head>, where document.body is still null.
+        val html = wrap("<p>x</p>")
+        assertTrue(html.contains(".observe(root)"))
+        assertFalse(html.contains(".observe(document.body)"))
+    }
+
+    @Test
     fun nonceIsAlphanumericAndFresh() {
         val a = ReaderHtml.newNonce()
         assertTrue(a.isNotEmpty() && a.all { it.isLetterOrDigit() })
@@ -80,6 +90,46 @@ class ReaderHtmlTest {
         assertNull(parseProgressMessage("garbage"))
         assertNull(parseProgressMessage("0.5|x"))
         assertNull(parseProgressMessage("NaN|1"))
+    }
+
+    @Test
+    fun parsesAtEndFlag() {
+        assertEquals(ProgressReport(1f, 3, atEnd = true), parseProgressMessage("1.0000|3|1"))
+        assertEquals(ProgressReport(0.5f, null, atEnd = false), parseProgressMessage("0.5000||0"))
+        assertNull(parseProgressMessage("0.5|3|2"))
+        assertNull(parseProgressMessage("0.5|3|1|9"))
+    }
+
+    @Test
+    fun defaultAppearanceKeepsTodaysLook() {
+        val out = wrap("<p>x</p>")
+        assertTrue(out.contains("data-font=\"sans\""))
+        assertTrue(out.contains("--lh:1.65"))
+        assertTrue(out.contains("--end:96px"))
+    }
+
+    @Test
+    fun fontSpacingAndEndPaddingAreInTheDocument() {
+        val out = ReaderHtml.wrap(
+            "<p>x</p>", "https://appassets.androidplatform.net/articles/i1/", EffectiveTheme.DARK, 1f, null, 0f, "n1",
+            font = ReaderFont.SERIF, lineSpacing = ReaderLineSpacing.LOOSE, endPaddingPx = ReaderHtml.END_CARD_PADDING_PX,
+        )
+        assertTrue(out.contains("data-font=\"serif\""))
+        assertTrue(out.contains("--lh:1.90"))
+        assertTrue(out.contains("--end:300px"))
+        assertTrue(out.contains("html[data-font=serif] body{font-family:'Noto Serif'"))
+    }
+
+    @Test
+    fun appearanceScriptCarriesAllFourValues() {
+        assertEquals(
+            "window.__srokaSetAppearance&&window.__srokaSetAppearance('dark',1.30,'serif',1.45);",
+            ReaderHtml.appearanceScript(EffectiveTheme.DARK, 1.3f, ReaderFont.SERIF, ReaderLineSpacing.TIGHT),
+        )
+        assertEquals(
+            "window.__srokaSetAppearance&&window.__srokaSetAppearance('light',1.00,'sans',1.65);",
+            ReaderHtml.appearanceScript(EffectiveTheme.LIGHT, 1f),
+        )
     }
 
     @Test

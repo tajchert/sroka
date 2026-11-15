@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.sroka.core.model.DownloadPolicy
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.ThemeMode
@@ -41,6 +43,8 @@ class UserPreferencesDataSource @Inject constructor(
                     UserPreferences.READER_TEXT_SCALE_MIN,
                     UserPreferences.READER_TEXT_SCALE_MAX,
                 ),
+                readerFont = p[READER_FONT]?.let { enumValueOrNull<ReaderFont>(it) } ?: defaults.readerFont,
+                readerLineSpacing = p[READER_LINE_SPACING]?.let { enumValueOrNull<ReaderLineSpacing>(it) } ?: defaults.readerLineSpacing,
                 sortOrder = p[SORT_ORDER]?.let { enumValueOrNull<SortOrder>(it) } ?: defaults.sortOrder,
                 serverUrl = p[SERVER_URL],
             )
@@ -58,6 +62,10 @@ class UserPreferencesDataSource @Inject constructor(
         it[READER_TEXT_SCALE] = value.coerceIn(UserPreferences.READER_TEXT_SCALE_MIN, UserPreferences.READER_TEXT_SCALE_MAX)
     }
 
+    suspend fun setReaderFont(value: ReaderFont) = dataStore.edit { it[READER_FONT] = value.name }
+
+    suspend fun setReaderLineSpacing(value: ReaderLineSpacing) = dataStore.edit { it[READER_LINE_SPACING] = value.name }
+
     suspend fun setSortOrder(value: SortOrder) = dataStore.edit { it[SORT_ORDER] = value.name }
 
     /** null clears the override (build default server). */
@@ -71,6 +79,8 @@ class UserPreferencesDataSource @Inject constructor(
         val DOWNLOAD_POLICY = stringPreferencesKey("download_policy")
         val READER_THEME = stringPreferencesKey("reader_theme")
         val READER_TEXT_SCALE = floatPreferencesKey("reader_text_scale")
+        val READER_FONT = stringPreferencesKey("reader_font")
+        val READER_LINE_SPACING = stringPreferencesKey("reader_line_spacing")
         val SORT_ORDER = stringPreferencesKey("sort_order")
         val SERVER_URL = stringPreferencesKey("server_url")
     }

@@ -7,6 +7,8 @@ import app.sroka.core.datastore.UserPreferencesDataSource
 import app.sroka.core.domain.AuthRepository
 import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.model.DownloadPolicy
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.ThemeMode
@@ -49,6 +51,14 @@ internal class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setReaderTextScale(scale: Float) {
         dataSource.setReaderTextScale(scale.coerceIn(UserPreferences.READER_TEXT_SCALE_MIN, UserPreferences.READER_TEXT_SCALE_MAX))
+    }
+
+    override suspend fun setReaderFont(font: ReaderFont) {
+        dataSource.setReaderFont(font)
+    }
+
+    override suspend fun setReaderLineSpacing(spacing: ReaderLineSpacing) {
+        dataSource.setReaderLineSpacing(spacing)
     }
 
     override suspend fun setSortOrder(order: SortOrder) {

@@ -19,8 +19,13 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
   offline reading, with progress under the top bar ("Downloading 3 of 12"), a progress notification and a result
   snackbar. Background sync runs on app start/foreground, after edits and hourly.
 - **Reader**: the offline article package in a locked-down WebView (local assets only, no network, no JS from the
-  article), themes Light/Sepia/Dark/Auto, text size, reading progress saved and synced, favorite/archive (with
-  undo)/share/tags/delete. On tablets and unfolded foldables the reader opens next to the list.
+  article), reading progress saved and synced, favorite/archive (with undo)/share/tags/delete. An "Aa" sheet in the
+  top bar sets theme (Light/Sepia/Dark/Auto swatches), font (Sans/Serif), size and line spacing, applied live and
+  remembered. Scrolling to the end of an article shows a "Finished" card with "Archive & next" (archives and opens
+  the newest other readable item; plain "Archive" when there is none), "Keep" and an "Up next" preview (not on PDFs
+  or in tabletop mode). The progress line is brand blue on light and yellow on dark. A page that could not be saved
+  explains why in plain words ("The site blocks Sroka.") instead of showing the server code.
+  On tablets and unfolded foldables the reader opens next to the list.
 - **Settings**: download policy (Wi-Fi only / any network / manual), *Download all now*, storage used, remove
   downloads, app theme and dynamic color, reader theme and text size, account (sign out wipes local data; delete
   account), Import/Export (opens the web app), server URL.

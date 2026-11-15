@@ -84,7 +84,7 @@ internal fun TabletopChrome(
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(progress.coerceIn(0f, 1f))
-                        .background(colors.progress),
+                        .background(colors.readerProgress),
                 )
             }
             Box(

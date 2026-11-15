@@ -2,6 +2,8 @@ package app.sroka.core.testing.fake
 
 import app.sroka.core.domain.SettingsRepository
 import app.sroka.core.model.DownloadPolicy
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.ThemeMode
@@ -32,6 +34,10 @@ class FakeSettingsRepository(
     override suspend fun setReaderTextScale(scale: Float) = preferencesFlow.update {
         it.copy(readerTextScale = scale.coerceIn(UserPreferences.READER_TEXT_SCALE_MIN, UserPreferences.READER_TEXT_SCALE_MAX))
     }
+
+    override suspend fun setReaderFont(font: ReaderFont) = preferencesFlow.update { it.copy(readerFont = font) }
+
+    override suspend fun setReaderLineSpacing(spacing: ReaderLineSpacing) = preferencesFlow.update { it.copy(readerLineSpacing = spacing) }
 
     override suspend fun setSortOrder(order: SortOrder) = preferencesFlow.update { it.copy(sortOrder = order) }
 

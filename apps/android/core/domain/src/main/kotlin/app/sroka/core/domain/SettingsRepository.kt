@@ -1,6 +1,8 @@
 package app.sroka.core.domain
 
 import app.sroka.core.model.DownloadPolicy
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
 import app.sroka.core.model.ThemeMode
@@ -27,6 +29,10 @@ interface SettingsRepository {
 
     /** Clamped to [UserPreferences.READER_TEXT_SCALE_MIN]..[UserPreferences.READER_TEXT_SCALE_MAX]. */
     suspend fun setReaderTextScale(scale: Float)
+
+    suspend fun setReaderFont(font: ReaderFont)
+
+    suspend fun setReaderLineSpacing(spacing: ReaderLineSpacing)
 
     suspend fun setSortOrder(order: SortOrder)
 

@@ -64,6 +64,7 @@ dependencies {
     debugImplementation(libs.bundles.compose.debug)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.browser)
+    implementation(libs.coil.compose)
 
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)

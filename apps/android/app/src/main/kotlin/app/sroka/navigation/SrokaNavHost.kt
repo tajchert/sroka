@@ -83,9 +83,10 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 /**
- * App shell: one Navigation 3 back stack plus a [NavigationSuiteScaffold] (bottom bar on phones,
- * rail on larger windows) for the top-level tabs (DECISIONS A11). The bar is shown only while a tab
- * root is on top; reader, settings, tag lists and sign-in are full screen.
+ * App shell: one Navigation 3 back stack plus a [NavigationSuiteScaffold] rail on larger windows for
+ * the top-level destinations (DECISIONS A11). Phones have no bottom bar: the home chip row switches
+ * My List / Archive and opens Tags (proposal 08). The rail is shown only while a destination root is
+ * on top (or beside it in two panes); reader, settings, tag lists and sign-in are full screen.
  *
  * The session drives the stack: signed out ⇒ only [AuthKey]; signing in replaces it with My List.
  * An expired session keeps the library (local-first) and opens sign-in on demand.
@@ -174,7 +175,8 @@ fun SrokaApp(
     val drawnTwoPane = directive.maxHorizontalPartitions > 1
     val current = currentTab(backStack, twoPane)
     val adaptiveType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
-    val layoutType = if (current != null && !shell.hideNavigation) adaptiveType else NavigationSuiteType.None
+    // Only the rail: on phones the bottom bar is replaced by the home chip row.
+    val layoutType = if (current != null && !shell.hideNavigation && adaptiveType.isRail()) adaptiveType else NavigationSuiteType.None
     val railShown = layoutType.isRail()
     // The rail's "Save" button asks the next list that is shown to open its add-link dialog.
     var addLinkRequested by rememberSaveable { mutableStateOf(false) }
@@ -184,14 +186,6 @@ fun SrokaApp(
         if (!backStack.navigateToTopLevel(destination)) tabReselects++
     }
     val email = (session as? SessionState.SignedIn)?.email ?: (session as? SessionState.Expired)?.email.orEmpty()
-
-    val itemColors = NavigationSuiteDefaults.itemColors(
-        navigationBarItemColors = NavigationBarItemDefaults.colors(
-            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
-    )
 
     Surface(
         modifier = modifier,
@@ -217,24 +211,6 @@ fun SrokaApp(
                         onSelect = { selectTab(TopLevelDestination.entries[it]) },
                         onOpenSettings = { backStack.add(SettingsKey) },
                     )
-                } else {
-                    NavigationSuite(layoutType = layoutType) {
-                        TopLevelDestination.entries.forEach { destination ->
-                            val selected = destination == current
-                            item(
-                                selected = selected,
-                                onClick = { selectTab(destination) },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                                        contentDescription = null,
-                                    )
-                                },
-                                label = { Text(stringResource(destination.label)) },
-                                colors = itemColors,
-                            )
-                        }
-                    }
                 }
             },
         ) {
@@ -250,6 +226,8 @@ fun SrokaApp(
                         addLinkRequested = { addLinkRequested },
                         onAddLinkHandled = { addLinkRequested = false },
                         tabReselects = { tabReselects },
+                        onSelectTab = { tab -> selectTab(TopLevelDestination.of(tab)) },
+                        onOpenTags = { selectTab(TopLevelDestination.TAGS) },
                     )
                 }
                 // App-level snackbar for results that outlive a screen (archive from the reader).
@@ -297,6 +275,8 @@ private fun SrokaNavDisplay(
     addLinkRequested: () -> Boolean,
     onAddLinkHandled: () -> Unit,
     tabReselects: () -> Int,
+    onSelectTab: (LibraryTab) -> Unit,
+    onOpenTags: () -> Unit,
 ) {
     // PopLatest: with the default (pop until the scaffold value changes) system Back from the two-pane
     // list+reader popped the list too (list+placeholder has the same scaffold value) and closed the app.
@@ -374,6 +354,9 @@ private fun SrokaNavDisplay(
                 addLinkRequested = addLinkRequested,
                 onAddLinkHandled = onAddLinkHandled,
                 tabReselects = tabReselects,
+                onSelectTab = onSelectTab,
+                onOpenTags = onOpenTags,
+                onCloseTags = goBack,
             )
             readerEntries(
                 onBack = goBack,

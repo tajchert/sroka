@@ -30,6 +30,12 @@ interface LibraryRepository {
     /** Total number of hits [search] would return for [query] in [scope] (0 for a blank / symbol-only query). */
     fun searchCount(query: String, scope: SearchScope): Flow<Int>
 
+    /**
+     * "Continue reading" (proposal 08): unread items read between 5 % and 95 %, most recently read
+     * first, at most [limit].
+     */
+    fun observeContinueReading(limit: Int = CONTINUE_READING_LIMIT): Flow<List<ItemSummary>>
+
     /** One item with full detail, or null once it no longer exists locally. */
     fun observeItem(id: String): Flow<Item?>
 
@@ -85,3 +91,6 @@ enum class SaveSource(val wire: String) {
     /** Links dragged into the list (R15.1); sent to the server as a share. */
     DRAG("share"),
 }
+
+/** Most items the "Continue reading" strip shows. */
+const val CONTINUE_READING_LIMIT = 10

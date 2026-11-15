@@ -76,6 +76,7 @@ fun TagsRoute(
     selectedTag: String? = null,
     navRailShown: Boolean = false,
     scrollToTopSignal: Int = 0,
+    onBack: (() -> Unit)? = null,
     viewModel: TagsViewModel = hiltViewModel(),
 ) {
     val listState = rememberLazyListState()
@@ -97,6 +98,7 @@ fun TagsRoute(
         onRename = { renaming = it },
         onDelete = { deleting = it },
         listState = listState,
+        onBack = onBack,
     )
 
     renaming?.let { name ->
@@ -126,7 +128,7 @@ fun TagsRoute(
 
 /**
  * Stateless Tags list. [selectedTag] is highlighted (two-pane); [navRailShown] hides the avatar,
- * which the rail hosts.
+ * which the rail hosts. [onBack] (phones, where Tags opens from the home chip row) adds a back arrow.
  */
 @Composable
 fun TagsContent(
@@ -140,6 +142,7 @@ fun TagsContent(
     onDelete: (String) -> Unit,
     onOpenSearch: () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
+    onBack: (() -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -150,6 +153,7 @@ fun TagsContent(
                 onSortChange = null,
                 onOpenSearch = onOpenSearch,
                 onOpenSettings = onOpenSettings.takeUnless { navRailShown },
+                onBack = onBack,
             )
         },
     ) { padding ->

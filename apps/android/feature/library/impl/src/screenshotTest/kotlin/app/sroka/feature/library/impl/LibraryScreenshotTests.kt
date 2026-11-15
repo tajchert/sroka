@@ -20,6 +20,7 @@ import app.sroka.feature.library.impl.tags.TagsContent
 import app.sroka.feature.library.impl.list.DropState
 import app.sroka.feature.library.impl.list.LibraryListContent
 import app.sroka.feature.library.impl.list.LibraryListUiState
+import app.sroka.feature.library.impl.list.ListFilters
 import app.sroka.feature.library.impl.list.ListScope
 import app.sroka.feature.library.impl.list.UploadCard
 import app.sroka.core.model.ItemSummary
@@ -34,15 +35,20 @@ private fun ListFixture(
     dropState: DropState = DropState.Idle,
     items: List<ItemSummary> = sampleItems,
     uploadCards: List<UploadCard> = emptyList(),
+    tab: LibraryTab = LibraryTab.MY_LIST,
+    filters: ListFilters = ListFilters(),
+    continueReading: List<ItemSummary> = sampleContinueReading,
+    extensionDone: Boolean = false,
+    clipboardHasLink: Boolean = false,
 ) {
     SrokaTheme(darkTheme = darkTheme) {
         LibraryListContent(
-            scope = ListScope.Tab(LibraryTab.MY_LIST),
+            scope = ListScope.Tab(tab),
             state = LibraryListUiState(email = "magpie@example.com"),
             snackbarHostState = remember { SnackbarHostState() },
             refreshing = false,
             onRefresh = {},
-            isEmpty = false,
+            isEmpty = items.isEmpty(),
             listState = rememberLazyListState(),
             itemCount = { items.size },
             itemAt = { items.getOrNull(it) },
@@ -62,9 +68,52 @@ private fun ListFixture(
             navRailShown = twoPane,
             dropState = dropState,
             uploadCards = uploadCards,
+            filters = filters,
+            topTags = sampleTopTags,
+            onTabChange = {},
+            onOpenTags = {},
+            continueReading = continueReading,
+            extensionDone = extensionDone,
+            clipboardHasLink = clipboardHasLink,
         )
     }
 }
+
+/** Home with filters on (Favorites + a tag): no Continue reading strip, selected chips filled. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListFiltered() = ListFixture(
+    darkTheme = false, twoPane = false, items = sampleItems.filter { it.isFavorite },
+    filters = ListFilters(favoritesOnly = true, tag = "rust"),
+)
+
+/** Archive: the Archive chip is selected; no Continue reading strip. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListArchive() = ListFixture(darkTheme = true, twoPane = false, tab = LibraryTab.ARCHIVE)
+
+/** Empty My List: onboarding, browser step done, clipboard chip shown (proposal 01). */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListOnboarding() = ListFixture(
+    darkTheme = false, twoPane = false, items = emptyList(), extensionDone = true, clipboardHasLink = true,
+)
+
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListOnboardingDark() = ListFixture(darkTheme = true, twoPane = false, items = emptyList())
+
+/** Filters that match nothing: "Nothing matches" with Clear filters. */
+@PreviewTest
+@FoldablePreviews
+@Composable
+fun LibraryListFilteredEmpty() = ListFixture(
+    darkTheme = false, twoPane = false, items = emptyList(), filters = ListFilters(underTenMinutes = true),
+)
 
 @PreviewTest
 @FoldablePreviews

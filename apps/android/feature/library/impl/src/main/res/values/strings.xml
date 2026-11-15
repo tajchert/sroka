@@ -7,9 +7,20 @@
 
     <!-- T3: search bar, cards, row status, FAB, search view -->
     <string name="feature_library_search_bar_my_list">Search My List</string>
-    <string name="feature_library_search_bar_favorites">Search Favorites</string>
     <string name="feature_library_search_bar_archive">Search Archive</string>
     <string name="feature_library_search_bar_tags">Search Tags</string>
+    <!-- Home chip row (proposal 08) -->
+    <string name="feature_library_chip_under_10">Under 10 min</string>
+    <string name="feature_library_chip_tag">#%1$s</string>
+    <string name="feature_library_continue_reading">Continue reading</string>
+    <string name="feature_library_continue_minutes_left">%1$d min left</string>
+    <!-- Onboarding empty state (proposal 01) -->
+    <string name="feature_library_onboarding_title">Start your list</string>
+    <string name="feature_library_onboarding_share">Share any link to Sroka</string>
+    <string name="feature_library_onboarding_extension">Save from Chrome</string>
+    <string name="feature_library_onboarding_paste">Paste a link</string>
+    <string name="feature_library_onboarding_done">Done</string>
+    <string name="feature_library_onboarding_clipboard">Save link from clipboard</string>
     <string name="feature_library_fab_save">Save</string>
     <string name="feature_library_card_downloading">Downloading for offline</string>
     <string name="feature_library_card_downloading_count">%1$d of %2$d</string>
@@ -25,6 +36,7 @@
     <string name="feature_library_status_sync_waiting">Waiting to sync</string>
     <string name="feature_library_status_failed">Couldn\u2019t save the text</string>
     <string name="feature_library_status_partial">Partial copy</string>
+    <string name="feature_library_status_preview_only">Preview only</string>
     <string name="feature_library_status_preparing">Preparing\u2026</string>
     <string name="feature_library_status_downloading_badge">Downloading</string>
     <string name="feature_library_status_not_on_device">Not on this device</string>
@@ -82,12 +94,10 @@
     <string name="feature_library_fetch_failed_storage">Couldn\'t download: device storage is full</string>
 
     <!-- Empty states -->
-    <string name="feature_library_empty_my_list_title">Nothing saved yet</string>
-    <string name="feature_library_empty_my_list_body">Share any link to Sroka to save it</string>
     <string name="feature_library_empty_archive_title">Archive is empty</string>
     <string name="feature_library_empty_archive_body">Articles you finish or archive show up here</string>
-    <string name="feature_library_empty_favorites_title">No favorites</string>
-    <string name="feature_library_empty_favorites_body">Long-press an article and choose Add to favorites</string>
+    <string name="feature_library_empty_filtered_title">Nothing matches</string>
+    <string name="feature_library_filters_clear">Clear filters</string>
     <string name="feature_library_empty_tag_title">No articles with this tag</string>
     <string name="feature_library_empty_search_title">No results</string>
     <string name="feature_library_empty_search_body">Try different words</string>

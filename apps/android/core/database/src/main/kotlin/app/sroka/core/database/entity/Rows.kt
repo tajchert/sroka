@@ -36,6 +36,8 @@ data class ItemSummaryRow(
     @ColumnInfo(name = "pending_type") val pendingType: String? = null,
     val kind: ItemKind = ItemKind.ARTICLE,
     @ColumnInfo(name = "file_size") val fileSize: Long? = null,
+    /** Server parse error code (e.g. `paywalled`), null if none. */
+    @ColumnInfo(name = "parse_error") val parseError: String? = null,
 ) {
     fun toSummary(): ItemSummary = ItemSummary(
         id = id,
@@ -54,6 +56,7 @@ data class ItemSummaryRow(
         pendingChange = pendingChangeOf(pendingType),
         kind = kind,
         fileSize = fileSize,
+        parseError = parseError,
     )
 }
 

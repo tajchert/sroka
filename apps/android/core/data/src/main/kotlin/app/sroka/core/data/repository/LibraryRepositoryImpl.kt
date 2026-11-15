@@ -74,6 +74,9 @@ internal class LibraryRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun observeContinueReading(limit: Int): Flow<List<ItemSummary>> =
+        itemDao.observeContinueReading(limit).map { rows -> rows.map { it.toSummary() } }.distinctUntilChanged()
+
     override fun observeItem(id: String): Flow<Item?> =
         itemDao.observeItem(id).map { it?.toItem() }.distinctUntilChanged()
 

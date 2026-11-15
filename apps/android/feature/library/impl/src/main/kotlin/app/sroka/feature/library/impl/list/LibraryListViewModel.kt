@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import app.sroka.core.domain.AccountRepository
 import app.sroka.core.domain.AuthRepository
 import android.net.Uri
 import app.sroka.core.domain.LibraryRepository
@@ -57,6 +58,41 @@ sealed interface ListScope {
     data class Tab(val tab: LibraryTab) : ListScope
 
     data class Tag(val name: String) : ListScope
+}
+
+/**
+ * Home filter chips (proposal 08), combined with AND inside the selected tab: favorites only, under
+ * 10 minutes, one tag. Ignored on tag pages.
+ */
+data class ListFilters(
+    val favoritesOnly: Boolean = false,
+    val underTenMinutes: Boolean = false,
+    val tag: String? = null,
+) {
+    val active: Boolean get() = favoritesOnly || underTenMinutes || tag != null
+
+    companion object {
+        /** "Under 10 min": a known reading time of at most this many whole minutes. */
+        const val UNDER_TEN_MAX_MINUTES = 9
+
+        /** Saves the filters across rotation and process death. */
+        val Saver = androidx.compose.runtime.saveable.listSaver<ListFilters, Any?>(
+            save = { listOf(it.favoritesOnly, it.underTenMinutes, it.tag) },
+            restore = { ListFilters(it[0] as Boolean, it[1] as Boolean, it[2] as String?) },
+        )
+    }
+}
+
+/** The query a list scope, its filters and the sort produce. */
+internal fun listQuery(scope: ListScope, filters: ListFilters, sort: SortOrder): ItemQuery = when (scope) {
+    is ListScope.Tab -> ItemQuery(
+        tab = scope.tab,
+        sort = sort,
+        tag = filters.tag,
+        favoritesOnly = filters.favoritesOnly,
+        maxReadingMinutes = if (filters.underTenMinutes) ListFilters.UNDER_TEN_MAX_MINUTES else null,
+    )
+    is ListScope.Tag -> ItemQuery(tab = null, tag = scope.name, sort = sort)
 }
 
 /** Typed screen state (the paged rows are exposed separately as [LibraryListViewModel.items]). */
@@ -125,6 +161,7 @@ sealed interface UndoAction {
 class LibraryListViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val tags: TagRepository,
+    private val account: AccountRepository,
     private val sync: SyncController,
     syncStatus: SyncStatusRepository,
     auth: AuthRepository,
@@ -133,12 +170,18 @@ class LibraryListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val scope = MutableStateFlow<ListScope?>(null)
+    private val filters = MutableStateFlow(ListFilters())
     private val selectedId = MutableStateFlow<String?>(null)
     private val eventChannel = Channel<ListEvent>(Channel.BUFFERED)
 
     /** Sets what this screen lists. Idempotent; the ViewModel is per navigation entry. */
     fun setScope(value: ListScope) {
         scope.value = value
+    }
+
+    /** Sets the home filter chips (ignored on tag pages). */
+    fun setFilters(value: ListFilters) {
+        filters.value = value
     }
 
     private val sort = settings.preferences.map { it.sortOrder }.distinctUntilChanged()
@@ -164,13 +207,10 @@ class LibraryListViewModel @Inject constructor(
     /** Rows for the current scope and sort. Search lives in its own screen (`search/`). */
     val items: Flow<PagingData<ItemSummary>> = combine(
         scope.filterNotNull(),
+        filters,
         sort,
-    ) { scope, sortOrder ->
-        when (scope) {
-            is ListScope.Tab -> ItemQuery(tab = scope.tab, sort = sortOrder)
-            is ListScope.Tag -> ItemQuery(tab = LibraryTab.MY_LIST, tag = scope.name, sort = sortOrder)
-        }
-    }
+        ::listQuery,
+    )
         .distinctUntilChanged()
         .flatMapLatest { library.pagedItems(it) }
         .cachedIn(viewModelScope)
@@ -179,6 +219,29 @@ class LibraryListViewModel @Inject constructor(
     val selectedItem: StateFlow<Item?> = selectedId
         .flatMapLatest { id -> if (id == null) flowOf(null) else library.observeItem(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** "Continue reading" cards (My List without filters only; the screen decides when to show them). */
+    val continueReading: StateFlow<List<ItemSummary>> = library.observeContinueReading()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The most-used tags (by item count) offered as filter chips. */
+    val topTags: StateFlow<List<String>> = tags.observeTags()
+        .map { all -> all.filter { it.count > 0 }.sortedByDescending { it.count }.take(TOP_TAGS).map { it.name } }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val extensionConnectedState = MutableStateFlow(false)
+
+    /** The account has used the browser extension (`/v1/me` `clients.extension`): onboarding shows it done. */
+    val extensionConnected: StateFlow<Boolean> = extensionConnectedState
+
+    /** Re-reads which clients the account has used. Failures are silent (the step just stays open). */
+    fun refreshConnectedClients() {
+        if (extensionConnectedState.value) return
+        viewModelScope.launch {
+            if (account.connectedClients()?.extension == true) extensionConnectedState.value = true
+        }
+    }
 
     val recentTags: StateFlow<List<String>> = tags.observeRecentTags(RECENT_TAGS)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -345,5 +408,6 @@ class LibraryListViewModel @Inject constructor(
 
     private companion object {
         const val RECENT_TAGS = 20
+        const val TOP_TAGS = 5
     }
 }

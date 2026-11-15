@@ -1,19 +1,10 @@
 package app.sroka.core.database
 
 import androidx.room3.useReaderConnection
-import app.sroka.core.database.dao.FROM_TAG
-import app.sroka.core.database.dao.LIST_FROM
-import app.sroka.core.database.dao.MATCH
-import app.sroka.core.database.dao.ORDER_LONGEST
-import app.sroka.core.database.dao.ORDER_NEWEST
-import app.sroka.core.database.dao.ORDER_OLDEST
-import app.sroka.core.database.dao.ORDER_SHORTEST
-import app.sroka.core.database.dao.ROW_COLUMNS
-import app.sroka.core.database.dao.SCOPE_FAV
-import app.sroka.core.database.dao.SCOPE_STATUS
-import app.sroka.core.database.dao.SCOPE_TAG
-import app.sroka.core.database.dao.SEARCH_FROM
-import app.sroka.core.database.dao.SEARCH_TAG_FROM
+import app.sroka.core.database.dao.itemListSql
+import app.sroka.core.model.ItemQuery
+import app.sroka.core.model.LibraryTab
+import app.sroka.core.model.SortOrder
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,8 +12,6 @@ import org.junit.Test
 
 /** The list/search queries must be index-driven: no full scan of `items` (alias `i`). */
 class ListPlanTest : DatabaseTestBase() {
-
-    private val orders = listOf(ORDER_NEWEST, ORDER_OLDEST, ORDER_SHORTEST, ORDER_LONGEST)
 
     /**
      * EXPLAIN returns rows but the androidx.sqlite Android driver runs it as an update, so replay the
@@ -38,8 +27,7 @@ class ListPlanTest : DatabaseTestBase() {
         val plain = android.database.sqlite.SQLiteDatabase.create(null)
         try {
             ddl.forEach { plain.execSQL(it) }
-            val literal = sql.replace(":status", "'UNREAD'").replace(":tagKey", "'x'").replace(":match", "'x*'")
-            plain.rawQuery("EXPLAIN QUERY PLAN $literal", null).use { c ->
+            plain.rawQuery("EXPLAIN QUERY PLAN $sql", null).use { c ->
                 buildString { while (c.moveToNext()) appendLine(c.getString(3)) }
             }
         } finally {
@@ -54,21 +42,37 @@ class ListPlanTest : DatabaseTestBase() {
         assertFalse("full scan of items:\n$p", fullScanOfItems.containsMatchIn(p))
     }
 
+    /** [query]'s statement with its bound arguments inlined as literals. */
+    private fun literalSql(query: ItemQuery): String {
+        val built = itemListSql(query)
+        var i = 0
+        return built.sql.replace(Regex("""\?""")) {
+            when (val arg = built.args[i++]) {
+                is Long -> arg.toString()
+                else -> "'" + arg.toString().replace("'", "''") + "'"
+            }
+        }
+    }
+
     @Test fun listQueriesDoNotScanItems() {
-        for (order in orders) {
-            assertIndexed("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $order")
-            assertIndexed("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $order")
-            assertIndexed("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $order")
-            assertIndexed("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $order")
-            assertIndexed("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $order")
-            assertIndexed("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $order")
+        val tabs = listOf(LibraryTab.MY_LIST, LibraryTab.ARCHIVE, LibraryTab.FAVORITES)
+        for (sort in SortOrder.entries) {
+            for (tab in tabs) {
+                assertIndexed(literalSql(ItemQuery(tab, sort = sort)))
+                assertIndexed(literalSql(ItemQuery(tab, sort = sort, favoritesOnly = true, maxReadingMinutes = 9)))
+                assertIndexed(literalSql(ItemQuery(tab, sort = sort, search = "x")))
+                assertIndexed(literalSql(ItemQuery(tab, sort = sort, tag = "x", favoritesOnly = true)))
+                assertIndexed(literalSql(ItemQuery(tab, sort = sort, tag = "x", search = "x", maxReadingMinutes = 9)))
+            }
+            assertIndexed(literalSql(ItemQuery(tab = null, sort = sort, tag = "x")))
+            assertIndexed(literalSql(ItemQuery(tab = null, sort = sort, tag = "x", search = "x")))
         }
     }
 
     @Test fun newestAndOldestNeedNoTempSort() {
-        for (order in listOf(ORDER_NEWEST, ORDER_OLDEST)) {
-            for (scope in listOf(SCOPE_STATUS, SCOPE_FAV)) {
-                val p = plan("$ROW_COLUMNS $LIST_FROM $scope $order")
+        for (sort in listOf(SortOrder.NEWEST, SortOrder.OLDEST)) {
+            for (tab in listOf(LibraryTab.MY_LIST, LibraryTab.ARCHIVE, LibraryTab.FAVORITES)) {
+                val p = plan(literalSql(ItemQuery(tab, sort = sort)))
                 assertTrue(p, p.contains("index_items_"))
                 assertFalse("temp sort:\n$p", p.contains("TEMP B-TREE FOR ORDER BY"))
             }

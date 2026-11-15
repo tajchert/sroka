@@ -98,8 +98,13 @@ data class MeUserDto(
 @Serializable
 data class MeStatsDto(val unread: Int = 0, val archived: Int = 0, val favorites: Int = 0, val tags: Int = 0)
 
+/** Client types that have made an authenticated request for this user (api.md `/v1/me`). */
 @Serializable
-data class MeDto(val user: MeUserDto, val stats: MeStatsDto = MeStatsDto())
+data class MeClientsDto(val extension: Boolean = false, val android: Boolean = false)
+
+/** [clients] is null on servers that predate it: treat as all false. */
+@Serializable
+data class MeDto(val user: MeUserDto, val stats: MeStatsDto = MeStatsDto(), val clients: MeClientsDto? = null)
 
 @Serializable
 data class MinVersionsDto(val android: Int? = null)

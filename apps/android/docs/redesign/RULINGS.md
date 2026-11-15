@@ -55,10 +55,12 @@ Progress is tracked in `docs/redesign/LEDGER.md`.
   beak; viewport tight to the glyph) in `core/designsystem` res. Any notification (download, import) uses it.
 
 ## R4 Copy
+- *Superseded by R17.2:* US spelling ("Favorites", "Favorite").
 - British spelling as in the mock: "Favourites", "Favourite". Use the mock's strings verbatim where given; all strings
   in `strings.xml` of the owning module. Plurals via `<plurals>`.
 
 ## R5 Navigation bar (T3)
+- *Superseded by R17.1:* phones have no bottom bar; the rail lists My List, Archive and Tags.
 - Order: My List (`bookmarks`), Favourites (`star`), Archive (`archive`), Tags (`label`). Selected = filled icon on
   primaryContainer indicator. The avatar (first letter of the signed-in email, primaryContainer circle) in the search
   bar / Tags app bar opens Settings. No separate settings icon on the list.
@@ -310,3 +312,19 @@ Mock: `docs/redesign/sroka-android.dc.html` lines 742–783 (19) and 694–740 (
   tag articles, settings detail, placeholders) must line up exactly with the top edge of the list pane's search
   pill: both = status-bar inset + 8dp. Today the card sits a few dp lower (24dp top margin). Keep 24dp end/bottom.
   Apply to every pane using the card; add a screenshot assertion by regenerating shell references.
+
+## R17 Home chips and onboarding (proposals 08 and 01, 2026-11-15)
+- **R17.1 Bottom navigation replaced by chips:** phones have no bottom bar. One horizontally scrolling chip row under
+  the search pill holds the destination chips My List / Archive (single select, selected = filled inverseSurface), a
+  divider, the filter chips Favorites (star) and Under 10 min (clock: `reading_minutes` known and < 10), the top 5
+  tags by count as `#tag`, and a trailing Tags icon chip that opens the Tags screen (with a back arrow on phones).
+  Filters toggle and AND-combine within the current destination (one tag at a time) and are saved per list entry
+  (rotation, process death). Favorites is a filter, no longer a destination. Rail layouts show My List, Archive and
+  Tags in the rail and the same chip row without the destination chips at the top of the list pane.
+- **R17.2 US spelling:** "Favorites", "Favorite" (supersedes R4's British spelling).
+- **R17.3 Continue reading:** on My List with no filter, the first list item is a "Continue reading" strip of up to 10
+  cards (unread, progress 5–95 %, newest read first; 2-line title, `N min left`, thin progress bar). Hidden when empty.
+- **R17.4 Onboarding:** an empty, unfiltered My List shows "Start your list" with three steps (share a link;
+  Save from Chrome → `https://sroka.app/#get`, done when `/v1/me` `clients.extension` is true; paste a link, plus a
+  "Save link from clipboard" chip when the clipboard looks like a link). Done steps show a check. Other empty lists
+  keep simple empty states; filters that match nothing show "Nothing matches" with Clear filters.

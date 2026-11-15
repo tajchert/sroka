@@ -63,7 +63,7 @@ class LibraryListScreenTest {
     private val searchOpened = mutableListOf<LibraryTab>()
 
     private fun show(scope: ListScope = ListScope.Tab(LibraryTab.MY_LIST)) {
-        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), sync, status, auth, FakeSettingsRepository(), app.sroka.core.testing.fake.FakePdfUploader())
+        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), app.sroka.core.testing.fake.FakeAccountRepository(), sync, status, auth, FakeSettingsRepository(), app.sroka.core.testing.fake.FakePdfUploader())
         compose.setContent {
             SrokaTheme(dynamicColor = false) {
                 LibraryListRoute(
@@ -79,10 +79,19 @@ class LibraryListScreenTest {
     }
 
     @Test
-    fun emptyListShowsGuidance() {
+    fun emptyMyListShowsOnboarding() {
         show()
-        compose.waitUntil(5_000) { compose.onAllNodesMatching("Share any link to Sroka to save it") }
-        compose.onNodeWithText("Share any link to Sroka to save it").assertIsDisplayed()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Start your list") }
+        compose.onNodeWithText("Share any link to Sroka").assertIsDisplayed()
+        compose.onNodeWithText("Save from Chrome").assertIsDisplayed()
+        compose.onNodeWithText("Paste a link").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyArchiveShowsSimpleEmptyState() {
+        show(ListScope.Tab(LibraryTab.ARCHIVE))
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Archive is empty") }
+        compose.onNodeWithText("Start your list").assertDoesNotExist()
     }
 
     @Test

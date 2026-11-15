@@ -32,7 +32,7 @@ class LibraryViewModelsTest {
     private val library = FakeLibraryRepository()
 
     private fun listVm() = LibraryListViewModel(
-        library, FakeTagRepository(), FakeSyncController(), FakeSyncStatusRepository(),
+        library, FakeTagRepository(), app.sroka.core.testing.fake.FakeAccountRepository(), FakeSyncController(), FakeSyncStatusRepository(),
         FakeAuthRepository(SessionState.SignedIn("a@b.c")), FakeSettingsRepository(),
         app.sroka.core.testing.fake.FakePdfUploader(),
     )

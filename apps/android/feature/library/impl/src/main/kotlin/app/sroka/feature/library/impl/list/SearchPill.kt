@@ -28,9 +28,10 @@ import app.sroka.core.model.SortOrder
 import app.sroka.feature.library.impl.R
 
 /**
- * M3-style search pill (surfaceContainerHigh), shared by My List/Archive/Favourites and Tags. Its top
+ * M3-style search pill (surfaceContainerHigh), shared by My List/Archive and Tags. Its top
  * edge sits at status-bar inset + 8dp (the detail card aligns with it, R16.2). [onSortChange] null
- * omits the sort icon; [onOpenSettings] null omits the avatar (the rail hosts it).
+ * omits the sort icon; [onOpenSettings] null omits the avatar (the rail hosts it); [onBack] adds a
+ * leading back arrow in place of the search icon.
  */
 @Composable
 internal fun SearchPill(
@@ -40,6 +41,7 @@ internal fun SearchPill(
     onSortChange: ((SortOrder) -> Unit)?,
     onOpenSearch: () -> Unit,
     onOpenSettings: (() -> Unit)?,
+    onBack: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier
@@ -52,10 +54,16 @@ internal fun SearchPill(
         onClick = onOpenSearch,
     ) {
         Row(
-            Modifier.padding(start = 16.dp, end = 4.dp),
+            Modifier.padding(start = if (onBack != null) 4.dp else 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(SrokaIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (onBack != null) {
+                androidx.compose.material3.IconButton(onClick = onBack) {
+                    Icon(SrokaIcons.ArrowBack, contentDescription = stringResource(R.string.feature_library_back))
+                }
+            } else {
+                Icon(SrokaIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Text(
                 hint,
                 style = MaterialTheme.typography.bodyLarge,

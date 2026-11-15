@@ -11,12 +11,16 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
 - **Save**: share any link to Sroka from another app (translucent "Save to Sroka" sheet with title and tag
   suggestions), or tap *Add* (clipboard prefill). Saving works offline and syncs later; re-saving a URL moves it back
   to My List.
-- **Library**: My List · Archive · Favorites · Tags (bottom bar on phones, rail on larger windows). Paged lists with
+- **Library**: My List and Archive, switched by chips under the search pill on phones (rail with My List, Archive
+  and Tags on larger windows). Filter chips AND-combine within the list: Favorites, Under 10 min and the top 5 tags;
+  a trailing Tags chip opens the Tags screen. My List starts with a "Continue reading" strip (articles 5–95 % read),
+  and an empty My List shows onboarding (share, Chrome extension with a done check, paste or save from the
+  clipboard). Paged lists with
   thumbnails, swipe to archive or favorite (with undo), long-press actions (favorite, archive,
   edit tags, share, open original, refresh, delete), four sort orders, local full-text search over title, excerpt,
   site, tags and downloaded article text. Tags tab with counts, rename and delete.
   Rows are title + `domain · N min` + thumbnail, the same height in every state, and flag only exceptions: an icon
-  badge on the thumbnail (waiting to sync, couldn't save the text, partial copy, downloading, not on this device; a
+  badge on the thumbnail (waiting to sync, couldn't save the text, partial copy, preview only for paywalled pages, downloading, not on this device; a
   spinner while preparing) and a retry button on failed rows. Ready/downloaded rows show nothing extra. Reading
   progress shows as a thin bar on the thumbnail and `N min left`, then a ✓ Read mark from 98%.
 - **Fetch new articles**: one button in the top bar (or pull to refresh) syncs and downloads every new article for

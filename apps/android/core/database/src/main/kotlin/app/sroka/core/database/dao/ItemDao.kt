@@ -6,21 +6,23 @@ import androidx.room3.Dao
 import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
+import androidx.room3.RawQuery
+import androidx.room3.RoomRawQuery
 import androidx.room3.Transaction
 import androidx.room3.Upsert
-import app.sroka.core.database.FtsQuery
+import app.sroka.core.database.entity.ContentFileEntity
 import app.sroka.core.database.entity.CountsRow
 import app.sroka.core.database.entity.ItemDetailRow
 import app.sroka.core.database.entity.ItemEntity
+import app.sroka.core.database.entity.ItemFtsEntity
 import app.sroka.core.database.entity.ItemSummaryRow
 import app.sroka.core.database.entity.ItemTagEntity
+import app.sroka.core.database.entity.PendingOpEntity
 import app.sroka.core.database.entity.SearchRow
 import app.sroka.core.database.entity.TagCountRow
 import app.sroka.core.database.entity.TagEntity
 import app.sroka.core.model.ItemQuery
 import app.sroka.core.model.ItemStatus
-import app.sroka.core.model.LibraryTab
-import app.sroka.core.model.SortOrder
 import app.sroka.core.model.tagKey
 import kotlinx.coroutines.flow.Flow
 
@@ -34,134 +36,42 @@ interface ItemDao {
 
     // ---- Paged lists -------------------------------------------------------------------------
 
-    /** The library list for [query]: tab / tag filter, optional FTS search, sort. */
+    /**
+     * The library list for [query]: tab, tag, favorites and reading-time filters (AND), optional FTS
+     * search, sort. One code path: [itemListSql] builds the statement.
+     */
     fun pagedItems(query: ItemQuery): PagingSource<Int, ItemSummaryRow> {
-        val tagKey = query.tag?.let { tagKey(it) }
-        val match = query.search?.let { FtsQuery.build(it) }
-        val sort = query.sort
-        return when {
-            tagKey != null -> if (match == null) {
-                when (sort) {
-                    SortOrder.NEWEST -> listTagNewest(tagKey)
-                    SortOrder.OLDEST -> listTagOldest(tagKey)
-                    SortOrder.SHORTEST -> listTagShortest(tagKey)
-                    SortOrder.LONGEST -> listTagLongest(tagKey)
-                }
-            } else {
-                when (sort) {
-                    SortOrder.NEWEST -> searchTagNewest(match, tagKey)
-                    SortOrder.OLDEST -> searchTagOldest(match, tagKey)
-                    SortOrder.SHORTEST -> searchTagShortest(match, tagKey)
-                    SortOrder.LONGEST -> searchTagLongest(match, tagKey)
-                }
-            }
-            query.tab == LibraryTab.FAVORITES -> if (match == null) {
-                when (sort) {
-                    SortOrder.NEWEST -> listFavNewest()
-                    SortOrder.OLDEST -> listFavOldest()
-                    SortOrder.SHORTEST -> listFavShortest()
-                    SortOrder.LONGEST -> listFavLongest()
-                }
-            } else {
-                when (sort) {
-                    SortOrder.NEWEST -> searchFavNewest(match)
-                    SortOrder.OLDEST -> searchFavOldest(match)
-                    SortOrder.SHORTEST -> searchFavShortest(match)
-                    SortOrder.LONGEST -> searchFavLongest(match)
-                }
-            }
-            else -> {
-                val status = if (query.tab == LibraryTab.ARCHIVE) ItemStatus.ARCHIVED.name else ItemStatus.UNREAD.name
-                if (match == null) {
-                    when (sort) {
-                        SortOrder.NEWEST -> listStatusNewest(status)
-                        SortOrder.OLDEST -> listStatusOldest(status)
-                        SortOrder.SHORTEST -> listStatusShortest(status)
-                        SortOrder.LONGEST -> listStatusLongest(status)
-                    }
-                } else {
-                    when (sort) {
-                        SortOrder.NEWEST -> searchStatusNewest(match, status)
-                        SortOrder.OLDEST -> searchStatusOldest(match, status)
-                        SortOrder.SHORTEST -> searchStatusShortest(match, status)
-                        SortOrder.LONGEST -> searchStatusLongest(match, status)
+        val built = itemListSql(query)
+        return pagedItemsRaw(
+            RoomRawQuery(built.sql) { statement ->
+                built.args.forEachIndexed { i, arg ->
+                    when (arg) {
+                        is Long -> statement.bindLong(i + 1, arg)
+                        else -> statement.bindText(i + 1, arg.toString())
                     }
                 }
-            }
-        }
+            },
+        )
     }
 
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_NEWEST")
-    fun listStatusNewest(status: String): PagingSource<Int, ItemSummaryRow>
+    /** Backs [pagedItems]; the observed tables are every table [itemListSql] can read. */
+    @RawQuery(
+        observedEntities = [
+            ItemEntity::class, ItemTagEntity::class, ContentFileEntity::class, PendingOpEntity::class, ItemFtsEntity::class,
+        ],
+    )
+    fun pagedItemsRaw(query: RoomRawQuery): PagingSource<Int, ItemSummaryRow>
 
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_OLDEST")
-    fun listStatusOldest(status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_SHORTEST")
-    fun listStatusShortest(status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_STATUS $ORDER_LONGEST")
-    fun listStatusLongest(status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_NEWEST")
-    fun listFavNewest(): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_OLDEST")
-    fun listFavOldest(): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_SHORTEST")
-    fun listFavShortest(): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $LIST_FROM $SCOPE_FAV $ORDER_LONGEST")
-    fun listFavLongest(): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_NEWEST")
-    fun listTagNewest(tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_OLDEST")
-    fun listTagOldest(tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_SHORTEST")
-    fun listTagShortest(tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $FROM_TAG $SCOPE_TAG $ORDER_LONGEST")
-    fun listTagLongest(tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_NEWEST")
-    fun searchStatusNewest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_OLDEST")
-    fun searchStatusOldest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_SHORTEST")
-    fun searchStatusShortest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.status = :status $ORDER_LONGEST")
-    fun searchStatusLongest(match: String, status: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_NEWEST")
-    fun searchFavNewest(match: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_OLDEST")
-    fun searchFavOldest(match: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_SHORTEST")
-    fun searchFavShortest(match: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_FROM WHERE $MATCH AND i.is_favorite = 1 $ORDER_LONGEST")
-    fun searchFavLongest(match: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_NEWEST")
-    fun searchTagNewest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_OLDEST")
-    fun searchTagOldest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_SHORTEST")
-    fun searchTagShortest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
-
-    @Query("$ROW_COLUMNS $SEARCH_TAG_FROM WHERE $MATCH AND t.name_key = :tagKey $ORDER_LONGEST")
-    fun searchTagLongest(match: String, tagKey: String): PagingSource<Int, ItemSummaryRow>
+    /**
+     * "Continue reading": unread items read between 5 % and 95 %, most recently read first, at most
+     * [limit] (proposal 08).
+     */
+    @Query(
+        """$ROW_COLUMNS $LIST_FROM WHERE i.status = 'UNREAD'
+           AND i.progress >= $CONTINUE_FROM AND i.progress <= $CONTINUE_TO
+           ORDER BY i.last_read_at DESC, i.id DESC LIMIT :limit""",
+    )
+    fun observeContinueReading(limit: Int): Flow<List<ItemSummaryRow>>
 
     // ---- Search (R8) --------------------------------------------------------------------------
 

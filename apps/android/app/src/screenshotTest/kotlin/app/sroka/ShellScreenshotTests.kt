@@ -132,6 +132,8 @@ private fun MyListPane() {
                     selectedItemId = "i2",
                     twoPane = true,
                     navRailShown = true,
+                    topTags = listOf("birds", "longreads", "rust"),
+                    onOpenTags = {},
                 )
             }
 
@@ -272,12 +274,12 @@ fun ShellSearchEmptyDetailDark() = ShellFixture(darkTheme = true, list = { Searc
 @PreviewTest
 @UnfoldedPreviews
 @Composable
-fun ShellTagsDark() = ShellFixture(darkTheme = true, selectedTab = 3, list = { TagsPane() }) { TagItemsPane() }
+fun ShellTagsDark() = ShellFixture(darkTheme = true, selectedTab = 2, list = { TagsPane() }) { TagItemsPane() }
 
 @PreviewTest
 @UnfoldedPreviews
 @Composable
-fun ShellTagsLight() = ShellFixture(darkTheme = false, selectedTab = 3, list = { TagsPane() }) { TagItemsPane() }
+fun ShellTagsLight() = ShellFixture(darkTheme = false, selectedTab = 2, list = { TagsPane() }) { TagItemsPane() }
 
 /** R14.3: list pane collapsed to 0, rail stays, the reader card spans the rest (column stays <= 640dp, centred). */
 @PreviewTest

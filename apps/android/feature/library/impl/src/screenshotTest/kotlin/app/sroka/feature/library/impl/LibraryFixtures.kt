@@ -26,7 +26,9 @@ private fun summary(
     kind: ItemKind = ItemKind.ARTICLE,
     fileSize: Long? = null,
     thumbnailPath: String? = null,
+    parseError: String? = null,
 ) = ItemSummary(
+    parseError = parseError,
     id = id,
     displayTitle = title,
     domain = domain,
@@ -53,6 +55,7 @@ internal val sampleItems: List<ItemSummary> = listOf(
     summary("i4", "Notes on tagging a growing library", "blog.example.dev", 5, progress = 1f, offline = OfflineState.DOWNLOADED, pending = PendingChange.TAGS),
     summary("i5", "Starring from the train, syncing later", "offline.example.io", 3, favorite = true, pending = PendingChange.FAVORITE),
     summary("i6", "A page that only half parsed", "partial.example.com", 6, parse = ParseStatus.PARTIAL),
+    summary("i6p", "Behind a paywall: only the preview was saved", "paper.example.com", 4, parse = ParseStatus.PARTIAL, parseError = "paywalled"),
     summary("i7", "Downloading this one right now", "fetching.example.com", 11, offline = OfflineState.DOWNLOADING),
     summary("i8", "Available offline on this device", "saved.example.com", 8, offline = OfflineState.DOWNLOADED),
     summary("i9", "Couldn't read this page at all", "blocked.example.com", null, parse = ParseStatus.FAILED),
@@ -95,3 +98,12 @@ internal val sampleTags = listOf(
     TagCount("nature", 7),
     TagCount("tech", 21),
 )
+
+/** "Continue reading" strip: started, not finished. */
+internal val sampleContinueReading: List<ItemSummary> = listOf(
+    summary("c1", "How a magpie decides what to collect", "nature.example.org", 9, progress = 0.4f),
+    summary("c2", "The slow web: why reading later still matters", "longreads.example.com", 14, progress = 0.72f),
+    summary("c3", "A field guide to corvid intelligence", "birds.example.org", null, progress = 0.1f),
+)
+
+internal val sampleTopTags: List<String> = listOf("birds", "longreads", "rust", "design", "cooking")

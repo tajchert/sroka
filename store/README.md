@@ -35,7 +35,7 @@ Prereqs: developer account, `app/google-services.json` in place, `./gradlew :app
 
 ## After the first upload (post-upload steps)
 1. Chrome Web Store assigns the extension id (Dashboard > item > Package). Add it:
-   - API: `EXT_ID` is a single value today (`workers/api/src/auth.ts` builds `chrome-extension://${env.EXT_ID}`), so it must trust BOTH the unpacked id `gmfnkkciofcaafddbcgphofiikmplema` and the store id. Extend `trustedOrigins` to accept a comma-separated list (or a second var), set it on the worker, redeploy `sroka-api`. Without this, store users cannot sign in ("Invalid origin").
+   - API: `EXT_ID` (worker secret) is a comma-separated list. In `workers/api` run `npx wrangler secret put EXT_ID` with `gmfnkkciofcaafddbcgphofiikmplema,<storeId>` (keep the unpacked id; the secret is replaced, not appended). No redeploy needed. Without this, store users cannot sign in ("Invalid origin").
    - Web: add the store id to `EXTENSION_IDS` in `apps/web/src/lib/extension.ts`, rebuild and deploy (re-save with extension pings these ids).
 2. When listings are live, replace the `https://sroka.app/#get` placeholders:
    - `apps/web/src/lib/links.ts` (`EXTENSION_URL`, `ANDROID_URL`; update the Onboarding test that expects `#get`)

@@ -63,7 +63,9 @@ export default function SignIn() {
     try {
       await api.verifyOtp(email.trim(), value);
       track({ name: "login", params: { method: "email_otp" } });
-      qc.clear();
+      // Drop the previous user's cache but keep the `me` query itself: clear() would destroy the query Shell is
+      // observing, so the invalidate below would have nothing to refetch and the app would stay on this screen.
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
       await qc.invalidateQueries({ queryKey: ["me"] });
     } catch (e) {
       fail(e);

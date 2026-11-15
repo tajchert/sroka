@@ -106,7 +106,7 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
         <div className="flex items-start gap-3">
-          <h3 className={`flex-1 text-[17px] leading-[1.3] font-semibold tracking-[-.005em] text-pretty ${done ? "text-ink2" : ""}`}>
+          <h3 className={`flex-1 line-clamp-2 min-w-0 text-[17px] leading-[1.3] font-semibold tracking-[-.005em] text-pretty ${done ? "text-ink2" : ""}`}>
             {temp ? (
               <span>{itemTitle(item)}</span>
             ) : (
@@ -123,7 +123,7 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
                 rel="noopener noreferrer"
                 title="Open original"
                 aria-label="Open original"
-                className="flex size-8 items-center justify-center rounded-lg text-ink2 hover:bg-paper3 hover:text-ink pointer-coarse:size-11"
+                className="hidden size-8 items-center justify-center rounded-lg text-ink2 hover:bg-paper3 hover:text-ink sm:flex pointer-coarse:size-11"
               >
                 <ExternalIcon size={18} />
               </a>
@@ -200,13 +200,17 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
             <TagEditor tags={item.tags} onChange={(tags) => void actions.setTags(item, tags)} />
           </div>
         )}
-        {status === "pending" ? (
-          <div data-testid="excerpt-skeleton" aria-hidden className="flex h-[21px] items-center">
-            <div className="h-3 w-3/4 animate-pulse rounded bg-paper3" />
-          </div>
-        ) : (
-          item.excerpt && <p className="line-clamp-2 text-sm leading-normal text-ink2/85">{item.excerpt}</p>
-        )}
+        {/* Two excerpt lines are always reserved (skeleton, text or nothing), so a status never changes the row's height. */}
+        <div className="min-h-[42px]">
+          {status === "pending" ? (
+            <div data-testid="excerpt-skeleton" aria-hidden className="flex h-[42px] flex-col justify-center gap-2">
+              <div className="h-3 w-3/4 animate-pulse rounded bg-paper3" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-paper3" />
+            </div>
+          ) : (
+            item.excerpt && <p className="line-clamp-2 text-sm leading-normal text-ink2/85">{item.excerpt}</p>
+          )}
+        </div>
       </div>
     </li>
   );

@@ -5,7 +5,7 @@ Monorepo (npm workspaces). Product/design: `docs/sroka-system-design.md` (long �
 Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.md` (use `log` from `@sroka/shared`, never bare `console.*`; never log secrets, emails, article content).
 
 ## Layout
-- `packages/shared` — zod schemas, sync op types, URL normalizer, UUIDv7, content-URL signing (TS source, no build)
+- `packages/shared` — zod schemas, sync op types, URL normalizer, UUIDv7, content-URL signing, `src/vocab.ts` (`VOCAB` words + `failureReason()` plain parse-failure reasons shared by web/extension; Android mirrors them in `strings.xml`) (TS source, no build)
 - `packages/extractor` — fetch/Readability/sanitize/images/package (pure, node+workers)
 - `workers/api` — Worker `sroka-api`: Hono, Better Auth, `LibraryDO`, `/v1`, content route, static web assets
 - `workers/parser` — Worker `sroka-parser`: queue consumer for `sroka-parse`

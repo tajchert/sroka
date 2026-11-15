@@ -13,3 +13,10 @@ Built to `dist/`, served by `sroka-api` as static assets (same origin as `/v1` a
 ## Decisions that apply
 D8 (stack, same-origin `credentials: "same-origin"`, reader = sandboxed iframe srcdoc with `<base href={baseUrl}>` from `GET /v1/items/:id/content`), D7, D4 (cookie auth via Better Auth email OTP; `better-auth/react` client available), D1 scope.
 Contract: `docs/api.md`; validate/parse with `@sroka/shared` schemas. Use the `frontend-design` skill; brand = magpie (black/white + iridescent blue-green). Only extra dep: `firebase` (D15; lazy, consent-gated; config `firebase.config.json`, see `lib/analytics.ts`, `lib/consent.ts`).
+
+## Reader end card (`lib/reader.ts`, `routes/Reader.tsx`)
+The finish card is drawn inside the sandboxed frame (the parent never touches frame DOM), over postMessage:
+- Frame → parent: `sroka:fits` (article fits without scrolling, sent after load/resize/settings; progress is not reported or stored), `sroka:metrics` (progress ≥ 0.98 latches `reachedEnd`), `sroka:endAction` `{action: "archive" | "keep" | "next"}`.
+- Parent → frame: `sroka:endCard` `{card}` with final strings (`endCardModel`) or `null` to clear. Frame code writes them with `textContent` only.
+- The frame always appends an empty `#sroka-end` block (min-height 19rem, replaces the bottom padding) so showing/hiding the card never changes scroll height, hence never the progress maths or resume anchor. Keep that block reserved; don't append content after it.
+- Card shows only for readable items (`ok`/`partial`, not PDF) once `reachedEnd` and the next-item lookup (`useNextItem`) has answered; "Keep" hides it for the visit.

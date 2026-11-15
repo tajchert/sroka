@@ -95,7 +95,8 @@ const ICON_ARCHIVE = `<path d="M3.5 5h17v4h-17z M5 9v10h14V9 M10 13h4" fill="non
  * The only script that runs in the sandboxed iframe. Talks to the parent via postMessage only.
  * End card: the frame reserves an always-present `#sroka-end` block (so showing the card never changes the
  * scroll height, hence never the progress maths) and fills it when the parent sends `sroka:endCard`; button
- * clicks go back as `sroka:endAction`. No inline handlers: listeners are added here, under the nonce.
+ * clicks go back as `sroka:endAction`. An article that fits without scrolling never produces a scroll event
+ * (and would report progress 0), so the frame says `sroka:fits` after load/resize/settings instead; progress is untouched. No inline handlers: listeners are added here, under the nonce.
  */
 export function readerScript(): string {
   return `(function(){
@@ -119,16 +120,17 @@ end.appendChild(c)}
 function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,l=anchors(),a=null;
 for(var i=0;i<l.length;i++){if(l[i].getBoundingClientRect().bottom>1){a=i;break}}
 post({type:"sroka:metrics",progress:p,anchor:a})}
+function fits(){var s=sc();if(s.clientHeight>0&&s.scrollHeight-s.clientHeight<=1)post({type:"sroka:fits"})}
 function restore(){if(pending==null)return;var el=anchors()[pending],s=sc();if(el&&s.clientHeight>0){s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8}}
 addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-last>=150){last=n;report()}else{timer=setTimeout(function(){last=Date.now();report()},150)}},{passive:true});
 ["wheel","touchstart","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
 addEventListener("message",function(e){if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=="object")return;
 if(d.type==="sroka:scrollToAnchor"&&typeof d.anchor==="number"){pending=d.anchor;if(!user)restore()}
 else if(d.type==="sroka:scrollToTop"){pending=null;user=true;sc().scrollTop=0;report()}
-else if(d.type==="sroka:settings"&&d.vars){for(var k in d.vars){root.style.setProperty(k,d.vars[k])}}
+else if(d.type==="sroka:settings"&&d.vars){for(var k in d.vars){root.style.setProperty(k,d.vars[k])}requestAnimationFrame(fits)}
 else if(d.type==="sroka:endCard"){renderEnd(d.card)}});
-addEventListener("load",function(){if(!user)restore()});
-addEventListener("resize",function(){if(!user)restore()});
+addEventListener("load",function(){if(!user)restore();fits()});
+addEventListener("resize",function(){if(!user)restore();fits()});
 document.addEventListener("DOMContentLoaded",function(){if(document.body){end=el("div");end.id="sroka-end";document.body.appendChild(end)}post({type:"sroka:ready"})});
 })();`;
 }

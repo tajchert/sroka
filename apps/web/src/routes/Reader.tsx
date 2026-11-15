@@ -248,6 +248,9 @@ function ReaderView() {
         setLiveProgress(pendingProgress.current.progress);
         if (pendingProgress.current.progress >= FINISHED_THRESHOLD) setReachedEnd(true);
         flushTimer.current ??= setTimeout(flush, 3000);
+      } else if (d.type === "sroka:fits") {
+        // Nothing to scroll: the whole article is on screen, so the finish card may show. Progress stays as it is.
+        setReachedEnd(true);
       } else if (d.type === "sroka:endAction" && isEndAction(d.action)) {
         endAction.current(d.action);
       }

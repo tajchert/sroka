@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   getItem: (() => new Promise(() => undefined)) as (id: string) => Promise<unknown>,
   listItems: (async () => ({ items: [], nextCursor: null })) as () => Promise<unknown>,
   setArchived: undefined as unknown as ReturnType<typeof import("vitest").vi.fn>,
+  updates: [] as string[],
 }));
 
 vi.mock("../lib/api.ts", async (orig) => {
@@ -22,7 +23,7 @@ vi.mock("../lib/api.ts", async (orig) => {
       listItems: () => h.listItems(),
       getContent: async () => ({ articleUrl: "https://c.sroka.app/a/article.html", baseUrl: "https://c.sroka.app/a/" }),
       fetchArticle: async () => "<article><h1>T</h1><p>Body</p></article>",
-      updateItem: (id: string) => h.getItem(id),
+      updateItem: (id: string) => (h.updates.push(id), h.getItem(id)),
     },
   };
 });
@@ -153,6 +154,19 @@ describe("Reader", () => {
       // The card stays up if the reader scrolls back a little (latched for the visit).
       await f.progress(0.9);
       expect(f.cards().at(-1)).not.toBeNull();
+    });
+
+    it("shows the card for an article that fits without scrolling, without touching its progress", async () => {
+      h.getItem = async () => item();
+      h.listItems = async () => ({ items: list, nextCursor: null });
+      h.updates.length = 0;
+      mount();
+      const f = await frame();
+      await f.ready();
+      expect(f.cards().at(-1)).toBeNull();
+      await f.send({ type: "sroka:fits" });
+      await waitFor(() => expect(f.cards().at(-1)).toMatchObject({ finished: "Finished", primary: "Archive & next" }));
+      expect(h.updates).toHaveLength(0);
     });
 
     it("Archive & next archives the item and opens the next item's reader", async () => {

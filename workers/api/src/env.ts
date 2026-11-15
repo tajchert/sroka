@@ -25,7 +25,7 @@ export interface Env {
   ADMIN_EMAILS?: string;
   BETTER_AUTH_SECRET: string;
   CONTENT_URL_SIGNING_KEY: string;
-  /** Published extension id (adds chrome-extension://<id> to trustedOrigins). */
+  /** Comma-separated extension ids (unpacked + Web Store); each adds chrome-extension://<id> to trustedOrigins. */
   EXT_ID?: string;
   /** Turnstile site key (public var; served via GET /v1/config). */
   TURNSTILE_SITE_KEY?: string;

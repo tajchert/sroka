@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, emailOTP } from "better-auth/plugins";
 import { createAuthMiddleware } from "better-auth/api";
 import { drizzle } from "drizzle-orm/d1";
+import { log } from "@sroka/shared";
 import type { Env } from "./env.ts";
 import * as schema from "./db/auth-schema.ts";
 import { sendOtpEmail } from "./email.ts";
@@ -14,6 +15,16 @@ export type WaitUntil = { waitUntil(p: Promise<unknown>): void };
 /** Parse DEV_ORIGINS (comma-separated) into a clean list. */
 export function devOrigins(env: Pick<Env, "DEV_ORIGINS">): string[] {
   return (env.DEV_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+/** Parse EXT_ID (comma-separated Chrome extension ids) into valid ids; invalid entries are skipped with a warning. */
+export function extensionIds(env: Pick<Env, "EXT_ID">): string[] {
+  const out: string[] = [];
+  for (const id of (env.EXT_ID ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+    if (/^[a-p]{32}$/.test(id)) out.push(id);
+    else log.warn("ignoring invalid EXT_ID entry", { event: "ext_id.invalid", length: id.length });
+  }
+  return out;
 }
 
 function randomOtp(len: number): string {
@@ -35,7 +46,7 @@ export function createAuth(env: Env, ctx?: WaitUntil) {
   const trustedOrigins = [
     env.APP_ORIGIN,
     env.API_ORIGIN,
-    ...(env.EXT_ID ? [`chrome-extension://${env.EXT_ID}`] : []),
+    ...extensionIds(env).map((id) => `chrome-extension://${id}`),
     ...(dev ? ["chrome-extension://*"] : []),
     ...devOrigins(env),
   ];

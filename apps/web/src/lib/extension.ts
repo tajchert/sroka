@@ -11,7 +11,7 @@
 
 /**
  * Extension ids to try, in order. Unpacked/dev build (manifest `key`) first. Add the Chrome Web Store id here once the
- * listing exists (one line); the API's `EXT_ID` must trust it too.
+ * listing exists (one line); the API's `EXT_ID` (comma-separated list) must include it too.
  */
 export const EXTENSION_IDS: readonly string[] = ["gmfnkkciofcaafddbcgphofiikmplema"];
 

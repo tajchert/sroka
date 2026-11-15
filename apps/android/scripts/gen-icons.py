@@ -37,6 +37,7 @@ ICONS = [
     ("DownloadForOffline", "download_for_offline", 0, False),
     ("Downloading", "downloading", 0, False),
     ("DownloadingFilled", "downloading", 1, False),
+    ("ErrorFilled", "error", 1, False),
     ("FolderZip", "folder_zip", 0, False),
     ("FormatSize", "format_size", 0, False),
     ("Inbox", "inbox", 0, False),

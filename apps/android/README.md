@@ -12,9 +12,13 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
   suggestions), or tap *Add* (clipboard prefill). Saving works offline and syncs later; re-saving a URL moves it back
   to My List.
 - **Library**: My List · Archive · Favorites · Tags (bottom bar on phones, rail on larger windows). Paged lists with
-  thumbnails and offline badges, swipe to archive or favorite (with undo), long-press actions (favorite, archive,
+  thumbnails, swipe to archive or favorite (with undo), long-press actions (favorite, archive,
   edit tags, share, open original, refresh, delete), four sort orders, local full-text search over title, excerpt,
   site, tags and downloaded article text. Tags tab with counts, rename and delete.
+  Rows are title + `domain · N min` + thumbnail, the same height in every state, and flag only exceptions: an icon
+  badge on the thumbnail (waiting to sync, couldn't save the text, partial copy, downloading, not on this device; a
+  spinner while preparing) and a retry button on failed rows. Ready/downloaded rows show nothing extra. Reading
+  progress shows as a thin bar on the thumbnail and `N min left`, then a ✓ Read mark from 98%.
 - **Fetch new articles**: one button in the top bar (or pull to refresh) syncs and downloads every new article for
   offline reading, with progress under the top bar ("Downloading 3 of 12"), a progress notification and a result
   snackbar. Background sync runs on app start/foreground, after edits and hourly.

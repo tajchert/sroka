@@ -18,6 +18,7 @@ private fun summary(
     domain: String,
     minutes: Int? = 7,
     favorite: Boolean = false,
+    progress: Float = 0f,
     parse: ParseStatus = ParseStatus.OK,
     offline: OfflineState = OfflineState.AVAILABLE_REMOTE,
     pending: PendingChange? = null,
@@ -33,7 +34,7 @@ private fun summary(
     readingMinutes = minutes,
     status = status,
     isFavorite = favorite,
-    progress = 0f,
+    progress = progress,
     parseStatus = parse,
     offline = offline,
     thumbnailPath = thumbnailPath,
@@ -44,16 +45,19 @@ private fun summary(
     fileSize = fileSize,
 )
 
-/** One row per status line (R6), plus a favourite and an ordinary row. */
+/** One row per row state (badge, progress, read, failed, preparing), plus a favorite and an ordinary row. */
 internal val sampleItems: List<ItemSummary> = listOf(
-    summary("i1", "How a magpie decides what to collect", "nature.example.org", 9, favorite = true, offline = OfflineState.DOWNLOADED),
+    summary("i1", "How a magpie decides what to collect", "nature.example.org", 9, favorite = true, progress = 0.4f, offline = OfflineState.DOWNLOADED),
     summary("i2", "The slow web: why reading later still matters", "longreads.example.com", 14),
     summary("i3", "A saved link that has not reached the server yet", "draft.example.net", null, pending = PendingChange.SAVE),
-    summary("i4", "Notes on tagging a growing library", "blog.example.dev", 5, pending = PendingChange.TAGS),
+    summary("i4", "Notes on tagging a growing library", "blog.example.dev", 5, progress = 1f, offline = OfflineState.DOWNLOADED, pending = PendingChange.TAGS),
     summary("i5", "Starring from the train, syncing later", "offline.example.io", 3, favorite = true, pending = PendingChange.FAVORITE),
     summary("i6", "A page that only half parsed", "partial.example.com", 6, parse = ParseStatus.PARTIAL),
     summary("i7", "Downloading this one right now", "fetching.example.com", 11, offline = OfflineState.DOWNLOADING),
     summary("i8", "Available offline on this device", "saved.example.com", 8, offline = OfflineState.DOWNLOADED),
+    summary("i9", "Couldn't read this page at all", "blocked.example.com", null, parse = ParseStatus.FAILED),
+    summary("i10", "Just saved, the server is still parsing it", "fresh.example.com", null, parse = ParseStatus.PENDING, offline = OfflineState.NONE),
+    summary("i11", "Finished reading this one last night", "done.example.com", 12, progress = 1f, offline = OfflineState.DOWNLOADED),
 )
 
 /** Library rows with PDFs: one downloaded, one waiting for its first sync, one with a first-page preview. */

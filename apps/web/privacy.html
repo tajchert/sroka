@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="How Sroka collects, uses and protects your data." />
+    <meta name="description" content="What Sroka keeps, why, and how to delete it." />
     <title>Privacy Policy · Sroka</title>
     <link rel="canonical" href="https://sroka.app/privacy" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -45,74 +45,48 @@
 
     <main class="wrap">
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: 6 November 2026</p>
+      <p class="updated">Last updated: 15 November 2026</p>
 
       <div class="summary">
         <ul>
-          <li>We keep what you save so you can read it on your devices. We don't sell it, and we show no ads.</li>
-          <li>Usage analytics (Google Analytics for Firebase) are <strong>off until you allow them</strong>.</li>
-          <li>Crash reports are on by default and can be turned off in Settings.</li>
-          <li>You can export your library and delete your account at any time.</li>
+          <li>Sroka saves articles so you can read them later. We keep what you save, and only to show it back to you.</li>
+          <li>No ads, no selling data, no AI training on your library.</li>
+          <li>Usage analytics are off unless you turn them on. Crash reports can be turned off in Settings.</li>
+          <li>Export your library or delete your account any time.</li>
         </ul>
       </div>
 
-      <h2 id="who">Who we are</h2>
-      <p>Sroka (the website sroka.app, the Android app and the browser extension) is run by Michal Tajchert, Poland, who is the data controller. Contact: <a href="mailto:hello@sroka.app">hello@sroka.app</a>.</p>
-
-      <h2 id="data">What we collect</h2>
+      <h2 id="data">What we keep</h2>
       <ul>
-        <li><strong>Account:</strong> your email address and the one-time sign-in codes we send to it.</li>
-        <li><strong>Your library:</strong> the links, articles, PDFs and pages you save (including the page copy the browser extension captures), tags, favorites, archive status, reading progress, and files you import.</li>
-        <li><strong>Sign-in sessions:</strong> the IP address and device/browser type of each signed-in session, to keep your account secure.</li>
-        <li><strong>Server logs:</strong> technical request data (time, route, status, approximate location derived by our hosting provider). Your user id appears in logs only as a one-way hash, and logs never contain article content or your full email.</li>
-        <li><strong>Crash and error reports:</strong> on Android via Firebase Crashlytics (device model, OS version, app version, stack trace); on the web and in the extension we send them to our own server. Reports never contain what you saved or read.</li>
-        <li><strong>Usage analytics, only if you allow them:</strong> which screens and features are used (for example "an item was saved from the share sheet"), with an app-generated identifier, via Google Analytics for Firebase. We never send links, titles, search terms, tag names or your email to analytics, and advertising identifiers are disabled.</li>
+        <li><strong>Your email</strong>, to send you sign-in codes.</li>
+        <li><strong>Your library</strong>: the links, pages, PDFs and imports you save, with tags, favorites and reading progress.</li>
+        <li><strong>Sign-in sessions</strong>: IP address and device type, to keep your account secure.</li>
+        <li><strong>Crash reports</strong>: device model, OS and app version, the error, and an app install ID. They never include what you save or read.</li>
+        <li><strong>Usage analytics, only if you allow them</strong>: which features are used (for example "an article was saved"), with a random app ID. Never links, titles, searches or your email.</li>
+        <li><strong>On your device</strong>: a sign-in cookie and your settings. The apps keep an offline copy of your library; signing out removes it.</li>
       </ul>
+      <p>We use this to run Sroka for you and keep it secure; analytics only with your consent.</p>
 
-      <h2 id="use">How we use it and why</h2>
+      <h2 id="processing">How saving works</h2>
+      <p>When you save a link, our server fetches the page and makes a clean, readable copy, so the website sees our server, not you. Pages saved with the browser extension and PDFs you upload stay private to your account.</p>
+
+      <h2 id="processors">Services we use</h2>
       <ul>
-        <li>To run the service you asked for: store and sync your library, fetch and clean up articles, send sign-in codes (performance of a contract).</li>
-        <li>To keep it secure and working: sessions, logs, abuse protection, crash and error reports (our legitimate interest in a reliable, safe service).</li>
-        <li>To understand how Sroka is used and improve it: usage analytics (your consent, which you can withdraw at any time in Settings).</li>
+        <li><strong>Cloudflare</strong>: hosting, storage, sign-in emails and bot protection.</li>
+        <li><strong>Google</strong>: Firebase Crashlytics (Android crash reports), Google Analytics (only if you allow it), and Google Fonts for our typeface.</li>
       </ul>
-      <p>We don't sell your data, use it for advertising, or train AI models on your library.</p>
-
-      <h2 id="processing">How saving an article works</h2>
-      <p>When you save a link, our servers download the page to make a readable copy. The website sees a request from our servers, not from you. For some sites we use public APIs instead: for X/Twitter posts only the post id is sent to FxTwitter or X's embed service, and for Hacker News threads to Algolia and the Hacker News API. A clean copy of a public article may be cached and reused when other people save the same link; it is never linked to who saved it. Pages captured by the extension and uploaded PDFs stay private to your account.</p>
-
-      <h2 id="processors">Who processes data for us</h2>
-      <ul>
-        <li><strong>Cloudflare, Inc.</strong>: hosting, database and file storage, email delivery, bot protection (Turnstile) on sign-in, page rendering.</li>
-        <li><strong>Google LLC</strong> (Firebase): Crashlytics crash reports on Android, and Google Analytics for Firebase if you allow analytics.</li>
-      </ul>
-      <p>Both may process data outside the European Economic Area, under the EU–US Data Privacy Framework and the European Commission's standard contractual clauses.</p>
 
       <h2 id="retention">How long we keep it</h2>
-      <ul>
-        <li>Your account and library: until you delete them or your account.</li>
-        <li>Server logs: up to 30 days. Aggregated usage counters: up to 3 months.</li>
-        <li>Crash reports: up to 90 days. Analytics: up to 2 months.</li>
-      </ul>
-
-      <h2 id="rights">Your choices and rights</h2>
-      <ul>
-        <li>Turn usage analytics and crash reports on or off in the Settings of each app.</li>
-        <li>Export your library (CSV or JSON) from Settings.</li>
-        <li>Under the GDPR you can ask us for access to, correction, deletion, restriction or a copy of your data, and object to processing based on legitimate interest. Write to <a href="mailto:hello@sroka.app">hello@sroka.app</a>.</li>
-        <li>You can complain to a data protection authority; in Poland this is the President of the Personal Data Protection Office (UODO, uodo.gov.pl).</li>
-      </ul>
+      <p>Your account and library: until you delete them. Server logs: up to 30 days. Crash reports: up to 90 days. Analytics: up to 2 months.</p>
 
       <h2 id="delete-account">Deleting your account</h2>
-      <p>In the Android app or on <a href="/app/">sroka.app/app</a>, open <strong>Settings → Delete account</strong>. This immediately deletes your account, your whole library, your uploaded files and your sign-in sessions. If you can't sign in, email <a href="mailto:hello@sroka.app">hello@sroka.app</a> from the address of your account and we'll delete it within 30 days. Server logs and crash reports expire on the schedule above.</p>
+      <p>In the Android app or at <a href="/app/">sroka.app/app</a>, open <strong>Settings → Delete account</strong>. Your account, library, files and sessions are deleted right away. Can't sign in? Email <a href="mailto:hello@sroka.app">hello@sroka.app</a> from your account's address and we'll delete it within 30 days.</p>
 
-      <h2 id="storage">Storage on your device</h2>
-      <p>The website uses a sign-in cookie and stores your preferences in your browser. If you allow analytics, Google Analytics sets its own cookies. The apps keep a copy of your library on your device for offline reading; signing out removes it.</p>
+      <h2 id="rights">Your rights</h2>
+      <p>You can ask to see, correct, export or delete your data at <a href="mailto:hello@sroka.app">hello@sroka.app</a> (export is also in Settings). If you're in the EU, you can also contact your data protection authority (in Poland: UODO).</p>
 
-      <h2 id="children">Children</h2>
-      <p>Sroka isn't meant for children under 16, and we don't knowingly collect their data.</p>
-
-      <h2 id="changes">Changes</h2>
-      <p>If we change this policy, we'll update the date at the top. For important changes we'll let you know in the app or by email.</p>
+      <h2 id="who">Who we are</h2>
+      <p>Sroka (sroka.app, the Android app and the browser extension) is run by Michal Tajchert, Poland. Sroka isn't meant for children under 16. If this policy changes, we'll update the date above and tell you in the app for anything important.</p>
     </main>
 
     <footer class="foot">

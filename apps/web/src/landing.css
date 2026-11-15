@@ -143,14 +143,6 @@ svg {
   background: #2a2d35;
   color: var(--cream);
 }
-.btn-outline {
-  border: 2px solid var(--ink);
-  color: var(--ink);
-}
-.btn-outline:hover {
-  background: var(--ink);
-  color: var(--cream);
-}
 .btn-sm {
   padding: 10px 18px;
   font-weight: 500;
@@ -159,10 +151,6 @@ svg {
   padding: 16px 26px;
   font-size: 17px;
   font-weight: 600;
-}
-.btn-outline.btn-lg {
-  padding: 14px 24px;
-  font-weight: 500;
 }
 .hatch {
   background: repeating-linear-gradient(135deg, #e2dfd7 0 6px, #ebe9e3 6px 12px);
@@ -176,14 +164,34 @@ svg {
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 56px), 0 100%);
   padding-bottom: 140px;
 }
+/* Stacked layout: the band hangs off the hero's bottom edge, far below the copy (the artwork sits between). */
 .stripe {
   position: absolute;
+  z-index: -1;
   left: -10%;
   right: -10%;
   bottom: 150px;
   height: 64px;
   background: var(--blue);
   transform: rotate(-8deg);
+}
+/* Two columns (2 × gutter + 420 + 56 + 520: the width at which .hero-body fits one row). The band is anchored to the
+   copy column, not the hero edge: pivot = the column's bottom-right corner plus a gap, so the top edge never passes
+   above that point anywhere left of it, whatever the copy height or width. It rises to the right behind the artwork. */
+@media (min-width: 1044px) {
+  .hero {
+    padding-bottom: 160px; /* the band's low left end stays inside the hero up to ~1920px */
+  }
+  .hero-copy {
+    position: relative;
+  }
+  .stripe {
+    top: calc(100% + 28px);
+    bottom: auto;
+    left: -100vw;
+    right: -100vw;
+    transform-origin: calc(100% - 100vw) 0;
+  }
 }
 .nav {
   position: relative;
@@ -215,7 +223,6 @@ svg {
   color: var(--blue);
 }
 .hero-body {
-  position: relative;
   padding-top: 72px;
   display: flex;
   flex-wrap: wrap;
@@ -276,7 +283,33 @@ h1 .sizer {
 .cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 12px;
+}
+/* One primary action per device; the other platform is a quiet text link. */
+.cta-alt {
+  padding: 12px 4px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 5px;
+  white-space: nowrap;
+}
+.cta-alt:hover {
+  color: var(--blue);
+  text-decoration-color: currentColor;
+}
+.cta-alt .btn-arrow {
+  margin-left: 6px;
+}
+.platforms-line {
+  width: 100%;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
 }
 /* Signed-in visitors (landing.ts sets html.signed-in): the hero and nav CTAs open the app instead. */
 .signed-in.btn,
@@ -296,7 +329,8 @@ html.signed-in .signed-in.btn {
   margin-left: 10px;
   transition: transform 0.15s ease;
 }
-.btn:hover .btn-arrow {
+.btn:hover .btn-arrow,
+.cta-alt:hover .btn-arrow {
   transform: translateX(3px);
 }
 
@@ -1048,10 +1082,11 @@ html.signed-in .signed-in.btn {
   }
   .cta {
     flex-direction: column;
-    gap: 10px;
+    align-items: stretch;
+    row-gap: 2px;
+    text-align: center;
   }
-  .btn-lg,
-  .btn-outline.btn-lg {
+  .btn-lg {
     height: 52px;
     padding: 0 24px;
   }

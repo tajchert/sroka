@@ -27,6 +27,8 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.feature.reader.impl.EffectiveTheme
 import app.sroka.feature.reader.impl.ProgressReport
 import app.sroka.feature.reader.impl.ReaderHtml
@@ -41,6 +43,8 @@ private class WebState {
     var loadedHtml: String? = null
     var theme: EffectiveTheme? = null
     var scale: Float = 0f
+    var font: ReaderFont? = null
+    var lineSpacing: ReaderLineSpacing? = null
     var topSignal: Int = 0
     var header: String = ""
     var appliedHeader: String = ""
@@ -54,7 +58,7 @@ private class WebState {
  * Hardened WebView showing an already wrapped article document (DECISIONS A10). Files come from
  * [articlesDir] through WebViewAssetLoader; no file/content access, no network loads.
  *
- * [html] must be produced by `ReaderHtml.wrap`; [theme]/[textScale] changes after load are applied by script.
+ * [html] must be produced by `ReaderHtml.wrap`; [theme]/[textScale]/[font]/[lineSpacing] changes after load are applied by script.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -64,6 +68,8 @@ internal fun ArticleWebView(
     articlesDir: File,
     theme: EffectiveTheme,
     textScale: Float,
+    font: ReaderFont,
+    lineSpacing: ReaderLineSpacing,
     onProgress: (ProgressReport) -> Unit,
     onLinkClick: (String) -> Unit,
     onRendererGone: () -> Unit,
@@ -160,11 +166,15 @@ internal fun ArticleWebView(
                 state.userTouched = false
                 state.theme = theme
                 state.scale = textScale
+                state.font = font
+                state.lineSpacing = lineSpacing
                 view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
-            } else if (state.theme != theme || state.scale != textScale) {
+            } else if (state.theme != theme || state.scale != textScale || state.font != font || state.lineSpacing != lineSpacing) {
                 state.theme = theme
                 state.scale = textScale
-                view.evaluateJavascript(ReaderHtml.appearanceScript(theme, textScale), null)
+                state.font = font
+                state.lineSpacing = lineSpacing
+                view.evaluateJavascript(ReaderHtml.appearanceScript(theme, textScale, font, lineSpacing), null)
             }
             if (headerScript.isNotEmpty() && headerScript != state.appliedHeader && state.pageReady) {
                 state.appliedHeader = headerScript

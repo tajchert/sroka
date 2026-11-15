@@ -3,6 +3,10 @@ package app.sroka.feature.reader.impl.ui
 import app.sroka.core.designsystem.icon.SrokaIcons
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,6 +83,9 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlin.math.roundToInt
 import app.sroka.feature.reader.impl.minutesLeft
+import app.sroka.feature.reader.impl.FailureReason
+import app.sroka.feature.reader.impl.failureReason
+import app.sroka.feature.reader.impl.isPreviewOnly
 import app.sroka.feature.reader.impl.textSizePx
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalDensity
@@ -119,6 +126,8 @@ internal fun ReaderScreen(
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val snackbarHost = remember { SnackbarHostState() }
     val upNext by viewModel.upNext.collectAsStateWithLifecycle()
+    val endNext by viewModel.endNext.collectAsStateWithLifecycle()
+    val atEnd by viewModel.atEnd.collectAsStateWithLifecycle()
     val layout = rememberReaderLayout()
     // Hinge bounds are window coordinates: convert into this container's space once it is laid out.
     var container by remember { mutableStateOf<IntArray?>(null) }
@@ -152,6 +161,10 @@ internal fun ReaderScreen(
         if (state is ReaderUiState.Missing) leave()
     }
 
+    // "Keep" hides the finish card until the reader scrolls away from the end and back.
+    var endCardKept by remember(itemId) { mutableStateOf(false) }
+    LaunchedEffect(atEnd) { if (!atEnd) endCardKept = false }
+
     var menuOpen by remember { mutableStateOf(false) }
     var showTags by remember { mutableStateOf(false) }
     var showAppearance by remember { mutableStateOf(false) }
@@ -164,7 +177,9 @@ internal fun ReaderScreen(
     val msgRefreshFailed = stringResource(R.string.feature_reader_refresh_failed)
     val resources = LocalResources.current
     val msgStartOver = stringResource(R.string.feature_reader_start_over)
-    val msgPartial = stringResource(R.string.feature_reader_partial_warning)
+    val msgPartial = stringResource(
+        if (isPreviewOnly(item?.parseError)) R.string.feature_reader_preview_only else R.string.feature_reader_partial_warning,
+    )
     val msgMinRead = item?.readingMinutes?.let { stringResource(R.string.feature_reader_min_read_prefix, it) }.orEmpty()
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -206,6 +221,9 @@ internal fun ReaderScreen(
     }
 
     val cardArgb = MaterialTheme.colorScheme.surfaceContainerLow.toArgb()
+    val systemDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val theme = resolveTheme(prefs.readerTheme, systemDark)
+    val endPaddingPx = if (tabletopRequested) ReaderHtml.DEFAULT_END_PADDING_PX else ReaderHtml.END_CARD_PADDING_PX
     Scaffold(
         modifier = if (keepAwake) Modifier.keepScreenOn() else Modifier,
         containerColor = if (detailPane) Color.Transparent else MaterialTheme.colorScheme.background,
@@ -235,6 +253,11 @@ internal fun ReaderScreen(
                             }
                         }
                         if (current != null) {
+                            if (!isPdf) {
+                                IconButton(onClick = { showAppearance = true }) {
+                                    Icon(SrokaIcons.FormatSize, stringResource(R.string.feature_reader_appearance))
+                                }
+                            }
                             IconButton(onClick = viewModel::toggleFavorite) {
                                 Icon(
                                     if (current.isFavorite) SrokaIcons.StarFilled else SrokaIcons.Star,
@@ -285,9 +308,6 @@ internal fun ReaderScreen(
                                         ReaderMenuItem(R.string.feature_reader_refresh, SrokaIcons.Refresh, enabled = !offline) {
                                             menuOpen = false; viewModel.refresh()
                                         }
-                                        ReaderMenuItem(R.string.feature_reader_text_size, SrokaIcons.FormatSize) {
-                                            menuOpen = false; showAppearance = true
-                                        }
                                     }
                                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
                                     ReaderMenuItem(
@@ -327,8 +347,6 @@ internal fun ReaderScreen(
         ) {
             when (val s = state) {
                 is ReaderUiState.Ready -> {
-                    val systemDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                    val theme = resolveTheme(prefs.readerTheme, systemDark)
                     // Wrapped once per article load; later theme/size changes go through script.
                     val headerItem = item
                     val headerSite = headerItem?.let { it.siteName?.takeIf(String::isNotBlank) ?: it.domain }
@@ -347,7 +365,7 @@ internal fun ReaderScreen(
                     }
                     // Keyed on the article only: header changes are pushed into the live page by script.
                     val pane = if (detailPane) ReaderPaneStyle.forWidth(cardArgb, paneWidthDp, centered = isExpanded) else null
-                    val wrapped = remember(s.html, s.baseUrl, pane) {
+                    val wrapped = remember(s.html, s.baseUrl, pane, endPaddingPx) {
                         val restore = viewModel.restorePoint()
                         ReaderHtml.wrap(
                             articleHtml = s.html,
@@ -358,6 +376,9 @@ internal fun ReaderScreen(
                             startProgress = restore.progress,
                             header = header?.copy(progress = restore.progress),
                             pane = pane,
+                            font = prefs.readerFont,
+                            lineSpacing = prefs.readerLineSpacing,
+                            endPaddingPx = endPaddingPx,
                         )
                     }
                     // A new document starts with the bar fully shown (the previous article may have hidden it).
@@ -377,6 +398,8 @@ internal fun ReaderScreen(
                         articlesDir = articlesDir,
                         theme = theme,
                         textScale = prefs.readerTextScale,
+                        font = prefs.readerFont,
+                        lineSpacing = prefs.readerLineSpacing,
                         onProgress = viewModel::onProgress,
                         onScrollDelta = { dy ->
                             // enterAlways: scrolling down hides the bar, scrolling up shows it.
@@ -445,8 +468,7 @@ internal fun ReaderScreen(
                         stringResource(R.string.feature_reader_failed_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Text(stringResource(R.string.feature_reader_failed_message), textAlign = TextAlign.Center)
-                    s.error?.let { Text(stringResource(R.string.feature_reader_failed_reason, it)) }
+                    failureReason(s.error)?.let { Text(stringResource(it.messageRes()), textAlign = TextAlign.Center) }
                     Button(onClick = viewModel::refresh) { Text(stringResource(R.string.feature_reader_try_again)) }
                     OriginalButton(originalUrl) { openExternalLink(context, it) }
                 }
@@ -490,6 +512,35 @@ internal fun ReaderScreen(
                     )
                 }
             }
+            val finished = item
+            val showEndCard = state is ReaderUiState.Ready && !tabletopRequested && atEnd && !endCardKept &&
+                finished?.parseStatus == ParseStatus.OK
+            AnimatedVisibility(
+                visible = showEndCard,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn() + slideInVertically { it / 3 },
+                exit = fadeOut(),
+            ) {
+                if (finished != null) {
+                    EndOfArticleCard(
+                        minutes = finished.readingMinutes,
+                        archived = finished.status == ItemStatus.ARCHIVED,
+                        next = endNext,
+                        theme = theme,
+                        onArchive = {
+                            if (!leaving) {
+                                leaving = true
+                                viewModel.archiveAndNext(
+                                    onNext = { onOpenItem(it) },
+                                    onNoNext = { onArchived(itemId) },
+                                )
+                            }
+                        },
+                        onKeep = { endCardKept = true },
+                        onOpenNext = { endNext?.let { viewModel.flushProgress(); onOpenItem(it.id) } },
+                    )
+                }
+            }
             if (refreshing) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopStart))
             }
@@ -508,6 +559,8 @@ internal fun ReaderScreen(
         AppearanceSheet(
             preferences = prefs,
             onTheme = viewModel::setReaderTheme,
+            onFont = viewModel::setReaderFont,
+            onSpacing = viewModel::setReaderLineSpacing,
             onTextScale = viewModel::setTextScale,
             onDismiss = { showAppearance = false },
         )
@@ -518,6 +571,15 @@ internal fun ReaderScreen(
             onDismiss = { showDelete = false },
         )
     }
+}
+
+private fun FailureReason.messageRes(): Int = when (this) {
+    FailureReason.BOT_WALL -> R.string.feature_reader_failed_reason_bot_wall
+    FailureReason.PAYWALLED -> R.string.feature_reader_failed_reason_paywalled
+    FailureReason.GONE -> R.string.feature_reader_failed_reason_gone
+    FailureReason.NO_RESPONSE -> R.string.feature_reader_failed_reason_no_response
+    FailureReason.TOO_LARGE -> R.string.feature_reader_failed_reason_too_large
+    FailureReason.NOT_ARTICLE -> R.string.feature_reader_failed_reason_not_article
 }
 
 @Composable
@@ -533,7 +595,7 @@ private fun ReadingProgressLine(progress: Float) {
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .background(colors.progress),
+                .background(colors.readerProgress),
         )
     }
 }

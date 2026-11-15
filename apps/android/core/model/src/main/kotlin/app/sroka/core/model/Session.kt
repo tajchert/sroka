@@ -18,6 +18,8 @@ data class UserPreferences(
     val readerTheme: ReaderTheme = ReaderTheme.AUTO,
     /** Reader text scale, clamped to [READER_TEXT_SCALE_MIN]..[READER_TEXT_SCALE_MAX]. */
     val readerTextScale: Float = 1.0f,
+    val readerFont: ReaderFont = ReaderFont.SANS,
+    val readerLineSpacing: ReaderLineSpacing = ReaderLineSpacing.NORMAL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
     /** Overrides the build's default server; null = default. */
     val serverUrl: String? = null,

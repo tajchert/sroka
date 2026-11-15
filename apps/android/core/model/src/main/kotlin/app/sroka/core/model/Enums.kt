@@ -41,3 +41,9 @@ enum class DownloadPolicy { WIFI_ONLY, ANY_NETWORK, MANUAL }
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 enum class ReaderTheme { AUTO, LIGHT, SEPIA, DARK }
+
+/** Article typeface in the reader; SANS is the original look. */
+enum class ReaderFont { SANS, SERIF }
+
+/** Article line spacing in the reader; NORMAL is the original look. */
+enum class ReaderLineSpacing { TIGHT, NORMAL, LOOSE }

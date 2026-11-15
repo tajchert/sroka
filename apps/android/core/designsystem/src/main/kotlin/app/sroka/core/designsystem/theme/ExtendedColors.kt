@@ -17,6 +17,8 @@ data class SrokaExtendedColors(
     /** Reading progress line and read-progress bar. */
     val progress: Color,
     val progressTrack: Color,
+    /** The reader's reading-progress line only: brand blue on light, yellow on dark. [progress] stays yellow (favourite star, save sheet). */
+    val readerProgress: Color,
     /** Reader body text. */
     val readerBody: Color,
 )
@@ -28,6 +30,7 @@ internal val DarkExtendedColors = SrokaExtendedColors(
     warningContainer = Color(0xFF2A2619),
     progress = BrandYellow,
     progressTrack = DarkSurfaceHigh,
+    readerProgress = BrandYellow,
     readerBody = Color(0xFFD9D7D1),
 )
 
@@ -38,6 +41,7 @@ internal val LightExtendedColors = SrokaExtendedColors(
     warningContainer = Color(0xFFF6ECC9),
     progress = BrandYellow,
     progressTrack = LightSurfaceHighest,
+    readerProgress = BrandBlue,
     readerBody = Color(0xFF2B2E34),
 )
 

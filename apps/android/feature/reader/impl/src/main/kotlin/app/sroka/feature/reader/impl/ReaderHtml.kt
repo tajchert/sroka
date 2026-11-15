@@ -1,15 +1,30 @@
 package app.sroka.feature.reader.impl
 
 import app.sroka.core.domain.ContentStore
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import java.security.SecureRandom
 import java.util.Base64
 
 /** Palette actually applied to the article; [ReaderTheme.AUTO] resolves to LIGHT or DARK. */
-enum class EffectiveTheme(val cssName: String, val backgroundArgb: Int, val isDark: Boolean) {
-    LIGHT("light", 0xFFFBFBF9.toInt(), false),
-    SEPIA("sepia", 0xFFF3EAD8.toInt(), false),
-    DARK("dark", 0xFF121314.toInt(), true),
+enum class EffectiveTheme(val cssName: String, val backgroundArgb: Int, val foregroundArgb: Int, val isDark: Boolean) {
+    LIGHT("light", 0xFFFBFBF9.toInt(), 0xFF15171C.toInt(), false),
+    SEPIA("sepia", 0xFFF3EAD8.toInt(), 0xFF40321F.toInt(), false),
+    DARK("dark", 0xFF121314.toInt(), 0xFFD9D7D1.toInt(), true),
+}
+
+/** CSS `data-font` value of the article typeface (the stacks live in the reader CSS). */
+internal fun ReaderFont.cssName(): String = when (this) {
+    ReaderFont.SANS -> "sans"
+    ReaderFont.SERIF -> "serif"
+}
+
+/** Unitless CSS line-height of the article body; [ReaderLineSpacing.NORMAL] is the original 1.65. */
+internal fun ReaderLineSpacing.lineHeight(): Float = when (this) {
+    ReaderLineSpacing.TIGHT -> 1.45f
+    ReaderLineSpacing.NORMAL -> 1.65f
+    ReaderLineSpacing.LOOSE -> 1.9f
 }
 
 /** Resolves the stored reader theme against the current app brightness. */
@@ -56,16 +71,24 @@ data class ReaderPaneStyle(val backgroundArgb: Int, val narrow: Boolean = false,
 }
 
 /** A reading position reported by the reader script. */
-data class ProgressReport(val progress: Float, val anchor: Int?)
+data class ProgressReport(val progress: Float, val anchor: Int?, val atEnd: Boolean = false)
 
-/** Parses the reader script's `"0.5321|12"` (anchor may be empty) message; null when malformed. */
+/**
+ * Parses the reader script's `"0.5321|12|1"` message (anchor may be empty; the optional third field is `1` when the
+ * page is scrolled to its very end); null when malformed.
+ */
 fun parseProgressMessage(message: String?): ProgressReport? {
     if (message == null) return null
     val parts = message.split('|')
-    if (parts.size != 2) return null
+    if (parts.size != 2 && parts.size != 3) return null
     val progress = parts[0].toFloatOrNull()?.takeIf { it.isFinite() } ?: return null
     val anchor = if (parts[1].isEmpty()) null else parts[1].toIntOrNull() ?: return null
-    return ProgressReport(progress.coerceIn(0f, 1f), anchor?.takeIf { it >= 0 })
+    val atEnd = when (parts.getOrNull(2)) {
+        null, "0" -> false
+        "1" -> true
+        else -> return null
+    }
+    return ProgressReport(progress.coerceIn(0f, 1f), anchor?.takeIf { it >= 0 }, atEnd)
 }
 
 /**
@@ -77,6 +100,11 @@ object ReaderHtml {
     const val FALLBACK_BRIDGE_NAME = "SrokaBridgeJs"
     const val ASSET_HOST = "appassets.androidplatform.net"
     const val ASSET_ORIGIN = "https://$ASSET_HOST"
+    /** The original 6rem of space under the article. */
+    const val DEFAULT_END_PADDING_PX = 96
+
+    /** Space under the article reserved for the end-of-article card. */
+    const val END_CARD_PADDING_PX = 300
     const val ANCHOR_SELECTOR = "p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,figure"
 
     fun newNonce(): String {
@@ -97,6 +125,10 @@ object ReaderHtml {
         nonce: String = newNonce(),
         header: ReaderHeader? = null,
         pane: ReaderPaneStyle? = null,
+        font: ReaderFont = ReaderFont.SANS,
+        lineSpacing: ReaderLineSpacing = ReaderLineSpacing.NORMAL,
+        /** Blank space (CSS px) after the article; the end-of-article card is drawn over it. */
+        endPaddingPx: Int = DEFAULT_END_PADDING_PX,
     ): String {
         val headerHtml = header?.let(::headerHtml).orEmpty()
         val inject = "<meta http-equiv=\"Content-Security-Policy\" content=\"${escapeAttr(csp(nonce))}\">" +
@@ -104,7 +136,8 @@ object ReaderHtml {
             "<base href=\"${escapeAttr(baseUrl)}\">" +
             "<style>$CSS${pane?.css().orEmpty()}</style>" +
             "<script nonce=\"$nonce\">${script(startAnchor, startProgress)}</script>"
-        val htmlAttrs = " data-theme=\"${theme.cssName}\" style=\"--scale:${scaleText(textScale)}\""
+        val htmlAttrs = " data-theme=\"${theme.cssName}\" data-font=\"${font.cssName()}\" " +
+            "style=\"--scale:${scaleText(textScale)};--lh:${lineHeightText(lineSpacing)};--end:${endPaddingPx.coerceIn(0, 1000)}px\""
         val headOpen = Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
         val htmlOpen = Regex("<html(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
         val bodyOpen = Regex("<body(\\s[^>]*)?>", RegexOption.IGNORE_CASE)
@@ -126,9 +159,14 @@ object ReaderHtml {
         }
     }
 
-    /** JS to run after load when theme or text size changes; keeps the reading position. */
-    fun appearanceScript(theme: EffectiveTheme, textScale: Float): String =
-        "window.__srokaSetAppearance&&window.__srokaSetAppearance('${theme.cssName}',${scaleText(textScale)});"
+    /** JS to run after load when theme, text size, font or line spacing changes; keeps the reading position. */
+    fun appearanceScript(
+        theme: EffectiveTheme,
+        textScale: Float,
+        font: ReaderFont = ReaderFont.SANS,
+        lineSpacing: ReaderLineSpacing = ReaderLineSpacing.NORMAL,
+    ): String = "window.__srokaSetAppearance&&window.__srokaSetAppearance(" +
+        "'${theme.cssName}',${scaleText(textScale)},'${font.cssName()}',${lineHeightText(lineSpacing)});"
 
     /**
      * JS that updates the header in place (no document reload). The values travel as one JSON document
@@ -184,6 +222,8 @@ object ReaderHtml {
 
     private fun scaleText(scale: Float): String = String.format(java.util.Locale.ROOT, "%.2f", scale)
 
+    private fun lineHeightText(spacing: ReaderLineSpacing): String = String.format(java.util.Locale.ROOT, "%.2f", spacing.lineHeight())
+
     private fun escapeAttr(s: String) =
         s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -197,18 +237,21 @@ object ReaderHtml {
     private val SCRIPT = """
 (function(){
 var SEL=__SEL__,START_A=__START_A__,START_P=__START_P__;
-var timer=null,last=0,user=false,root=document.documentElement;
+var timer=null,last=0,user=false,lastEnd=false,root=document.documentElement;
 function sc(){return document.scrollingElement||root}
 function anchors(){return document.body?document.body.querySelectorAll(SEL):[]}
 function send(m){try{if(window.__BRIDGE__&&window.__BRIDGE__.postMessage){window.__BRIDGE__.postMessage(m)}else if(window.__FALLBACK__){window.__FALLBACK__.post(m)}}catch(e){}}
 function firstVisible(){var l=anchors();for(var i=0;i<l.length;i++){if(l[i].getBoundingClientRect().bottom>1)return i}return null}
-function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,a=firstVisible();var pe=document.getElementById("sk-pct");if(pe)pe.textContent=Math.round(p*100)+"%";send(p.toFixed(4)+"|"+(a==null?"":a))}
+function report(){var s=sc(),max=s.scrollHeight-s.clientHeight,p=max>0?Math.min(1,Math.max(0,s.scrollTop/max)):0,a=firstVisible(),e=atEnd();lastEnd=e;var pe=document.getElementById("sk-pct");if(pe)pe.textContent=Math.round(p*100)+"%";send(p.toFixed(4)+"|"+(a==null?"":a)+"|"+(e?1:0))}
+function atEnd(){var s=sc();return s.scrollTop+s.clientHeight>=s.scrollHeight-4}
+function fits(){var s=sc();return s.scrollHeight-s.clientHeight<=2}
 function toAnchor(i){var el=anchors()[i];if(el){var s=sc();s.scrollTop=el.getBoundingClientRect().top+s.scrollTop-8;return true}return false}
 function restore(){if(user)return;if(START_A!==null&&toAnchor(START_A))return;if(START_P>0){var s=sc(),max=s.scrollHeight-s.clientHeight;if(max>0)s.scrollTop=START_P*max}}
 addEventListener("scroll",function(){var n=Date.now();clearTimeout(timer);if(n-last>=150){last=n;report()}else{timer=setTimeout(function(){last=Date.now();report()},150)}},{passive:true});
 ["touchstart","wheel","keydown","mousedown"].forEach(function(e){addEventListener(e,function(){user=true},{passive:true})});
-addEventListener("load",function(){restore();setTimeout(restore,300)});
-window.__srokaSetAppearance=function(theme,scale){var a=firstVisible();root.setAttribute("data-theme",theme);root.style.setProperty("--scale",scale);if(a!==null)toAnchor(a)};
+if(window.ResizeObserver){new ResizeObserver(function(){if(atEnd()!==lastEnd&&document.readyState==="complete")report()}).observe(root)}
+addEventListener("load",function(){restore();if(fits())report();setTimeout(function(){restore();if(fits())report()},300)});
+window.__srokaSetAppearance=function(theme,scale,font,lh){var a=firstVisible();root.setAttribute("data-theme",theme);root.setAttribute("data-font",font);root.style.setProperty("--scale",scale);root.style.setProperty("--lh",lh);if(a!==null)toAnchor(a)};
 window.__srokaSetHeader=function(raw){var h;try{h=JSON.parse(raw)}catch(e){return}var head=document.querySelector(".sk-head");var old=document.getElementById("sk-pct");var pct=old?old.textContent:"0%";if(!head){head=document.createElement("header");head.className="sk-head";document.body.insertBefore(head,document.body.firstChild)}
 while(head.firstChild)head.removeChild(head.firstChild);
 function div(c,t){var d=document.createElement("div");d.className=c;if(t!==undefined)d.textContent=t;head.appendChild(d);return d}
@@ -248,13 +291,14 @@ blockquote.sr-note{padding:.6rem .85rem;border:1px solid var(--rule);border-radi
 """.trimIndent().replace("\n", "")
 
     private val CSS = """
-:root{--scale:1;--warn:#7a5a00;--bg:#f6f5f1;--fg:#15171c;--muted:#5d5f66;--link:#1e6f8f;--rule:#e3e3df}
+:root{--scale:1;--lh:1.65;--end:96px;--warn:#7a5a00;--bg:#f6f5f1;--fg:#15171c;--muted:#5d5f66;--link:#1e6f8f;--rule:#e3e3df}
 html[data-theme=dark]{--bg:#15171c;--fg:#d9d7d1;--muted:#a5a8ae;--link:#7cc0da;--rule:#2a2d2f;--warn:#e8cf86}
 html[data-theme=sepia]{--bg:#f3ead8;--fg:#40321f;--muted:#8a7656;--link:#1f6f6a;--rule:#e0d3b8}
 .sk-head{margin:0 0 1.4em}.sk-site{font-size:14px;font-weight:500;color:var(--link);margin-bottom:14px}.sk-title{font-size:28px;font-weight:600;line-height:1.2;margin-bottom:14px}.sk-meta{font-size:14px;color:var(--muted)}.sk-warn{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--warn);margin-top:14px}
 .sk-head~article>h1:first-child{display:none}.sk-head~article>h1:first-child+.byline{font-size:14px;color:var(--muted);margin-top:0}
 html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{margin:0 auto;max-width:42em;padding:1.25rem 1.1rem 6rem;background:var(--bg);color:var(--fg);font-family:system-ui,Roboto,sans-serif;font-size:calc(18px*var(--scale));line-height:1.65;overflow-wrap:break-word}
+body{margin:0 auto;max-width:42em;padding:1.25rem 1.1rem var(--end);background:var(--bg);color:var(--fg);font-family:system-ui,Roboto,sans-serif;font-size:calc(18px*var(--scale));line-height:var(--lh);overflow-wrap:break-word}
+html[data-font=serif] body{font-family:'Noto Serif',Georgia,serif}
 h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.6em 0 .6em}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}
 p,ul,ol,pre,blockquote,figure,table{margin:0 0 1.1em}
 a{color:var(--link)}

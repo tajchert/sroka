@@ -21,6 +21,8 @@ import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.ReaderFont
+import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SyncPhase
 import app.sroka.core.model.UserPreferences
@@ -142,9 +144,20 @@ class ReaderViewModel @AssistedInject constructor(
     val upNext: StateFlow<ItemSummary?> = library.observeNextUnread(itemId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    /**
+     * What the end-of-article card offers as "Up next": the newest other unread item whose text is ready
+     * (a pending or failed one would open an empty reader).
+     */
+    val endNext: StateFlow<ItemSummary?> = upNext.map { it?.takeIf(::isReadableNext) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     /** Live reading progress for the indicator (0..1). */
     private val _progress = MutableStateFlow(0f)
     val progress: StateFlow<Float> = _progress
+
+    /** True while the article is scrolled to its very end: the end-of-article card shows. */
+    private val _atEnd = MutableStateFlow(false)
+    val atEnd: StateFlow<Boolean> = _atEnd
 
     /** True while sync reports no network; Refresh is disabled then. */
     val offline: StateFlow<Boolean> = syncStatus.status.map { it.phase == SyncPhase.Offline }
@@ -254,6 +267,7 @@ class ReaderViewModel @AssistedInject constructor(
         ready = true
         reported = null
         _progress.value = latestItem?.progress ?: 0f
+        _atEnd.value = false
         emit(ReaderUiState.PdfReady(file))
     }
 
@@ -277,6 +291,7 @@ class ReaderViewModel @AssistedInject constructor(
         // Start from the saved position; restorePoint() refines it for recreated WebViews.
         reported = null
         _progress.value = latestItem?.progress ?: 0f
+        _atEnd.value = false
         emit(ReaderUiState.Ready(html, content.articleBaseUrl(itemId)))
     }
 
@@ -304,6 +319,7 @@ class ReaderViewModel @AssistedInject constructor(
                 ready = true
                 reported = null
                 _progress.value = latestItem?.progress ?: 0f
+                _atEnd.value = false
                 ReaderUiState.Ready(html, content.articleBaseUrl(itemId))
             } else {
                 ReaderUiState.NotDownloaded(NotDownloadedReason.ERROR)
@@ -338,6 +354,7 @@ class ReaderViewModel @AssistedInject constructor(
         if (!ready) return
         reported = report
         _progress.value = report.progress
+        _atEnd.value = report.atEnd
         unsaved = true
         trailingSave?.cancel()
         val now = nowMillis()
@@ -390,6 +407,19 @@ class ReaderViewModel @AssistedInject constructor(
         }
     }
 
+    /**
+     * End-of-article "Archive & next": archives this item, then [onNext] gets the id of the item shown as "Up next"
+     * to open in its place, or [onNoNext] runs when there is none (today's archive behaviour).
+     */
+    fun archiveAndNext(onNext: (itemId: String) -> Unit, onNoNext: () -> Unit) {
+        val next = endNext.value
+        flushProgress()
+        viewModelScope.launch {
+            library.setStatus(itemId, ItemStatus.ARCHIVED)
+            if (next != null) onNext(next.id) else onNoNext()
+        }
+    }
+
     fun setTags(names: List<String>) {
         viewModelScope.launch { library.setTags(itemId, names) }
     }
@@ -426,6 +456,7 @@ class ReaderViewModel @AssistedInject constructor(
     fun startOver() {
         reported = ProgressReport(0f, null)
         _progress.value = 0f
+        _atEnd.value = false
         unsaved = false
         lastSavedAt = nowMillis()
         viewModelScope.launch { library.setProgress(itemId, 0f, null) }
@@ -448,6 +479,14 @@ class ReaderViewModel @AssistedInject constructor(
         viewModelScope.launch { settings.setReaderTextScale(steppedTextScale(preferences.value.readerTextScale, direction)) }
     }
 
+    fun setReaderFont(font: ReaderFont) {
+        viewModelScope.launch { settings.setReaderFont(font) }
+    }
+
+    fun setReaderLineSpacing(spacing: ReaderLineSpacing) {
+        viewModelScope.launch { settings.setReaderLineSpacing(spacing) }
+    }
+
     fun setTextScale(scale: Float) {
         viewModelScope.launch { settings.setReaderTextScale(scale) }
     }
@@ -462,6 +501,13 @@ class ReaderViewModel @AssistedInject constructor(
         const val RESUME_THRESHOLD = 0.02f
     }
 }
+
+/**
+ * A next item is only offered once it opens as something readable: a PDF always is (even while parsing), an
+ * article once its text is OK or a usable partial copy.
+ */
+internal fun isReadableNext(item: ItemSummary): Boolean =
+    item.kind == ItemKind.PDF || item.parseStatus == ParseStatus.OK || item.parseStatus == ParseStatus.PARTIAL
 
 /** Reading progress of a PDF at 0-based [page] of [pageCount]: the last page reads 1.0. */
 internal fun pdfProgress(page: Int, pageCount: Int): Float =

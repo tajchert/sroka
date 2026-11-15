@@ -207,6 +207,11 @@ export const MeResponse = z.object({
   stats: z.object({ unread: z.number().int(), archived: z.number().int(), favorites: z.number().int(), tags: z.number().int() }),
   /** True when the user's email is in env `ADMIN_EMAILS` (D10). Optional so older servers still parse. */
   isAdmin: z.boolean().optional(),
+  /**
+   * Which client types this user has used (true once an authenticated /v1 request came from it).
+   * Optional so older servers still parse; clients treat a missing value as all-false.
+   */
+  clients: z.object({ extension: z.boolean(), android: z.boolean() }).optional(),
 });
 export type MeResponse = z.infer<typeof MeResponse>;
 

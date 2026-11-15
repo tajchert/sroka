@@ -15,6 +15,7 @@ import {
   urlHash,
 } from "@sroka/shared";
 import type { Env } from "./env.ts";
+import { CLIENT_KINDS, type ClientKind } from "./clients.ts";
 import { patchToOps } from "./do/rest.ts";
 import { migrate } from "./do/schema.ts";
 import { deletePrefix } from "./r2.ts";
@@ -510,6 +511,25 @@ export class LibraryDO extends DurableObject<Env> {
   stats(): { unread: number; archived: number; favorites: number; tags: number } {
     this.ensureSchema();
     return this.store.stats();
+  }
+
+  /**
+   * Write-once client flag for `/v1/me` `clients` (DO KV storage `client:<kind>` = first-seen ms; no SQL
+   * schema). Skipped for a destroyed library so a late request can't leave data behind after account deletion.
+   */
+  async noteClient(kind: ClientKind): Promise<void> {
+    if (!CLIENT_KINDS.includes(kind) || this.isDestroyed()) return;
+    const key = `client:${kind}`;
+    if ((await this.ctx.storage.get<number>(key)) === undefined) await this.ctx.storage.put(key, Date.now());
+  }
+
+  /** GET /v1/me clients. */
+  async clients(): Promise<Record<ClientKind, boolean>> {
+    const out = { extension: false, android: false };
+    if (this.isDestroyed()) return out;
+    const got = await this.ctx.storage.get<number>(CLIENT_KINDS.map((k) => `client:${k}`));
+    for (const k of CLIENT_KINDS) out[k] = got.has(`client:${k}`);
+    return out;
   }
 
   /** All live items (export), savedAt ascending. */

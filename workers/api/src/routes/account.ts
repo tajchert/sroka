@@ -7,6 +7,7 @@ import * as authSchema from "../db/auth-schema.ts";
 import { jobs } from "../db/schema.ts";
 import { deletePrefix } from "../r2.ts";
 import { isAdminEmail } from "./admin.ts";
+import { clientKind } from "../clients.ts";
 
 export { deletePrefix };
 
@@ -14,7 +15,8 @@ export const accountRoutes = new Hono<AppEnv>();
 
 type Stats = MeResponse["stats"];
 /** Stats helper on the LibraryDO (internal to workers/api, api.md §15); tolerate a DO without it. */
-type LibraryStub = { stats?: () => Promise<Stats>; destroy?: () => Promise<unknown> };
+type Clients = NonNullable<MeResponse["clients"]>;
+type LibraryStub = { stats?: () => Promise<Stats>; clients?: () => Promise<Clients>; destroy?: () => Promise<unknown> };
 
 accountRoutes.get("/me", async (c) => {
   const userId = c.var.userId;
@@ -22,12 +24,16 @@ accountRoutes.get("/me", async (c) => {
   const u = (await db.select().from(authSchema.user).where(eq(authSchema.user.id, userId)).limit(1))[0];
   if (!u) return c.json({ error: "unauthorized" }, 401);
   let stats: Stats = { unread: 0, archived: 0, favorites: 0, tags: 0 };
-  try {
-    const stub = c.env.LIBRARY.getByName(userId) as unknown as LibraryStub;
-    stats = await stub.stats!();
-  } catch (e) {
-    if (!isMissingRpc(e)) log.exception("stats failed", e, { event: "stats_failed" });
-  }
+  let clients: Clients = { extension: false, android: false };
+  const stub = c.env.LIBRARY.getByName(userId) as unknown as LibraryStub;
+  const [st, cl] = await Promise.allSettled([stub.stats!(), stub.clients!()]);
+  if (st.status === "fulfilled") stats = st.value;
+  else if (!isMissingRpc(st.reason)) log.exception("stats failed", st.reason, { event: "stats_failed" });
+  if (cl.status === "fulfilled") clients = cl.value;
+  else if (!isMissingRpc(cl.reason)) log.warnException("clients failed", cl.reason, { event: "clients_failed" });
+  // The flag for this very request may still be in flight (waitUntil in requireAuth).
+  const current = clientKind(c.req.raw.headers);
+  if (current) clients = { ...clients, [current]: true };
   const body: MeResponse = {
     user: {
       id: u.id,
@@ -38,6 +44,7 @@ accountRoutes.get("/me", async (c) => {
     },
     stats,
     isAdmin: isAdminEmail(c.env, u.email),
+    clients,
   };
   return c.json(body);
 });

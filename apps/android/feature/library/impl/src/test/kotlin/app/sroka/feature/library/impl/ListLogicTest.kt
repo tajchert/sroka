@@ -8,11 +8,14 @@ import app.sroka.core.model.SyncPhase
 import app.sroka.core.model.SyncStatus
 import app.sroka.core.model.toSummary
 import app.sroka.core.testing.testItem
+import app.sroka.feature.library.impl.list.ReadState
 import app.sroka.feature.library.impl.list.RowStatus
 import app.sroka.feature.library.impl.list.StatusCard
 import app.sroka.feature.library.impl.list.archiveMessage
 import app.sroka.feature.library.impl.list.avatarLetter
 import app.sroka.feature.library.impl.list.insertedAbove
+import app.sroka.feature.library.impl.list.minutesLeft
+import app.sroka.feature.library.impl.list.readState
 import app.sroka.feature.library.impl.list.rowStatus
 import app.sroka.feature.library.impl.list.selectStatusCard
 import app.sroka.feature.library.impl.search.highlightSnippet
@@ -30,21 +33,55 @@ class ListLogicTest {
     ) = testItem(pendingChange = pending, parseStatus = parse, offline = offline).toSummary()
 
     @Test
-    fun pendingChangeBeatsEverything() {
-        val partialDownloaded = summary(PendingChange.TAGS, ParseStatus.PARTIAL, OfflineState.DOWNLOADED)
-        assertEquals(RowStatus.TAGS_WAITING, rowStatus(partialDownloaded))
-        assertEquals(RowStatus.SAVE_WAITING, rowStatus(summary(PendingChange.SAVE)))
-        assertEquals(RowStatus.FAVORITE_WAITING, rowStatus(summary(PendingChange.FAVORITE)))
-        assertEquals(RowStatus.CHANGE_WAITING, rowStatus(summary(PendingChange.OTHER)))
+    fun syncPendingBeatsEverythingAndCoversEveryChangeKind() {
+        val failedPartialQueued = summary(PendingChange.TAGS, ParseStatus.FAILED, OfflineState.QUEUED)
+        assertEquals(RowStatus.SYNC_PENDING, rowStatus(failedPartialQueued))
+        for (kind in PendingChange.entries) assertEquals(RowStatus.SYNC_PENDING, rowStatus(summary(kind)))
     }
 
     @Test
-    fun partialBeatsDownloadStates() {
+    fun failedBeatsPartialPreparingAndDownloadStates() {
+        assertEquals(RowStatus.FAILED, rowStatus(summary(parse = ParseStatus.FAILED, offline = OfflineState.DOWNLOADING)))
+        assertEquals(RowStatus.FAILED, rowStatus(summary(parse = ParseStatus.FAILED, offline = OfflineState.AVAILABLE_REMOTE)))
+    }
+
+    @Test
+    fun partialBeatsPreparingAndDownloadStates() {
         assertEquals(RowStatus.PARTIAL, rowStatus(summary(parse = ParseStatus.PARTIAL, offline = OfflineState.DOWNLOADED)))
+        assertEquals(RowStatus.PARTIAL, rowStatus(summary(parse = ParseStatus.PARTIAL, offline = OfflineState.DOWNLOADING)))
+        assertEquals(RowStatus.PREPARING, rowStatus(summary(parse = ParseStatus.PENDING, offline = OfflineState.QUEUED)))
+    }
+
+    @Test
+    fun downloadingBeatsNotDownloaded() {
         assertEquals(RowStatus.DOWNLOADING, rowStatus(summary(offline = OfflineState.QUEUED)))
         assertEquals(RowStatus.DOWNLOADING, rowStatus(summary(offline = OfflineState.DOWNLOADING)))
-        assertEquals(RowStatus.OFFLINE, rowStatus(summary(offline = OfflineState.DOWNLOADED)))
-        assertNull(rowStatus(summary(offline = OfflineState.AVAILABLE_REMOTE)))
+        assertEquals(RowStatus.NOT_DOWNLOADED, rowStatus(summary(offline = OfflineState.AVAILABLE_REMOTE)))
+    }
+
+    @Test
+    fun readyAndDownloadedRowsFlagNothing() {
+        assertNull(rowStatus(summary(offline = OfflineState.DOWNLOADED)))
+        assertNull(rowStatus(summary(offline = OfflineState.NONE)))
+    }
+
+    @Test
+    fun readStateThresholds() {
+        assertEquals(ReadState.UNREAD, readState(0f))
+        assertEquals(ReadState.UNREAD, readState(0.019f))
+        assertEquals(ReadState.IN_PROGRESS, readState(0.02f))
+        assertEquals(ReadState.IN_PROGRESS, readState(0.979f))
+        assertEquals(ReadState.READ, readState(0.98f))
+        assertEquals(ReadState.READ, readState(1f))
+    }
+
+    @Test
+    fun minutesLeftRoundsUpWithAFloorOfOne() {
+        assertEquals(5, minutesLeft(10, 0.5f))
+        assertEquals(8, minutesLeft(10, 0.25f)) // 7.5 -> 8
+        assertEquals(1, minutesLeft(10, 0.9f)) // float noise must not give 2
+        assertEquals(1, minutesLeft(1, 0.5f))
+        assertEquals(1, minutesLeft(3, 0.97f))
     }
 
     @Test

@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
 import app.sroka.core.model.OfflineState
+import app.sroka.core.model.ParseStatus
+import app.sroka.core.model.PendingChange
 import app.sroka.core.designsystem.theme.SrokaTheme
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.LibraryTab
@@ -130,13 +132,60 @@ class LibraryListScreenTest {
     }
 
     @Test
-    fun rowsShowStatusLineAndFavouriteStar() {
+    fun downloadedRowShowsNoStatusWordsAndKeepsFavoriteStar() {
         fake.items.value = listOf(
             testItem(id = "a", title = "Alpha", offline = OfflineState.DOWNLOADED, isFavorite = true),
         )
         show()
-        compose.waitUntil(5_000) { compose.onAllNodesMatching("Available offline") }
-        compose.onNodeWithContentDescription("Favourite").assertIsDisplayed()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithContentDescription("Favorite").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Not on this device").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Waiting to sync").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Try again").assertDoesNotExist()
+        compose.onNodeWithText("Available offline").assertDoesNotExist()
+    }
+
+    @Test
+    fun exceptionsAreIconBadgesWithContentDescriptions() {
+        fake.items.value = listOf(
+            testItem(id = "a", title = "Alpha", offline = OfflineState.AVAILABLE_REMOTE),
+            testItem(id = "b", title = "Beta", offline = OfflineState.DOWNLOADED, pendingChange = PendingChange.TAGS),
+            testItem(id = "c", title = "Gamma", offline = OfflineState.DOWNLOADED, parseStatus = ParseStatus.PARTIAL),
+        )
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithContentDescription("Not on this device").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Waiting to sync").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Partial copy").assertIsDisplayed()
+    }
+
+    @Test
+    fun metaLineShowsMinutesLeftAndReadState() {
+        fake.items.value = listOf(
+            testItem(id = "a", title = "Alpha", url = "https://www.one.example/a", readingMinutes = 10, progress = 0.5f),
+            testItem(id = "b", title = "Beta", url = "https://two.example/b", readingMinutes = 10, progress = 1f),
+            testItem(id = "c", title = "Gamma", url = "https://three.example/c", readingMinutes = 10),
+        )
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithText("one.example · 5 min left").assertIsDisplayed()
+        compose.onNodeWithText("two.example ·").assertIsDisplayed()
+        compose.onNodeWithText("Read").assertIsDisplayed()
+        compose.onNodeWithText("three.example · 10 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun failedRowHasRetryButtonThatReparses() {
+        fake.items.value = listOf(
+            testItem(id = "a", title = "Alpha", parseStatus = ParseStatus.FAILED, isFavorite = true),
+        )
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithContentDescription("Couldn\u2019t save the text").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Favorite").assertDoesNotExist() // the retry button takes the star's slot
+        compose.onNodeWithContentDescription("Try again").performClick()
+        compose.waitUntil(5_000) { fake.items.value.single().parseStatus == ParseStatus.PENDING }
+        assertEquals(emptyList<String>(), opened) // retry must not open the article
     }
 
     @Test

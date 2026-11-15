@@ -319,6 +319,7 @@ fun LibraryListRoute(
         onOpenItem = onOpenItem,
         onLongClick = { viewModel.showActions(it.id) },
         onArchive = { viewModel.toggleArchive(it.id, it.status) },
+        onRetry = { viewModel.refresh(it.id) },
         selectedItemId = selectedItemId,
         twoPane = twoPane,
         navRailShown = navRailShown,
@@ -407,6 +408,7 @@ fun LibraryListContent(
     onOpenItem: (String) -> Unit,
     onLongClick: (ItemSummary) -> Unit,
     onArchive: (ItemSummary) -> Unit,
+    onRetry: (ItemSummary) -> Unit = {},
     selectedItemId: String?,
     twoPane: Boolean,
     navRailShown: Boolean,
@@ -492,6 +494,7 @@ fun LibraryListContent(
                         onOpenItem = onOpenItem,
                         onLongClick = onLongClick,
                         onArchive = onArchive,
+                        onRetry = onRetry,
                         bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
                         selectedItemId = selectedItemId,
                         inset = twoPane,
@@ -694,6 +697,7 @@ private fun ItemList(
     onOpenItem: (String) -> Unit,
     onLongClick: (ItemSummary) -> Unit,
     onArchive: (ItemSummary) -> Unit,
+    onRetry: (ItemSummary) -> Unit,
     bottomPadding: Dp,
     selectedItemId: String? = null,
     inset: Boolean = false,
@@ -719,6 +723,7 @@ private fun ItemList(
                 onClick = { onOpenItem(item.id) },
                 onLongClick = { onLongClick(item) },
                 onArchive = { onArchive(item) },
+                onRetry = { onRetry(item) },
             )
         }
     }
@@ -738,6 +743,7 @@ private fun SwipeableRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onArchive: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     val currentArchive by rememberUpdatedState(onArchive)
     val coroutineScope = rememberCoroutineScope()
@@ -784,7 +790,7 @@ private fun SwipeableRow(
         // A transparent (two-pane) row needs an opaque base while it slides over the action bar.
         val swiping = state.dismissDirection != SwipeToDismissBoxValue.Settled
         Box(if (swiping) Modifier.background(MaterialTheme.colorScheme.background) else Modifier) {
-            ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset)
+            ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset, onRetry = onRetry)
         }
     }
 }

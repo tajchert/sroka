@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { call, migrate, signIn, testEnv } from "./helpers.ts";
 import type { Env } from "../../src/env.ts";
 
@@ -159,5 +159,72 @@ describe("site rules CRUD", () => {
     expect((await put("bad.com", { minTextChars: -1 })).status).toBe(400);
     expect((await put("not%20a%20host", {})).status).toBe(400);
     expect(await testEnv.CONFIG.get("site-rules:v1:bad.com")).toBeNull();
+  });
+});
+
+describe("GET /stats/popular (D16)", () => {
+  const DAY = 24 * HOUR;
+  const users = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+  // [contentId, urlHash, url, refs: [userId, at][]]
+  const content: [string, string, string, [string, number][]][] = [
+    // Same URL parsed twice (two content rows): 3 + 3 refs, one user on both -> 5 distinct savers.
+    ["pc-a1", "h-a", "https://pop.example/a", users("u", 3).map((u) => [u, NOW - HOUR])],
+    ["pc-a2", "h-a", "https://pop.example/a", ["u2", "u3", "u4"].map((u) => [u, NOW - 2 * HOUR])],
+    // 4 savers: below the threshold.
+    ["pc-b", "h-b", "https://pop.example/b", users("u", 4).map((u) => [u, NOW - HOUR])],
+    // 6 savers, all 10 days ago.
+    ["pc-c", "h-c", "https://pop.example/c", users("v", 6).map((u) => [u, NOW - 10 * DAY])],
+  ];
+  const attempts: [string, string | null, number][] = [
+    ["pop.example", "https://pop.example/x", 5],
+    ["captured.example", null, 7], // captures only: never listed
+    ["few.example", "https://few.example/x", 4],
+  ];
+
+  beforeAll(async () => {
+    for (const [id, hash, url, refs] of content) {
+      await testEnv.DB.prepare(
+        "INSERT INTO content (id, url_hash, canonical_url, parser_version, status, title, parsed_at) VALUES (?,?,?,1,'ok',?,?)",
+      )
+        .bind(id, hash, url, `Title ${hash}`, NOW)
+        .run();
+      for (const [u, at] of refs) await testEnv.DB.prepare("INSERT INTO content_refs (content_id, user_id, at) VALUES (?,?,?)").bind(id, u, at).run();
+    }
+    for (const [domain, url, n] of attempts)
+      for (let i = 0; i < n; i++)
+        await testEnv.DB.prepare(
+          `INSERT INTO parse_attempts (id, created_at, user_hash, item_id, domain, url, status, method, fallback_outcome, attempt, parser_version) VALUES (?,?,?,?,?,?,'ok','fetch','none',1,1)`,
+        )
+          .bind(`pop-${domain}-${i}`, NOW - HOUR, `uh${i}`, `item-pop-${i}`, domain, url)
+          .run();
+  });
+  afterAll(async () => {
+    await testEnv.DB.prepare("DELETE FROM content_refs WHERE content_id LIKE 'pc-%'").run();
+    await testEnv.DB.prepare("DELETE FROM content WHERE id LIKE 'pc-%'").run();
+    await testEnv.DB.prepare("DELETE FROM parse_attempts WHERE id LIKE 'pop-%'").run();
+  });
+
+  it("non-admin gets 404", async () => {
+    expect((await get(user, "/stats/popular")).status).toBe(404);
+  });
+  it("lists only URLs and domains with >= 5 distinct savers, re-parses counted once, captures excluded", async () => {
+    const res = await get(admin, "/stats/popular");
+    expect(res.status).toBe(200);
+    const b = (await res.json()) as any;
+    expect(b).toMatchObject({ minSavers: 5, days: null, domainDays: 30 });
+    expect(b.articles.map((a: any) => [a.url, a.savers])).toEqual([
+      ["https://pop.example/c", 6],
+      ["https://pop.example/a", 5],
+    ]);
+    expect(b.articles[1]).toMatchObject({ title: "Title h-a", lastSavedAt: NOW - HOUR });
+    expect(b.domains).toEqual([{ domain: "pop.example", savers: 5 }]);
+  });
+  it("days narrows to recent saves; bad params -> 400", async () => {
+    const b = (await (await get(admin, "/stats/popular?days=7")).json()) as any;
+    expect(b.articles.map((a: any) => a.url)).toEqual(["https://pop.example/a"]);
+    expect(b.domainDays).toBe(7);
+    expect((await (await get(admin, "/stats/popular?days=90")).json() as any).domainDays).toBe(30);
+    expect((await get(admin, "/stats/popular?days=0")).status).toBe(400);
+    expect((await get(admin, "/stats/popular?limit=201")).status).toBe(400);
   });
 });

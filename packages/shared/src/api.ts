@@ -357,3 +357,27 @@ export type AdminSiteRuleEntry = z.infer<typeof AdminSiteRuleEntry>;
 export const AdminSiteRulesResponse = z.object({ rules: z.array(AdminSiteRuleEntry) });
 export type AdminSiteRulesResponse = z.infer<typeof AdminSiteRulesResponse>;
 export const AdminSiteRuleResponse = AdminSiteRuleEntry;
+
+// ---------- admin popular totals (D16): GET /v1/admin/stats/popular ----------
+
+/** A URL or domain is listed only when at least this many distinct users saved it (privacy policy #totals). */
+export const POPULAR_MIN_SAVERS = 5;
+/** Domain totals come from `parse_attempts`, which keeps 30 days. */
+export const POPULAR_DOMAIN_MAX_DAYS = 30;
+
+export const AdminPopularQuery = z.object({
+  /** Only saves from the last N days; omitted = all live saves (articles) / 30 days (domains). */
+  days: z.coerce.number().int().min(1).max(365).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const AdminPopularResponse = z.object({
+  minSavers: z.number().int(),
+  days: z.number().int().nullable(),
+  domainDays: z.number().int(),
+  articles: z.array(
+    z.object({ url: z.string(), title: z.string().nullable(), savers: z.number().int(), lastSavedAt: z.number().int() }),
+  ),
+  domains: z.array(z.object({ domain: z.string(), savers: z.number().int() })),
+});
+export type AdminPopularResponse = z.infer<typeof AdminPopularResponse>;

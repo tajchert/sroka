@@ -4,7 +4,10 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
   AdminAttemptsQuery,
+  AdminPopularQuery,
   AdminSummaryQuery,
+  POPULAR_DOMAIN_MAX_DAYS,
+  POPULAR_MIN_SAVERS,
   SITE_RULE_KEY_PREFIX,
   SiteRuleSchema,
   log,
@@ -14,6 +17,7 @@ import {
   type AdminAttempt,
   type AdminAttemptsResponse,
   type AdminDomainSummary,
+  type AdminPopularResponse,
   type AdminSiteRuleEntry,
   type AdminSiteRulesResponse,
   type AdminSummaryResponse,
@@ -215,6 +219,50 @@ adminRoutes.get("/parse/attempts", async (c) => {
   const body: AdminAttemptsResponse = {
     attempts,
     nextCursor: rows.length > limit && last ? encodeCursor(num(last.created_at), String(last.id)) : null,
+  };
+  return c.json(body);
+});
+
+// ---------- popular totals (D16) ----------
+
+// Articles: live public saves (D1 `content_refs` × `content`, grouped by url_hash so re-parses count once).
+// Captured pages and PDFs never get a `content` row, so they can't appear. Domains: `parse_attempts` without
+// captures (url NULL), counted by distinct `user_hash`. Both are cut at POPULAR_MIN_SAVERS distinct users.
+adminRoutes.get("/stats/popular", async (c) => {
+  const q = AdminPopularQuery.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
+  if (!q.success) return c.json(toApiError(q.error), 400);
+  const { days, limit } = q.data;
+  const now = Date.now();
+  const since = days ? now - days * DAY_MS : 0;
+  const domainDays = Math.min(days ?? POPULAR_DOMAIN_MAX_DAYS, POPULAR_DOMAIN_MAX_DAYS);
+
+  const [articlesRes, domainsRes] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `SELECT MAX(c.canonical_url) AS url, MAX(c.title) AS title, COUNT(DISTINCT r.user_id) AS savers, MAX(r.at) AS last_at
+       FROM content_refs r JOIN content c ON c.id = r.content_id
+       WHERE r.at >= ?
+       GROUP BY c.url_hash HAVING COUNT(DISTINCT r.user_id) >= ?
+       ORDER BY savers DESC, last_at DESC LIMIT ?`,
+    ).bind(since, POPULAR_MIN_SAVERS, limit),
+    c.env.DB.prepare(
+      `SELECT domain, COUNT(DISTINCT user_hash) AS savers FROM parse_attempts
+       WHERE created_at >= ? AND url IS NOT NULL
+       GROUP BY domain HAVING COUNT(DISTINCT user_hash) >= ?
+       ORDER BY savers DESC, domain LIMIT ?`,
+    ).bind(now - domainDays * DAY_MS, POPULAR_MIN_SAVERS, limit),
+  ]);
+
+  const body: AdminPopularResponse = {
+    minSavers: POPULAR_MIN_SAVERS,
+    days: days ?? null,
+    domainDays,
+    articles: ((articlesRes!.results ?? []) as { url: string; title: string | null; savers: number; last_at: number }[]).map((r) => ({
+      url: r.url,
+      title: r.title,
+      savers: num(r.savers),
+      lastSavedAt: num(r.last_at),
+    })),
+    domains: ((domainsRes!.results ?? []) as { domain: string; savers: number }[]).map((r) => ({ domain: r.domain, savers: num(r.savers) })),
   };
   return c.json(body);
 });

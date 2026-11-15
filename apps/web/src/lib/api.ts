@@ -1,6 +1,7 @@
 /** Typed same-origin API client for /v1 and /api/auth (docs/api.md). */
 import {
   AdminAttemptsResponse,
+  AdminPopularResponse,
   AdminSiteRuleResponse,
   AdminSiteRulesResponse,
   AdminSummaryResponse,
@@ -177,6 +178,8 @@ export const api = {
 
   // --- admin (D10; 404 for non-admins) ---
   adminSummary: (days: number) => request("/v1/admin/parse/summary", { query: { days }, schema: AdminSummaryResponse }),
+  adminPopular: (days: number | null) =>
+    request("/v1/admin/stats/popular", { query: days ? { days } : {}, schema: AdminPopularResponse }),
   adminAttempts: (query: AdminAttemptsQueryParams) =>
     request("/v1/admin/parse/attempts", { query: { ...query }, schema: AdminAttemptsResponse }),
   adminRules: async () => (await request("/v1/admin/site-rules", { schema: AdminSiteRulesResponse })).rules,

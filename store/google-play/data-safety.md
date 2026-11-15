@@ -20,7 +20,7 @@ Answers for the form at Play Console > App content > Data safety. Checked agains
 | Personal info > Email address | Yes | No | No | Required (account) | App functionality, Account management |
 | Personal info > User IDs | Yes (internal account id, session) | No | No | Required | App functionality, Account management |
 | App activity > App interactions | Yes (only if user allows analytics: screens viewed, save/open/archive/favorite/search events, enum values only) | No | No | Optional (off until the first-run prompt is accepted; switch in Settings) | Analytics |
-| App activity > Web browsing history | Yes (the URLs of pages the user chooses to save; it is their library, not their browsing) | No | No | Required for the core feature | App functionality |
+| App activity > Web browsing history | Yes (the URLs of pages the user chooses to save; it is their library, not their browsing) | No | No | Required for the core feature | App functionality, Analytics (anonymous totals: sites/public articles saved by ≥ 5 people, owner-only, D16) |
 | App activity > Other user-generated content | Yes (saved article copies, tags, favorites, archive state, reading progress, imported lists) | No | No | Required for the core feature | App functionality |
 | Files and docs > Files and docs | Yes (PDFs the user shares to the app, stored in the user's private library) | No | No | Optional (only if the user saves PDFs) | App functionality |
 | App info and performance > Crash logs | Yes (Firebase Crashlytics) | No | No | Optional (on by default; "Send crash reports" switch in Settings) | Analytics (diagnostics) |

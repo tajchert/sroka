@@ -91,6 +91,7 @@ Source: `lib/analytics.ts` (events `popup_open`, `open_library`, `login`, `save_
 ## Certifications (tick all three)
 - I do not sell or transfer user data to third parties, outside of the approved use cases. (Cloudflare hosts the service and Google Analytics processes opt-in statistics on our behalf: approved service-provider uses.)
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
+  (D16 anonymous totals of saved sites/public articles, shown to the owner only once ≥ 5 people saved them, are used to improve how pages are saved: related to the single purpose. Pages captured by the extension are never counted.)
 - I do not use or transfer user data to determine creditworthiness or for lending purposes.
 
 ## Privacy policy URL (field on this tab)

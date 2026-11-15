@@ -5,11 +5,12 @@ import { SiteRuleSchema, ruleHost, type AdminAttempt, type AdminDomainSummary, t
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
 
-type Tab = "overview" | "attempts" | "rules";
+type Tab = "overview" | "attempts" | "rules" | "popular";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "attempts", label: "Attempts" },
   { id: "rules", label: "Site rules" },
+  { id: "popular", label: "Popular" },
 ];
 
 export default function Admin() {
@@ -48,6 +49,7 @@ export default function Admin() {
       {tab === "overview" && <Overview sp={sp} go={go} />}
       {tab === "attempts" && <Attempts sp={sp} go={go} />}
       {tab === "rules" && <Rules sp={sp} go={go} />}
+      {tab === "popular" && <Popular sp={sp} go={go} />}
     </div>
   );
 }
@@ -165,6 +167,88 @@ function Overview({ sp, go }: { sp: URLSearchParams; go: Go }) {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const POPULAR_PERIODS = [7, 30, 0];
+
+/** D16: anonymous totals, only URLs/domains saved by at least `minSavers` people. */
+function Popular({ sp, go }: { sp: URLSearchParams; go: Go }) {
+  const days = POPULAR_PERIODS.includes(Number(sp.get("days"))) ? Number(sp.get("days")) : 30;
+  const q = useQuery({ queryKey: ["admin", "popular", days], queryFn: () => api.adminPopular(days || null), staleTime: 60_000 });
+  const d = q.data;
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2" role="group" aria-label="Period">
+        {POPULAR_PERIODS.map((p) => (
+          <button key={p} className={`btn ${days === p ? "btn-primary" : ""}`} aria-pressed={days === p} onClick={() => go({ days: p === 30 ? null : String(p) })}>
+            {p ? `${p} days` : "All time"}
+          </button>
+        ))}
+        {q.isFetching && <span className="spinner ml-2" aria-label="Loading" />}
+      </div>
+      {q.isError && <ErrorNote error={q.error} />}
+      {d && (
+        <p className="text-sm text-ink2">
+          Only pages and sites saved by at least {d.minSavers} people. Private pages and PDFs are never counted. Sites cover the last {d.domainDays} days.
+        </p>
+      )}
+      {d && (
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <section aria-label="Popular articles" className="overflow-x-auto">
+            <h2 className="mb-2 font-semibold">Articles</h2>
+            {d.articles.length === 0 ? (
+              <p className="text-sm text-ink2">Nothing has reached {d.minSavers} savers yet.</p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-ink2">
+                  <tr className="border-b border-rule">
+                    <th className="py-2 pr-3 font-medium">Article</th>
+                    <th className="py-2 pr-3 font-medium">Savers</th>
+                    <th className="py-2 font-medium">Last saved</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.articles.map((a) => (
+                    <tr key={a.url} className="border-b border-rule align-top">
+                      <td className="py-2 pr-3">
+                        <a href={a.url} target="_blank" rel="noreferrer noopener" className="font-medium hover:underline">{a.title || a.url}</a>
+                        <div className="max-w-xl truncate text-xs text-ink2">{a.url}</div>
+                      </td>
+                      <td className="py-2 pr-3 tabular-nums">{a.savers}</td>
+                      <td className="py-2 whitespace-nowrap text-ink2">{fmtTime(a.lastSavedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+          <section aria-label="Popular sites" className="overflow-x-auto">
+            <h2 className="mb-2 font-semibold">Sites</h2>
+            {d.domains.length === 0 ? (
+              <p className="text-sm text-ink2">Nothing has reached {d.minSavers} savers yet.</p>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs text-ink2">
+                  <tr className="border-b border-rule">
+                    <th className="py-2 pr-3 font-medium">Site</th>
+                    <th className="py-2 font-medium">Savers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.domains.map((x) => (
+                    <tr key={x.domain} className="border-b border-rule">
+                      <td className="py-2 pr-3">{x.domain}</td>
+                      <td className="py-2 tabular-nums">{x.savers}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
         </div>
       )}
     </div>

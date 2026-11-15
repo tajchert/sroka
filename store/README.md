@@ -11,7 +11,7 @@ Copy-paste text and images for both stores. The forms are legal declarations: ev
 - `google-play/data-safety.md` Data safety form answers
 - `google-play/app-content.md` app access, ads, content rating, target audience, news, foreground service, release notes
 - `google-play/images/` icon, feature graphic, screenshots (images agent)
-- `upload/` gitignored: the extension zip and the `.aab` (orchestrator puts them here)
+- `upload/` gitignored: the extension zip, the `.aab`, and `sroka-fgs-datasync-demo.mp4` (foreground-service demo video for the Play declaration)
 
 Secrets: never commit `REVIEW_EMAIL`/`REVIEW_OTP` values. Set them as API worker secrets (`wrangler secret put` in `workers/api`) and paste them only into the store consoles.
 
@@ -53,4 +53,4 @@ Items found while verifying; each needs an owner decision, the store text was NO
 7. **Landing page** shows a "Download on the App Store" badge (`apps/web/index.html`) and the description in some places mentions iOS; there is no iOS app. Remove before store review, as it contradicts the listings.
 8. **Manifest description** ("Save pages to read later in Sroka") differs from the listing summary. Optional alignment.
 9. **Not verified on a device.** The ledger says Android 1.4.0/1.5.0 and the consent flow were never run on a device; Data safety describes the code's intent. Run the consent flow once on a play-flavor build before submitting.
-10. **Reviewer account is not set up** (needs `REVIEW_EMAIL`/`REVIEW_OTP` secrets on the production API) and no screen recording of the foreground service exists; both are required for review.
+10. ~~Reviewer account / foreground-service recording missing.~~ DONE 2026-11-15: reviewer secrets set on the production API; `upload/sroka-fgs-datasync-demo.mp4` (86 s, play release 1.5.0) shows a 1,600-link Pocket import running in the "Importing links… N of 1600" foreground notification until "Import finished". Upload it (e.g. Google Drive, link visible to anyone) and paste the link in the Foreground service declaration.

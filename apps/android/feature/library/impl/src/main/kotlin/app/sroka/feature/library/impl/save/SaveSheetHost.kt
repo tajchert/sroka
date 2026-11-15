@@ -182,7 +182,7 @@ private fun closeSheet(scope: kotlinx.coroutines.CoroutineScope, sheetState: She
 }
 
 @Composable
-private fun JustSaved(
+internal fun JustSaved(
     item: Item?,
     onAddTags: () -> Unit,
     onFavorite: () -> Unit,

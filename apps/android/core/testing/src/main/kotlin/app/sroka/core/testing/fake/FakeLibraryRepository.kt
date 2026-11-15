@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.domain.SaveSource
 import app.sroka.core.model.Item
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemQuery
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
@@ -162,6 +163,13 @@ class FakeLibraryRepository(initial: List<Item> = emptyList()) : LibraryReposito
 
     override fun observeNextUnread(excludeId: String?): Flow<ItemSummary?> = items.map { list ->
         list.filter { it.status == ItemStatus.UNREAD && it.id != excludeId }.maxByOrNull { it.savedAt }?.toSummary()
+    }
+
+    override fun observeNextReadable(excludeId: String?): Flow<ItemSummary?> = items.map { list ->
+        list.filter {
+            it.status == ItemStatus.UNREAD && it.id != excludeId &&
+                (it.kind == ItemKind.PDF || it.parseStatus == ParseStatus.OK || it.parseStatus == ParseStatus.PARTIAL)
+        }.maxByOrNull { it.savedAt }?.toSummary()
     }
 
     override fun observeContinueReading(limit: Int): Flow<List<ItemSummary>> = items.map { list ->

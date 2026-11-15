@@ -3,6 +3,7 @@ package app.sroka.core.database
 import androidx.room3.withWriteTransaction
 import app.sroka.core.database.entity.ContentFileEntity
 import app.sroka.core.database.entity.ContentState
+import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.OfflineState
@@ -94,6 +95,20 @@ class ItemDaoTest : DatabaseTestBase() {
         assertEquals("old", dao.observeNextUnread("new").first()?.id)
         assertEquals("new", dao.observeNextUnread("old").first()?.id)
         assertEquals("new", dao.observeNextUnread("missing").first()?.id)
+    }
+
+    @Test fun nextReadableSkipsPendingAndFailedItems() = runBlocking {
+        dao.upsertItem(item("open", savedAt = 50))
+        dao.upsertItem(item("older", savedAt = 100))
+        dao.upsertItem(item("pending", savedAt = 300).copy(parseStatus = ParseStatus.PENDING))
+        dao.upsertItem(item("failed", savedAt = 200).copy(parseStatus = ParseStatus.FAILED))
+        dao.upsertItem(item("done", savedAt = 400, status = ItemStatus.ARCHIVED))
+        assertEquals("pending", dao.observeNextUnread("open").first()?.id)
+        assertEquals("older", dao.observeNextReadable("open").first()?.id)
+        dao.upsertItem(item("partial", savedAt = 150).copy(parseStatus = ParseStatus.PARTIAL))
+        assertEquals("partial", dao.observeNextReadable("open").first()?.id)
+        dao.upsertItem(item("pdf", savedAt = 250).copy(parseStatus = ParseStatus.PENDING, kind = ItemKind.PDF))
+        assertEquals("pdf", dao.observeNextReadable("open").first()?.id)
     }
 
     @Test fun nextUnreadIsNullWhenOnlyTheExcludedItemIsUnread() = runBlocking {

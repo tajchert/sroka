@@ -77,6 +77,19 @@ class ReaderUpNextTest {
     }
 
     @Test
+    fun endNextSkipsANewerPendingItemForAnOlderReadableOne() = runTest(dispatcher) {
+        library.items.value = listOf(
+            testItem(id = "a", savedAt = 1_000L),
+            testItem(id = "p", savedAt = 5_000L, parseStatus = ParseStatus.PENDING),
+            testItem(id = "f", savedAt = 4_000L, parseStatus = ParseStatus.FAILED),
+            testItem(id = "older", savedAt = 500L, parseStatus = ParseStatus.OK),
+        )
+        val vm = vm()
+        vm.endNext.onEach { }.launchIn(backgroundScope)
+        assertEquals("older", vm.endNext.value?.id)
+    }
+
+    @Test
     fun archiveAndNextArchivesThenOpensTheNextItem() = runTest(dispatcher) {
         library.items.value = listOf(testItem(id = "a", savedAt = 2_000L), testItem(id = "b", savedAt = 1_000L))
         val vm = vm()

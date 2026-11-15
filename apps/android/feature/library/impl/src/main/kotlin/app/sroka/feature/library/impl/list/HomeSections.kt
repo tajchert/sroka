@@ -139,7 +139,7 @@ internal fun OnboardingPanel(
             AssistChip(
                 onClick = onSaveClipboard,
                 label = { Text(stringResource(R.string.feature_library_onboarding_clipboard)) },
-                leadingIcon = { Icon(SrokaIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                leadingIcon = { Icon(SrokaIcons.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 modifier = Modifier.padding(start = 56.dp),
             )
         }

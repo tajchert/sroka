@@ -24,6 +24,8 @@ import java.io.File
  *   LibraryRepository.setStatus). Defaults to [onBack] with no undo.
  * @param isExpanded / onToggleExpanded R14.3: the list pane is collapsed; the app bar button toggles it
  * @param onOpenItem open another item in place of this reader (tabletop "Up next")
+ * @param onArchivedNext end-card "Archive & next": open [nextId] in place of this reader and offer undo for
+ *   [archivedId]. Defaults to [onOpenItem] with no undo.
  * @param detailPaneActive (read lazily) true while the reader sits next to the list (two-pane, R13): it is drawn in
  *   the rounded detail card without a back arrow. When false it is full screen (phone, folded).
  */
@@ -35,6 +37,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
     isExpanded: () -> Boolean = { false },
     onToggleExpanded: (() -> Unit)? = null,
     onOpenItem: (itemId: String) -> Unit = {},
+    onArchivedNext: (archivedId: String, nextId: String) -> Unit = { _, nextId -> onOpenItem(nextId) },
 ) {
     entry<ReaderKey>(metadata = ListDetailSceneStrategy.detailPane()) { key ->
         val viewModel = hiltViewModel<ReaderViewModel, ReaderViewModel.Factory>(
@@ -54,6 +57,7 @@ fun EntryProviderScope<NavKey>.readerEntries(
                 isExpanded = isExpanded(),
                 onToggleExpanded = onToggleExpanded,
                 onOpenItem = onOpenItem,
+                onArchivedNext = onArchivedNext,
             )
         }
         if (detailPaneActive) {

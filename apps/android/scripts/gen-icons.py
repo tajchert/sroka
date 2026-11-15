@@ -27,6 +27,7 @@ ICONS = [
     ("CloseFullscreen", "close_fullscreen", 0, False),
     ("CloudDownload", "cloud_download", 0, False),
     ("CloudOff", "cloud_off", 0, False),
+    ("ContentPaste", "content_paste", 0, False),
     ("DarkMode", "dark_mode", 0, False),
     ("Delete", "delete", 0, False),
     ("DeleteForever", "delete_forever", 0, False),

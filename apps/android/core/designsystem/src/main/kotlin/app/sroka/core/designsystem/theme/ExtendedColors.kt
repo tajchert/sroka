@@ -51,3 +51,9 @@ val MaterialTheme.srokaColors: SrokaExtendedColors
     @Composable
     @ReadOnlyComposable
     get() = LocalSrokaColors.current
+
+/**
+ * The extended palette for a surface whose darkness is decided by something other than the app theme, e.g. the
+ * reader's own theme (a dark reader inside a light app reads [SrokaExtendedColors.readerProgress] yellow).
+ */
+fun srokaColorsFor(dark: Boolean): SrokaExtendedColors = if (dark) DarkExtendedColors else LightExtendedColors

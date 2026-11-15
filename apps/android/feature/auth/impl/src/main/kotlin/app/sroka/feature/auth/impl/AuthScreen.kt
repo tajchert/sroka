@@ -352,7 +352,7 @@ private fun CodeForm(
             AssistChip(
                 onClick = { onPaste(pasteCode) },
                 label = { Text(stringResource(R.string.feature_auth_paste_code, pasteCode)) },
-                leadingIcon = { Icon(ClipboardIcon, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                leadingIcon = { Icon(SrokaIcons.ContentPaste, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
                 modifier = Modifier.testTag(PASTE_CHIP_TAG),
             )
         }

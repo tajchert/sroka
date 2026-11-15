@@ -45,6 +45,12 @@ interface LibraryRepository {
     /** The newest unread item whose id is not [excludeId] (null excludes nothing), or null when there is none. */
     fun observeNextUnread(excludeId: String?): Flow<ItemSummary?>
 
+    /**
+     * The newest unread item other than [excludeId] that opens as readable (a PDF, or an article whose text is
+     * OK or PARTIAL); pending and failed items are skipped so an older readable one is returned.
+     */
+    fun observeNextReadable(excludeId: String?): Flow<ItemSummary?>
+
     /** Counts for tab badges / empty states. */
     fun observeCounts(): Flow<LibraryCounts>
 

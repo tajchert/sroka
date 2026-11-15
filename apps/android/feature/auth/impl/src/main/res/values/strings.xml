@@ -5,7 +5,6 @@
     <string name="feature_auth_email_label">Email</string>
     <string name="feature_auth_send_code">Send code</string>
     <string name="feature_auth_code_hint">Enter the code sent to %1$s</string>
-    <string name="feature_auth_code_label">6-digit code</string>
     <string name="feature_auth_resend">Resend code</string>
     <string name="feature_auth_resend_in">Resend code in %1$d s</string>
     <string name="feature_auth_change_email">Use another email</string>

@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.sroka.core.designsystem.theme.srokaColors
+import app.sroka.core.designsystem.theme.srokaColorsFor
 import app.sroka.core.model.ItemKind
 import app.sroka.core.model.ParseStatus
 import app.sroka.feature.reader.impl.ReaderEvent
@@ -98,6 +99,7 @@ import app.sroka.feature.reader.impl.resolveTheme
  *
  * @param onBack leave the reader
  * @param onArchived the item was archived; caller pops and shows an undo snackbar (defaults to [onBack])
+ * @param onArchivedNext "Archive & next" archived this item: caller opens the next one and offers undo
  * @param isExpanded list pane collapsed (R14.3); [onToggleExpanded] shows the expand/show-list button (detail pane only)
  * @param detailPane true while shown in the two-pane detail card (R13): no back arrow, transparent
  *   bars, the page background follows the card and the article column is wider-pane styled
@@ -115,6 +117,7 @@ internal fun ReaderScreen(
     isExpanded: Boolean = false,
     onToggleExpanded: (() -> Unit)? = null,
     onOpenItem: (itemId: String) -> Unit = {},
+    onArchivedNext: (archivedId: String, nextId: String) -> Unit = { _, nextId -> onOpenItem(nextId) },
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -330,7 +333,7 @@ internal fun ReaderScreen(
                         TopAppBarDefaults.topAppBarColors()
                     },
                 )
-                ReadingProgressLine(progress)
+                ReadingProgressLine(progress, readerDark = theme.isDark)
             }
         },
     ) { padding ->
@@ -531,7 +534,7 @@ internal fun ReaderScreen(
                             if (!leaving) {
                                 leaving = true
                                 viewModel.archiveAndNext(
-                                    onNext = { onOpenItem(it) },
+                                    onNext = { onArchivedNext(itemId, it) },
                                     onNoNext = { onArchived(itemId) },
                                 )
                             }
@@ -583,8 +586,9 @@ private fun FailureReason.messageRes(): Int = when (this) {
 }
 
 @Composable
-private fun ReadingProgressLine(progress: Float) {
-    val colors = MaterialTheme.srokaColors
+private fun ReadingProgressLine(progress: Float, readerDark: Boolean) {
+    // Follows the reader's effective theme, not the app chrome: blue on light/sepia, yellow on dark.
+    val colors = srokaColorsFor(readerDark)
     Box(
         Modifier
             .fillMaxWidth()

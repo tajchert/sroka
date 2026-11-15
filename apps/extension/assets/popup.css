@@ -1,23 +1,74 @@
-/* Toolbar popup — "Sroka Popup" from Claude Design. Dark only, 340px wide. */
+/* Toolbar popup — "Sroka Popup" from Claude Design, 340px wide. Follows the system theme: light is the default
+   (paper/ink/wing blue, same palette as the options page and web app), dark under prefers-color-scheme. */
 :root {
-  --bg: #1b1e23;
-  --raise: #23272e;
-  --raise-2: #2a2e35;
-  --line: #3a3f48;
-  --line-2: #4a4f58;
-  --fg: #f1efe9;
-  --fg-2: #c8cacf;
-  --muted: #a5a8ae;
-  --cream: #f6f5f1;
+  --bg: #fbfaf7;
+  --raise: #f3f1ea;
+  --raise-2: #ebe8df;
+  --line: #e3e0d8;
+  --line-2: #d3d0c6;
+  --field: #8f8c83; /* input / OTP box borders: 3:1 against the paper */
+  --fg: #15171c;
+  --fg-2: #3d4047;
+  --muted: #5d5f66;
+  --cream: #f6f5f1; /* text on the coloured bars */
   --ink: #15171c;
-  --blue: #1e6f8f;
-  --blue-soft: #7cc0da;
-  --focus: #4f9fbf;
-  --tag-bg: #1d3a47;
-  --tag-fg: #9fd0e3;
+  --blue: #1e6f8f; /* bar background */
+  --blue-soft: #1e6f8f; /* links and accents on the page background */
+  --focus: #1e6f8f;
+  --tag-bg: #dcebf1;
+  --tag-fg: #124b61;
+  --tag-x-hover: #c3dce6;
   --beak: #f2c84b;
-  --danger: #f08f7f;
-  color-scheme: dark;
+  --danger: #b42318;
+  --bar-muted: #4a4f58;
+  --bar-error: #9c2f25;
+  --btn-bg: #15171c;
+  --btn-bg-hover: #2a2e35;
+  --btn-fg: #fbfaf7;
+  --placeholder: #666971;
+  --menu-bg: #ffffff;
+  --menu-shadow: 0 6px 20px rgba(21, 23, 28, 0.18);
+  --fav-edge: #c99a1e;
+  --thumb-a: #e7e4da;
+  --thumb-b: #efede5;
+  --thumb-blue-a: #dcebf1;
+  --thumb-blue-b: #cde2eb;
+  --spin-track: rgba(21, 23, 28, 0.18);
+  --spin-btn-track: rgba(251, 250, 247, 0.3);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1e23;
+    --raise: #23272e;
+    --raise-2: #2a2e35;
+    --line: #3a3f48;
+    --line-2: #4a4f58;
+    --field: #3a3f48;
+    --fg: #f1efe9;
+    --fg-2: #c8cacf;
+    --muted: #a5a8ae;
+    --blue-soft: #7cc0da;
+    --focus: #4f9fbf;
+    --tag-bg: #1d3a47;
+    --tag-fg: #9fd0e3;
+    --tag-x-hover: #2a5568;
+    --danger: #f08f7f;
+    --bar-muted: #2a2e35;
+    --bar-error: #5a2b26;
+    --btn-bg: #f1efe9;
+    --btn-bg-hover: #ffffff;
+    --btn-fg: #15171c;
+    --placeholder: #8b8f97;
+    --menu-bg: #2a2e35;
+    --menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --thumb-a: #2a2e35;
+    --thumb-b: #30343c;
+    --thumb-blue-a: #1d3a47;
+    --thumb-blue-b: #22485a;
+    --spin-track: rgba(241, 239, 233, 0.2);
+    --spin-btn-track: rgba(21, 23, 28, 0.18);
+  }
 }
 
 *,
@@ -79,7 +130,7 @@ svg {
 /* Brand header (sign-in screens) */
 .brand-bar {
   padding: 14px 18px;
-  border-bottom: 1px solid #2c3038;
+  border-bottom: 1px solid var(--line);
 }
 .brand {
   display: inline-flex;
@@ -138,7 +189,7 @@ svg {
 .input {
   height: 44px;
   border-radius: 10px;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--field);
   padding: 0 14px;
   font-size: 15px;
   background: var(--raise);
@@ -150,7 +201,7 @@ svg {
 }
 .input::placeholder,
 .tag-input::placeholder {
-  color: #6b6f78;
+  color: var(--placeholder);
 }
 .err {
   font-size: 13px;
@@ -174,7 +225,7 @@ svg {
 .otp-box {
   height: 50px;
   border-radius: 10px;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--field);
   background: var(--raise);
   display: flex;
   align-items: center;
@@ -183,7 +234,7 @@ svg {
   font-weight: 600;
 }
 .otp-box.is-filled {
-  border-color: var(--line-2);
+  border-color: var(--fg-2);
   background: var(--raise-2);
 }
 .otp-box.is-active {
@@ -219,6 +270,7 @@ svg {
 }
 .link:hover {
   color: var(--fg);
+  text-decoration: underline;
 }
 
 /* First-run analytics consent card (D15) */
@@ -243,11 +295,11 @@ svg {
   white-space: nowrap;
 }
 .btn-primary {
-  background: var(--fg);
-  color: var(--ink);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
 }
 .btn-primary:hover {
-  background: #ffffff;
+  background: var(--btn-bg-hover);
 }
 .btn-primary:disabled:not([aria-busy="true"]) {
   opacity: 0.35;
@@ -275,53 +327,147 @@ svg {
 .pair .btn:only-child {
   grid-column: 1 / -1;
 }
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.btn-tile {
-  height: 42px;
-  border-radius: 12px;
-  border: 1.5px solid var(--line);
-  background: transparent;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.btn-tile:hover {
-  border-color: var(--line-2);
-}
-.btn-tile svg path,
-.btn-tile .star polygon {
+.ext-arrow path,
+.menu svg path,
+.fav .star polygon {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.btn-tile.is-fav {
-  border-color: var(--beak);
-  background: #3a3220;
+
+/* Saved screen: one row of actions, then (once) the shortcut hint */
+.body-saved {
+  gap: 12px;
+  padding: 14px 18px 12px;
 }
-.btn-tile.is-fav .star polygon {
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -8px;
+}
+.fav,
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.fav {
+  color: var(--fg-2);
+}
+.fav:hover:not(:disabled) {
+  background: var(--raise);
+  color: var(--fg);
+}
+.fav.is-fav {
+  color: var(--fg);
+}
+.fav.is-fav .star polygon {
   fill: var(--beak);
-  stroke: #c99a1e;
+  stroke: var(--fav-edge);
   stroke-width: 1.4;
 }
-.btn-danger:hover {
-  border-color: var(--danger);
+.open {
+  color: var(--blue-soft);
+}
+.open:hover:not(:disabled) {
+  background: var(--raise);
+}
+.foot {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+kbd {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--raise);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 11.5px;
+}
+
+/* "⋯" menu in the saved header */
+.more {
+  position: relative;
+  flex: none;
+  margin: -6px -8px -6px 0;
+}
+.bar-more {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, background 0.15s ease;
+}
+.is-done .bar-more {
+  opacity: 1;
+  pointer-events: auto;
+}
+.bar-more circle {
+  fill: currentColor;
+}
+.bar-more:hover,
+.bar-more[aria-expanded="true"] {
+  background: rgba(246, 245, 241, 0.2);
+}
+.bar :focus-visible {
+  outline-color: var(--cream);
+}
+.menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+}
+.menu-item {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
+  background: var(--raise);
+}
+.menu-danger {
   color: var(--danger);
 }
-.ext-arrow path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.menu :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 /* Coloured status bars */
@@ -337,10 +483,10 @@ svg {
   background: var(--blue);
 }
 .bar-muted {
-  background: var(--raise-2);
+  background: var(--bar-muted);
 }
 .bar-error {
-  background: #5a2b26;
+  background: var(--bar-error);
 }
 .bar-tight {
   padding: 12px 14px;
@@ -396,6 +542,25 @@ svg {
   height: 3px;
   background: rgba(246, 245, 241, 0.2);
   overflow: hidden;
+}
+.countdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+}
+.countdown span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--cream);
+  transform-origin: left center;
+  animation: acShrink linear forwards;
+}
+.countdown .is-paused {
+  animation-play-state: paused;
 }
 .progress span {
   display: block;
@@ -460,9 +625,6 @@ svg {
   opacity: 0.45;
   pointer-events: none;
 }
-.is-pending .btn-primary:disabled {
-  opacity: 0.45;
-}
 
 /* Item preview */
 .item {
@@ -478,10 +640,10 @@ svg {
   object-fit: cover;
 }
 .thumb-grey {
-  background: repeating-linear-gradient(135deg, #2a2e35 0 6px, #30343c 6px 12px);
+  background: repeating-linear-gradient(135deg, var(--thumb-a) 0 6px, var(--thumb-b) 6px 12px);
 }
 .thumb-blue {
-  background: repeating-linear-gradient(135deg, #1d3a47 0 6px, #22485a 6px 12px);
+  background: repeating-linear-gradient(135deg, var(--thumb-blue-a) 0 6px, var(--thumb-blue-b) 6px 12px);
 }
 .item-text {
   display: flex;
@@ -552,7 +714,7 @@ svg {
   padding: 0;
 }
 .chip-draft button:hover {
-  background: #2a5568;
+  background: var(--tag-x-hover);
 }
 .chip-draft path {
   stroke: var(--tag-fg);
@@ -574,7 +736,7 @@ svg {
 .tag-box {
   min-height: 44px;
   border-radius: 10px;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--field);
   padding: 6px 8px;
   display: flex;
   flex-wrap: wrap;
@@ -606,15 +768,15 @@ svg {
   animation: spSpin 0.7s linear infinite;
 }
 .spin-light {
-  border-color: rgba(21, 23, 28, 0.18);
-  border-top-color: var(--ink);
+  border-color: var(--spin-btn-track);
+  border-top-color: var(--btn-fg);
 }
 .spin-dark {
-  border-color: rgba(241, 239, 233, 0.2);
+  border-color: var(--spin-track);
   border-top-color: var(--fg);
 }
 .spin-blue {
-  border-color: rgba(124, 192, 218, 0.2);
+  border-color: var(--spin-track);
   border-top-color: var(--blue-soft);
 }
 
@@ -623,8 +785,12 @@ svg {
   .swap-a,
   .swap-b,
   .progress,
+  .bar-more,
   .fade-ctl {
     transition: none !important;
+  }
+  .countdown {
+    display: none;
   }
   .bar-icon-b {
     transform: none !important;
@@ -637,6 +803,14 @@ svg {
 @keyframes spSpin {
   to {
     transform: rotate(360deg);
+  }
+}
+@keyframes acShrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
   }
 }
 @keyframes spBar {

@@ -1,18 +1,22 @@
 // Popup — implements "Sroka Popup" / "Sroka Extension" from Claude Design (screens: email, otp, saving →
 // saved, tags, removed), plus queued/failed states in the same language. Saving and saved are ONE screen (`SaveView`):
 // same DOM, so the bar icon/title crossfade and the controls un-dim instead of the popup blinking between screens.
+// The saved screen is deliberately light and closes itself after 3 s (`lib/auto-close.ts`) unless the user engages.
 import type { Item } from "@sroka/shared";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Glyph, Mark } from "../../components/Mark.tsx";
 import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSuggestions } from "../../lib/api.ts";
 import { removeSaved } from "../../lib/saved-set.ts";
 import type { Msg } from "../../lib/messages.ts";
 import { track } from "../../lib/analytics.ts";
+import { AUTO_CLOSE_MS, createAutoClose, type AutoCloseState } from "../../lib/auto-close.ts";
 import { getConsent, PRIVACY_URL, setConsent, shouldShowConsentPrompt } from "../../lib/consent.ts";
 import { openApp } from "../../lib/open-app.ts";
 import { clearFailed, readFailed, type FailedSave } from "../../lib/queue.ts";
+import { failedBody } from "../../lib/save-failure.ts";
 import { isSavableUrl, type SaveResult } from "../../lib/save.ts";
 import { getPendingOtp, getSettings, setPendingOtp } from "../../lib/settings.ts";
+import { markShortcutHintSeen, shortcutHintToShow } from "../../lib/shortcut.ts";
 
 type Tab = { id?: number; url?: string; title?: string };
 type Phase =
@@ -39,16 +43,24 @@ const hostOf = (url?: string) => {
 export function App() {
   const [phase, setPhase] = useState<Phase>({ k: "loading" });
   const [tab, setTab] = useState<Tab>({});
+  // Cards that sit above the saved screen: while one is showing the popup must stay open until it is dealt with.
+  const [consentShown, setConsentShown] = useState(false);
+  const [failedShown, setFailedShown] = useState(false);
+  const [countdown, setCountdown] = useState<AutoCloseState>("idle");
+  const [hint, setHint] = useState<string | null>(null);
+  // Set once the user engages with the saved screen; it stays set until the next save starts.
+  const engaged = useRef(false);
 
   const save = useCallback(async (t: Tab, signedIn = false) => {
     // chrome://, the new tab page, the Web Store…: nothing to save, and not an error (e.g. signing in on chrome://extensions).
     if (!isSavableUrl(t.url)) return setPhase({ k: "unsupported", signedIn });
+    engaged.current = false;
     setPhase({ k: "saving" });
     const r = await send<SaveResult>({ type: "save-tab", tab: t });
     if (r.ok) setPhase({ k: "saved", item: r.item, created: r.created });
     else if (r.reason === "signed_out") setPhase({ k: "signin" });
     else if (r.queued) setPhase({ k: "queued", message: "You’re offline. It will save as soon as the connection is back." });
-    else setPhase({ k: "failed", message: r.message ?? "Could not save this page." });
+    else setPhase({ k: "failed", message: failedBody(r.message) });
   }, []);
 
   useEffect(() => {
@@ -59,8 +71,65 @@ export function App() {
       setTab(tb);
       if ((await getSettings()).signedOut) return setPhase({ k: "signin" });
       await save(tb);
-    })().catch((e) => setPhase({ k: "failed", message: describeError(e) }));
+    })().catch((e) => setPhase({ k: "failed", message: failedBody(describeError(e)) }));
   }, [save]);
+
+  // Any click or key on the saved screen (cards above it included) ends auto-close for good, until the next save.
+  const onSaved = phase.k === "saved";
+  useEffect(() => {
+    if (!onSaved) return;
+    const engage = () => {
+      engaged.current = true;
+    };
+    const events = ["pointerdown", "click", "keydown"] as const;
+    for (const e of events) document.addEventListener(e, engage, true);
+    return () => {
+      for (const e of events) document.removeEventListener(e, engage, true);
+    };
+  }, [onSaved]);
+
+  // Auto-close: runs only on the saved screen with no card above it, and never restarts once the user engaged.
+  const autoClose = onSaved && !consentShown && !failedShown;
+  useEffect(() => {
+    if (!autoClose || engaged.current) return;
+    const root = document.documentElement;
+    const ac = createAutoClose({ onClose: () => window.close(), onState: setCountdown });
+    const cancel = () => ac.cancel();
+    const hover = () => ac.hold("hover");
+    const unhover = () => ac.release("hover");
+    const focusIn = (e: FocusEvent) => {
+      if ((e.target as Element | null)?.matches?.(":focus-visible")) ac.hold("focus");
+    };
+    const focusOut = () => ac.release("focus");
+    root.addEventListener("mouseenter", hover);
+    root.addEventListener("mouseleave", unhover);
+    document.addEventListener("focusin", focusIn);
+    document.addEventListener("focusout", focusOut);
+    document.addEventListener("pointerdown", cancel, true);
+    document.addEventListener("click", cancel, true);
+    document.addEventListener("keydown", cancel, true);
+    if (root.matches(":hover")) ac.hold("hover");
+    ac.start();
+    return () => {
+      ac.dispose();
+      root.removeEventListener("mouseenter", hover);
+      root.removeEventListener("mouseleave", unhover);
+      document.removeEventListener("focusin", focusIn);
+      document.removeEventListener("focusout", focusOut);
+      document.removeEventListener("pointerdown", cancel, true);
+      document.removeEventListener("click", cancel, true);
+      document.removeEventListener("keydown", cancel, true);
+      setCountdown("idle");
+    };
+  }, [autoClose]);
+
+  // The shortcut hint is read up front (so the footer is there when the saved screen appears) and shown once.
+  useEffect(() => {
+    void shortcutHintToShow().then(setHint);
+  }, []);
+  useEffect(() => {
+    if (phase.k === "saved" && hint) void markShortcutHintSeen();
+  }, [phase.k, hint]);
 
   const onSignedIn = async () => {
     // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
@@ -70,8 +139,8 @@ export function App() {
 
   return (
     <div className="popup-card">
-      <ConsentCard />
-      <FailedSavesCard />
+      <ConsentCard onShown={setConsentShown} />
+      <FailedSavesCard onShown={setFailedShown} />
       {phase.k === "loading" && <div className="body hint">Loading…</div>}
       {phase.k === "signin" && <SignIn onDone={onSignedIn} />}
       {(phase.k === "saving" || phase.k === "saved") && (
@@ -80,6 +149,8 @@ export function App() {
           item={phase.k === "saved" ? phase.item : undefined}
           created={phase.k === "saved" ? phase.created : true}
           tab={tab}
+          countdown={countdown}
+          hint={hint}
           onItem={(item) => phase.k === "saved" && setPhase({ ...phase, item })}
           onTags={() => phase.k === "saved" && setPhase({ k: "tags", item: phase.item, created: phase.created })}
           onRemoved={() => setPhase({ k: "removed" })}
@@ -142,11 +213,12 @@ export function App() {
 }
 
 /** First-run analytics opt-in (D15). Inline, never blocks the save running alongside. */
-function ConsentCard() {
+function ConsentCard({ onShown }: { onShown: (shown: boolean) => void }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     void getConsent().then((c) => setShow(shouldShowConsentPrompt(c)));
   }, []);
+  useEffect(() => onShown(show), [show, onShown]);
   if (!show) return null;
   const decide = (analytics: boolean) => {
     setShow(false);
@@ -178,24 +250,26 @@ const FAILED_REASON: Record<string, string> = {
 };
 
 /** Saves the retry queue dropped (lib/queue.ts `failedSaves`), so none are lost silently. */
-function FailedSavesCard() {
+function FailedSavesCard({ onShown }: { onShown: (shown: boolean) => void }) {
   const [failed, setFailed] = useState<FailedSave[]>([]);
   useEffect(() => {
     void readFailed().then(setFailed);
   }, []);
+  const shown = failed.length > 0;
+  useEffect(() => onShown(shown), [shown, onShown]);
   if (!failed.length) return null;
-  const shown = failed.slice(-3).reverse();
+  const recent = failed.slice(-3).reverse();
   return (
     <div className="consent" role="region" aria-label="Saves not sent">
       <strong>{failed.length === 1 ? "1 save couldn’t be sent" : `${failed.length} saves couldn’t be sent`}</strong>
       <p>
-        {shown.map((f, i) => (
+        {recent.map((f, i) => (
           <span key={i}>
             {hostOf(f.url) || "a page"} ({FAILED_REASON[f.reason] ?? f.reason})
             <br />
           </span>
         ))}
-        {failed.length > shown.length ? `and ${failed.length - shown.length} more. ` : ""}Save them again to keep them.
+        {failed.length > recent.length ? `and ${failed.length - recent.length} more. ` : ""}Save them again to keep them.
       </p>
       <div className="consent-actions">
         <button
@@ -435,6 +509,8 @@ function SaveView({
   item,
   created,
   tab,
+  countdown,
+  hint,
   onItem,
   onTags,
   onRemoved,
@@ -442,6 +518,8 @@ function SaveView({
   item?: Item;
   created: boolean;
   tab: Tab;
+  countdown: AutoCloseState;
+  hint: string | null;
   onItem: (i: Item) => void;
   onTags: () => void;
   onRemoved: () => void;
@@ -466,8 +544,9 @@ function SaveView({
   const meta = item
     ? [item.siteName || hostOf(item.url), item.readingMinutes ? `${item.readingMinutes} min` : ""].filter(Boolean).join(" · ")
     : hostOf(tab.url);
-  const savedTitle = created ? "Saved to Sroka" : "Already in Sroka";
+  const savedTitle = created ? "Saved" : "Already saved";
   const tags = item?.tags ?? [];
+  const counting = ready && (countdown === "running" || countdown === "paused");
 
   return (
     <>
@@ -490,67 +569,167 @@ function SaveView({
             {savedTitle}
           </span>
         </span>
+        <MoreMenu
+          disabled={!ready}
+          removing={busy === "remove"}
+          onRemove={() =>
+            act("remove", async () => {
+              if (!item) return;
+              await deleteItem(item.id);
+              await removeSaved(item.id, [tab.url, item.url, item.canonicalUrl]).catch(() => undefined);
+              if (tab.id != null) await send({ type: "refresh-badge", tabId: tab.id, url: tab.url });
+              onRemoved();
+            })
+          }
+        />
         <span className="progress" aria-hidden="true">
           <span />
         </span>
+        {counting && (
+          <span className="countdown" aria-hidden="true">
+            <span className={countdown === "paused" ? "is-paused" : undefined} style={{ animationDuration: `${AUTO_CLOSE_MS}ms` }} />
+          </span>
+        )}
       </div>
-      <div className={`body${ready ? " is-ready" : " is-pending"}`}>
+      <div className={`body body-saved${ready ? " is-ready" : " is-pending"}`}>
         <ItemCard item={item} tab={tab} meta={meta} />
-        <div className="field-group fade-ctl">
-          <span className="eyebrow">Tags</span>
-          <div className="chips">
-            {tags.map((t) => (
-              <button key={t} className="chip chip-tag" disabled={!ready} onClick={onTags}>
-                {t}
-              </button>
-            ))}
-            <button className="chip chip-add" disabled={!ready} onClick={onTags}>
-              {tags.length ? "+ Tag" : "+ Add tags"}
+        <div className="chips fade-ctl">
+          {tags.map((t) => (
+            <button key={t} className="chip chip-tag" disabled={!ready} onClick={onTags}>
+              {t}
             </button>
-          </div>
+          ))}
+          <button className="chip chip-add" disabled={!ready} onClick={onTags}>
+            + Tag
+          </button>
         </div>
-        <div className="grid2 fade-ctl">
+        {err && <p className="err">{err}</p>}
+        <div className="actions fade-ctl">
           <button
-            className={`btn-tile${item?.isFavorite && busy !== "fav" ? " is-fav" : ""}`}
+            className={`fav${item?.isFavorite && busy !== "fav" ? " is-fav" : ""}`}
             aria-pressed={item?.isFavorite ?? false}
             disabled={!ready}
             onClick={() => void act("fav", async () => item && onItem(await patchItem(item.id, { isFavorite: !item.isFavorite })))}
           >
             {busy === "fav" ? (
-              <>
-                <Spinner tone="dark" />
-                Saving…
-              </>
+              <Spinner tone="dark" />
             ) : (
-              <>
-                <svg className="star" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
-                  <polygon points="12,2.8 14.8,8.9 21.4,9.6 16.5,14.1 17.9,20.6 12,17.3 6.1,20.6 7.5,14.1 2.6,9.6 9.2,8.9" />
-                </svg>
-                {item?.isFavorite ? "Favourited" : "Favourite"}
-              </>
+              <svg className="star" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <polygon points="12,2.8 14.8,8.9 21.4,9.6 16.5,14.1 17.9,20.6 12,17.3 6.1,20.6 7.5,14.1 2.6,9.6 9.2,8.9" />
+              </svg>
             )}
+            Favorite
           </button>
           <button
-            className="btn-tile btn-danger"
+            className="open"
+            title="Open in Sroka"
+            aria-label="Open in Sroka"
             disabled={!ready}
             onClick={() =>
-              void act("remove", async () => {
+              void act("open", async () => {
                 if (!item) return;
-                await deleteItem(item.id);
-                await removeSaved(item.id, [tab.url, item.url, item.canonicalUrl]).catch(() => undefined);
-                if (tab.id != null) await send({ type: "refresh-badge", tabId: tab.id, url: tab.url });
-                onRemoved();
+                await openApp(`item/${item.id}`);
+                window.close();
               })
             }
           >
-            {busy === "remove" ? (
+            Open
+            {busy === "open" ? (
+              <Spinner tone="blue" />
+            ) : (
+              <svg className="ext-arrow" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path d="M13.5 5h5.5v5.5 M19 5l-8.5 8.5 M17 14v5H5V7h5" />
+              </svg>
+            )}
+          </button>
+        </div>
+        {hint && (
+          <p className="foot fade-ctl" title="Keyboard shortcut for the Sroka button">
+            Shortcut <kbd>{hint}</kbd>
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** "⋯" in the saved header: the destructive action lives here, out of the way. Removing is undone from the removed screen. */
+function MoreMenu({ disabled, removing, onRemove }: { disabled: boolean; removing: boolean; onRemove: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const items = () => Array.from(wrap.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? []);
+
+  useEffect(() => {
+    if (!open) return;
+    items()[0]?.focus();
+    const outside = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) trigger.current?.focus();
+  };
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    const list = items();
+    const at = list.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      list[(at + (e.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]?.focus();
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      list[e.key === "Home" ? 0 : list.length - 1]?.focus();
+    } else if (e.key === "Tab") setOpen(false);
+  };
+
+  return (
+    <div className="more" ref={wrap} onKeyDown={onMenuKey}>
+      <button
+        ref={trigger}
+        className="bar-more"
+        title="More"
+        aria-label="More"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <circle cx="5.5" cy="12" r="1.8" />
+          <circle cx="12" cy="12" r="1.8" />
+          <circle cx="18.5" cy="12" r="1.8" />
+        </svg>
+      </button>
+      {open && (
+        <div className="menu" role="menu" aria-label="More">
+          <button
+            role="menuitem"
+            className="menu-item menu-danger"
+            disabled={removing}
+            onClick={() => void onRemove().then(() => setOpen(false))}
+          >
+            {removing ? (
               <>
                 <Spinner tone="dark" />
                 Removing…
               </>
             ) : (
               <>
-                <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                   <path d="M4.5 7h15 M9.5 7V4.5h5V7 M6.5 7l1 13h9l1-13" />
                 </svg>
                 Remove
@@ -558,34 +737,8 @@ function SaveView({
             )}
           </button>
         </div>
-        {err && <p className="err">{err}</p>}
-        <button
-          className="btn btn-primary fade-ctl"
-          disabled={!ready}
-          onClick={() =>
-            void act("open", async () => {
-              if (!item) return;
-              await openApp(`item/${item.id}`);
-              window.close();
-            })
-          }
-        >
-          {busy === "open" ? (
-            <>
-              <Spinner />
-              Opening…
-            </>
-          ) : (
-            <>
-              Open in Sroka
-              <svg className="ext-arrow" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path d="M13.5 5h5.5v5.5 M19 5l-8.5 8.5 M17 14v5H5V7h5" />
-              </svg>
-            </>
-          )}
-        </button>
-      </div>
-    </>
+      )}
+    </div>
   );
 }
 

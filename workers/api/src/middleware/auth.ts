@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { cors } from "hono/cors";
 import type { AppEnv } from "../env.ts";
 import { createAuth, devOrigins } from "../auth.ts";
+import { clientKind, noteClient } from "../clients.ts";
 
 /** CORS for /api/* and /v1/* (api.md §2). */
 export const corsMiddleware = cors({
@@ -20,7 +21,8 @@ export const corsMiddleware = cors({
 });
 
 /**
- * /v1 auth: Better Auth session (cookie or bearer) → c.var.userId, else 401. When Better Auth refreshes the
+ * /v1 auth: Better Auth session (cookie or bearer) → c.var.userId, else 401. Extension/Android requests are
+ * recorded once per user (`/v1/me` `clients`, see clients.ts). When Better Auth refreshes the
  * session (updateAge passed), its Set-Cookie is forwarded so the browser cookie's Max-Age moves along with
  * the server-side expiry (the web app never calls /api/auth/get-session itself).
  */
@@ -31,6 +33,8 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   });
   if (!session) return c.json({ error: "unauthorized" }, 401);
   c.set("userId", session.user.id);
+  const kind = clientKind(c.req.raw.headers);
+  if (kind) noteClient(c.env, c.executionCtx, session.user.id, kind);
   await next();
   const cookies = headers?.getSetCookie?.() ?? [];
   if (cookies.length === 0) return;

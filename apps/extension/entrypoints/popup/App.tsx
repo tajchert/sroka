@@ -2,7 +2,7 @@
 // saved, tags, removed), plus queued/failed states in the same language. Saving and saved are ONE screen (`SaveView`):
 // same DOM, so the bar icon/title crossfade and the controls un-dim instead of the popup blinking between screens.
 // The saved screen is deliberately light and closes itself after 3 s (`lib/auto-close.ts`) unless the user engages.
-import type { Item } from "@sroka/shared";
+import { VOCAB, type Item } from "@sroka/shared";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Glyph, Mark } from "../../components/Mark.tsx";
 import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSuggestions } from "../../lib/api.ts";
@@ -407,7 +407,7 @@ function SignIn({ onDone }: { onDone: () => Promise<void> }) {
                 Sending code…
               </>
             ) : (
-              "Send code"
+              VOCAB.sendCode
             )}
           </button>
         </form>
@@ -544,7 +544,7 @@ function SaveView({
   const meta = item
     ? [item.siteName || hostOf(item.url), item.readingMinutes ? `${item.readingMinutes} min` : ""].filter(Boolean).join(" · ")
     : hostOf(tab.url);
-  const savedTitle = created ? "Saved" : "Already saved";
+  const savedTitle = created ? VOCAB.saved : "Already saved";
   const tags = item?.tags ?? [];
   const counting = ready && (countdown === "running" || countdown === "paused");
 
@@ -618,7 +618,7 @@ function SaveView({
                 <polygon points="12,2.8 14.8,8.9 21.4,9.6 16.5,14.1 17.9,20.6 12,17.3 6.1,20.6 7.5,14.1 2.6,9.6 9.2,8.9" />
               </svg>
             )}
-            Favorite
+            {VOCAB.favorite}
           </button>
           <button
             className="open"

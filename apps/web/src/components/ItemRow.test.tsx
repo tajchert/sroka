@@ -81,6 +81,19 @@ describe("ItemRow statuses", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the row height stable: 2-line title clamp, two excerpt lines reserved, Open original inline only from sm up", () => {
+    const { container } = row(article({ parseStatus: "failed", parseError: "http_404", excerpt: null }));
+    expect(container.querySelector("h3")!.className).toContain("line-clamp-2");
+    expect(container.querySelector("h3")!.className).toContain("min-w-0");
+    // Reserved even with nothing to show (failed, no excerpt), so a status never changes the height.
+    expect(container.querySelector(".min-h-\\[42px\\]")).toBeTruthy();
+    // On a phone only Retry sits inline (Open original lives in the ⋯ menu), so the title keeps its width.
+    const open = screen.getByRole("link", { name: "Open original" });
+    expect(open.className).toContain("hidden");
+    expect(open.className).toContain("sm:flex");
+    expect(screen.getByRole("button", { name: "Retry" }).className).not.toContain("hidden");
+  });
+
   it("failed with an unknown code shows no reason sentence and never the code", () => {
     const { container } = row(article({ parseStatus: "failed", parseError: "weird_internal" }));
     expect(container.textContent).not.toContain("weird_internal");

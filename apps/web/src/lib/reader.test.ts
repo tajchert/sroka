@@ -90,6 +90,14 @@ describe("end card (frame side)", () => {
     expect(out.match(/innerHTML/g)).toHaveLength(1);
   });
 
+  it("tells the parent when the article fits without scrolling (load, resize, settings) and leaves progress alone", () => {
+    const out = script();
+    expect(out).toContain('post({type:"sroka:fits"})');
+    expect(out).toContain('addEventListener("load",function(){if(!user)restore();fits()})');
+    expect(out).toContain('addEventListener("resize",function(){if(!user)restore();fits()})');
+    expect(out).toContain("requestAnimationFrame(fits)");
+  });
+
   it("reserves the end block in the document so showing the card never changes the scroll height", () => {
     const out = script();
     expect(out).toContain("#sroka-end{box-sizing:border-box;min-height:19rem");

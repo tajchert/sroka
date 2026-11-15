@@ -1,0 +1,64 @@
+# Google Play: Main store listing
+
+Paste text from the fenced blocks. Counts are characters (checked with `wc -m`).
+
+## App name (max 30) — 20 chars
+```
+Sroka: Read it later
+```
+
+## Short description (max 80)
+```
+Save articles, threads and PDFs from any app. Read them later, even offline.
+```
+Count: 76
+
+## Full description (max 4000, plain text)
+```
+Sroka is a read-later app. Save an article, a thread or a PDF in a tap, and read it later in a calm reader view, on a train, on a plane, anywhere without signal.
+
+SAVE FROM ANYWHERE
+- Use Share > Save to Sroka in any app: browser, Reddit, Hacker News, a newsletter, a chat.
+- Share a PDF to Sroka and it is added to your library.
+- Install the Sroka Chrome extension (or use sroka.app) to save pages from your computer. Everything syncs.
+
+READ OFFLINE
+- Saved articles are downloaded with their text and images, so they open without a connection.
+- Your place in each article is remembered and synced between your devices.
+
+ARTICLES, THREADS AND COMMENTS
+- Clean reader view with adjustable type, light and dark themes.
+- Save a Reddit post, an X thread or a Hacker News story and Sroka keeps the discussion with it.
+
+STAY ORGANIZED
+- Tags, favorites and archive.
+- Search your library.
+- Configurable swipe actions on the list.
+- Import your links from Pocket, Instapaper or browser bookmarks.
+- Export your library as CSV or JSON whenever you like.
+
+YOURS TO CONTROL
+- Sign in with your email and a one-time code. No password to remember.
+- No ads, no tracking of what you read. We do not sell your data.
+- Usage statistics are off until you allow them. Crash reports can be turned off in Settings.
+- Delete your account and all your data from Settings at any time.
+
+Sroka is open source (Apache-2.0). Privacy policy: https://sroka.app/privacy
+```
+Count: 1446 (limit 4000)
+
+## Category and tags
+- App or game: App
+- Category: Productivity (alternative: Books & Reference; do NOT use News & Magazines, see `app-content.md`)
+- Tags (Play lets you pick up to 5 from its fixed list; choose the closest available): Productivity, Reading, Bookmarks or Read it later if present, Offline.
+- Store listing contact details:
+  - Email: `hello@sroka.app`
+  - Website: `https://sroka.app`
+  - Phone: optional, leave empty
+- Privacy policy URL (App content > Privacy policy): `https://sroka.app/privacy`
+
+## Graphics (owned by the play-images agent: `store/google-play/images/`)
+App icon 512x512, feature graphic 1024x500, phone screenshots 2-8, optional 7" and 10" tablet screenshots.
+
+## Default language
+English (United States). Add translations only if you provide them; the app itself is English only.

@@ -30,9 +30,6 @@ render.experimental.xml
 *.keystore
 keystore.properties
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
-
 # Android Profiling
 *.hprof
 .DS_Store
@@ -43,5 +40,3 @@ google-services.json
 # Python helper caches
 __pycache__/
 
-# Firebase config (D15); app/google-services.example.json is the committed template
-app/google-services.json

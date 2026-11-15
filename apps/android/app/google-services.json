@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "139667468994",
+    "project_id": "sroka-95489",
+    "storage_bucket": "sroka-95489.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:139667468994:android:f6609b26bba2759120015b",
+        "android_client_info": {
+          "package_name": "app.sroka"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCK5XtvhhRrzuG591SHjzmHJmKzxViQs5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:139667468994:android:f15644b673a7643c20015b",
+        "android_client_info": {
+          "package_name": "app.sroka.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCK5XtvhhRrzuG591SHjzmHJmKzxViQs5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

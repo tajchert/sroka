@@ -25,7 +25,7 @@ Prereqs: developer account ($5 one-time), reviewer secrets set, extension built 
 6. Resolve the Mismatches below before submitting (at least: Google Fonts, policy wording).
 
 ## Google Play upload checklist
-Prereqs: developer account, `app/google-services.json` in place, `./gradlew :app:bundlePlayRelease` (JDK 21) producing a release-signed `.aab` in `store/upload/`. Reviewer secrets set.
+Prereqs: developer account, `./gradlew :app:bundlePlayRelease` (JDK 21) producing a release-signed `.aab` in `store/upload/`. Reviewer secrets set.
 1. Create app: name from `google-play/listing.md`, default language English, App, Free.
 2. Main store listing: short and full description, icon 512x512, feature graphic 1024x500, phone screenshots (2-8), optional tablet screenshots.
 3. Store settings: category Productivity, tags, contact email, website.

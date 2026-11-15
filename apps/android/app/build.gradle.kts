@@ -52,11 +52,13 @@ fun requiredReleaseSigningValue(property: String, envVar: String): String =
 
 val releaseStorePath = releaseSigningValue("storeFile", "SROKA_KEYSTORE_PATH")
 
-// Firebase config (DECISIONS repo-root D15). The file is gitignored; without it the play flavor
-// builds without the google-services/Crashlytics plugins (telemetry is a no-op) and only the
+// Firebase config (DECISIONS repo-root D15). Committed (project sroka-95489). If it is removed, the play
+// flavor builds without the google-services/Crashlytics plugins (telemetry is a no-op) and only the
 // distributable play release tasks refuse to run.
 val googleServicesFile = file("google-services.json")
 val hasGoogleServices = googleServicesFile.exists()
+// A template copy (project number 000000000000) builds fine but reports into nothing; release tasks reject it.
+val googleServicesIsPlaceholder = hasGoogleServices && googleServicesFile.readText().contains("\"000000000000\"")
 if (hasGoogleServices) {
     apply(plugin = "com.google.gms.google-services")
     apply(plugin = "com.google.firebase.crashlytics")
@@ -182,12 +184,17 @@ baselineProfile {
 // The distributable play build must carry the Firebase config.
 val requireGoogleServicesJson by tasks.registering {
     val present = hasGoogleServices
+    val placeholder = googleServicesIsPlaceholder
     val path = googleServicesFile.path
     doLast {
+        check(!placeholder) {
+            "app/google-services.json is a placeholder (project number 000000000000): download the real file " +
+                "from the Firebase console (project sroka-95489) to $path."
+        }
         check(present) {
             "app/google-services.json is missing: the play release needs the Firebase config " +
                 "($path). Copy the real file from the Firebase console " +
-                "(see app/google-services.example.json and docs/RELEASING.md), or build the foss flavor."
+                "(see docs/RELEASING.md), or build the foss flavor."
         }
     }
 }

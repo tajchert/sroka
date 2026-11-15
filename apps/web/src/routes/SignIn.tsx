@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { VOCAB } from "@sroka/shared";
 import { LogoMark } from "../components/Logo.tsx";
+import { OtpInput } from "../components/OtpInput.tsx";
 import { Turnstile, type TurnstileHandle } from "../components/Turnstile.tsx";
 import { track } from "../lib/analytics.ts";
 import { ApiRequestError, api, describeAuthError } from "../lib/api.ts";
@@ -93,7 +95,7 @@ export default function SignIn() {
             </label>
             <input id="email" className="input" type="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
             <button className="btn btn-primary" disabled={busy || wait > 0 || !email || needToken || cfg.isPending}>
-              {busy ? "Sending" : wait > 0 ? `Wait ${wait}s` : needToken ? "Verifying" : "Email me a code"}
+              {busy ? "Sending" : wait > 0 ? `Wait ${wait}s` : needToken ? "Verifying" : VOCAB.sendCode}
             </button>
           </form>
         ) : (
@@ -104,24 +106,21 @@ export default function SignIn() {
             }}
             className="flex flex-col gap-3"
           >
-            <label htmlFor="code" className="text-sm text-ink2">
+            <p className="text-sm text-ink2">
               We sent a code to <strong className="text-ink">{email}</strong>. It expires in 5 minutes.
-            </label>
-            <input
-              id="code"
+            </p>
+            <OtpInput
               ref={codeRef}
-              className="input text-center font-mono text-2xl tracking-[0.5em]"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
               value={code}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+              label={`Code sent to ${email}`}
+              busy={busy}
+              invalid={!!error}
+              describedBy={error ? "signin-error" : undefined}
+              onChange={(v) => {
                 setCode(v);
-                if (v.length === 6 && !busy) void verify(v);
+                if (error) setError(null);
               }}
-              placeholder="000000"
+              onComplete={(v) => void verify(v)}
             />
             <button className="btn btn-primary" disabled={busy || code.length !== 6}>
               {busy ? "Checking" : "Sign in"}
@@ -138,7 +137,7 @@ export default function SignIn() {
         )}
         {siteKey && <Turnstile ref={tsRef} siteKey={siteKey} onToken={setToken} />}
         {error && (
-          <p role="alert" className="mt-4 text-sm text-[#c2362f]">
+          <p id="signin-error" role="alert" className="mt-4 text-sm text-[#c2362f]">
             {error}
           </p>
         )}

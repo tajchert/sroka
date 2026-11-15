@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_READER_SETTINGS, buildSrcdoc, loadReaderSettings, readerVars, resolveTheme, saveReaderSettings } from "./reader.ts";
+import {
+  DEFAULT_READER_SETTINGS,
+  buildSrcdoc,
+  endCardModel,
+  endCardThumb,
+  isEndAction,
+  loadReaderSettings,
+  readerVars,
+  resolveTheme,
+  saveReaderSettings,
+} from "./reader.ts";
 
 const BASE = "https://c.sroka.app/s/1760486400/abc/p/0192/";
 const input = (html: string) => ({ html, baseUrl: BASE, settings: DEFAULT_READER_SETTINGS, prefersDark: false, nonce: "NONCE123" });
@@ -63,5 +73,46 @@ describe("reader settings", () => {
     expect(s.font).toBe("mono");
     expect(s.size).toBe(28);
     expect(loadReaderSettings({ getItem: () => "{bad" })).toEqual(DEFAULT_READER_SETTINGS);
+  });
+});
+
+describe("end card (frame side)", () => {
+  const script = () => buildSrcdoc(input("<p>x</p>"));
+
+  it("keeps the CSP as strict as before and adds no inline handlers", () => {
+    const out = script();
+    expect(out).toContain(`default-src 'none'; img-src https://c.sroka.app data:; style-src 'unsafe-inline'; script-src 'nonce-NONCE123'`);
+    expect(out.match(/<script/g)).toHaveLength(1);
+    expect(out).not.toMatch(/\son(click|load|error)=/i);
+    expect(out).toContain("sroka:endCard");
+    expect(out).toContain("sroka:endAction");
+    // Article-derived strings are written with textContent only; innerHTML is limited to the static icons.
+    expect(out.match(/innerHTML/g)).toHaveLength(1);
+  });
+
+  it("reserves the end block in the document so showing the card never changes the scroll height", () => {
+    const out = script();
+    expect(out).toContain("#sroka-end{box-sizing:border-box;min-height:19rem");
+    expect(out).toContain(`end.id="sroka-end"`);
+  });
+
+  it("builds a model with the right primary label", () => {
+    const next = { id: "n", title: "T", meta: "4 min", thumb: null };
+    expect(endCardModel({ readingMinutes: 7, archived: false, next })).toMatchObject({ finished: "Finished", meta: "7 min", primary: "Archive & next", keep: "Keep", next });
+    expect(endCardModel({ readingMinutes: null, archived: false, next: null })).toMatchObject({ meta: null, primary: "Archive", keep: "Keep", next: null });
+    expect(endCardModel({ readingMinutes: 0, archived: true, next })).toMatchObject({ meta: null, primary: null, keep: null, next });
+  });
+
+  it("only offers thumbnails from the content origin", () => {
+    expect(endCardThumb("https://c.sroka.app/n/thumb.webp?x=1", BASE)).toBe("https://c.sroka.app/n/thumb.webp?x=1");
+    expect(endCardThumb("https://evil.example/t.webp", BASE)).toBeNull();
+    expect(endCardThumb("not a url", BASE)).toBeNull();
+    expect(endCardThumb(null, BASE)).toBeNull();
+  });
+
+  it("recognises only known end actions", () => {
+    expect(["archive", "keep", "next"].every(isEndAction)).toBe(true);
+    expect(isEndAction("delete")).toBe(false);
+    expect(isEndAction(undefined)).toBe(false);
   });
 });

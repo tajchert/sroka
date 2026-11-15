@@ -2,18 +2,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { track } from "../lib/analytics.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { VOCAB, failureReason } from "@sroka/shared";
 import { patchItem } from "../lib/cache.ts";
 import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
 import { ICONS, MenuItem, MenuLink, MenuSep, MoreMenu, Star } from "../components/MoreMenu.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
+import { useNextItem } from "../lib/nextItem.ts";
 import { useScreenWakeLock } from "../lib/wakeLock.ts";
 import { isTyping, itemTitle, useItemActions, useParsePolling } from "../lib/hooks.ts";
 import {
   DEFAULT_READER_SETTINGS,
   buildSrcdoc,
+  endCardModel,
+  endCardThumb,
+  isEndAction,
   loadReaderSettings,
+  minutesLabel,
   readerVars,
   saveReaderSettings,
   type ReaderSettings,
@@ -21,6 +27,10 @@ import {
 
 /** Positions below this open as if new: no "Resumed" toast. */
 const RESUME_THRESHOLD = 0.02;
+/** Progress at or above this counts as read (same line as the list's "Read" state): the end card appears. */
+const FINISHED_THRESHOLD = 0.98;
+/** Start resolving the next item from here, so the card has its "Up next" row the moment it appears. */
+const PREFETCH_NEXT_FROM = 0.8;
 
 const prefersDark = () => typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
 
@@ -132,6 +142,53 @@ function ReaderView() {
   // Keep the screen on while reading; scrolling restarts the 5-minute idle timer.
   useScreenWakeLock(true, liveProgress);
 
+  // Finish line. The card is drawn inside the sandboxed frame (see `readerScript`); this side decides when it
+  // shows and what it says, and acts on its button clicks. `reachedEnd` latches for the visit.
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const [keepReading, setKeepReading] = useState(false);
+  const isPdf = item?.kind === "pdf";
+  const readable = item?.parseStatus === "ok" || item?.parseStatus === "partial";
+  const nextQ = useNextItem(id, !isPdf && !!srcdoc && readable && (reachedEnd || (liveProgress ?? 0) >= PREFETCH_NEXT_FROM));
+  const baseUrl = contentQ.data?.baseUrl;
+  const endCard = useMemo(
+    () =>
+      !item || isPdf || !srcdoc || !baseUrl || !readable || !reachedEnd || keepReading || !nextQ.ready
+        ? null
+        : endCardModel({
+            readingMinutes: item.readingMinutes,
+            archived: item.status === "archived",
+            next: nextQ.next
+              ? {
+                  id: nextQ.next.id,
+                  title: itemTitle(nextQ.next),
+                  meta: minutesLabel(nextQ.next.readingMinutes),
+                  thumb: endCardThumb(nextQ.next.leadImageUrl, baseUrl),
+                }
+              : null,
+          }),
+    [item, isPdf, srcdoc, baseUrl, readable, reachedEnd, keepReading, nextQ.ready, nextQ.next],
+  );
+  const endCardRef = useRef(endCard);
+  endCardRef.current = endCard;
+  const postEndCard = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "sroka:endCard", card: endCardRef.current }, "*");
+  }, []);
+  useEffect(() => {
+    if (frameReady.current) postEndCard();
+  }, [endCard, postEndCard]);
+  // Archive (if it is not yet) and move on without waiting for the request: a failure restores the item and toasts.
+  const endAction = useRef<(a: string) => void>(() => undefined);
+  endAction.current = (action) => {
+    if (!item || !endCardRef.current) return;
+    const next = nextQ.next;
+    if (action === "keep") setKeepReading(true);
+    else if (action === "next" && next) navigate(`/item/${next.id}`);
+    else if (action === "archive") {
+      void actions.setArchived(item, true);
+      navigate(next ? `/item/${next.id}` : "/");
+    }
+  };
+
   // progress: iframe -> parent -> PATCH (throttled, flushed on leave)
   const pendingProgress = useRef<{ progress: number; anchor: number | null } | null>(null);
   const lastSent = useRef<number>(-1);
@@ -177,18 +234,22 @@ function ReaderView() {
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return;
-      const d = e.data as { type?: string; progress?: unknown; anchor?: unknown } | null;
+      const d = e.data as { type?: string; progress?: unknown; anchor?: unknown; action?: unknown } | null;
       if (!d || typeof d !== "object") return;
       if (d.type === "sroka:ready") {
         frameReady.current = true;
         pushSettings(settingsRef.current);
         resume();
+        postEndCard();
       } else if (d.type === "sroka:metrics" && typeof d.progress === "number") {
         const anchor = typeof d.anchor === "number" ? d.anchor : null;
         if (anchor !== null) startAnchor.current = anchor; // a rebuilt frame resumes here, not at the first position
         pendingProgress.current = { progress: Math.min(1, Math.max(0, d.progress)), anchor };
         setLiveProgress(pendingProgress.current.progress);
+        if (pendingProgress.current.progress >= FINISHED_THRESHOLD) setReachedEnd(true);
         flushTimer.current ??= setTimeout(flush, 3000);
+      } else if (d.type === "sroka:endAction" && isEndAction(d.action)) {
+        endAction.current(d.action);
       }
     };
     window.addEventListener("message", onMsg);
@@ -196,7 +257,7 @@ function ReaderView() {
       window.removeEventListener("message", onMsg);
       flush();
     };
-  }, [flush, pushSettings, resume]);
+  }, [flush, pushSettings, resume, postEndCard]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -224,7 +285,6 @@ function ReaderView() {
   }
 
   const archived = item.status === "archived";
-  const isPdf = item.kind === "pdf";
   const waiting = item.parseStatus === "pending" && !contentId;
   const failed = !contentId && !waiting;
   const percent = Math.round((liveProgress ?? item.progress) * 100);
@@ -331,20 +391,9 @@ function ReaderView() {
 
       {!isPdf && contentId && item.parseStatus === "partial" && (
         <div role="note" className="border-b border-rule bg-ink/5 px-4 py-2 text-sm sm:px-8">
-          <p className="mx-auto max-w-4xl">
-            {item.parseError === "paywalled" ? (
-              <>
-                <strong>Only a preview was saved.</strong> This article is for subscribers. To keep the full text,{" "}
-                <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">open it</a> while signed in and save it
-                again with the Sroka browser extension.
-              </>
-            ) : (
-              <>
-                <strong>This copy may be incomplete.</strong>{" "}
-                <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">Open the original</a> to read the full page, or
-                save it with the Sroka browser extension.
-              </>
-            )}
+          <p className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-3">
+            <strong>{item.parseError === "paywalled" ? VOCAB.paywalledTitle : VOCAB.partialTitle}</strong>
+            <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
           </p>
         </div>
       )}
@@ -364,17 +413,11 @@ function ReaderView() {
             className="h-full w-full border-0"
           />
         ) : waiting ? (
-          <Notice busy title="Fetching this page" body={gaveUp ? "Still processing. This is taking longer than usual. Check back soon." : "Sroka is extracting the article. This usually takes a few seconds."} />
+          <Notice busy title={VOCAB.pendingTitle} body={gaveUp ? "Still processing. This is taking longer than usual. Check back soon." : "Sroka is extracting the article. This usually takes a few seconds."} />
         ) : failed ? (
           <Notice
-            title="This page could not be turned into an article"
-            body={
-              item.parseError === "bot_wall"
-                ? "This site blocks automated fetching. Open it in your browser and save it again with the Sroka browser extension."
-                : item.parseError
-                  ? `Reason: ${item.parseError.replaceAll("_", " ")}.`
-                  : "Open the original page instead, or try fetching it again."
-            }
+            title={VOCAB.failedTitle}
+            body={failureReason(item.parseError) ?? ""}
             actions={<>
               <a className="btn btn-primary" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
               <button className="btn" onClick={() => void actions.refresh(item)}>Retry</button>

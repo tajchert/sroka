@@ -146,9 +146,9 @@ class ReaderViewModel @AssistedInject constructor(
 
     /**
      * What the end-of-article card offers as "Up next": the newest other unread item whose text is ready
-     * (a pending or failed one would open an empty reader).
+     * (a pending or failed one would open an empty reader, so the query skips it for an older readable one).
      */
-    val endNext: StateFlow<ItemSummary?> = upNext.map { it?.takeIf(::isReadableNext) }
+    val endNext: StateFlow<ItemSummary?> = library.observeNextReadable(itemId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /** Live reading progress for the indicator (0..1). */
@@ -501,13 +501,6 @@ class ReaderViewModel @AssistedInject constructor(
         const val RESUME_THRESHOLD = 0.02f
     }
 }
-
-/**
- * A next item is only offered once it opens as something readable: a PDF always is (even while parsing), an
- * article once its text is OK or a usable partial copy.
- */
-internal fun isReadableNext(item: ItemSummary): Boolean =
-    item.kind == ItemKind.PDF || item.parseStatus == ParseStatus.OK || item.parseStatus == ParseStatus.PARTIAL
 
 /** Reading progress of a PDF at 0-based [page] of [pageCount]: the last page reads 1.0. */
 internal fun pdfProgress(page: Int, pageCount: Int): Float =

@@ -141,8 +141,7 @@ fun SrokaApp(
     val archivedMessage = stringResource(R.string.reader_archived)
     val undoLabel = stringResource(R.string.reader_archived_undo)
     val scope = rememberCoroutineScope()
-    val onArchived: (String) -> Unit = { itemId ->
-        if (backStack.size > 1) backStack.removeLastOrNull()
+    val showArchivedUndo: (String) -> Unit = { itemId ->
         scope.launch {
             snackbarHostState.currentSnackbarData?.dismiss()
             val result = snackbarHostState.showSnackbar(
@@ -152,6 +151,15 @@ fun SrokaApp(
             )
             if (result == SnackbarResult.ActionPerformed) onUndoArchive(itemId)
         }
+    }
+    val onArchived: (String) -> Unit = { itemId ->
+        if (backStack.size > 1) backStack.removeLastOrNull()
+        showArchivedUndo(itemId)
+    }
+    // "Archive & next": the next article replaces the reader, with the same undo for the archived one.
+    val onArchivedNext: (String, String) -> Unit = { archivedId, nextId ->
+        backStack.openReader(nextId)
+        showArchivedUndo(archivedId)
     }
 
     // Wide windows show the reader next to the list (list-detail scene), so the tab bar stays.
@@ -221,6 +229,7 @@ fun SrokaApp(
                         backStack = backStack,
                         directive = directive,
                         onArchived = onArchived,
+                        onArchivedNext = onArchivedNext,
                         twoPane = twoPane,
                         drawnTwoPane = drawnTwoPane,
                         addLinkRequested = { addLinkRequested },
@@ -270,6 +279,7 @@ private fun SrokaNavDisplay(
     backStack: NavBackStack<NavKey>,
     directive: PaneScaffoldDirective,
     onArchived: (itemId: String) -> Unit,
+    onArchivedNext: (archivedId: String, nextId: String) -> Unit,
     twoPane: Boolean,
     drawnTwoPane: Boolean,
     addLinkRequested: () -> Boolean,
@@ -362,6 +372,7 @@ private fun SrokaNavDisplay(
                 onBack = goBack,
                 onOpenItem = backStack::openReader,
                 onArchived = onArchived,
+                onArchivedNext = onArchivedNext,
                 detailPaneActive = { drawnTwoPaneState.value && detailPaneItemId(backStack, twoPaneState.value) != null },
                 isExpanded = { expandedState.value },
                 onToggleExpanded = {

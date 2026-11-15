@@ -101,6 +101,16 @@ interface ItemDao {
     @Query("$ROW_COLUMNS $LIST_FROM WHERE i.status = 'UNREAD' AND (:excludeId IS NULL OR i.id != :excludeId) $ORDER_NEWEST LIMIT 1")
     fun observeNextUnread(excludeId: String?): Flow<ItemSummaryRow?>
 
+    /**
+     * Like [observeNextUnread] but only rows that open as something readable: a PDF (even while parsing) or an
+     * article whose text is OK or a usable partial copy. Used by the reader's end-of-article "Up next".
+     */
+    @Query(
+        "$ROW_COLUMNS $LIST_FROM WHERE i.status = 'UNREAD' AND (:excludeId IS NULL OR i.id != :excludeId) " +
+            "AND (i.kind = 'PDF' OR i.parse_status IN ('OK', 'PARTIAL')) $ORDER_NEWEST LIMIT 1",
+    )
+    fun observeNextReadable(excludeId: String?): Flow<ItemSummaryRow?>
+
     @Query("$DETAIL_SELECT WHERE i.id = :id")
     fun observeItem(id: String): Flow<ItemDetailRow?>
 

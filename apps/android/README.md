@@ -33,8 +33,9 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
   article), reading progress saved and synced, favorite/archive (with undo)/share/tags/delete. An "Aa" sheet in the
   top bar sets theme (Light/Sepia/Dark/Auto swatches), font (Sans/Serif), size and line spacing, applied live and
   remembered. Scrolling to the end of an article shows a "Finished" card with "Archive & next" (archives and opens
-  the newest other readable item; plain "Archive" when there is none), "Keep" and an "Up next" preview (not on PDFs
-  or in tabletop mode). The progress line is brand blue on light and yellow on dark. A page that could not be saved
+  the newest other readable item, skipping newer pending or failed ones, with an undo snackbar; plain "Archive" when
+  there is none), "Keep" and an "Up next" preview (not on PDFs or in tabletop mode). The progress line follows the
+  reader theme: brand blue on light and sepia, yellow on dark. A page that could not be saved
   explains why in plain words ("The site blocks Sroka.") instead of showing the server code.
   On tablets and unfolded foldables the reader opens next to the list.
 - **Settings**: download policy (Wi-Fi only / any network / manual), *Download all now*, storage used, remove

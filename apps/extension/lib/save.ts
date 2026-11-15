@@ -1,6 +1,7 @@
 import { alwaysCapture, detectPaywall, LIMITS, type Item } from "@sroka/shared";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
 import { ext } from "./chrome.ts";
+import { markSavedOnce } from "./consent.ts";
 import { enqueue, QueueFullError } from "./queue.ts";
 import { addSaved } from "./saved-set.ts";
 import { getSettings } from "./settings.ts";
@@ -92,6 +93,7 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
   try {
     const r = await saveItem(body);
     await addSaved(r.item).catch(() => undefined);
+    await markSavedOnce().catch(() => undefined);
     return { ok: true, item: r.item, created: r.created };
   } catch (e) {
     if (e instanceof ApiFailure) {
@@ -117,8 +119,17 @@ export async function saveWithFallback(body: SaveBody): Promise<SaveResult> {
   }
 }
 
-export async function saveTab(tab: { id?: number; url?: string; title?: string }): Promise<SaveResult> {
+/**
+ * `forceCapture` (re-save of a paywalled preview, lib/resave.ts): always send the rendered page whatever the capture
+ * setting, and do not save at all when it cannot be captured (a URL-only save would not replace the preview).
+ */
+export async function saveTab(tab: { id?: number; url?: string; title?: string }, opts: { forceCapture?: boolean } = {}): Promise<SaveResult> {
   if (!isSavableUrl(tab.url)) return { ok: false, queued: false, reason: "unsupported", message: "This page can't be saved." };
+  if (opts.forceCapture) {
+    const html = tab.id != null ? await captureHtml(tab.id) : null;
+    if (!html) return { ok: false, queued: false, reason: "error", message: "This page can't be saved." };
+    return saveWithFallback({ url: tab.url, title: tab.title?.trim().slice(0, LIMITS.maxTitleLength) || undefined, source: "extension", html });
+  }
   const s = await getSettings();
   // Send the rendered page (default on): the tab has what the user's subscription unlocks and gets past bot walls
   // that block server fetches. Paywalled pages and Reddit are captured even when the user turned capture off.

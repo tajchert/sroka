@@ -4,6 +4,8 @@ import { ext } from "./chrome.ts";
 export const CONSENT_KEY = "sroka.consent.v1";
 export const CLIENT_ID_KEY = "sroka.ga.clientId";
 export const SESSION_KEY = "sroka.ga.session";
+/** Set (storage.local) after the first successful save from any path; the consent card waits for it. */
+export const HAS_SAVED_KEY = "sroka.hasSaved.v1";
 export const PRIVACY_URL = "https://sroka.app/privacy";
 export const TERMS_URL = "https://sroka.app/terms";
 
@@ -45,7 +47,30 @@ export async function setConsent(patch: Partial<Consent>): Promise<Consent> {
   return next;
 }
 
-/** The first-run card is shown only when a GA config was built in and the user has not decided yet. */
+/** The card is possible only when a GA config was built in and the user has not decided yet (unanswered = off). */
 export function shouldShowConsentPrompt(consent: Consent, config: AnalyticsConfig | null = analyticsConfig()): boolean {
   return config != null && consent.analytics === null;
+}
+
+export async function hasSavedOnce(): Promise<boolean> {
+  const r = (await ext().storage.local.get(HAS_SAVED_KEY)) as Record<string, unknown>;
+  return r[HAS_SAVED_KEY] === true;
+}
+
+export async function markSavedOnce(): Promise<void> {
+  if (!(await hasSavedOnce())) await ext().storage.local.set({ [HAS_SAVED_KEY]: true });
+}
+
+/**
+ * Should the saved popup show the consent card? Only after the user's first successful save (never at first run or
+ * on the sign-in screen) and only while unanswered. The popup keeps its auto-close on hold while the card shows.
+ */
+export async function consentCardDue(config: AnalyticsConfig | null = analyticsConfig()): Promise<boolean> {
+  if (!shouldShowConsentPrompt(await getConsent(), config)) return false;
+  return hasSavedOnce();
+}
+
+/** The card renders only on the saved screen (never sign-in, saving, failed…), once `consentCardDue` said so. */
+export function consentCardVisible(phase: string, due: boolean): boolean {
+  return phase === "saved" && due;
 }

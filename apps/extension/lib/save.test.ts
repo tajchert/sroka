@@ -58,3 +58,17 @@ describe("saveTab html capture", () => {
     expect(init.body).toBeInstanceOf(ArrayBuffer);
   });
 });
+
+describe("saveTab forceCapture (re-save)", () => {
+  it("sends the rendered html even with capture off and a free page", async () => {
+    page("<html><body><p>Full text after sign-in</p></body></html>");
+    expect((await saveTab(tab, { forceCapture: true })).ok).toBe(true);
+    expect(String(bodies[0]?.html)).toContain("Full text after sign-in");
+  });
+  it("does not save at all when the page cannot be captured", async () => {
+    c.scripting.executeScript.mockRejectedValue(new Error("restricted") as never);
+    const r = await saveTab(tab, { forceCapture: true });
+    expect(r.ok).toBe(false);
+    expect(bodies).toHaveLength(0);
+  });
+});

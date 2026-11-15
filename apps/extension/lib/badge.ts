@@ -1,4 +1,5 @@
 import { ext } from "./chrome.ts";
+import { paintResaveHint, resaveHintFor } from "./resave.ts";
 import { isSavableUrl } from "./save.ts";
 import { lookupSaved } from "./saved-set.ts";
 import { getSettings } from "./settings.ts";
@@ -48,6 +49,8 @@ export async function refreshBadge(tabId: number, url: string | undefined) {
     } catch {
       return; // tab gone
     }
+    // A tab opened for "Re-save with extension" keeps its hint until the user saves it (lib/resave.ts).
+    if (await resaveHintFor(tabId, url).catch(() => false)) return await paintResaveHint(tabId);
     await paintBadge(tabId, !!r?.saved);
   } catch {
     /* storage unavailable: leave as is */

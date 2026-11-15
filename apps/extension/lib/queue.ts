@@ -1,6 +1,7 @@
 import { log } from "@sroka/shared";
 import { ext } from "./chrome.ts";
 import { ApiFailure, saveItem, type SaveBody } from "./api.ts";
+import { markSavedOnce } from "./consent.ts";
 import { addSaved } from "./saved-set.ts";
 import { getSettings, type Settings } from "./settings.ts";
 
@@ -164,6 +165,7 @@ export function processQueue(now = Date.now()): Promise<{ sent: number; remainin
       try {
         const r = await saveItem(e.body);
         await addSaved(r.item).catch(() => undefined);
+        await markSavedOnce().catch(() => undefined);
         q = q.filter((x) => x.id !== e.id);
         sent++;
       } catch (err) {

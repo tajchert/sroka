@@ -82,3 +82,8 @@ export function createAutoClose(opts: { ms?: number; onClose: () => void; onStat
     },
   };
 }
+
+/** The countdown may run only on the saved screen and while no card waiting for an answer (consent, failed saves) shows. */
+export function autoCloseWanted(s: { saved: boolean; consentShown: boolean; failedShown: boolean }): boolean {
+  return s.saved && !s.consentShown && !s.failedShown;
+}

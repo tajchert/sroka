@@ -38,6 +38,11 @@ export default defineConfig({
       "https://api.sroka.app/*",
       ...(mode === "development" ? ["http://localhost:8787/*"] : []),
     ],
+    // The Sroka web app may message the extension ("Re-save with extension", lib/resave.ts). No permission warning,
+    // no host permission. localhost (any port: vite :5173, wrangler :8807) only in non-store builds.
+    externally_connectable: {
+      matches: ["https://sroka.app/*", ...(process.env.SROKA_STORE_BUILD ? [] : ["http://localhost/*"])],
+    },
     // Custom server URL (options page): requested at runtime via chrome.permissions.request.
     optional_host_permissions: ["https://*/*", "http://localhost/*"],
   }),

@@ -110,6 +110,9 @@ export async function lookupUrl(url: string): Promise<Item | null> {
   return r.items[0] ?? null;
 }
 
+/** One item of the signed-in library (404 when unknown, deleted, or another account's). */
+export const getItem = (id: string) => json<{ item: Item }>(`/v1/items/${id}`).then((r) => r.item);
+
 export const patchItem = (id: string, patch: Record<string, unknown>) =>
   json<{ item: Item }>(`/v1/items/${id}`, { method: "PATCH", body: patch }).then((r) => r.item);
 

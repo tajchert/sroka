@@ -10,10 +10,13 @@
  */
 
 /**
- * Extension ids to try, in order. Unpacked/dev build (manifest `key`) first. Add the Chrome Web Store id here once the
- * listing exists (one line); the API's `EXT_ID` (comma-separated list) must include it too.
+ * Extension ids to try, in order: Chrome Web Store build first (most users), then the unpacked/dev build (manifest
+ * `key`). The API's `EXT_ID` (comma-separated list) must contain the same ids.
  */
-export const EXTENSION_IDS: readonly string[] = ["gmfnkkciofcaafddbcgphofiikmplema"];
+export const EXTENSION_IDS: readonly string[] = [
+  "mgeodllnkiehnjbdogljfjgdbadjdblh", // Chrome Web Store
+  "gmfnkkciofcaafddbcgphofiikmplema", // unpacked (manifest key)
+];
 
 const PING_TIMEOUT_MS = 1500;
 const RESAVE_TIMEOUT_MS = 10_000;
@@ -58,11 +61,12 @@ let found: Promise<string | null> | null = null;
 export function findExtension(): Promise<string | null> {
   found ??= (async () => {
     if (!runtime()) return null;
-    for (const id of EXTENSION_IDS) {
-      const r = (await send(id, { type: "sroka.ping" }, PING_TIMEOUT_MS)) as { ok?: unknown } | null;
-      if (r?.ok === true) return id;
-    }
-    return null;
+    // Ping every id at once (worst case one timeout, not one per id); the first id in list order that answers wins.
+    const replies = await Promise.all(
+      EXTENSION_IDS.map((id) => send(id, { type: "sroka.ping" }, PING_TIMEOUT_MS) as Promise<{ ok?: unknown } | null>),
+    );
+    const i = replies.findIndex((r) => r?.ok === true);
+    return i >= 0 ? EXTENSION_IDS[i]! : null;
   })();
   return found;
 }

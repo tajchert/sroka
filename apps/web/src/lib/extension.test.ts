@@ -55,8 +55,18 @@ describe("findExtension", () => {
     const rt = installRuntime((_id, msg, cb) => cb((msg as { type: string }).type === "sroka.ping" ? { ok: true, version: "1" } : null));
     expect(await findExtension()).toBe(EXTENSION_IDS[0]);
     expect(await findExtension()).toBe(EXTENSION_IDS[0]);
-    expect(rt.sendMessage).toHaveBeenCalledTimes(1);
+    expect(rt.sendMessage).toHaveBeenCalledTimes(EXTENSION_IDS.length);
     expect(rt.sendMessage.mock.calls[0]![1]).toEqual({ type: "sroka.ping" });
+  });
+
+  it("finds the unpacked build when only the second id answers", async () => {
+    installRuntime((id, _msg, cb, rt) => {
+      if (id === EXTENSION_IDS[1]) return cb({ ok: true, version: "1" });
+      rt.lastError = { message: "Could not establish connection. Receiving end does not exist." };
+      cb(undefined);
+      rt.lastError = undefined;
+    });
+    expect(await findExtension()).toBe(EXTENSION_IDS[1]);
   });
 });
 

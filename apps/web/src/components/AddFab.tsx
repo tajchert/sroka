@@ -1,6 +1,11 @@
+import { VOCAB } from "@sroka/shared";
 import { useEffect, useRef, useState } from "react";
 
-// Floating "Add" button: opens a popup to paste a link; PDF upload hides in the popup's "⋯" menu.
+const OPEN_EVENT = "sroka:open-save";
+/** Opens the Save popup (focus in the link field) from anywhere, e.g. the onboarding card. */
+export const openSavePopup = () => window.dispatchEvent(new Event(OPEN_EVENT));
+
+// Floating "Save" button: opens a popup to paste a link; PDF upload hides in the popup's "⋯" menu.
 export function AddFab({ onAdd, onPickPdf }: { onAdd: (url: string) => Promise<boolean>; onPickPdf: () => void }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -14,6 +19,12 @@ export function AddFab({ onAdd, onPickPdf }: { onAdd: (url: string) => Promise<b
     setMenuOpen(false);
     fabRef.current?.focus();
   };
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -47,11 +58,11 @@ export function AddFab({ onAdd, onPickPdf }: { onAdd: (url: string) => Promise<b
           <div aria-hidden className="fixed inset-0 z-30 bg-[rgb(10_11_14/.35)]" onClick={close} />
           <div
             role="dialog"
-            aria-label="Add to My List"
+            aria-label="Save to My List"
             className="fixed right-4 bottom-[96px] left-4 z-30 flex flex-col gap-3 rounded-2xl border border-rule bg-paper2 px-3.5 pt-3.5 pb-4 shadow-[0_18px_50px_rgb(0_0_0/.5)] sm:left-auto sm:right-8 sm:bottom-[104px] sm:w-[420px]"
           >
             <div className="relative flex items-center justify-between pl-1.5">
-              <h2 className="text-[15px] font-semibold">Add to My List</h2>
+              <h2 className="text-[15px] font-semibold">Save to My List</h2>
               <button
                 type="button"
                 title="More options"
@@ -121,7 +132,7 @@ export function AddFab({ onAdd, onPickPdf }: { onAdd: (url: string) => Promise<b
         <span aria-hidden className={`block text-[26px] leading-none font-normal transition-transform duration-150 ${open ? "rotate-45" : ""}`}>
           +
         </span>
-        <span>{open ? "Close" : "Add"}</span>
+        <span>{open ? "Close" : VOCAB.save}</span>
       </button>
     </>
   );

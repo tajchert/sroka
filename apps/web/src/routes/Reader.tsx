@@ -6,6 +6,7 @@ import { VOCAB, failureReason } from "@sroka/shared";
 import { patchItem } from "../lib/cache.ts";
 import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
 import { ICONS, MenuItem, MenuLink, MenuSep, MoreMenu, Star } from "../components/MoreMenu.tsx";
+import { ShortcutsSheet } from "../components/ShortcutsSheet.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
@@ -47,6 +48,7 @@ function ReaderView() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [settings, setSettings] = useState<ReaderSettings>(() => loadReaderSettings());
   const [panel, setPanel] = useState<"" | "settings" | "tags">("");
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const itemQ = useQuery({ queryKey: ["item", id], queryFn: () => api.getItem(id), retry: false, refetchOnMount: "always" });
   const item = itemQ.data;
@@ -264,17 +266,27 @@ function ReaderView() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || !item) return;
+      if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || !item || shortcutsOpen) return;
+      // preventDefault: a key that opens a field (tags) must not also type into it.
       if (e.key === "a") void actions.setArchived(item, item.status !== "archived");
       else if (e.key === "f") void actions.toggleFavorite(item);
-      else if (e.key === "Escape") {
+      else if (e.key === "t") {
+        e.preventDefault();
+        setPanel((p) => (p === "tags" ? "" : "tags"));
+      } else if (e.key === "o") {
+        const href = item.kind === "pdf" ? pdfBlob.url : item.url;
+        if (href) window.open(href, "_blank", "noopener,noreferrer");
+      } else if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen(true);
+      } else if (e.key === "Escape") {
         if (panel) setPanel("");
         else navigate(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [item, actions, navigate, panel]);
+  }, [item, actions, navigate, panel, shortcutsOpen, pdfBlob.url]);
 
   if (itemQ.isPending) return <div className="flex justify-center py-24"><span className="spinner" aria-label="Loading" /></div>;
   if (itemQ.isError || !item) {
@@ -315,16 +327,8 @@ function ReaderView() {
           {itemTitle(item)}
         </h1>
         <div className="flex shrink-0 items-center gap-0.5">
-          {isPdf ? (
-            <ToolLink href={pdfBlob.url} label="Open in new tab" icon={ICONS.external} />
-          ) : (
-            <ToolLink href={item.url} label="Open original" icon={ICONS.external} />
-          )}
           <ToolBtn label={item.isFavorite ? "Remove from favorites (f)" : "Add to favorites (f)"} pressed={item.isFavorite} onClick={() => void actions.toggleFavorite(item)}>
             <Star on={item.isFavorite} />
-          </ToolBtn>
-          <ToolBtn label="Tags" expanded={panel === "tags"} onClick={() => togglePanel("tags")}>
-            {ICONS.tag}
           </ToolBtn>
           {!isPdf && (
             <button
@@ -344,6 +348,20 @@ function ReaderView() {
           <MoreMenu className="size-9 rounded-[9px]">
             {(close) => (
               <>
+                {isPdf ? (
+                  pdfBlob.url && (
+                    <MenuLink href={pdfBlob.url} icon={ICONS.external} hint="o" onClick={close}>
+                      Open in new tab
+                    </MenuLink>
+                  )
+                ) : (
+                  <MenuLink href={item.url} icon={ICONS.external} hint="o" onClick={close}>
+                    Open original
+                  </MenuLink>
+                )}
+                <MenuItem icon={ICONS.tag} hint="t" onClick={() => { close(); setPanel("tags"); }}>
+                  Tags
+                </MenuItem>
                 {isPdf && pdfBlob.url && (
                   <MenuLink href={pdfBlob.url} download={item.fileName ?? "document.pdf"} icon={ICONS.download} onClick={close}>
                     Download
@@ -354,6 +372,9 @@ function ReaderView() {
                     Refresh content
                   </MenuItem>
                 )}
+                <MenuItem icon={ICONS.keyboard} hint="?" onClick={() => { close(); setShortcutsOpen(true); }}>
+                  Keyboard shortcuts
+                </MenuItem>
                 <MenuSep />
                 <MenuItem icon={ICONS.trash} danger onClick={() => { close(); actions.remove(item, () => navigate(archived ? "/archive" : "/")); }}>
                   Delete
@@ -445,6 +466,7 @@ function ReaderView() {
           <div className="absolute top-2 right-4 rounded-full bg-ink px-3 py-1 text-xs text-paper">Refresh failed. Showing the earlier copy.</div>
         )}
       </div>
+      {shortcutsOpen && <ShortcutsSheet onClose={() => setShortcutsOpen(false)} />}
     </div>
   );
 }
@@ -477,24 +499,6 @@ function ToolBtn({ label, onClick, pressed, expanded, children }: { label: strin
         {children}
       </svg>
     </button>
-  );
-}
-
-function ToolLink({ href, label, icon }: { href: string | null; label: string; icon: React.ReactNode }) {
-  return (
-    <a
-      href={href ?? undefined}
-      aria-disabled={!href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={label}
-      aria-label={label}
-      className={`${toolCls} text-ink2 aria-disabled:pointer-events-none aria-disabled:opacity-50`}
-    >
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-        {icon}
-      </svg>
-    </a>
   );
 }
 

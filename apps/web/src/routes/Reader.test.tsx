@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { Item } from "@sroka/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -297,6 +297,107 @@ describe("Reader", () => {
       h.getItem = async () => item({ parseStatus: "partial", parseError: "paywalled" });
       mount();
       expect((await screen.findByRole("note")).textContent).toBe("Preview onlyOpen original");
+    });
+  });
+
+  describe("toolbar and shortcuts", () => {
+    const key = (k: string, init: KeyboardEventInit = {}, target: Element | Window = window) =>
+      act(() => void target.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init })));
+    const open = async () => {
+      h.getItem = async () => item();
+      mount();
+      await screen.findByRole("button", { name: "Archive (a)" });
+    };
+
+    it("keeps Aa, Favorite and Archive on the toolbar, each tooltip carrying its shortcut", async () => {
+      await open();
+      const bar = screen.getByRole("banner");
+      const names = within(bar).getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+      expect(names).toEqual(["Add to favorites (f)", "Reader settings", "Archive (a)", "More"]);
+      expect(within(bar).queryByRole("link", { name: /open original/i })).toBeNull();
+      for (const b of within(bar).getAllByRole("button")) expect(b.getAttribute("title")).toBe(b.getAttribute("aria-label"));
+    });
+
+    it("the ⋯ menu leads with Open original and Tags, and ends with Keyboard shortcuts before Delete", async () => {
+      await open();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      const entries = within(screen.getByRole("menu")).getAllByRole("menuitem");
+      expect(entries.map((e) => e.textContent)).toEqual(["Open originalo", "Tagst", "Refresh content", "Keyboard shortcuts?", "Delete"]);
+      expect(entries[0]!.getAttribute("href")).toBe("https://example.com/a");
+      expect(entries[0]!.getAttribute("target")).toBe("_blank");
+    });
+
+    it("Tags in the menu opens the tag panel", async () => {
+      await open();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /^Tags/ }));
+      expect(screen.getByRole("dialog", { name: "Tags" })).toBeTruthy();
+    });
+
+    it("t toggles the tag panel and does not type into the tag field", async () => {
+      await open();
+      await key("t");
+      const dialog = screen.getByRole("dialog", { name: "Tags" });
+      expect(dialog).toBeTruthy();
+      expect(within(dialog).queryByDisplayValue("t")).toBeNull();
+      await key("t");
+      expect(screen.queryByRole("dialog", { name: "Tags" })).toBeNull();
+    });
+
+    it("o opens the original in a new tab without opener access", async () => {
+      await open();
+      const w = vi.spyOn(window, "open").mockImplementation(() => null);
+      await key("o");
+      expect(w).toHaveBeenCalledWith("https://example.com/a", "_blank", "noopener,noreferrer");
+    });
+
+    it("? opens the shortcuts sheet listing reader and list keys; Esc closes it without leaving the reader", async () => {
+      await open();
+      await key("?", { shiftKey: true });
+      const sheet = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+      expect(sheet.getAttribute("aria-modal")).toBe("true");
+      const listed = within(sheet).getAllByText((_, el) => el?.tagName === "KBD").map((k) => k.textContent);
+      expect(listed).toEqual(expect.arrayContaining(["a", "f", "t", "o", "?", "Esc", "j", "k", "Enter", "/"]));
+      expect(document.activeElement).toBe(within(sheet).getByRole("button", { name: "Close" }));
+      await key("Escape");
+      expect(screen.queryByRole("dialog", { name: "Keyboard shortcuts" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Archive (a)" })).toBeTruthy(); // still on the article
+    });
+
+    it("the sheet opens from the ⋯ menu and ignores reader keys while it is up", async () => {
+      await open();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /Keyboard shortcuts/ }));
+      expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeTruthy();
+      await key("a");
+      await key("t");
+      expect(h.setArchived).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog", { name: "Tags" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(screen.queryByRole("dialog", { name: "Keyboard shortcuts" })).toBeNull();
+    });
+
+    it("no other window-level shortcut (such as / for search) sees keys while the sheet is up", async () => {
+      await open();
+      await key("?", { shiftKey: true });
+      const seen = vi.fn();
+      window.addEventListener("keydown", seen);
+      await key("/");
+      await key("j");
+      window.removeEventListener("keydown", seen);
+      expect(seen).not.toHaveBeenCalled();
+    });
+
+    it("shortcuts are ignored while typing and with Ctrl/Meta/Alt held", async () => {
+      await open();
+      const w = vi.spyOn(window, "open").mockImplementation(() => null);
+      const input = document.body.appendChild(document.createElement("input"));
+      for (const k of ["t", "o", "?", "a"]) await key(k, {}, input);
+      for (const mod of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }]) for (const k of ["t", "o", "?", "a"]) await key(k, mod);
+      input.remove();
+      expect(w).not.toHaveBeenCalled();
+      expect(h.setArchived).not.toHaveBeenCalled();
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
   });
 });

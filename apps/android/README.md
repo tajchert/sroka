@@ -19,7 +19,8 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
   a trailing Tags chip opens the Tags screen. My List starts with a "Continue reading" strip (articles 5–95 % read),
   and an empty My List shows onboarding (share, Chrome extension with a done check, paste or save from the
   clipboard). Paged lists with
-  thumbnails, swipe to archive or favorite (with undo), long-press actions (favorite, archive,
+  thumbnails, swipe actions (left archives by default, right is off; Settings picks Archive, Favorite, Tags or None per
+  direction; archive and favorite have undo; the first row peeks once to hint at them), long-press actions (favorite, archive,
   edit tags, share, open original, refresh, delete), four sort orders, local full-text search over title, excerpt,
   site, tags and downloaded article text. Tags tab with counts, rename and delete.
   Rows are title + `domain · N min` + thumbnail, the same height in every state, and flag only exceptions: an icon
@@ -38,7 +39,7 @@ sheet, read them later, **fully offline**, in a clean reader. Kotlin, Jetpack Co
   reader theme: brand blue on light and sepia, yellow on dark. A page that could not be saved
   explains why in plain words ("The site blocks Sroka.") instead of showing the server code.
   On tablets and unfolded foldables the reader opens next to the list.
-- **Settings**: download policy (Wi-Fi only / any network / manual), *Download all now*, storage used, remove
+- **Settings**: swipe actions (left/right), download policy (Wi-Fi only / any network / manual), *Download all now*, storage used, remove
   downloads, app theme and dynamic color, reader theme and text size, account (sign out wipes local data; delete
   account), Import/Export (opens the web app), server URL.
 

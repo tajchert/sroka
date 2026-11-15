@@ -89,7 +89,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,6 +107,7 @@ import app.sroka.core.model.ItemStatus
 import app.sroka.core.model.ItemSummary
 import app.sroka.core.model.LibraryTab
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.SyncErrorKind
 import app.sroka.core.ui.tags.EditTagsSheet
 import app.sroka.core.ui.rememberWithNotificationPermission
@@ -158,13 +162,14 @@ fun LibraryListRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val selected by viewModel.selectedItem.collectAsStateWithLifecycle()
     val recentTags by viewModel.recentTags.collectAsStateWithLifecycle()
+    val swipeConfig by viewModel.swipeConfig.collectAsStateWithLifecycle()
     val items = viewModel.items.collectAsLazyPagingItems()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     var pulled by rememberSaveable { mutableStateOf(false) }
     var showAdd by rememberSaveable { mutableStateOf(false) }
-    var editTagsFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
+    var editTagsFor by remember { mutableStateOf<TagEditTarget?>(null) }
     var confirmDeleteFor by remember { mutableStateOf<app.sroka.core.model.Item?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val uploads by viewModel.uploads.collectAsStateWithLifecycle()
@@ -345,7 +350,11 @@ fun LibraryListRoute(
         onAddLink = { showAdd = true },
         onOpenItem = onOpenItem,
         onLongClick = { viewModel.showActions(it.id) },
-        onArchive = { viewModel.toggleArchive(it.id, it.status) },
+        swipe = swipeConfig,
+        onSwipe = { side, item ->
+            if (viewModel.swipe(side, item) == SwipeAction.TAGS) editTagsFor = TagEditTarget(item.id, item.tags)
+        },
+        onSwipePeekDone = viewModel::markSwipeHintShown,
         onRetry = { viewModel.refresh(it.id) },
         selectedItemId = selectedItemId,
         twoPane = twoPane,
@@ -383,7 +392,7 @@ fun LibraryListRoute(
             onToggleFavorite = { viewModel.toggleFavorite(item.id, item.isFavorite) },
             onToggleArchive = { viewModel.toggleArchive(item.id, item.status) },
             // A second sheet/dialog replaces the actions sheet instead of stacking under it.
-            onEditTags = { editTagsFor = item; viewModel.dismissActions() },
+            onEditTags = { editTagsFor = TagEditTarget(item.id, item.tags); viewModel.dismissActions() },
             onRefresh = { viewModel.refresh(item.id) },
             onDelete = { confirmDeleteFor = item; viewModel.dismissActions() },
         )
@@ -449,7 +458,6 @@ fun LibraryListContent(
     onAddLink: () -> Unit,
     onOpenItem: (String) -> Unit,
     onLongClick: (ItemSummary) -> Unit,
-    onArchive: (ItemSummary) -> Unit,
     onRetry: (ItemSummary) -> Unit = {},
     selectedItemId: String?,
     twoPane: Boolean,
@@ -470,6 +478,9 @@ fun LibraryListContent(
     clipboardHasLink: Boolean = false,
     onGetExtension: () -> Unit = {},
     onSaveClipboard: () -> Unit = {},
+    swipe: SwipeConfig = SwipeConfig(),
+    onSwipe: (SwipeSide, ItemSummary) -> Unit = { _, _ -> },
+    onSwipePeekDone: () -> Unit = {},
 ) {
     val tab = (scope as? ListScope.Tab)?.tab
     val isTopLevel = tab != null
@@ -562,7 +573,9 @@ fun LibraryListContent(
                         archiveTab = tab == LibraryTab.ARCHIVE,
                         onOpenItem = onOpenItem,
                         onLongClick = onLongClick,
-                        onArchive = onArchive,
+                        swipe = swipe,
+                        onSwipe = onSwipe,
+                        onSwipePeekDone = onSwipePeekDone,
                         onRetry = onRetry,
                         bottomPadding = if (isTopLevel && !navRailShown) FAB_CLEARANCE else 0.dp,
                         selectedItemId = selectedItemId,
@@ -809,7 +822,9 @@ private fun ItemList(
     archiveTab: Boolean,
     onOpenItem: (String) -> Unit,
     onLongClick: (ItemSummary) -> Unit,
-    onArchive: (ItemSummary) -> Unit,
+    swipe: SwipeConfig,
+    onSwipe: (SwipeSide, ItemSummary) -> Unit,
+    onSwipePeekDone: () -> Unit,
     onRetry: (ItemSummary) -> Unit,
     bottomPadding: Dp,
     selectedItemId: String? = null,
@@ -838,7 +853,11 @@ private fun ItemList(
                 inset = inset,
                 onClick = { onOpenItem(item.id) },
                 onLongClick = { onLongClick(item) },
-                onArchive = { onArchive(item) },
+                swipe = swipe,
+                onSwipe = { side -> onSwipe(side, item) },
+                // One-time hint on the first row only; the other rows never move.
+                peekSide = if (index == 0) swipe.peekSide() else null,
+                onPeekDone = onSwipePeekDone,
                 onRetry = { onRetry(item) },
             )
         }
@@ -846,8 +865,10 @@ private fun ItemList(
 }
 
 /**
- * End to start archives (or unarchives in the Archive tab). The row always snaps back; if the
- * action moves it out of the list the list animates it away. Favourite toggling is in the long-press sheet.
+ * Rows swipe towards each edge for the action chosen in Settings (default: left archives, or
+ * unarchives in the Archive tab; right does nothing). The row always snaps back; an archive that
+ * moves it out of the list animates it away, favorite and tags leave it in place.
+ * [peekSide] non-null plays the one-time hint (the row slides towards that edge and back), then calls [onPeekDone].
  */
 @Composable
 private fun SwipeableRow(
@@ -858,58 +879,88 @@ private fun SwipeableRow(
     inset: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onArchive: () -> Unit,
+    swipe: SwipeConfig,
+    onSwipe: (SwipeSide) -> Unit,
+    peekSide: SwipeSide?,
+    onPeekDone: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    val currentArchive by rememberUpdatedState(onArchive)
+    val currentSwipe by rememberUpdatedState(onSwipe)
     val coroutineScope = rememberCoroutineScope()
     val state = rememberSwipeToDismissBoxState()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val unarchive = archiveTab || item.status == ItemStatus.ARCHIVED
-    // Tick when the swipe crosses the archive threshold, so the user feels when letting go will act.
+    val peekOffset = rememberPeekOffset(peekSide, onPeekDone)
+    val peeking by remember { derivedStateOf { peekOffset.value != 0f } }
+    // Tick when the swipe crosses the action threshold, so the user feels when letting go will act.
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(state) {
         snapshotFlow { state.targetValue }
             .drop(1)
-            .collect { if (it == SwipeToDismissBoxValue.EndToStart) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) }
+            .collect { if (it != SwipeToDismissBoxValue.Settled) haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) }
     }
     SwipeToDismissBox(
         state = state,
         modifier = if (inset) modifier.padding(horizontal = ROW_INSET).clip(rowShape) else modifier,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = swipe.actionFor(SwipeToDismissBoxValue.StartToEnd.toSide(rtl)!!) != SwipeAction.NONE,
+        enableDismissFromEndToStart = swipe.actionFor(SwipeToDismissBoxValue.EndToStart.toSide(rtl)!!) != SwipeAction.NONE,
         onDismiss = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) currentArchive()
-            // The row stays in the list for tag views; reset so it snaps back.
+            value.toSide(rtl)?.let { currentSwipe(it) }
+            // The row stays in the list for favorite, tags and tag views; reset so it snaps back.
             coroutineScope.launch { state.reset() }
         },
         backgroundContent = {
-            // Only while swiping: the primary-coloured action bar would otherwise bleed through the
-            // anti-aliased rounded corners of a transparent two-pane row.
-            if (state.dismissDirection == SwipeToDismissBoxValue.Settled) return@SwipeToDismissBox
-            val label = stringResource(if (unarchive) R.string.feature_library_swipe_unarchive else R.string.feature_library_swipe_archive)
+            // Only while swiping or peeking: the primary-coloured action bar would otherwise bleed
+            // through the anti-aliased rounded corners of a transparent two-pane row.
+            val direction = when {
+                state.dismissDirection != SwipeToDismissBoxValue.Settled -> state.dismissDirection
+                peeking && peekSide != null -> peekSide.toDirection(rtl)
+                else -> return@SwipeToDismissBox
+            }
+            val action = swipe.actionFor(direction.toSide(rtl)!!)
+            val (icon, labelRes) = when (action) {
+                SwipeAction.ARCHIVE ->
+                    if (unarchive) SrokaIcons.Unarchive to R.string.feature_library_swipe_unarchive
+                    else SrokaIcons.Archive to R.string.feature_library_swipe_archive
+                SwipeAction.FAVORITE ->
+                    if (item.isFavorite) SrokaIcons.Star to R.string.feature_library_swipe_unfavorite
+                    else SrokaIcons.StarFilled to R.string.feature_library_swipe_favorite
+                SwipeAction.TAGS -> SrokaIcons.Label to R.string.feature_library_swipe_tags
+                SwipeAction.NONE -> return@SwipeToDismissBox
+            }
+            val onPrimary = MaterialTheme.colorScheme.onPrimary
+            val toEnd = direction == SwipeToDismissBoxValue.EndToStart
             Row(
                 Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.primary)
                     .padding(horizontal = 20.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp, if (toEnd) Alignment.End else Alignment.Start),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    if (unarchive) SrokaIcons.Unarchive else SrokaIcons.Archive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary)
+                // The icon sits on the outer edge, so it is what the peek and the first pixels of a swipe reveal.
+                val text = @Composable {
+                    Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge, color = onPrimary)
+                }
+                val glyph = @Composable { Icon(icon, contentDescription = null, tint = onPrimary) }
+                if (toEnd) { text(); glyph() } else { glyph(); text() }
             }
         },
     ) {
         // A transparent (two-pane) row needs an opaque base while it slides over the action bar.
-        val swiping = state.dismissDirection != SwipeToDismissBoxValue.Settled
-        Box(if (swiping) Modifier.background(MaterialTheme.colorScheme.background) else Modifier) {
+        val swiping = state.dismissDirection != SwipeToDismissBoxValue.Settled || peeking
+        Box(
+            Modifier
+                .graphicsLayer { translationX = peekOffset.value }
+                .then(if (swiping) Modifier.background(MaterialTheme.colorScheme.background) else Modifier),
+        ) {
             ItemRow(item = item, onClick = onClick, onLongClick = onLongClick, selected = selected, rounded = inset, onRetry = onRetry)
         }
     }
 }
+
+/** What the tag editor edits: the item's id and current tags (from a swipe or the actions sheet). */
+private data class TagEditTarget(val id: String, val tags: List<String>)
 
 private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
     is Activity -> this

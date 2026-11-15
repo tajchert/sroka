@@ -66,21 +66,24 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sroka.core.model.DownloadPolicy
 import app.sroka.core.model.ReaderTheme
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import app.sroka.core.ui.rememberWithNotificationPermission
 import app.sroka.feature.settings.api.SettingsChoiceKind
 
-private enum class Dialog { None, Theme, ReaderTheme, TextSize, Offline, RemoveDownloads, SignOut, DeleteAccount, Server }
+private enum class Dialog { None, Theme, ReaderTheme, TextSize, Offline, SwipeLeft, SwipeRight, RemoveDownloads, SignOut, DeleteAccount, Server }
 
 /** The row whose detail page is open in the detail pane (highlighted in the list). */
-enum class SettingsSelection { Theme, ReaderTheme, TextSize, Offline, Server, Import, Export }
+enum class SettingsSelection { Theme, ReaderTheme, TextSize, Offline, SwipeLeft, SwipeRight, Server, Import, Export }
 
 internal fun SettingsChoiceKind.toSelection() = when (this) {
     SettingsChoiceKind.Theme -> SettingsSelection.Theme
     SettingsChoiceKind.ReaderTheme -> SettingsSelection.ReaderTheme
     SettingsChoiceKind.TextSize -> SettingsSelection.TextSize
     SettingsChoiceKind.Offline -> SettingsSelection.Offline
+    SettingsChoiceKind.SwipeLeft -> SettingsSelection.SwipeLeft
+    SettingsChoiceKind.SwipeRight -> SettingsSelection.SwipeRight
     SettingsChoiceKind.Server -> SettingsSelection.Server
 }
 
@@ -129,6 +132,8 @@ class SettingsActions(
     val setThemeMode: (ThemeMode) -> Unit = {},
     val setReaderTheme: (ReaderTheme) -> Unit = {},
     val setReaderTextScale: (Float) -> Unit = {},
+    val setSwipeLeftAction: (SwipeAction) -> Unit = {},
+    val setSwipeRightAction: (SwipeAction) -> Unit = {},
     val setDownloadPolicy: (DownloadPolicy) -> Unit = {},
     val downloadAllNow: () -> Unit = {},
     val removeDownloads: () -> Unit = {},
@@ -144,6 +149,8 @@ class SettingsActions(
             setThemeMode = { vm.setThemeMode(it) },
             setReaderTheme = { vm.setReaderTheme(it) },
             setReaderTextScale = { vm.setReaderTextScale(it) },
+            setSwipeLeftAction = { vm.setSwipeLeftAction(it) },
+            setSwipeRightAction = { vm.setSwipeRightAction(it) },
             setDownloadPolicy = { vm.setDownloadPolicy(it) },
             downloadAllNow = { vm.downloadAllNow() },
             removeDownloads = { vm.removeDownloads() },
@@ -213,6 +220,20 @@ fun SettingsScreen(
                 textSizeLabel(prefs.readerTextScale),
                 selected = selected == SettingsSelection.TextSize,
             ) { open(Dialog.TextSize, SettingsChoiceKind.TextSize) }
+
+            SectionHeader(R.string.feature_settings_section_swipe)
+            SettingRow(
+                prefs.swipeLeftAction.icon(),
+                stringResource(R.string.feature_settings_swipe_left),
+                stringResource(prefs.swipeLeftAction.labelRes()),
+                selected = selected == SettingsSelection.SwipeLeft,
+            ) { open(Dialog.SwipeLeft, SettingsChoiceKind.SwipeLeft) }
+            SettingRow(
+                prefs.swipeRightAction.icon(),
+                stringResource(R.string.feature_settings_swipe_right),
+                stringResource(prefs.swipeRightAction.labelRes()),
+                selected = selected == SettingsSelection.SwipeRight,
+            ) { open(Dialog.SwipeRight, SettingsChoiceKind.SwipeRight) }
 
             SectionHeader(R.string.feature_settings_section_library)
             SettingRow(
@@ -322,6 +343,8 @@ fun SettingsScreen(
         Dialog.ReaderTheme -> ChoiceDialog(SettingsChoiceKind.ReaderTheme, prefs, vm, close)
         Dialog.TextSize -> ChoiceDialog(SettingsChoiceKind.TextSize, prefs, vm, close)
         Dialog.Offline -> ChoiceDialog(SettingsChoiceKind.Offline, prefs, vm, close)
+        Dialog.SwipeLeft -> ChoiceDialog(SettingsChoiceKind.SwipeLeft, prefs, vm, close)
+        Dialog.SwipeRight -> ChoiceDialog(SettingsChoiceKind.SwipeRight, prefs, vm, close)
         Dialog.RemoveDownloads -> ConfirmDialog(
             title = R.string.feature_settings_remove_downloads,
             body = stringResource(R.string.feature_settings_remove_downloads_body),
@@ -427,6 +450,8 @@ internal fun SettingsChoiceKind.titleRes() = when (this) {
     SettingsChoiceKind.ReaderTheme -> R.string.feature_settings_reader_theme
     SettingsChoiceKind.TextSize -> R.string.feature_settings_text_size
     SettingsChoiceKind.Offline -> R.string.feature_settings_offline
+    SettingsChoiceKind.SwipeLeft -> R.string.feature_settings_swipe_left
+    SettingsChoiceKind.SwipeRight -> R.string.feature_settings_swipe_right
     SettingsChoiceKind.Server -> R.string.feature_settings_server
 }
 
@@ -456,6 +481,12 @@ internal fun SettingsChoiceBody(
         SettingsChoiceKind.Offline -> ChoiceList(
             DownloadPolicy.entries, prefs.downloadPolicy, { stringResource(it.labelRes()) }, inPane,
         ) { vm.setDownloadPolicy(it); onChosen() }
+        SettingsChoiceKind.SwipeLeft -> ChoiceList(
+            SwipeAction.entries, prefs.swipeLeftAction, { stringResource(it.labelRes()) }, inPane,
+        ) { vm.setSwipeLeftAction(it); onChosen() }
+        SettingsChoiceKind.SwipeRight -> ChoiceList(
+            SwipeAction.entries, prefs.swipeRightAction, { stringResource(it.labelRes()) }, inPane,
+        ) { vm.setSwipeRightAction(it); onChosen() }
         SettingsChoiceKind.Server -> Unit
     }
 }
@@ -601,6 +632,21 @@ private fun DownloadPolicy.labelRes() = when (this) {
     DownloadPolicy.WIFI_ONLY -> R.string.feature_settings_policy_wifi
     DownloadPolicy.ANY_NETWORK -> R.string.feature_settings_policy_any
     DownloadPolicy.MANUAL -> R.string.feature_settings_policy_manual
+}
+
+private fun SwipeAction.labelRes() = when (this) {
+    SwipeAction.ARCHIVE -> R.string.feature_settings_swipe_archive
+    SwipeAction.FAVORITE -> R.string.feature_settings_swipe_favorite
+    SwipeAction.TAGS -> R.string.feature_settings_swipe_tags
+    SwipeAction.NONE -> R.string.feature_settings_swipe_none
+}
+
+/** The glyph a swipe action shows on the row's swipe background; the settings row shows the same one. */
+private fun SwipeAction.icon() = when (this) {
+    SwipeAction.ARCHIVE -> SrokaIcons.Archive
+    SwipeAction.FAVORITE -> SrokaIcons.Star
+    SwipeAction.TAGS -> SrokaIcons.Label
+    SwipeAction.NONE -> SrokaIcons.Block
 }
 
 private fun ThemeMode.labelRes() = when (this) {

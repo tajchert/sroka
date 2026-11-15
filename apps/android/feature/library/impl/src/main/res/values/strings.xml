@@ -115,6 +115,7 @@
     <string name="feature_library_swipe_unarchive">Unarchive</string>
     <string name="feature_library_swipe_favorite">Favorite</string>
     <string name="feature_library_swipe_unfavorite">Remove favorite</string>
+    <string name="feature_library_swipe_tags">Tags</string>
 
     <!-- Snackbars -->
     <string name="feature_library_undo">Undo</string>

@@ -11,6 +11,7 @@ import app.sroka.core.model.ReaderFont
 import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
@@ -63,6 +64,18 @@ internal class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setSortOrder(order: SortOrder) {
         dataSource.setSortOrder(order)
+    }
+
+    override suspend fun setSwipeLeftAction(action: SwipeAction) {
+        dataSource.setSwipeLeftAction(action)
+    }
+
+    override suspend fun setSwipeRightAction(action: SwipeAction) {
+        dataSource.setSwipeRightAction(action)
+    }
+
+    override suspend fun setSwipeHintShown() {
+        dataSource.setSwipeHintShown()
     }
 
     override suspend fun setServerUrl(url: String?): Boolean {

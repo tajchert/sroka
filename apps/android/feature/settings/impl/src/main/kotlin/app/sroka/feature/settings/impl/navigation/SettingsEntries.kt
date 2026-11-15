@@ -81,6 +81,8 @@ private fun selectionOf(key: NavKey?): SettingsSelection? = when (key) {
         SettingsChoiceKind.ReaderTheme -> SettingsSelection.ReaderTheme
         SettingsChoiceKind.TextSize -> SettingsSelection.TextSize
         SettingsChoiceKind.Offline -> SettingsSelection.Offline
+        SettingsChoiceKind.SwipeLeft -> SettingsSelection.SwipeLeft
+        SettingsChoiceKind.SwipeRight -> SettingsSelection.SwipeRight
         SettingsChoiceKind.Server -> SettingsSelection.Server
     }
     ImportKey -> SettingsSelection.Import

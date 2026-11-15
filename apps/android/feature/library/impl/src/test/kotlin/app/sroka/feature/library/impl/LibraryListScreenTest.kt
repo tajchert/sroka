@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import app.sroka.core.model.OfflineState
 import app.sroka.core.model.ParseStatus
 import app.sroka.core.model.PendingChange
@@ -35,6 +36,8 @@ import app.sroka.core.domain.LibraryRepository
 import app.sroka.core.model.Item
 import app.sroka.core.model.ItemQuery
 import app.sroka.core.model.ItemSummary
+import app.sroka.core.model.SwipeAction
+import app.sroka.core.model.UserPreferences
 import app.sroka.core.model.toSummary
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -62,8 +65,11 @@ class LibraryListScreenTest {
     private var settingsClicks = 0
     private val searchOpened = mutableListOf<LibraryTab>()
 
+    /** The one-time swipe peek is off unless a test asks for it, so it cannot disturb other gestures. */
+    private val settings = FakeSettingsRepository(UserPreferences(swipeHintShown = true))
+
     private fun show(scope: ListScope = ListScope.Tab(LibraryTab.MY_LIST)) {
-        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), app.sroka.core.testing.fake.FakeAccountRepository(), sync, status, auth, FakeSettingsRepository(), app.sroka.core.testing.fake.FakePdfUploader())
+        val vm = LibraryListViewModel(LoadedLibrary(fake), FakeTagRepository(), app.sroka.core.testing.fake.FakeAccountRepository(), sync, status, auth, settings, app.sroka.core.testing.fake.FakePdfUploader())
         compose.setContent {
             SrokaTheme(dynamicColor = false) {
                 LibraryListRoute(
@@ -113,6 +119,69 @@ class LibraryListScreenTest {
         compose.waitUntil(5_000) { compose.onAllNodesMatching("Undo") }
         compose.onNodeWithText("Undo").performClick()
         compose.waitUntil(5_000) { fake.items.value.single().status == ItemStatus.UNREAD }
+    }
+
+    @Test
+    fun swipeRightRunsTheConfiguredAction() {
+        settings.preferencesFlow.value = UserPreferences(swipeRightAction = SwipeAction.FAVORITE, swipeHintShown = true)
+        fake.items.value = listOf(testItem(id = "a", title = "Alpha"))
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithText("Alpha").performTouchInput { swipeRight() }
+        compose.waitUntil(5_000) { fake.items.value.single().isFavorite }
+        // Favorite does not archive or remove the row, which springs back.
+        assertEquals(ItemStatus.UNREAD, fake.items.value.single().status)
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+    }
+
+    @Test
+    fun swipeIsOffInADirectionSetToNone() {
+        settings.preferencesFlow.value = UserPreferences(swipeLeftAction = SwipeAction.NONE, swipeHintShown = true)
+        fake.items.value = listOf(testItem(id = "a", title = "Alpha"))
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.onNodeWithText("Alpha").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        assertEquals(ItemStatus.UNREAD, fake.items.value.single().status)
+    }
+
+    @Test
+    fun firstListWithARowPeeksOnceWithoutActing() {
+        settings.preferencesFlow.value = UserPreferences(swipeHintShown = false)
+        fake.items.value = listOf(testItem(id = "a", title = "Alpha"), testItem(id = "b", title = "Beta"))
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Alpha") }
+        compose.waitUntil(5_000) { settings.preferencesFlow.value.swipeHintShown }
+        compose.waitForIdle()
+        // The peek is only a hint: nothing archived, no undo snackbar, both rows still there.
+        assertEquals(listOf(ItemStatus.UNREAD, ItemStatus.UNREAD), fake.items.value.map { it.status })
+        assertEquals(listOf(false, false), fake.items.value.map { it.isFavorite })
+        compose.onNodeWithText("Undo").assertDoesNotExist()
+        compose.onNodeWithText("Alpha").assertIsDisplayed()
+        compose.onNodeWithText("Beta").assertIsDisplayed()
+    }
+
+    @Test
+    fun peekIsSkippedButCountedWhenAnimationsAreOff() {
+        android.provider.Settings.Global.putFloat(
+            androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>().contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            0f,
+        )
+        settings.preferencesFlow.value = UserPreferences(swipeHintShown = false)
+        fake.items.value = listOf(testItem(id = "a", title = "Alpha"))
+        show()
+        compose.waitUntil(5_000) { settings.preferencesFlow.value.swipeHintShown }
+        assertEquals(ItemStatus.UNREAD, fake.items.value.single().status)
+    }
+
+    @Test
+    fun noPeekWithoutRows() {
+        settings.preferencesFlow.value = UserPreferences(swipeHintShown = false)
+        show()
+        compose.waitUntil(5_000) { compose.onAllNodesMatching("Start your list") }
+        compose.waitForIdle()
+        assertEquals(false, settings.preferencesFlow.value.swipeHintShown)
     }
 
     @Test

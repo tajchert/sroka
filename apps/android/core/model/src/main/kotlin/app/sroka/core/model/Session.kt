@@ -21,6 +21,12 @@ data class UserPreferences(
     val readerFont: ReaderFont = ReaderFont.SANS,
     val readerLineSpacing: ReaderLineSpacing = ReaderLineSpacing.NORMAL,
     val sortOrder: SortOrder = SortOrder.NEWEST,
+    /** Row swipe towards the left edge (physical direction). Default is the original behaviour: archive. */
+    val swipeLeftAction: SwipeAction = SwipeAction.ARCHIVE,
+    /** Row swipe towards the right edge (physical direction). Off by default, as before. */
+    val swipeRightAction: SwipeAction = SwipeAction.NONE,
+    /** The one-time "peek" that hints at the swipe actions has played. */
+    val swipeHintShown: Boolean = false,
     /** Overrides the build's default server; null = default. */
     val serverUrl: String? = null,
 ) {

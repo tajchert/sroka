@@ -31,6 +31,13 @@
     <string name="feature_settings_terms">Terms of service</string>
 
     <string name="feature_settings_section_library">Library</string>
+    <string name="feature_settings_section_swipe">Swipe actions</string>
+    <string name="feature_settings_swipe_left">Swipe left</string>
+    <string name="feature_settings_swipe_right">Swipe right</string>
+    <string name="feature_settings_swipe_archive">Archive</string>
+    <string name="feature_settings_swipe_favorite">Favorite</string>
+    <string name="feature_settings_swipe_tags">Tags</string>
+    <string name="feature_settings_swipe_none">None</string>
     <string name="feature_settings_offline">Offline downloads</string>
     <string name="feature_settings_offline_sub">%1$s · %2$s used</string>
     <string name="feature_settings_policy_wifi">Wi-Fi only</string>

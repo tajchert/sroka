@@ -5,6 +5,7 @@ import app.sroka.core.model.ReaderFont
 import app.sroka.core.model.ReaderLineSpacing
 import app.sroka.core.model.ReaderTheme
 import app.sroka.core.model.SortOrder
+import app.sroka.core.model.SwipeAction
 import app.sroka.core.model.ThemeMode
 import app.sroka.core.model.UserPreferences
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +36,15 @@ interface SettingsRepository {
     suspend fun setReaderLineSpacing(spacing: ReaderLineSpacing)
 
     suspend fun setSortOrder(order: SortOrder)
+
+    /** Action of a row swipe towards the left edge. */
+    suspend fun setSwipeLeftAction(action: SwipeAction)
+
+    /** Action of a row swipe towards the right edge. */
+    suspend fun setSwipeRightAction(action: SwipeAction)
+
+    /** Records that the one-time swipe hint has played, so it never plays again. */
+    suspend fun setSwipeHintShown()
 
     /** Custom server base URL; null restores [defaultServerUrl]. Invalid URLs return false. */
     suspend fun setServerUrl(url: String?): Boolean

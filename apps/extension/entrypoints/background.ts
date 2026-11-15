@@ -5,6 +5,7 @@ import type { Msg } from "../lib/messages.ts";
 import { MENU_OPEN_ITEM, MENU_REMOVE_ITEM, openSavedItem, removeSavedItem } from "../lib/item-menu.ts";
 import { openApp } from "../lib/open-app.ts";
 import { ALARM, processQueue, releaseQueue, removeQueuedUrl } from "../lib/queue.ts";
+import { forgetResaveTab, handleExternal, onResaveTabUpdated, takeResave } from "../lib/resave.ts";
 import { saveLink, saveTab, type SaveResult } from "../lib/save.ts";
 import { REFRESH_ALARM, refreshSavedSet, scheduleSavedSetRefresh } from "../lib/saved-set.ts";
 
@@ -18,6 +19,12 @@ async function flash(tabId: number | undefined, r: SaveResult) {
     await chrome.action.setBadgeText({ tabId, text: "!" });
     await chrome.action.setBadgeBackgroundColor({ tabId, color: "#b91c1c" });
   }
+}
+
+/** A user save in a tab: a pending "Re-save with extension" tab is saved with forced capture under the item's URL. */
+async function saveUserTab(tab: { id?: number; url?: string; title?: string }): Promise<SaveResult> {
+  const rs = await takeResave(tab.id, tab.url).catch(() => null);
+  return rs ? saveTab({ ...tab, url: rs.url }, { forceCapture: true }) : saveTab(tab);
 }
 
 /** save_item only when a new item was created. kind is "article": SaveResult carries no kind and the extension never saves PDFs itself. */
@@ -60,7 +67,7 @@ export default defineBackground(() => {
       // Link isn't the current tab's page; only badge the tab when it is the same URL.
       if (tab?.id != null && tab.url === info.linkUrl) await flash(tab.id, r);
     } else if (info.menuItemId === "save-page" && tab) {
-      const r = await saveTab(tab);
+      const r = await saveUserTab(tab);
       trackSave(r, "context_menu");
       await flash(tab.id, r);
     } else if (info.menuItemId === "open-app") {
@@ -88,6 +95,21 @@ export default defineBackground(() => {
   });
   chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
     if (change.status === "loading" || change.status === "complete" || change.url) void refreshBadge(tabId, change.url ?? tab.url);
+    // "Re-save with extension": saves only a tab lib/resave.ts opened for that request, once it shows the page.
+    void onResaveTabUpdated(tabId, change, tab, {
+      save: async (t) => {
+        const r = await saveTab(t, { forceCapture: true });
+        await flash(t.id, r).catch(() => undefined);
+        return r;
+      },
+    }).catch(() => undefined);
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => void forgetResaveTab(tabId).catch(() => undefined));
+
+  // Sroka web app (manifest externally_connectable; origin re-checked in handleExternal).
+  chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+    handleExternal(msg, sender).then(sendResponse, () => sendResponse({ ok: false, error: "error" }));
+    return true;
   });
 
   chrome.alarms.onAlarm.addListener((a) => {
@@ -111,7 +133,7 @@ export default defineBackground(() => {
       return false;
     }
     if (msg.type === "save-tab") {
-      saveTab(msg.tab)
+      saveUserTab(msg.tab)
         .then(async (r) => {
           trackSave(r, "extension");
           await flash(msg.tab.id, r).catch(() => undefined);

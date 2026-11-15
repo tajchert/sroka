@@ -136,8 +136,9 @@ describe("local updates", () => {
     );
     expect((await saveWithFallback({ url: "https://b.com/p?utm_medium=x" })).ok).toBe(true);
     expect(await lookupSaved("https://b.com/p")).toEqual({ saved: true, id: B });
+    // One shard (plus the one-time "has saved once" flag, lib/consent.ts).
     const written = c.storage.local.set.mock.calls.map((call) => Object.keys(call[0] as object)).flat();
-    expect(written).toHaveLength(1);
+    expect(written.filter((k) => k.startsWith("savedSet."))).toHaveLength(1);
     await removeSaved(B, ["https://b.com/p"]);
     expect(await lookupSaved("https://b.com/p")).toEqual({ saved: false });
     expect(await lookupSaved("https://a.com/")).toEqual({ saved: true, id: A });
@@ -166,9 +167,9 @@ describe("background", () => {
     const listeners: Record<string, Fn> = {};
     const ev = (name: string) => ({ addListener: (fn: Fn) => void (listeners[name] = fn) });
     Object.assign(c, {
-      runtime: { ...c.runtime, onInstalled: ev("installed"), onStartup: ev("startup"), onMessage: ev("message") },
+      runtime: { ...c.runtime, onInstalled: ev("installed"), onStartup: ev("startup"), onMessage: ev("message"), onMessageExternal: ev("external") },
       contextMenus: { onClicked: ev("menu"), update: vi.fn(async () => {}) },
-      tabs: { onActivated: ev("activated"), onUpdated: ev("updated"), get: vi.fn(async (id: number) => ({ id, url: id === 7 ? "https://a.com/x" : "https://private.example/", active: true })) },
+      tabs: { onActivated: ev("activated"), onUpdated: ev("updated"), onRemoved: ev("removed"), get: vi.fn(async (id: number) => ({ id, url: id === 7 ? "https://a.com/x" : "https://private.example/", active: true })) },
       windows: { onFocusChanged: ev("focus"), WINDOW_ID_NONE: -1 },
       alarms: { ...c.alarms, onAlarm: ev("alarm") },
       storage: { ...c.storage, onChanged: ev("storage") },

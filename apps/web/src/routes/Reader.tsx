@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { VOCAB, failureReason } from "@sroka/shared";
 import { patchItem } from "../lib/cache.ts";
 import { PdfViewer, usePdfBlob } from "../components/PdfViewer.tsx";
+import { ResaveButton } from "../components/ResaveButton.tsx";
 import { ICONS, MenuItem, MenuLink, MenuSep, MoreMenu, Star } from "../components/MoreMenu.tsx";
 import { TagEditor } from "../components/TagEditor.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
@@ -397,6 +398,7 @@ function ReaderView() {
           <p className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-3">
             <strong>{item.parseError === "paywalled" ? VOCAB.paywalledTitle : VOCAB.partialTitle}</strong>
             <a className="underline" href={item.url} target="_blank" rel="noopener noreferrer">Open original</a>
+            {item.parseError === "paywalled" && <ResaveButton item={item} />}
           </p>
         </div>
       )}

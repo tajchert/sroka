@@ -9,8 +9,8 @@ import { deleteItem, describeError, listTags, patchItem, sendOtp, signIn, tagSug
 import { removeSaved } from "../../lib/saved-set.ts";
 import type { Msg } from "../../lib/messages.ts";
 import { track } from "../../lib/analytics.ts";
-import { AUTO_CLOSE_MS, createAutoClose, type AutoCloseState } from "../../lib/auto-close.ts";
-import { getConsent, PRIVACY_URL, setConsent, shouldShowConsentPrompt } from "../../lib/consent.ts";
+import { AUTO_CLOSE_MS, autoCloseWanted, createAutoClose, type AutoCloseState } from "../../lib/auto-close.ts";
+import { consentCardDue, consentCardVisible, PRIVACY_URL, setConsent } from "../../lib/consent.ts";
 import { openApp } from "../../lib/open-app.ts";
 import { clearFailed, readFailed, type FailedSave } from "../../lib/queue.ts";
 import { failedBody } from "../../lib/save-failure.ts";
@@ -44,7 +44,9 @@ export function App() {
   const [phase, setPhase] = useState<Phase>({ k: "loading" });
   const [tab, setTab] = useState<Tab>({});
   // Cards that sit above the saved screen: while one is showing the popup must stay open until it is dealt with.
-  const [consentShown, setConsentShown] = useState(false);
+  // Analytics consent (D15) waits for the first successful save; decided together with the saved phase so the
+  // countdown never starts before the card appears.
+  const [consentDue, setConsentDue] = useState(false);
   const [failedShown, setFailedShown] = useState(false);
   const [countdown, setCountdown] = useState<AutoCloseState>("idle");
   const [hint, setHint] = useState<string | null>(null);
@@ -57,7 +59,11 @@ export function App() {
     engaged.current = false;
     setPhase({ k: "saving" });
     const r = await send<SaveResult>({ type: "save-tab", tab: t });
-    if (r.ok) setPhase({ k: "saved", item: r.item, created: r.created });
+    if (r.ok) {
+      const due = await consentCardDue().catch(() => false);
+      setConsentDue(due);
+      setPhase({ k: "saved", item: r.item, created: r.created });
+    }
     else if (r.reason === "signed_out") setPhase({ k: "signin" });
     else if (r.queued) setPhase({ k: "queued", message: "You’re offline. It will save as soon as the connection is back." });
     else setPhase({ k: "failed", message: failedBody(r.message) });
@@ -89,7 +95,8 @@ export function App() {
   }, [onSaved]);
 
   // Auto-close: runs only on the saved screen with no card above it, and never restarts once the user engaged.
-  const autoClose = onSaved && !consentShown && !failedShown;
+  const consentShown = consentCardVisible(phase.k, consentDue);
+  const autoClose = autoCloseWanted({ saved: onSaved, consentShown, failedShown });
   useEffect(() => {
     if (!autoClose || engaged.current) return;
     const root = document.documentElement;
@@ -139,7 +146,6 @@ export function App() {
 
   return (
     <div className="popup-card">
-      <ConsentCard onShown={setConsentShown} />
       <FailedSavesCard onShown={setFailedShown} />
       {phase.k === "loading" && <div className="body hint">Loading…</div>}
       {phase.k === "signin" && <SignIn onDone={onSignedIn} />}
@@ -156,6 +162,7 @@ export function App() {
           onRemoved={() => setPhase({ k: "removed" })}
         />
       )}
+      {consentShown && <ConsentCard onDecided={() => setConsentDue(false)} />}
       {phase.k === "tags" && (
         <Tags item={phase.item} tab={tab} onDone={(item) => setPhase({ k: "saved", item, created: phase.created })} />
       )}
@@ -212,22 +219,16 @@ export function App() {
   );
 }
 
-/** First-run analytics opt-in (D15). Inline, never blocks the save running alongside. */
-function ConsentCard({ onShown }: { onShown: (shown: boolean) => void }) {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    void getConsent().then((c) => setShow(shouldShowConsentPrompt(c)));
-  }, []);
-  useEffect(() => onShown(show), [show, onShown]);
-  if (!show) return null;
+/** Analytics opt-in (D15), shown on the saved screen after the first save. Unanswered = nothing sent. */
+function ConsentCard({ onDecided }: { onDecided: () => void }) {
   const decide = (analytics: boolean) => {
-    setShow(false);
+    onDecided();
     void setConsent({ analytics });
   };
   return (
     <div className="consent" role="region" aria-label="Usage statistics">
       <strong>Help improve Sroka?</strong>
-      <p>Share anonymous usage statistics (which features are used, never what you read) via Google Analytics. You can change this anytime in Settings.</p>
+      <p>Share anonymous usage data. Never what you read: no content, URLs or titles.</p>
       <div className="consent-actions">
         <button className="btn btn-primary" onClick={() => decide(true)}>
           Allow

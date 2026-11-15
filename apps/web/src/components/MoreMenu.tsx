@@ -58,25 +58,36 @@ export function MoreMenu({ label = "More", className = "", children }: { label?:
 }
 
 /** Menu entry with an optional 16px icon (SVG children drawn in a 24-unit box). */
-export function MenuItem({ icon, danger, onClick, children }: { icon?: ReactNode; danger?: boolean; onClick: () => void; children: ReactNode }) {
+export function MenuItem({ icon, danger, hint, onClick, children }: { icon?: ReactNode; danger?: boolean; hint?: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" role="menuitem" className={`menu-item ${danger ? "text-danger" : ""}`} onClick={onClick}>
+    <button type="button" role="menuitem" className={`menu-item whitespace-nowrap ${danger ? "text-danger" : ""}`} onClick={onClick} aria-keyshortcuts={hint}>
       {icon && <MenuIcon>{icon}</MenuIcon>}
       {children}
+      {hint && <MenuHint>{hint}</MenuHint>}
     </button>
   );
 }
 
-export function MenuLink({ href, icon, download, onClick, children }: { href: string; icon?: ReactNode; download?: string; onClick?: () => void; children: ReactNode }) {
+export function MenuLink({ href, icon, download, hint, onClick, children }: { href: string; icon?: ReactNode; download?: string; hint?: string; onClick?: () => void; children: ReactNode }) {
   return (
-    <a role="menuitem" className="menu-item no-underline" href={href} download={download} target={download ? undefined : "_blank"} rel="noopener noreferrer" onClick={onClick}>
+    <a role="menuitem" className="menu-item whitespace-nowrap no-underline" href={href} download={download} target={download ? undefined : "_blank"} rel="noopener noreferrer" onClick={onClick} aria-keyshortcuts={hint}>
       {icon && <MenuIcon>{icon}</MenuIcon>}
       {children}
+      {hint && <MenuHint>{hint}</MenuHint>}
     </a>
   );
 }
 
 export const MenuSep = () => <div role="separator" className="mx-1.5 my-1 h-px bg-rule2" />;
+
+/** Shortcut key shown at the end of a menu entry (not read out twice: `aria-keyshortcuts` carries it). */
+function MenuHint({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden className="ml-auto pl-5 font-mono text-xs text-ink3 pointer-coarse:hidden">
+      {children}
+    </span>
+  );
+}
 
 function MenuIcon({ children }: { children: ReactNode }) {
   return (
@@ -98,6 +109,12 @@ export const ICONS = {
   ),
   trash: <path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />,
   refresh: <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />,
+  keyboard: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </>
+  ),
   download: <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />,
 };
 

@@ -94,6 +94,16 @@ describe("ItemRow statuses", () => {
     expect(screen.getByRole("button", { name: "Retry" }).className).not.toContain("hidden");
   });
 
+  it("⋯ button has the same 44px coarse-pointer hit area as the star and archive buttons, offset so the row height holds", () => {
+    row(article());
+    const more = screen.getByRole("button", { name: "More" });
+    expect(more.className).toContain("size-[30px]");
+    expect(more.className).toContain("pointer-coarse:size-11");
+    // 44px box, 18px of negative margin: the same 26px of row height as the 30px button with its -mt-1.
+    expect(more.className).toContain("pointer-coarse:-mt-[11px]");
+    expect(more.className).toContain("pointer-coarse:-mb-[7px]");
+  });
+
   it("failed with an unknown code shows no reason sentence and never the code", () => {
     const { container } = row(article({ parseStatus: "failed", parseError: "weird_internal" }));
     expect(container.textContent).not.toContain("weird_internal");

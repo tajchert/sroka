@@ -139,7 +139,7 @@ export function ItemRow({ item, selected, onDomain, onTag }: ItemRowProps) {
             </div>
           )}
           {!temp && (
-            <MoreMenu className="-mt-1 -mr-1.5 size-[30px] rounded-lg">
+            <MoreMenu className="-mt-1 -mr-1.5 size-[30px] rounded-lg pointer-coarse:-mt-[11px] pointer-coarse:-mr-[13px] pointer-coarse:-mb-[7px] pointer-coarse:size-11">
               {(close) => (
                 <>
                   {pdf ? null : (

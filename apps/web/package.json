@@ -17,6 +17,7 @@
     "better-auth": "^1.7.8",
     "firebase": "^13.2.0",
     "pdfjs-dist": "6.3.289",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router": "^7.18.4"

@@ -5,9 +5,16 @@ import { useNavigate } from "react-router";
 import { track } from "./analytics.ts";
 import { ApiRequestError, POLL_GIVE_UP_MS, api, pollDelay } from "./api.ts";
 import { patchItem, placeholderItem, prependItem, removeItem, replaceItem, snapshotItem } from "./cache.ts";
+import { titleFromUrl } from "./slug.ts";
 import { hideItem, unhideItem, useToasts } from "./store.tsx";
 
-export const itemTitle = (i: Item) => i.title || i.fileName || i.siteName || hostOf(i.canonicalUrl || i.url);
+export const itemTitle = (i: Item) =>
+  i.title ||
+  i.fileName ||
+  // Not fetched yet: a readable stand-in from the URL slug (host when there is none).
+  (i.parseStatus === "pending" ? titleFromUrl(i.canonicalUrl || i.url) : null) ||
+  i.siteName ||
+  hostOf(i.canonicalUrl || i.url);
 export function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");

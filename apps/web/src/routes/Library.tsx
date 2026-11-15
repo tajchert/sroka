@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { Adder } from "../components/Adder.tsx";
 import { ItemRow } from "../components/ItemRow.tsx";
 import { ListHeader, articles } from "../components/ListHeader.tsx";
+import { Onboarding } from "../components/Onboarding.tsx";
 import { api } from "../lib/api.ts";
 import type { ListParams } from "../lib/cache.ts";
 import { useListKeyboard } from "../lib/hooks.ts";
@@ -12,10 +13,10 @@ import { sortOptions, useListSort, type SortList } from "../lib/sort.ts";
 
 const TITLES: Record<ItemState, string> = { unread: "My List", archived: "Archive", favorites: "Favorites", all: "All items" };
 const EMPTY: Record<ItemState, [string, string]> = {
-  unread: ["Nothing saved yet", "Tap Add to save a link, drop a PDF, or use the browser extension."],
+  unread: ["Nothing saved yet", "Tap Save to add a link, drop a PDF, or use the browser extension."],
   archived: ["Archive is empty", "Archived articles land here once you’re done reading."],
   favorites: ["No favorites yet", "Star an article to keep it here."],
-  all: ["Your library is empty", "Tap Add to save your first page."],
+  all: ["Your library is empty", "Tap Save to keep your first page."],
 };
 
 export default function Library({ state: baseState }: { state: ItemState }) {
@@ -71,6 +72,8 @@ export default function Library({ state: baseState }: { state: ItemState }) {
           <p className="text-ink2">Could not load your library.</p>
           <button className="btn mt-3" onClick={() => void query.refetch()}>Try again</button>
         </div>
+      ) : items.length === 0 && state === "unread" && !tag && !domain ? (
+        <Onboarding />
       ) : items.length === 0 ? (
         <div className="flex flex-col gap-1.5 py-14 text-center">
           <p className="text-[17px] font-semibold">{emptyTitle}</p>

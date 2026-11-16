@@ -1,0 +1,9 @@
+# Gitignored files a build/dev run needs; copied into fresh worktrees. Paths only, never values.
+apps/android/local.properties
+apps/android/keystore.properties
+apps/extension/analytics.config.json
+apps/web/firebase.config.json
+workers/api/.dev.vars
+workers/parser/.dev.vars
+.dev.vars
+wrangler.dev.jsonc

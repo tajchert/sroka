@@ -28,3 +28,10 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - Wire JSON camelCase, SQL snake_case. Errors `{error, message?}`.
 - Keep test/build output short (`| tail -30`). Conventional commits.
 - Brand icon ("6a": black bookmark-magpie, blue band, yellow beak, white tile) has one source, `scripts/make-icons.mjs`. It generates `docs/brand/*`, web favicons (`apps/web/public`), extension PNGs and Android launcher icons. Change the mark there and rerun it (needs `sharp` via `SHARP_PREFIX`; see the script header).
+
+## Agent environment (this Mac)
+- Android builds: `export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools JAVA_HOME=$(/usr/libexec/java_home -v 21)` (no `local.properties` exists in the main checkout; do not guess another SDK path).
+- Fresh worktrees: `.worktreeinclude` lists the gitignored build inputs (keystore, analytics/firebase configs); copy them in before building.
+- Releases (APK/AAB) must pass `scripts/release-preflight.sh <artifact>` (no `sroka-example` placeholder Firebase config, release-signed). 1.4.0 and 1.5.0 shipped with the placeholder.
+- Emulators: use a sroka-specific AVD (create e.g. `sroka-phone`), never the shared `pixel`. If adb restarts, set `ADB_MDNS=0 ADB_MDNS_OPENSCREEN=0`. Never `adb kill-server`.
+- Worktree agents run one plain `git -C <path> ...` command per call (no `cd` chains, loops or long pipelines).

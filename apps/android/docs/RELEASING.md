@@ -59,6 +59,12 @@ The bundle is under `app/build/outputs/bundle/playRelease/`. An AAB is not direc
 
 Retain the exact distributed artifact, version, source commit, and signing-certificate identity. Archive the release R8 mapping from `app/build/outputs/mapping/playRelease/mapping.txt` with that version for crash retracing. The included CI verifies assembly; it does not publish or archive release mappings.
 
+Before publishing any APK or AAB, run the preflight from the repo root. It fails on the placeholder Firebase project (`sroka-example`) and on debug-signed artifacts:
+
+```bash
+scripts/release-preflight.sh apps/android/app/build/outputs/bundle/playRelease/app-play-release.aab
+```
+
 ## Check the distributed build
 
 Test the signed, optimized build rather than relying on debug behavior. Check startup, create/open/delete, persisted preferences, process restart, saved drafts, and deep links. Verify upgrades from the previous shipped version and database restore where supported. Check the minimum/target API, large fonts, RTL, accessibility, and adaptive windows for your product.

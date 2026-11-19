@@ -7,6 +7,7 @@ import { useConsent, setConsent } from "../lib/consent.ts";
 import { hasAnalyticsConfig } from "../lib/firebase-config.ts";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { useToasts } from "../lib/store.tsx";
+import { EXTENSION_URL } from "../lib/links.ts";
 
 const FORMATS: { value: ImportFormat; label: string; hint: string; accept: string }[] = [
   { value: "pocket_csv", label: "Pocket (CSV or ZIP)", hint: "The export file from getpocket.com/export", accept: ".csv,.zip" },
@@ -131,7 +132,7 @@ export default function Settings() {
 
       <Section title="Browser extension">
         <p className="text-sm text-ink2">Save any page with one click or Alt+Shift+S.</p>
-        <a className="btn mt-3" href="https://sroka.app/#extension" target="_blank" rel="noopener noreferrer">Get the Chrome extension</a>
+        <a className="btn mt-3" href={EXTENSION_URL} target="_blank" rel="noopener noreferrer">Get the Chrome extension</a>
       </Section>
 
       <PrivacySection />

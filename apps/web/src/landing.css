@@ -81,6 +81,9 @@ svg {
 .m-only {
   display: none;
 }
+.cta .btn.m-only {
+  display: none;
+}
 
 /* Shared bits */
 .tile {
@@ -1012,6 +1015,9 @@ html.signed-in .signed-in.btn {
   }
   .m-only {
     display: inline;
+  }
+  .cta .btn.m-only {
+    display: inline-flex;
   }
   h2 {
     font-size: 32px;

@@ -46,7 +46,7 @@ import app.sroka.core.model.extractFirstUrl
 import app.sroka.feature.library.impl.R
 
 /** Where "Save from Chrome" points until a store listing is live (one constant, brief "Store links"). */
-internal const val GET_EXTENSION_URL = "https://sroka.app/#get"
+internal const val GET_EXTENSION_URL = "https://chromewebstore.google.com/detail/mgeodllnkiehnjbdogljfjgdbadjdblh"
 
 /**
  * "Continue reading" (proposal 08): a section label and horizontally scrolling cards of articles in

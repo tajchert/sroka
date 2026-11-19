@@ -30,7 +30,7 @@ describe("Onboarding", () => {
     meOrNull.mockResolvedValue(me());
     setup();
     expect(screen.getByText("Save from anywhere")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Add to Chrome" }).getAttribute("href")).toBe("https://sroka.app/#get");
+    expect(screen.getByRole("link", { name: "Add to Chrome" }).getAttribute("href")).toBe("https://chromewebstore.google.com/detail/mgeodllnkiehnjbdogljfjgdbadjdblh");
     expect(screen.getByRole("button", { name: "Save a link" })).toBeTruthy();
     expect(screen.getByTestId("qr")).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId("qr").querySelector("path")).toBeTruthy());

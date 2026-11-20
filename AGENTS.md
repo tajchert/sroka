@@ -12,6 +12,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - `apps/web` — React SPA (`/app`) + landing (`/`)
 - `apps/extension` — WXT MV3 Chrome extension
 - `apps/android` — native Android app (Kotlin, Compose, Room, WorkManager); own Gradle root, not an npm workspace. See `apps/android/CLAUDE.md`
+- `apps/ios` — native iOS/iPadOS app (SwiftUI, one local Swift package `Modules/`, share extension); own Xcode project, not an npm workspace. See `apps/ios/AGENTS.md`
 
 ## Commands
 - Install: `npm install` (root)
@@ -21,6 +22,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - Local e2e: `DEV_LOG=<wrangler dev log> npm run e2e:local` (`scripts/e2e-local.sh`, curl + jq + node; non-zero exit on failure).
 - Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`. Release: `npm run zip -w @sroka/extension` (Web Store zip, no manifest `key`; it then rebuilds the keyed `chrome-mv3`). An unpacked build without `key` gets a different extension id, which signs the user out and makes sign-in fail with "Invalid origin" (API `EXT_ID` is a comma-separated list of trusted ids: Web Store `mgeodllnkiehnjbdogljfjgdbadjdblh` and unpacked `gmfnkkciofcaafddbcgphofiikmplema`, see `workers/api/CLAUDE.md`; the web keeps the same ids in `EXTENSION_IDS` in `apps/web/src/lib/extension.ts`). A new id must be added in both places.
 - Android: in `apps/android` with JDK 21, `./gradlew testDebugUnitTest lintDebug assembleDebug` (details: `apps/android/CLAUDE.md`)
+- iOS: `apps/ios/scripts/verify.sh all` (format, unit, build Dev, build Prod; Xcode 27.2, own simulator via `SIM_NAME`; details: `apps/ios/AGENTS.md`)
 - Each workspace has its own CLAUDE.md with specifics.
 
 ## Conventions

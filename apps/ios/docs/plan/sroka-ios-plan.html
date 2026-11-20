@@ -1,0 +1,1243 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sroka for iOS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column for the plan (tables may scroll inside), a wrapping gallery of annotated phone frames for the UI view. */
+:root{
+  --paper:#F6F5F1; --card:#FBFAF7; --sunk:#EFEDE7; --ink:#15171C; --muted:#55595F; --line:#D3D1C9;
+  --wing:#1E6F8F; --wing-soft:#CDE7F1; --on-wing-soft:#0B3646; --beak:#F2C84B; --beak-ink:#7A5A00; --beak-soft:#F6ECC9;
+  --danger:#B3261E; --ok:#2E6B4A;
+  --f-display:"Outfit",system-ui,sans-serif; --f-body:"Inter",system-ui,-apple-system,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#15171C; --card:#1B1E23; --sunk:#1F2228; --ink:#F1EFE9; --muted:#A5A8AE; --line:#3A3F48;
+  --wing:#7CC0DA; --wing-soft:#1D3A47; --on-wing-soft:#9FD0E3; --beak:#F2C84B; --beak-ink:#E8CF86; --beak-soft:#2A2619;
+  --danger:#F08F7F; --ok:#8CCBA6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#15171C; --card:#1B1E23; --sunk:#1F2228; --ink:#F1EFE9; --muted:#A5A8AE; --line:#3A3F48;
+  --wing:#7CC0DA; --wing-soft:#1D3A47; --on-wing-soft:#9FD0E3; --beak:#F2C84B; --beak-ink:#E8CF86; --beak-soft:#2A2619;
+  --danger:#F08F7F; --ok:#8CCBA6; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--wing)}
+:focus-visible{outline:2px solid var(--wing);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:600;font-size:18px}
+.brand svg{width:30px;height:30px;border-radius:7px;border:1px solid var(--line)}
+.views{display:flex;gap:4px;margin-left:auto;background:var(--sunk);padding:3px;border-radius:999px}
+.views a{padding:6px 14px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px}
+.views a[aria-current="page"]{background:var(--ink);color:var(--paper)}
+
+.hero{padding-block:36px 8px}
+.hero h1{font-family:var(--f-display);font-weight:600;font-size:clamp(28px,5vw,42px);line-height:1.1;margin:0 0 10px;text-wrap:balance}
+.hero p{max-width:68ch;color:var(--muted);margin:0;font-size:16px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin-block:24px 8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.facts div{padding:14px 16px 14px 0}
+.facts dt{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-family:var(--f-display);font-size:17px;font-weight:500}
+
+.toc{display:flex;flex-wrap:wrap;gap:6px;padding-block:16px}
+.toc button{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:4px 11px;border-radius:999px;cursor:pointer}
+.toc button:hover{background:var(--sunk)}
+
+section{padding-block:28px;border-top:1px solid var(--line)}
+section>h2{font-family:var(--f-display);font-weight:600;font-size:24px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+section>.lede{color:var(--muted);max-width:70ch;margin:0 0 16px}
+h3{font-family:var(--f-display);font-weight:600;font-size:17px;margin:22px 0 6px}
+p,li{max-width:76ch}
+ul,ol{padding-left:20px;margin:6px 0}
+li{margin:3px 0}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.tw{overflow-x:auto;margin-block:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:620px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--sunk)}
+td li{margin:1px 0}
+.note{border-left:3px solid var(--beak);background:var(--beak-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin-block:14px;max-width:80ch}
+.note b{color:var(--beak-ink)}
+.tag{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--wing-soft);color:var(--on-wing-soft);white-space:nowrap}
+.tag.y{background:var(--beak-soft);color:var(--beak-ink)}
+.tag.n{background:var(--sunk);color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.cols>div{min-width:0}
+
+.arch{display:grid;gap:8px;margin-block:14px}
+.arch .lane{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:stretch}
+.arch .lane>b{font-family:var(--f-display);font-weight:500;font-size:13px;color:var(--muted);align-self:center}
+.arch .boxes{display:flex;flex-wrap:wrap;gap:8px}
+.arch .bx{flex:1 1 150px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.35}
+.arch .bx b{display:block;font-family:var(--f-mono);font-size:12.5px;font-weight:500}
+.arch .bx.t{border-color:var(--wing);background:var(--wing-soft);color:var(--on-wing-soft)}
+@media (max-width:560px){.arch .lane{grid-template-columns:1fr}}
+
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps>li{counter-increment:s;position:relative;padding-left:38px;margin:10px 0}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);font-family:var(--f-display);font-size:13px;display:grid;place-items:center}
+
+.gantt{display:grid;gap:6px;margin-block:14px;font-size:13px}
+.gantt .gr{display:grid;grid-template-columns:minmax(120px,210px) 1fr;gap:10px;align-items:center}
+.gantt .track{display:grid;grid-template-columns:repeat(11,1fr);gap:2px}
+.gantt .track i{height:18px;border-radius:3px;background:var(--sunk)}
+.gantt .track i.on{background:var(--wing)}
+.gantt .track i.rel{background:var(--beak)}
+.gantt .wk{color:var(--muted);font-size:11px;text-align:center;height:auto;background:none}
+
+/* ---------- UI view ---------- */
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-block:8px 18px}
+.seg{display:inline-flex;background:var(--sunk);padding:3px;border-radius:999px}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;background:transparent;color:var(--muted);padding:5px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:36px 24px;justify-items:center;align-items:start}
+figure{margin:0;width:300px;max-width:100%}
+figcaption{margin-top:12px}
+figcaption b{font-family:var(--f-display);font-weight:600;font-size:16px;display:block}
+figcaption ul{font-size:13px;color:var(--muted);padding-left:16px;margin:4px 0 0}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-block:12px}
+.sw div{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);font-size:12px}
+.sw i{display:flex;height:44px}
+.sw i span{flex:1}
+.sw p{margin:0;padding:6px 9px;line-height:1.35}
+.sw p b{display:block;font-weight:600;font-size:12.5px}
+.sw code{background:none;padding:0;font-size:11px;color:var(--muted)}
+.icons{display:flex;flex-wrap:wrap;gap:18px;margin-block:12px;align-items:flex-end}
+.icons figure{width:auto;text-align:center;font-size:12px;color:var(--muted)}
+.icons svg{width:84px;height:84px;border-radius:19px;display:block;margin-bottom:6px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+
+/* phone frame: its palette is the Sroka app palette, independent of the page theme */
+.phone{--a-bg:#F6F5F1;--a-fg:#15171C;--a-muted:#55595F;--a-tint:#1E6F8F;--a-on-tint:#F6F5F1;--a-card:#FFFFFF;--a-low:#FBFAF7;--a-fill:#E8E6DF;--a-fill2:#E0DED6;--a-line:#D3D1C9;--a-tc:#CDE7F1;--a-otc:#0B3646;--a-star:#7A5A00;--a-warnc:#F6ECC9;--a-warn:#7A5A00;--a-err:#B3261E;--a-hl:#F6E7B0;--a-glass:rgba(255,255,255,.58);--a-edge:rgba(255,255,255,.75);--a-shadow:rgba(20,22,28,.16);
+  --r-bg:#FBFBF9;--r-fg:#15171C;--r-muted:#5D5F66;--r-link:#1E6F8F;--r-rule:#E3E3DF;--r-prog:#1E6F8F;
+  width:300px;height:640px;border-radius:46px;border:9px solid #0B0C0F;background:var(--a-bg);color:var(--a-fg);position:relative;overflow:hidden;font-family:-apple-system,"SF Pro Text",system-ui,"Inter",sans-serif;font-size:13px;line-height:1.3;box-shadow:0 18px 40px rgba(0,0,0,.22)}
+.phone[data-scheme="dark"]{--a-bg:#15171C;--a-fg:#F1EFE9;--a-muted:#A5A8AE;--a-tint:#7CC0DA;--a-on-tint:#06323F;--a-card:#1F2228;--a-low:#1B1E23;--a-fill:#262A31;--a-fill2:#2F333B;--a-line:#3A3F48;--a-tc:#1D3A47;--a-otc:#9FD0E3;--a-star:#F2C84B;--a-warnc:#2A2619;--a-warn:#E8CF86;--a-err:#F08F7F;--a-hl:#3A3220;--a-glass:rgba(52,57,66,.55);--a-edge:rgba(255,255,255,.16);--a-shadow:rgba(0,0,0,.45);
+  --r-bg:#121314;--r-fg:#D9D7D1;--r-muted:#A5A8AE;--r-link:#7CC0DA;--r-rule:#2A2D2F;--r-prog:#F2C84B}
+.phone[data-reader="sepia"]{--r-bg:#F3EAD8;--r-fg:#40321F;--r-muted:#8A7656;--r-link:#1F6F6A;--r-rule:#E0D3B8;--r-prog:#1E6F8F}
+.phone.short{height:470px}
+.phone *{box-sizing:border-box}
+.sb{position:absolute;inset:0 0 auto;height:44px;display:flex;justify-content:space-between;align-items:center;padding:6px 26px 0;font-weight:600;font-size:13px;z-index:6;pointer-events:none}
+.sb i{position:absolute;left:50%;top:9px;width:82px;height:24px;margin-left:-41px;border-radius:14px;background:#0B0C0F}
+.sb em{font-style:normal;display:flex;gap:4px;align-items:center}
+.sb em b{width:17px;height:9px;border:1px solid currentColor;border-radius:3px;position:relative;opacity:.9}
+.sb em b::after{content:"";position:absolute;inset:1px 4px 1px 1px;background:currentColor;border-radius:1px}
+.scr{position:absolute;inset:0;padding-top:46px;overflow:hidden}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.f{fill:currentColor}
+.glass{background:var(--a-glass);-webkit-backdrop-filter:blur(14px) saturate(180%);backdrop-filter:blur(14px) saturate(180%);border:1px solid var(--a-edge);box-shadow:0 6px 18px var(--a-shadow),inset 0 1px 0 var(--a-edge)}
+.nav{display:flex;align-items:center;gap:8px;padding:2px 14px 0;height:40px;position:relative;z-index:4}
+.gb{height:36px;min-width:36px;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;gap:14px;padding:0 9px;color:var(--a-fg)}
+.gb.tint{background:#1E6F8F;color:#F6F5F1;border-color:rgba(255,255,255,.3)}
+.gb.txt{padding:0 13px;font-weight:600;font-size:13px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--a-tc);color:var(--a-otc);display:grid;place-items:center;font-weight:600;font-size:14px;border:1px solid var(--a-edge)}
+.sp{flex:1}
+.lt{font-size:28px;font-weight:700;letter-spacing:-.01em;margin:6px 16px 8px;line-height:1.1}
+.chips{display:flex;gap:6px;padding:0 16px 10px;overflow:hidden;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:999px;background:var(--a-fill);font-size:12px;font-weight:500;flex:none}
+.chip .ic{width:13px;height:13px}
+.chip.on{background:var(--a-tc);color:var(--a-otc)}
+.sec{font-size:12px;font-weight:600;color:var(--a-muted);padding:4px 16px 6px}
+.cont{display:flex;gap:8px;padding:0 16px 10px;overflow:hidden}
+.cc{flex:none;width:128px;background:var(--a-card);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.cc b{font-size:12px;font-weight:600;line-height:1.25;height:30px;overflow:hidden}
+.cc span{font-size:11px;color:var(--a-muted)}
+.pb{height:3px;border-radius:2px;background:var(--a-fill2);overflow:hidden}
+.pb i{display:block;height:100%;background:#F2C84B}
+.row{display:flex;gap:12px;padding:9px 16px;align-items:center;position:relative;background:var(--a-bg)}
+.row+.row::before{content:"";position:absolute;left:76px;right:0;top:0;border-top:.5px solid var(--a-line)}
+.th{width:48px;height:48px;border-radius:9px;flex:none;position:relative;background:var(--a-fill);display:grid;place-items:center;font-weight:600;font-size:18px;color:var(--a-tint)}
+.th.p1{background:linear-gradient(140deg,#243b4a 0 38%,#e9eef0 38% 62%,#1b1d22 62%)}
+.th.p2{background:linear-gradient(200deg,#f38020 0 45%,#fbad41 45% 70%,#404041 70%)}
+.th.p3{background:linear-gradient(160deg,#7a8b6a,#c9c2a0 60%,#51624a)}
+.th.pdf{background:var(--a-tc);color:var(--a-otc);font-size:10px;letter-spacing:.04em}
+.th .tp{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,.45);border-radius:0 0 9px 9px;overflow:hidden}
+.th .tp i{display:block;height:100%;background:#F2C84B}
+.bd{position:absolute;right:-6px;top:-6px;width:18px;height:18px;border-radius:50%;border:2px solid var(--a-bg);display:grid;place-items:center;background:var(--a-tc);color:var(--a-otc)}
+.bd .ic{width:10px;height:10px;stroke-width:2.6}
+.bd.w{background:var(--a-warnc);color:var(--a-warn)}
+.rt{flex:1;min-width:0}
+.rt b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13.5px;font-weight:600;line-height:1.25}
+.rt span{display:block;font-size:12px;color:var(--a-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt mark{background:var(--a-hl);color:inherit;border-radius:2px;padding:0 1px}
+.rt p{margin:3px 0 0;font-size:11.5px;color:var(--a-muted);line-height:1.35;max-width:none}
+.star{color:var(--a-star)}
+.tabs{position:absolute;left:14px;bottom:14px;height:52px;border-radius:26px;display:flex;padding:4px;gap:0;z-index:5}
+.tabs span{width:64px;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:9.5px;font-weight:600;color:var(--a-fg)}
+.tabs span.on{background:color-mix(in srgb,var(--a-tint) 18%,transparent);color:var(--a-tint)}
+.tsearch{position:absolute;right:14px;bottom:14px;width:52px;height:52px;border-radius:26px;display:grid;place-items:center;z-index:5}
+.tsearch .ic,.tabs .ic{width:20px;height:20px}
+.toast{position:absolute;left:50%;transform:translateX(-50%);bottom:76px;border-radius:20px;height:38px;display:flex;align-items:center;gap:14px;padding:0 6px 0 16px;font-weight:500;z-index:5;white-space:nowrap}
+.toast u{text-decoration:none;font-weight:600;color:var(--a-tint);padding:6px 10px}
+.fade{position:absolute;inset:auto 0 0;height:110px;background:linear-gradient(transparent,color-mix(in srgb,var(--a-bg) 75%,transparent));z-index:3;pointer-events:none}
+.swipe{position:relative;overflow:hidden}
+.swipe .act{position:absolute;inset:0;background:var(--a-tint);color:var(--a-on-tint);display:flex;align-items:center;justify-content:flex-end;padding:0 22px;font-size:10.5px;font-weight:600}
+.swipe .act div{display:flex;flex-direction:column;align-items:center;gap:3px}
+.swipe .act.l{justify-content:flex-start;background:#F2C84B;color:#4A3600}
+.swipe .row{transform:translateX(-92px)}
+.swipe.r .row{transform:translateX(92px)}
+.dim{position:absolute;inset:0;background:color-mix(in srgb,var(--a-bg) 55%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:6}
+.lift{position:absolute;left:14px;right:14px;top:74px;z-index:7;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px var(--a-shadow)}
+.lift .row{background:var(--a-card)}
+.menu{position:absolute;left:14px;top:152px;width:216px;border-radius:18px;z-index:7;padding:5px 0;font-size:13.5px}
+.menu div{display:flex;justify-content:space-between;align-items:center;padding:8px 14px}
+.menu div+div{border-top:.5px solid var(--a-line)}
+.menu .sepr{border-top:5px solid color-mix(in srgb,var(--a-line) 50%,transparent)}
+.menu .d{color:var(--a-err)}
+.menu .ic{width:16px;height:16px}
+/* reader */
+.rd{position:absolute;inset:0;background:var(--r-bg);color:var(--r-fg);padding:92px 20px 0;font-family:ui-serif,"New York","Iowan Old Style",Georgia,serif;font-size:14.5px;line-height:1.62}
+.rd .site{font-family:-apple-system,system-ui,sans-serif;font-size:11.5px;font-weight:500;color:var(--r-link)}
+.rd h4{font-size:23px;line-height:1.18;font-weight:600;margin:8px 0 6px}
+.rd .meta{font-family:-apple-system,system-ui,sans-serif;font-size:11.5px;color:var(--r-muted);padding-bottom:10px;border-bottom:1px solid var(--r-rule);margin-bottom:12px}
+.rd p{margin:0 0 11px;max-width:none}
+.rd a{color:var(--r-link)}
+.rprog{position:absolute;left:0;right:0;top:44px;height:3px;background:color-mix(in srgb,var(--r-fg) 12%,transparent);z-index:5}
+.rprog i{display:block;height:100%;background:var(--r-prog);width:42%}
+.rnav{position:absolute;left:14px;right:14px;top:52px;display:flex;z-index:5}
+.rbar{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;height:48px;border-radius:24px;display:flex;align-items:center;gap:26px;padding:0 24px;z-index:5}
+.rbar .ic{width:20px;height:20px}
+.sheet{position:absolute;left:0;right:0;bottom:0;border-radius:30px 30px 0 0;z-index:8;padding:8px 18px 22px;background:var(--a-low);box-shadow:0 -8px 30px var(--a-shadow)}
+.sheet.g{background:var(--a-glass);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);border-top:1px solid var(--a-edge)}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--a-line);margin:0 auto 12px}
+.sheet h5{font-size:16px;font-weight:600;margin:0 0 12px}
+.lab{font-size:11.5px;font-weight:600;color:var(--a-muted);margin:12px 0 6px}
+.themes{display:flex;gap:10px}
+.themes div{flex:1;text-align:center;font-size:10.5px;color:var(--a-muted)}
+.themes i{display:grid;place-items:center;height:46px;border-radius:13px;border:1px solid var(--a-line);font-style:normal;font-weight:600;font-size:15px;margin-bottom:4px;font-family:ui-serif,Georgia,serif}
+.themes .sel i{border:2px solid var(--a-tint)}
+.themes .sel{color:var(--a-tint);font-weight:600}
+.sg{display:flex;background:var(--a-fill);border-radius:10px;padding:2px}
+.sg span{flex:1;text-align:center;padding:6px 0;border-radius:8px;font-size:12.5px;font-weight:500}
+.sg span.on{background:var(--a-card);box-shadow:0 1px 3px var(--a-shadow)}
+.sl{display:flex;align-items:center;gap:10px}
+.sl i{flex:1;height:5px;border-radius:3px;background:linear-gradient(90deg,var(--a-tint) 38%,var(--a-fill2) 38%);position:relative}
+.sl i::after{content:"";position:absolute;left:38%;top:-9px;width:30px;height:22px;margin-left:-15px;border-radius:11px;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.endc{position:absolute;left:14px;right:14px;bottom:76px;border-radius:22px;padding:14px;z-index:5;font-family:-apple-system,system-ui,sans-serif;color:var(--a-fg)}
+.endc .h{display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px}
+.endc .h .ic{color:var(--a-tint)}
+.btns{display:flex;gap:8px;margin:12px 0}
+.btn{height:36px;border-radius:18px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;background:var(--a-tint);color:var(--a-on-tint)}
+.btn.q{background:var(--a-fill);color:var(--a-fg)}
+.btn.w{width:100%;justify-content:center;height:46px;border-radius:23px;font-size:15px}
+.btn .ic{width:15px;height:15px}
+.next{display:flex;gap:10px;align-items:center}
+.next .th{width:42px;height:42px}
+/* forms */
+.grp{margin:0 16px 14px;border-radius:20px;background:var(--a-card);overflow:hidden}
+.grp div{display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13.5px;position:relative}
+.grp div+div::before{content:"";position:absolute;left:48px;right:0;top:0;border-top:.5px solid var(--a-line)}
+.grp .ib{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--a-tint);color:var(--a-on-tint);flex:none}
+.grp .ib .ic{width:15px;height:15px}
+.grp .v{margin-left:auto;color:var(--a-muted);display:flex;align-items:center;gap:3px;font-size:13px}
+.grp .v .ic{width:12px;height:12px}
+.grp .d{color:var(--a-err)}
+.gh{font-size:11.5px;color:var(--a-muted);padding:0 30px 5px;text-transform:uppercase;letter-spacing:.03em}
+.sw-t{margin-left:auto;width:42px;height:25px;border-radius:13px;background:var(--a-fill2);position:relative;flex:none}
+.sw-t::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw-t.on{background:#34A853;background:var(--a-tint)}
+.sw-t.on::after{left:19px}
+.field{height:46px;border-radius:14px;background:var(--a-card);display:flex;align-items:center;padding:0 14px;font-size:15px;color:var(--a-muted);border:1px solid var(--a-line)}
+.auth{padding:36px 22px 0;display:flex;flex-direction:column;gap:14px}
+.auth svg.mk{width:60px;height:60px;border-radius:14px;box-shadow:0 4px 14px var(--a-shadow)}
+.auth h4{font-family:"Outfit",system-ui,sans-serif;font-size:27px;font-weight:600;margin:6px 0 0;line-height:1.1}
+.auth p{margin:0;color:var(--a-muted);font-size:14px;max-width:none}
+.otp{display:flex;gap:6px}
+.otp span{flex:1;height:48px;border-radius:12px;border:1px solid var(--a-line);background:var(--a-card);display:grid;place-items:center;font-size:20px;font-weight:600}
+.otp span.f{border:2px solid var(--a-tint)}
+.lk{color:var(--a-tint);font-weight:500;font-size:13.5px;text-align:center}
+.kb{position:absolute;left:0;right:0;bottom:0;height:150px;background:var(--a-fill);border-top:.5px solid var(--a-line);padding:6px 8px;display:flex;flex-direction:column;gap:6px}
+.kb .ac{align-self:center;padding:5px 14px;font-size:12px;color:var(--a-muted)}
+.kb .ac b{color:var(--a-fg)}
+.kb .ks{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;flex:1}
+.kb .ks i{border-radius:6px;background:var(--a-card);display:grid;place-items:center;font-style:normal;font-size:16px}
+.srch{margin:2px 16px 10px;height:38px;border-radius:19px;background:var(--a-fill);display:flex;align-items:center;gap:7px;padding:0 12px;font-size:14px}
+.srch .ic{width:15px;height:15px;color:var(--a-muted)}
+.ban{margin:0 16px 10px;border-radius:16px;padding:10px 12px;display:flex;gap:10px;align-items:center;font-size:12.5px;background:var(--a-card)}
+.ban b{display:block}
+.ban.w{background:var(--a-warnc);color:var(--a-warn)}
+.ban.b{background:#1E6F8F;color:#F6F5F1}
+.ob{padding:10px 22px}
+.ob h4{font-family:"Outfit",system-ui,sans-serif;font-size:24px;font-weight:600;margin:0 0 14px}
+.ob div{display:flex;gap:12px;align-items:center;padding:8px 0;font-size:14px}
+.ob i{width:38px;height:38px;border-radius:50%;background:var(--a-fill);display:grid;place-items:center;color:var(--a-muted);flex:none}
+.ob i.done{background:var(--a-tint);color:var(--a-on-tint)}
+.ob .t{color:var(--a-tint);font-weight:500}
+/* iPad */
+.padw{overflow-x:auto;margin-block:14px}
+.pad{width:860px;height:560px;border-radius:30px;border:9px solid #0B0C0F;display:grid;grid-template-columns:200px 270px 1fr;position:relative;overflow:hidden}
+.pad.phone{box-shadow:0 18px 40px rgba(0,0,0,.22)}
+.pad .side{margin:10px 0 10px 10px;border-radius:22px;padding:14px 8px;z-index:2}
+.pad .side h6{font-size:20px;font-weight:700;margin:4px 10px 12px}
+.pad .side div{display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:12px;font-size:13.5px}
+.pad .side div.on{background:color-mix(in srgb,var(--a-tint) 18%,transparent);color:var(--a-tint);font-weight:600}
+.pad .side small{display:block;font-size:11px;font-weight:600;color:var(--a-muted);padding:14px 10px 4px}
+.pad .side em{margin-left:auto;font-style:normal;color:var(--a-muted);font-size:12px}
+.pad .mid{padding-top:14px;overflow:hidden;border-right:.5px solid var(--a-line)}
+.pad .mid .row.sel{background:var(--a-tc);border-radius:14px;margin:0 8px;padding:9px 8px}
+.pad .det{position:relative;overflow:hidden}
+.pad .det .rd{padding:74px 46px 0;font-size:15px}
+.pad .det .rprog{top:0}
+.pad .det .rnav{top:14px}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mk" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ffffff"/><path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c"/><polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"/><polygon points="69,27 83,33 69,39" fill="#f2c84b"/><circle cx="58" cy="32" r="4" fill="#ffffff"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><path d="M3.5 5h17v4h-17zM5 9v9.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M9.5 13h5"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V5A1.5 1.5 0 0 1 5 3.5h7.2a1.5 1.5 0 0 1 1 .4l7 7a1.5 1.5 0 0 1 0 2.2l-7.1 7.1a1.5 1.5 0 0 1-2.2 0l-7-7a1.5 1.5 0 0 1-.4-1z"/><circle cx="8" cy="8" r="1.1"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.5L6 20V5a1 1 0 0 1 1-1z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5l-7 7 7 7"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9.5 5l7 7-7 7"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3.5M8 7l4-4 4 4M7 11H5.500A1.5 1.5 0 0 0 4 12.5v6A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-6a1.5 1.5 0 0 0-1.5-1.500H17"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v15M3.5 7.5 7 4l3.5 3.5M17 20V5M13.5 16.5 17 20l3.5-3.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.500 4.500L19 7.500"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7.5 11l4.500 4.500 4.500-4.500M5 19.500h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.500 6.500h15M9.500 6.500v-2h5v2M6.500 6.500l1 13h9l1-13"/></symbol>
+  <symbol id="i-safari" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><path d="M15.500 8.500l-2 5-5 2 2-5z"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M19.500 12a7.500 7.500 0 1 1-2.200-5.300M19.500 4.500v4h-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.500 14.500A8 8 0 0 1 9.500 4.500a8 8 0 1 0 10 10z"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M14 4.500H6.500a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1H14M10.500 12h9M16.500 8.500l3.500 3.500-3.500 3.500"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.500a4 4 0 0 1-.500-8 5.500 5.500 0 0 1 10.700 1.300 3.400 3.400 0 0 1-.200 6.700zM4 4l16 16"/></symbol>
+</svg>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><svg viewBox="0 0 100 100"><use href="#mk"/></svg>Sroka for iOS</div>
+  <nav class="views" aria-label="Views"><a href="#plan" data-v="plan" aria-current="page">Build plan</a><a href="#ui" data-v="ui">UI design</a></nav>
+</div></header>
+
+<!-- ============================== PLAN ============================== -->
+<main id="plan" class="wrap view">
+<div class="hero">
+  <h1>Build plan: a native iOS client with full Android parity</h1>
+  <p>Handoff for the iOS team. The app is a second native client for the existing backend: same endpoints, same sync protocol, same local-first behaviour as <code>apps/android</code>. Every section points at the Android or server file that is the reference implementation, so you can read the behaviour instead of guessing it.</p>
+  <dl class="facts">
+    <div><dt>Backend changes required</dt><dd>None</dd></div>
+    <div><dt>Sign-in</dt><dd>Email, 6-digit code</dd></div>
+    <div><dt>Targets</dt><dd>App + Share Extension</dd></div>
+    <div><dt>Minimum OS</dt><dd>iOS / iPadOS 26</dd></div>
+    <div><dt>Parity baseline</dt><dd>Android 1.5.0</dd></div>
+  </dl>
+</div>
+<div class="toc" id="toc"></div>
+
+<section id="s-read"><h2>Read these first</h2>
+<p class="lede">The repo already documents the contract. This plan summarises it and adds the iOS decisions; where they disagree, the files below win.</p>
+<div class="tw"><table>
+<tr><th>File</th><th>What it gives you</th></tr>
+<tr><td><code>docs/api.md</code></td><td>The HTTP and sync contract. Sections to read in full: §2 auth, §4 item model, §5 endpoints, §7–8 sync and conflict rules, §10 content delivery, §13 URL normalisation, §14 rate limits.</td></tr>
+<tr><td><code>docs/decisions.md</code></td><td>Binding server rulings D1–D16. They override <code>docs/sroka-system-design.md</code>.</td></tr>
+<tr><td><code>apps/android/docs/DECISIONS.md</code></td><td>Android rulings A1–A12 (sync engine A8, content A9, reader A10, tests A12). Some details have drifted from the code; the code wins (see <a href="#plan" data-go="s-risk">pitfalls</a>).</td></tr>
+<tr><td><code>apps/android/docs/redesign/RULINGS.md</code></td><td>UI rulings R1–R17 behind the current Android look. HTML mock of 16 screens: <code>apps/android/docs/redesign/sroka-android.dc.html</code>.</td></tr>
+<tr><td><code>docs/sroka-system-design.md</code> §12.3, §10.3</td><td>The original iOS intent: SwiftUI, GRDB with FTS5, App Group shared with the Share Extension, BGTaskScheduler, Keychain access group, bundle id <code>app.sroka</code> and <code>app.sroka.share</code>.</td></tr>
+<tr><td><code>packages/shared/src</code></td><td>Source of truth for logic the client must mirror: <code>url.ts</code>, <code>ids.ts</code>, <code>hlc.ts</code>, <code>lww.ts</code>, <code>ops.ts</code>, <code>model.ts</code>, <code>limits.ts</code>, <code>vocab.ts</code>, each with a <code>*.test.ts</code> table of vectors.</td></tr>
+</table></div>
+<p>Path convention below: <code>apps/android/core/data/…/sync/SyncEngine.kt</code> means <code>apps/android/core/data/src/main/kotlin/app/sroka/core/data/sync/SyncEngine.kt</code>. The <code>…</code> always stands for <code>src/main/kotlin/app/sroka/&lt;module path&gt;</code>.</p>
+</section>
+
+<section id="s-scope"><h2>Scope and parity matrix</h2>
+<p class="lede">Everything Android 1.5.0 does, the iOS app does. The third column is the recommended native mechanism.</p>
+<div class="tw"><table>
+<tr><th>Feature</th><th>Android behaviour and reference</th><th>iOS implementation</th></tr>
+<tr><td>Sign in</td><td>Email, then 6-digit OTP, resend countdown, "Self-hosting?" server URL. <code>apps/android/feature/auth/impl/…/AuthScreen.kt</code>, <code>core/data/…/repository/AuthRepositoryImpl.kt</code></td><td>Same two steps. Code field uses <code>.textContentType(.oneTimeCode)</code> so iOS offers the code from Mail; this replaces Android's "Paste 123456" chip.</td></tr>
+<tr><td>Library: My List, Archive</td><td>Paged list from the local DB, sort (newest, oldest, shortest, longest), filters Favorites, Under 10 min, top 5 tags, AND-combined. <code>feature/library/impl/…/list/LibraryListScreen.kt</code></td><td><code>List</code> driven by GRDB <code>ValueObservation</code>. Destinations move to a tab bar; filters stay as a chip row. See the UI view.</td></tr>
+<tr><td>Row actions</td><td>Configurable swipe left/right (Archive, Favorite, Tags, None; default left = Archive, right = None), long-press sheet, Undo snackbar. <code>…/list/ItemActionsSheet.kt</code></td><td><code>.swipeActions</code> on both edges honouring the same two preferences, <code>.contextMenu</code> with preview, glass toast with Undo.</td></tr>
+<tr><td>Continue reading</td><td>Up to 10 unread items with progress between 5% and 95%, only on unfiltered My List.</td><td>Horizontal <code>ScrollView</code> section at the top of the list.</td></tr>
+<tr><td>Save a link</td><td>FAB opens "Add link or PDF", clipboard prefill, duplicate moves the item back to My List. <code>core/data/…/repository/LibraryRepositoryImpl.kt</code> <code>save()</code></td><td>Toolbar <code>+</code> opens a sheet. Detect a link with <code>UIPasteboard.general.hasURLs</code> (no prompt) and read it with <code>PasteButton</code>, so the paste permission alert never appears.</td></tr>
+<tr><td>Save from other apps</td><td><code>ShareActivity</code> bottom sheet: saved offline, Tags, Favorite, Open, auto-dismiss after 4 s; "Already saved" variant; PDF variant. <code>apps/android/app/…/ShareActivity.kt</code>, <code>feature/library/impl/…/save/SaveSheetHost.kt</code></td><td>Share Extension target with the same sheet in SwiftUI, writing to the shared database. Details in <a href="#plan" data-go="s-share">Share Extension</a>.</td></tr>
+<tr><td>Tags</td><td>Tag list with counts, rename, delete, tag editor with recent suggestions and "Create x". <code>…/tags/TagsScreen.kt</code>, <code>core/ui/…/tags/TagEditorSheet.kt</code></td><td>Tags tab; editor as a sheet with a token field and suggestion chips.</td></tr>
+<tr><td>Search</td><td>Local full-text only, works offline, scopes All / Archive / Favorites, highlighted snippets, "In title / In text" label. <code>core/database/…/FtsQuery.kt</code></td><td>SQLite FTS5 through GRDB, <code>.searchable</code> with scopes in a dedicated search tab.</td></tr>
+<tr><td>Reader (article)</td><td>WebView over the unzipped package, themes Auto/Light/Sepia/Dark, Sans/Serif, size 0.8–1.6, spacing, progress and anchor restore, end-of-article card, refresh, keep-awake. <code>feature/reader/impl/…/ReaderHtml.kt</code>, <code>…/ui/ArticleWebView.kt</code>, <code>…/ReaderViewModel.kt</code></td><td><code>WKWebView</code> with a custom URL scheme handler. Details in <a href="#plan" data-go="s-reader">Reader</a>.</td></tr>
+<tr><td>Reader (PDF)</td><td><code>PdfRenderer</code> pages, zoom, "Page N of M", share, open elsewhere. <code>…/ui/PdfViewer.kt</code></td><td>PDFKit <code>PDFView</code>; share through <code>ShareLink</code>.</td></tr>
+<tr><td>PDF upload</td><td>From the add dialog, share sheet or drop; 50 MiB cap; <code>%PDF-</code> sniff; first-page thumbnail upload. <code>core/data/…/upload/PdfUploadWorker.kt</code></td><td><code>.fileImporter</code>, background <code>URLSession</code> upload task from a file, thumbnail from <code>PDFPage.thumbnail</code> encoded as JPEG (the endpoint accepts JPEG; iOS has no built-in WebP encoder).</td></tr>
+<tr><td>Offline downloads</td><td>Policy Wi-Fi only / Any network / Manual, "Download all now", "Remove downloaded articles", 30-day eviction of old archived items. <code>core/data/…/content/ContentStoreImpl.kt</code></td><td>Same store on <code>URLSession</code>. Details in <a href="#plan" data-go="s-content">Offline content</a>.</td></tr>
+<tr><td>Sync</td><td>Outbox, push then pull, rebase, full resync on 410. <code>core/data/…/sync/SyncEngine.kt</code></td><td>Straight port as a Swift actor. Details in <a href="#plan" data-go="s-sync">Sync engine</a>.</td></tr>
+<tr><td>Import / export</td><td>Pocket, Instapaper, bookmarks HTML upload with progress; CSV or JSON export with Share and Save. <code>feature/settings/impl/…/ImportScreen.kt</code>, <code>ExportScreen.kt</code></td><td><code>.fileImporter</code>, <code>ShareLink</code>, <code>.fileExporter</code>. Progress in-app, plus a local notification when the import finishes.</td></tr>
+<tr><td>Settings</td><td>Theme, reader theme, text size, swipe actions, offline policy, server URL, privacy switches, sign out, delete account, version. <code>…/SettingsScreen.kt</code></td><td>Grouped <code>Form</code>. Same keys and defaults (<a href="#plan" data-go="s-prefs">table</a>).</td></tr>
+<tr><td>Consent and telemetry</td><td>Opt-in analytics prompt, crash reports on by default, enum-only events (D15). <code>apps/android/app/…/consent/ConsentPrompt.kt</code></td><td>Same prompt and events behind a <code>Telemetry</code> protocol. Provider is an <a href="#plan" data-go="s-open">open decision</a>.</td></tr>
+<tr><td>Wide screens</td><td>Navigation rail, list-detail two-pane, drag-and-drop of links. Tabletop fold posture.</td><td>iPad: <code>NavigationSplitView</code>, <code>.dropDestination(for: URL.self)</code>. The tabletop layout has no iOS counterpart and is dropped.</td></tr>
+</table></div>
+<h3>Not in scope (Android does not have them either)</h3>
+<p>Push notifications, widgets, highlights and notes, text-to-speech, Sign in with Apple or Google, passkeys, universal links, a Safari extension. D1 defers the server side of all of these. The Android <code>foss</code> flavor and Material You have no iOS equivalent and are not ported.</p>
+</section>
+
+<section id="s-server"><h2>Server contract</h2>
+<p class="lede">A native client is not specially registered anywhere. Android is admitted because it sends a bearer token and no <code>Origin</code> header; iOS works the same way from day one.</p>
+<div class="cols">
+<div>
+<h3>Hosts</h3>
+<ul>
+<li><code>https://api.sroka.app</code>: auth and <code>/v1</code>, bearer token. This is the app's default server.</li>
+<li><code>https://c.sroka.app</code>: signed content URLs only. Send no auth header there.</li>
+<li>Local: <code>npm run dev:setup</code> once, then <code>npm run dev -w @sroka/api</code> serves everything on <code>http://localhost:8787</code>. The Simulator reaches the Mac's localhost directly. Sign-in codes are printed in the wrangler log as <code>[sroka] OTP for &lt;email&gt;: &lt;code&gt;</code>.</li>
+</ul>
+<h3>Headers on every API call</h3>
+<ul>
+<li><code>Authorization: Bearer &lt;token&gt;</code></li>
+<li><code>X-Sroka-Device: ios_&lt;uuidv7&gt;</code>, generated once per install and kept across sign-out. It is the idempotency and tie-break identity.</li>
+<li><code>User-Agent: Sroka-iOS/&lt;version&gt;</code></li>
+</ul>
+</div>
+<div>
+<h3>Rules that bite</h3>
+<ul>
+<li><b>Never send an <code>Origin</code> header.</b> A request with <code>Origin: https://sroka.app</code> is treated as the web app and fails with <code>400 TURNSTILE_FAILED</code> (<code>workers/api/src/turnstile.ts</code>). <code>URLSession</code> sends none; do not call the API from inside <code>WKWebView</code>.</li>
+<li>The session token arrives in the <b><code>set-auth-token</code> response header</b> of the sign-in call. Store it verbatim; it contains <code>.</code> and may contain <code>=</code>.</li>
+<li>Sessions last 90 days, rolling. A <code>401</code> means "ask the user to sign in again", never "wipe data" (D4).</li>
+<li>Two error shapes: <code>/v1</code> returns <code>{error, message?}</code>; Better Auth returns <code>{code, message}</code>. Auth rate limits use the header <code>X-Retry-After</code>, <code>/v1</code> uses <code>Retry-After</code>. Parse both.</li>
+<li>Decode every enum-like field as a string with an unknown fallback. The server already returns codes that are missing from the shared enum (<code>length_required</code>, <code>storage_full</code>).</li>
+</ul>
+</div>
+</div>
+<h3>Endpoints the app calls</h3>
+<p>This is exactly the set Android uses (<code>apps/android/core/network/…/OkHttpSrokaApi.kt</code>, DTOs in <code>Dtos.kt</code> and <code>TransferDtos.kt</code>). All list, edit and tag changes go through sync ops, not REST.</p>
+<div class="tw"><table>
+<tr><th>Call</th><th>Use</th><th>Notes</th></tr>
+<tr><td><code>POST /api/auth/email-otp/send-verification-otp</code></td><td>Send code</td><td><code>{email, type:"sign-in"}</code>. Same response whether or not the account exists.</td></tr>
+<tr><td><code>POST /api/auth/sign-in/email-otp</code></td><td>Verify code</td><td><code>{email, otp}</code>. Errors <code>INVALID_OTP</code>, <code>OTP_EXPIRED</code>, <code>TOO_MANY_ATTEMPTS</code>; 429 with <code>X-Retry-After</code>.</td></tr>
+<tr><td><code>POST /api/auth/sign-out</code></td><td>Sign out</td><td>Best effort, 5 s timeout, then wipe locally.</td></tr>
+<tr><td><code>POST /v1/sync/push</code></td><td>Send queued ops</td><td><code>{deviceId, ops[≤500]}</code> returns <code>{applied, rejected, aliases, cursor}</code>.</td></tr>
+<tr><td><code>GET /v1/sync/pull</code></td><td>Receive changes</td><td><code>?cursor=&amp;limit=500[&amp;full=1]</code>; loop while <code>hasMore</code>; <code>410 resync_required</code>.</td></tr>
+<tr><td><code>GET /v1/items/{id}</code></td><td>Refresh polling</td><td>Only the reader's Refresh polls (every 4 s, up to 90 s).</td></tr>
+<tr><td><code>GET /v1/items/{id}/content</code></td><td>Signed URLs</td><td><code>{articleUrl, baseUrl, packageUrl, documentUrl?, expiresAt}</code>; <code>409 not_parsed</code>. URLs live 24 h.</td></tr>
+<tr><td><code>POST /v1/items/pdf</code></td><td>PDF upload</td><td>Raw bytes, <code>Content-Length</code> required, query <code>name</code>, <code>source</code>, <code>tag</code>. 413 over 50 MiB, 409 <code>storage_full</code>.</td></tr>
+<tr><td><code>PUT /v1/items/{id}/thumbnail</code></td><td>PDF first page</td><td><code>image/jpeg</code>, at most 512 KiB, about 480 px wide.</td></tr>
+<tr><td><code>GET /v1/me</code></td><td>Onboarding step state</td><td><code>clients.extension</code> ticks "Save from Chrome".</td></tr>
+<tr><td><code>DELETE /v1/account</code></td><td>Delete account</td><td><code>{"confirm":"DELETE"}</code>, then wipe locally.</td></tr>
+<tr><td><code>POST /v1/imports</code>, <code>GET /v1/imports/{id}</code></td><td>Import</td><td>Multipart <code>file</code> (≤20 MiB) and <code>format</code>: <code>pocket_csv</code>, <code>pocket_html</code>, <code>instapaper_csv</code>, <code>netscape_html</code>. 10 per day.</td></tr>
+<tr><td><code>GET /v1/exports?format=csv|json</code></td><td>Export</td><td>Stream to a file; name from <code>Content-Disposition</code>.</td></tr>
+<tr><td><code>GET /v1/config</code></td><td>Version gate</td><td>Public. Android declares it but does not call it. iOS should read <code>minVersions.ios</code> at launch and show an "Update Sroka" screen when below it.</td></tr>
+</table></div>
+<h3>Small server follow-ups (optional, one PR, about 20 lines)</h3>
+<ul>
+<li>Recognise the iOS client: add an <code>ios</code> kind for <code>User-Agent</code> prefix <code>Sroka-iOS/</code> in <code>workers/api/src/clients.ts</code> and <code>clients.ios</code> to <code>MeResponse</code> in <code>packages/shared/src/api.ts</code>. Web onboarding can then tick "Get the app".</li>
+<li>Before App Review: set the Worker secrets <code>REVIEW_EMAIL</code> and <code>REVIEW_OTP</code> in production (D4) so the reviewer can sign in with a fixed code. They are unset today.</li>
+<li>Later, if item links should open the app: an <code>apple-app-site-association</code> file and an <code>/i/{itemId}</code> route. Neither exists, and Android has no app links, so this is not part of parity.</li>
+</ul>
+</section>
+
+<section id="s-arch"><h2>Architecture</h2>
+<p class="lede">Mirror Android's layering (features see only domain protocols; data owns the engine) so that behaviour can be compared file by file. Keep third-party dependencies to three.</p>
+<div class="arch">
+  <div class="lane"><b>Targets</b><div class="boxes">
+    <div class="bx t"><b>Sroka</b>app, bundle <code>app.sroka</code>, iPhone and iPad</div>
+    <div class="bx t"><b>SrokaShare</b>Share Extension, <code>app.sroka.share</code></div>
+    <div class="bx"><b>group.app.sroka</b>App Group container: database, article files, preferences. Shared Keychain access group for the token.</div>
+  </div></div>
+  <div class="lane"><b>Features</b><div class="boxes">
+    <div class="bx"><b>AuthFeature</b>email and code screens</div>
+    <div class="bx"><b>LibraryFeature</b>list, tags, search, add, save sheet</div>
+    <div class="bx"><b>ReaderFeature</b>web reader, PDF, appearance</div>
+    <div class="bx"><b>SettingsFeature</b>settings, import, export</div>
+  </div></div>
+  <div class="lane"><b>Shared UI</b><div class="boxes">
+    <div class="bx"><b>SrokaDesign</b>colour assets, type, glass components, symbols, strings</div>
+  </div></div>
+  <div class="lane"><b>Engine</b><div class="boxes">
+    <div class="bx"><b>SrokaSync</b>outbox, <code>SyncEngine</code> actor, <code>LocalOpApplier</code>, schedulers</div>
+    <div class="bx"><b>SrokaContent</b>downloads, package installer, PDF upload, eviction</div>
+    <div class="bx"><b>SrokaDatabase</b>GRDB schema, migrations, FTS5, queries</div>
+    <div class="bx"><b>SrokaNetwork</b><code>URLSession</code> API client, DTOs, error model</div>
+  </div></div>
+  <div class="lane"><b>Core</b><div class="boxes">
+    <div class="bx"><b>SrokaCore</b>models, <code>UrlNormalizer</code>, <code>UUIDv7</code>, <code>tagKey</code>, <code>OpClock</code>, limits, vocabulary, <code>Telemetry</code> protocol, session and preference stores</div>
+  </div></div>
+</div>
+<div class="tw"><table>
+<tr><th>Concern</th><th>Choice</th><th>Why</th></tr>
+<tr><td>Location</td><td><code>apps/ios</code>, own Xcode project with local Swift packages, not an npm workspace</td><td>Same shape as <code>apps/android</code>. Add <code>apps/ios/CLAUDE.md</code>, <code>docs/DECISIONS.md</code> and <code>docs/LEDGER.md</code> like Android has, and one line in the root <code>AGENTS.md</code>.</td></tr>
+<tr><td>Language and UI</td><td>Swift 6 with strict concurrency, SwiftUI, Observation (<code>@Observable</code> view models)</td><td>UIKit only where SwiftUI has no equivalent: <code>WKWebView</code>, <code>PDFView</code>, the Share Extension host controller.</td></tr>
+<tr><td>Database</td><td><b>GRDB</b> <code>DatabasePool</code> in the App Group container, FTS5</td><td>The design doc already picks it. The app needs raw SQL, FTS, explicit transactions and a file shared between two processes; SwiftData gives none of these cleanly.</td></tr>
+<tr><td>Networking</td><td><code>URLSession</code> with <code>Codable</code>, hand-written client</td><td>Matches Android's hand-written OkHttp client. Three sessions: API (15 s connect, 30 s read), foreground downloads (120 s), and a background session for packages and uploads.</td></tr>
+<tr><td>Zip</td><td><b>ZIPFoundation</b></td><td>Foundation has no zip reader. The installer must enforce entry limits and path checks itself.</td></tr>
+<tr><td>Telemetry</td><td><b>Firebase</b> Analytics and Crashlytics, or none (<a href="#plan" data-go="s-open">decision I2</a>)</td><td>Behind the <code>Telemetry</code> protocol either way, so debug builds and tests use a no-op.</td></tr>
+<tr><td>Dependency injection</td><td>Plain initialiser injection from one composition root per target</td><td>The extension builds a much smaller graph than the app; a container framework adds launch time there.</td></tr>
+<tr><td>Navigation</td><td><code>TabView</code> on iPhone, <code>NavigationSplitView</code> on iPad, session-driven root</td><td>Signed out shows only the auth flow, like <code>apps/android/app/…/navigation/SrokaNavHost.kt</code>.</td></tr>
+</table></div>
+</section>
+
+<section id="s-data"><h2>Local database</h2>
+<p class="lede">Port the Room schema one to one. The UI reads only the database; the network never feeds a screen directly.</p>
+<p>Reference: <code>apps/android/core/database/…/entity/Entities.kt</code>, <code>…/dao/ItemDao.kt</code>, <code>…/Migrations.kt</code>, exported schemas under <code>apps/android/core/database/schemas</code> (currently version 3).</p>
+<div class="tw"><table>
+<tr><th>Table</th><th>Columns that matter</th><th>Notes</th></tr>
+<tr><td><code>items</code></td><td>All wire fields from <code>packages/shared/src/model.ts</code> in snake_case, plus <code>server_seq</code> (null until seen from the server), <code>fts_rowid</code> (unique), <code>resync_mark</code>, <code>kind</code>, <code>file_name</code>, <code>file_size</code></td><td>Indexes: (<code>status</code>, <code>saved_at</code>, <code>id</code>), (<code>is_favorite</code>, <code>saved_at</code>, <code>id</code>), <code>saved_at</code>, <code>canonical_url</code>.</td></tr>
+<tr><td><code>item_tags</code></td><td><code>item_id</code>, <code>name_key</code> (PK pair), <code>name</code></td><td>Cascade delete from items. Declare <code>ON UPDATE CASCADE</code> on iOS; Android lacks it and has to copy rows when an item is re-keyed.</td></tr>
+<tr><td><code>tags</code></td><td><code>id</code>, <code>name</code>, unique <code>name_key</code></td><td>Mirror of server tag rows.</td></tr>
+<tr><td><code>items_fts</code></td><td><code>title</code>, <code>excerpt</code>, <code>site_name</code>, <code>tags</code>, <code>body</code></td><td>FTS5, <code>unicode61 remove_diacritics 2</code>, rowid = <code>items.fts_rowid</code>. <code>body</code> is filled when a package is installed.</td></tr>
+<tr><td><code>pending_ops</code></td><td><code>local_seq</code> autoincrement, unique <code>op_id</code>, <code>item_id?</code>, <code>type</code>, <code>payload</code>, <code>created_at</code>, <code>attempts</code>, <code>last_error</code></td><td>The outbox. <code>payload</code> is the exact wire JSON.</td></tr>
+<tr><td><code>sync_state</code></td><td>single row: <code>cursor</code>, <code>last_success_at</code>, <code>last_error</code>, <code>full_resync</code></td><td></td></tr>
+<tr><td><code>content_files</code></td><td><code>item_id</code>, <code>content_id</code>, <code>state</code> (queued, downloading, downloaded, failed), <code>bytes</code>, <code>attempts</code>, <code>error</code>, <code>downloaded_at</code>, <code>thumb_path</code>, <code>thumb_attempts</code></td><td>Derived offline state: no <code>content_id</code> is "none"; no row or a different <code>content_id</code> is "available remotely".</td></tr>
+</table></div>
+<h3>iOS specifics</h3>
+<ul>
+<li><b>Two processes share the file.</b> Follow GRDB's guide for App Group databases: WAL mode with a persistent WAL, <code>NSFileCoordinator</code> only around creation and migration, and <code>observesSuspensionNotification</code> so the app is not killed with exception <code>0xDEAD10CC</code> for holding a lock while suspended. The extension opens the pool only after migrations are known to be current, otherwise it shows "Open Sroka to finish updating".</li>
+<li><b>Migrations are never destructive.</b> When a release starts reading a new server field, the migration also sets <code>sync_state.cursor = 0</code> so every row is pulled again. Android needed two migrations to get this right.</li>
+<li><b>Search query.</b> Each run of letters or digits becomes a quoted prefix term in FTS5 form <code>"term"*</code>, joined with AND; at most 8 terms of 64 characters. Android writes <code>"term*"</code> because it is on FTS4. FTS5 has no <code>offsets()</code>; derive "In title / In text" from a column filter (<code>{title}: …</code>) or from <code>highlight()</code> on the title column.</li>
+<li>List queries use <code>ValueObservation</code> with keyset paging. Port the query-plan test (<code>ListPlanTest</code> on Android) that asserts the sort indexes are used.</li>
+</ul>
+</section>
+
+<section id="s-sync"><h2>Sync engine</h2>
+<p class="lede">The largest piece of logic and the one where a faithful port matters most. One actor, single-flight, shared with the local wipe so the two never interleave.</p>
+<p>Reference: <code>apps/android/core/data/…/sync/SyncEngine.kt</code>, <code>…/ops/OpWriter.kt</code>, <code>…/ops/LocalOpApplier.kt</code>, <code>…/ops/WireOp.kt</code>, ruling A8, and <code>docs/api.md</code> §7–8. Server-side rules: <code>packages/shared/src/ops.ts</code>, <code>lww.ts</code>, <code>hlc.ts</code>.</p>
+<h3>Writes</h3>
+<p>Every user action is one database transaction: apply the change to the local rows and the FTS row, insert a <code>pending_ops</code> row, then request a sync debounced by 2 s. Ten op types exist: <code>item.add</code>, <code>item.setStatus</code>, <code>item.setFavorite</code>, <code>item.setProgress</code>, <code>item.tag</code>, <code>item.setTitle</code>, <code>item.delete</code>, <code>item.refresh</code>, <code>tag.rename</code>, <code>tag.delete</code>. Each carries a UUIDv7 <code>opId</code> and <code>at</code> from <code>OpClock</code> (<code>max(now, last + 1)</code>, strictly increasing per device). On enqueue, older unsent ops of the same item and type are deleted for <code>setProgress</code>, <code>setStatus</code>, <code>setFavorite</code> and <code>setTitle</code> only.</p>
+<h3>One sync pass</h3>
+<ol class="steps">
+<li><b>Push</b> in batches of up to 500 ordered by <code>local_seq</code>. In one transaction: delete applied and rejected ops; for a rejection <code>item_deleted</code> where an <code>item.add</code> is still queued, re-key the item to a fresh UUIDv7 with fresh op ids and keep the ops (the user re-saved a URL the server had tombstoned); for other <code>item_deleted</code>, delete the item, its ops and its files; for each <code>aliases[clientId] = existingId</code>, re-target queued ops and merge or re-key the local row.</li>
+<li>If the cursor is 0, mark the pass as a full resync so every pull page sends <code>full=1</code>.</li>
+<li><b>Pull</b> pages of 500 until <code>hasMore</code> is false. Each page is one transaction: upsert items and replace their tags, apply <code>deleted.items</code> and <code>deleted.tags</code>, then <b>rebase</b>: re-apply still-queued ops for the touched items and all tag-level ops through <code>LocalOpApplier</code>, so unsent local changes stay visible. Save the cursor. Delete files of removed items after commit.</li>
+<li>On <code>410 resync_required</code> (once per pass): mark every item, set the cursor to 0, push again, pull from 0 with <code>full=1</code>, then delete items still marked that have no pending ops.</li>
+<li>After success: queue automatic downloads by policy and run eviction.</li>
+</ol>
+<h3>Outcomes</h3>
+<ul>
+<li><code>401</code>: mark the session expired, keep all data, stop. Network failure: silent, retry later. Anything else: record <code>http_N</code> on the ops and retry with exponential backoff from 30 s, at most 5 attempts per trigger. The engine itself does not loop; on Android WorkManager retries, on iOS the scheduler must.</li>
+<li>Status shown in the list, one card at a time, by priority: session expired, resyncing, offline (with the count of queued changes), downloading.</li>
+</ul>
+<h3>Triggers on iOS</h3>
+<ul>
+<li>Scene becomes active; any local write (2 s debounce); pull to refresh; Refresh polling in the reader; PDF upload or import finished.</li>
+<li><code>BGAppRefreshTask</code> stands in for Android's hourly job. iOS decides when it runs, so never rely on it for correctness.</li>
+<li>The Share Extension does one push with a short timeout after its write (see below).</li>
+</ul>
+<div class="note"><b>Keep payload JSON canonical.</b> Alias and re-key handling on Android rewrite <code>"itemId":"…"</code> inside stored payloads by string replacement, which only works because the JSON is compact. In Swift, either store payloads with a fixed encoder configuration and re-encode on rewrite, or keep the op fields as columns. Do not copy the string replace.</div>
+</section>
+
+<section id="s-content"><h2>Offline content</h2>
+<p class="lede">An article is a zip per content version. Download, verify, unpack atomically, index the text.</p>
+<p>Reference: <code>apps/android/core/data/…/content/ContentStoreImpl.kt</code>, <code>PackageInstaller.kt</code>, <code>HtmlText.kt</code>, <code>…/sync/ContentDownloadWorker.kt</code>, ruling A9, <code>docs/api.md</code> §10.</p>
+<ol class="steps">
+<li><b>Eligible:</b> has a <code>content_id</code>, is unread or favorite, and its <code>content_files</code> row is missing, stale, queued, or failed fewer than 5 times. Newest first, 3 at a time.</li>
+<li><code>GET /v1/items/{id}/content</code>. <code>409</code> means not parsed yet (not an attempt). Require 100 MiB free, otherwise stop the batch with "device storage is full" (also not an attempt).</li>
+<li>Download <code>packageUrl</code> with no auth header; abort above 50 MiB.</li>
+<li><b>Install safely:</b> reject absolute paths, <code>..</code>, <code>\</code>, <code>:</code>, NUL, names over 512 characters and case-insensitive duplicates; at most 200 entries and 50 MiB unpacked; <code>manifest.json</code> must list <code>article.html</code>; verify every file's SHA-256; unpack into <code>articles/{id}.tmp</code> and swap into place by rename.</li>
+<li>Extract plain text from <code>article.html</code> (drop script, style, head, template, noscript and comments; strip tags; decode entities; cap at 300,000 characters) into the FTS <code>body</code>.</li>
+<li>Commit the row as downloaded in one transaction that re-checks the item still exists and that "Remove downloaded articles" did not run meanwhile.</li>
+<li>If <code>lead_image_key</code> is set, fetch <code>baseUrl/key</code> (up to 5 MiB) to <code>thumbs/{id}.webp</code>; retried separately, 3 attempts. iOS decodes WebP natively.</li>
+</ol>
+<ul>
+<li><b>PDF items:</b> fetch <code>documentUrl</code> (up to 50 MiB), check <code>%PDF-</code> in the first kilobyte, store as <code>articles/{id}/document.pdf</code>. If the signed URL answers 401, 403, 404 or 410, fetch fresh URLs once.</li>
+<li><b>Layout</b> in the App Group container: <code>articles/{id}/</code>, <code>thumbs/{id}.webp</code>, <code>pdf-uploads/</code>, with <code>isExcludedFromBackup</code> set on all three. Item ids become file names and reader URLs, so validate them against <code>^[A-Za-z0-9_-]{1,64}$</code>.</li>
+<li><b>Policy:</b> Wi-Fi only maps to <code>allowsExpensiveNetworkAccess = false</code> on the session configuration; Any network is the default configuration; Manual queues nothing automatically. A user-initiated Fetch ignores Wi-Fi only, as on Android.</li>
+<li><b>Eviction</b> after each successful sync: archived, non-favorite items archived more than 30 days ago that were neither downloaded nor read in the last 30 days. The FTS body is kept.</li>
+<li><b>Recovery</b> once per launch: rows stuck in "downloading" go back to queued; rows marked downloaded whose files are missing are dropped.</li>
+</ul>
+</section>
+
+<section id="s-reader"><h2>Reader</h2>
+<p class="lede">Same HTML wrapper, same CSS variables, same progress model as Android and the web, so an article looks and resumes identically on every device.</p>
+<p>Reference: <code>apps/android/feature/reader/impl/…/ReaderHtml.kt</code> (wrapper, theme CSS, post-card CSS, reader script), <code>…/ui/ArticleWebView.kt</code>, <code>…/ReaderViewModel.kt</code>, <code>…/ReaderReasons.kt</code>, <code>…/ui/EndOfArticleCard.kt</code>, ruling A10. Web copy of the same CSS: <code>apps/web/src/lib/reader.ts</code>.</p>
+<ul>
+<li><b>Loading.</b> Register a <code>WKURLSchemeHandler</code> for <code>sroka-article://{itemId}/</code> that serves files from <code>articles/{itemId}/</code> and nothing else. Load the wrapped HTML with that base URL so relative <code>img/…</code> paths resolve. This replaces Android's <code>WebViewAssetLoader</code>.</li>
+<li><b>Lock it down.</b> A <code>WKContentRuleList</code> that blocks every <code>http</code> and <code>https</code> load; <code>allowsContentJavaScript = false</code> for page content; the reader script injected as a <code>WKUserScript</code> in its own <code>WKContentWorld</code>, with the progress <code>WKScriptMessageHandler</code> registered only in that world. Article HTML is already sanitised server-side; this keeps the second line of defence that Android has.</li>
+<li><b>Links.</b> Cancel navigation in <code>decidePolicyFor</code>; open <code>http(s)</code> targets in <code>SFSafariViewController</code>; ignore every other scheme.</li>
+<li><b>Appearance.</b> Theme Auto / Light / Sepia / Dark, font Sans / Serif, scale 0.8 to 1.6 in 9 steps over an 18 px base, spacing 1.45 / 1.65 / 1.9, column capped at 42 em. Apply changes by updating CSS variables through <code>evaluateJavaScript</code>, without a reload. Font stacks on iOS: <code>system-ui</code> (San Francisco) and <code>ui-serif</code> (New York). Dark theme dims images as on Android.</li>
+<li><b>Progress.</b> <code>progress = scrollTop / (scrollHeight − clientHeight)</code>, clamped to 0…1. <code>anchor</code> is the index of the first element at or below the viewport top among <code>p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,figure</code> (<code>PROGRESS_ANCHOR_SELECTOR</code> in <code>packages/shared/src/limits.ts</code>). Report every 150 ms while scrolling; write locally at most every 2 s, 1 s after scrolling stops, and on leave. Restore by anchor, falling back to progress. Opening an article updates <code>last_read_at</code> and so queues one <code>item.setProgress</code> even without scrolling. Above 2% show "Resumed at N%" with "Start over".</li>
+<li><b>States.</b> Downloading; "Not saved for offline reading"; "Preparing article"; "Couldn't save the text" with a plain reason and "Try again" / "Open original"; web content process terminated (<code>webViewWebContentProcessDidTerminate</code>). Reason strings come from <code>packages/shared/src/vocab.ts</code> <code>failureReason()</code>; never show the raw code.</li>
+<li><b>Keep awake</b> while reading with <code>isIdleTimerDisabled</code>, released after 5 minutes without interaction.</li>
+<li><b>Posts and threads.</b> X posts and Reddit / Hacker News threads arrive as <code>sr-*</code> classes (D11, D13). Copy <code>POST_CARD_CSS</code> unchanged.</li>
+<li><b>PDF.</b> <code>PDFView</code>, continuous vertical. Progress is <code>(page + 1) / pageCount</code> with the page index as anchor, written on each page change.</li>
+</ul>
+</section>
+
+<section id="s-share"><h2>Share Extension and the save path</h2>
+<p class="lede">The most iOS-specific part: a separate process with about 120 MB of memory and a few seconds of life.</p>
+<p>Reference for behaviour: <code>apps/android/feature/library/impl/…/save/SaveSheetViewModel.kt</code>, <code>SaveSheetHost.kt</code>, and <code>UrlNormalizer.extractFirstUrl</code> in <code>apps/android/core/model/…/UrlNormalizer.kt</code>.</p>
+<ol class="steps">
+<li>Activation rule accepts web URLs, plain text and PDF files. Take the URL attachment first, then the first <code>http(s)</code> URL found in shared text (trailing punctuation and unbalanced closing brackets stripped). No URL shows "No link found in what you shared".</li>
+<li>Read the token from the shared Keychain group. Signed out shows "Sign in to Sroka to save articles".</li>
+<li>Normalise the URL, look up <code>canonical_url</code>. A new item gets a UUIDv7 id, <code>parse_status = pending</code>, <code>saved_at = now</code>; an existing one is moved back to My List. Queue <code>item.add</code> with <code>onDuplicate: "readd"</code>. One transaction. This works offline.</li>
+<li>Show the sheet at once: "Saved" (or "Already saved" with reading progress), the item card, Tags, Favorite, Open. It dismisses itself after 4 s unless touched.</li>
+<li>Fire one <code>POST /v1/sync/push</code> with a short timeout. If it fails, the app pushes on its next activation.</li>
+<li>PDF: copy the file into <code>pdf-uploads/</code> in the container and hand the upload to a background <code>URLSession</code> with the shared container identifier, then show "Adding PDF to Sroka".</li>
+</ol>
+<ul>
+<li>Link only <code>SrokaCore</code>, <code>SrokaDatabase</code> and a minimal push client into the extension. No reader, no Firebase, no download code.</li>
+<li>"Open" uses a private URL scheme (<code>sroka://item/{id}</code>) handled by the app, the counterpart of Android's <code>EXTRA_OPEN_ITEM_ID</code>.</li>
+<li>After the app returns to the foreground it must re-read state the extension may have changed; database observation covers the list, and the sync trigger on activation covers the push.</li>
+</ul>
+</section>
+
+<section id="s-bg"><h2>Background work</h2>
+<p class="lede">Android leans on WorkManager and foreground services. iOS gives less, so foreground paths must be complete on their own and background paths are a bonus.</p>
+<div class="tw"><table>
+<tr><th>Android job</th><th>Reference</th><th>iOS equivalent</th></tr>
+<tr><td>Sync after a write, on foreground</td><td><code>core/data/…/sync/WorkScheduler.kt</code>, <code>SyncWorker.kt</code></td><td>In-process task with a 2 s debounce, wrapped in <code>beginBackgroundTask</code> so a write made just before backgrounding still pushes.</td></tr>
+<tr><td>Hourly periodic sync</td><td><code>sroka-sync-periodic</code></td><td><code>BGAppRefreshTask</code> (<code>app.sroka.refresh</code>), rescheduled on every run. Best effort.</td></tr>
+<tr><td>Automatic package downloads</td><td><code>ContentDownloadWorker.kt</code></td><td>Background <code>URLSession</code> download tasks, which continue while the app is suspended; a <code>BGProcessingTask</code> (<code>app.sroka.download</code>, network required) to install and index what arrived.</td></tr>
+<tr><td>"Fetch" and "Download all now" with a progress notification</td><td><code>sroka-fetch</code>, foreground service</td><td>Runs in the foreground with the in-list progress card. To let it finish after the user leaves, use <code>BGContinuedProcessingTask</code> (iOS 26), which shows system progress for user-started work.</td></tr>
+<tr><td>Single article download from the reader</td><td><code>sroka-download-item-{id}</code></td><td>Foreground <code>URLSession</code> task tied to the screen.</td></tr>
+<tr><td>PDF upload with retries</td><td><code>upload/PdfUploadWorker.kt</code></td><td>Background <code>URLSession</code> upload task from a file. Permanent errors: 413, 415, 409 <code>storage_full</code>, other 4xx. Transient: 401 (expire session), 408, 429, 5xx, network.</td></tr>
+<tr><td>Import progress polling in a notification</td><td><code>transfer/ImportProgressWorker.kt</code></td><td>Poll every 3 s while the screen or app is active; resume polling on next launch from the stored job id; one local notification on completion if the user allowed notifications (ask when the import starts).</td></tr>
+</table></div>
+<p>Everything is cancelled on sign-out. Background task identifiers go in <code>BGTaskSchedulerPermittedIdentifiers</code>; enable the "Background fetch" and "Background processing" modes.</p>
+</section>
+
+<section id="s-auth"><h2>Session, sign-out and account deletion</h2>
+<p>Reference: <code>apps/android/core/datastore/…/SessionStore.kt</code>, <code>core/data/…/repository/AuthRepositoryImpl.kt</code>, <code>LocalDataWiper.kt</code>, <code>SettingsRepositoryImpl.kt</code>.</p>
+<ul>
+<li><b>Token</b> in the Keychain, shared access group, accessibility <code>AfterFirstUnlockThisDeviceOnly</code> (background tasks need it while locked; it never leaves the device or enters a backup).</li>
+<li><b>States:</b> signed out, signed in (email), expired (email). Expired keeps the library readable and shows "Sign in again to sync".</li>
+<li><b>Account marker.</b> Keep the last signed-in email and server outside the Keychain. On sign-in, wipe local data first if the email or server differs, or if data exists with no recorded owner. This is what stops one account's library appearing under another after a restore.</li>
+<li><b>Sign-out:</b> server call with a 5 s timeout, then wipe: cancel all work, clear every table inside the sync actor, delete <code>articles</code>, <code>thumbs</code>, <code>pdf-uploads</code>, temporary downloads and exports, checkpoint and vacuum, clear the token. The device id and preferences stay.</li>
+<li><b>Delete account</b> (App Review requires it in-app; it exists): dialog where the user types their email, <code>DELETE /v1/account</code>, then the same wipe.</li>
+<li><b>Custom server.</b> Must be <code>https</code>; <code>http</code> only for <code>localhost</code> and <code>127.0.0.1</code> (add <code>NSAllowsLocalNetworking</code> to App Transport Security for that). No query, fragment or credentials. Changing it while signed in signs out and wipes, so a token is never sent to a different server.</li>
+<li><b>Email validation:</b> <code>^[^\s@]+@[^\s@]+\.[^\s@]+$</code>, at most 254 characters. Strip whitespace from the code before sending.</li>
+</ul>
+</section>
+
+<section id="s-prefs"><h2>Preferences</h2>
+<p>Stored in <code>UserDefaults(suiteName: "group.app.sroka")</code> so the extension can read the theme. Per device, not synced. Reference: <code>apps/android/core/datastore/…/UserPreferencesDataSource.kt</code>, <code>ConsentStore.kt</code>. Unknown stored enum values fall back to the default.</p>
+<div class="tw"><table>
+<tr><th>Key</th><th>Values</th><th>Default</th></tr>
+<tr><td><code>theme_mode</code></td><td>system, light, dark</td><td>system</td></tr>
+<tr><td><code>reader_theme</code></td><td>auto, light, sepia, dark</td><td>auto</td></tr>
+<tr><td><code>reader_text_scale</code></td><td>0.8 … 1.6</td><td>1.0</td></tr>
+<tr><td><code>reader_font</code></td><td>sans, serif</td><td>sans</td></tr>
+<tr><td><code>reader_line_spacing</code></td><td>tight, normal, loose</td><td>normal</td></tr>
+<tr><td><code>sort_order</code></td><td>newest, oldest, shortest, longest</td><td>newest</td></tr>
+<tr><td><code>swipe_left_action</code> / <code>swipe_right_action</code></td><td>archive, favorite, tags, none</td><td>archive / none</td></tr>
+<tr><td><code>swipe_hint_shown</code></td><td>bool</td><td>false</td></tr>
+<tr><td><code>download_policy</code></td><td>wifi_only, any_network, manual</td><td>wifi_only</td></tr>
+<tr><td><code>server_url</code></td><td>string or absent</td><td>absent (build default)</td></tr>
+<tr><td><code>consent_analytics</code></td><td>true, false, absent (not asked, treated as off)</td><td>absent</td></tr>
+<tr><td><code>consent_crash_reports</code></td><td>bool</td><td>true</td></tr>
+</table></div>
+<p>Android's <code>dynamic_color</code> key is not ported.</p>
+</section>
+
+<section id="s-privacy"><h2>Telemetry, consent and privacy</h2>
+<p>D15 in <code>docs/decisions.md</code> is binding for every client. Reference: <code>apps/android/core/domain/…/Telemetry.kt</code>, <code>core/data/…/telemetry/TelemetryDecorators.kt</code>, <code>apps/android/app/src/play/kotlin/app/sroka/telemetry/FirebaseTelemetry.kt</code>.</p>
+<ul>
+<li>Analytics is off until the user accepts the first-run prompt ("Help improve Sroka?", "Allow" / "No thanks", link to <code>https://sroka.app/privacy</code>). Crash reports are on by default with a switch in Settings.</li>
+<li>Events, parameters as enums only: <code>screen_view</code>, <code>login {method: email_otp}</code>, <code>save_item {source, kind}</code>, <code>open_item {kind}</code>, <code>archive_item</code>, <code>unarchive_item</code>, <code>favorite_item {on}</code>, <code>delete_item</code>, <code>add_tag</code>, <code>search_used</code>, <code>import_start {source}</code>, <code>export {format}</code>.</li>
+<li>Never send URLs, domains, titles, search text, tag names, file names, email, user id or the server URL. No user id is set on the SDK.</li>
+<li>Emit events from decorators around the repositories, as Android does, so views stay free of telemetry calls.</li>
+<li>No advertising identifier and no tracking, so no App Tracking Transparency prompt. Ship a <code>PrivacyInfo.xcprivacy</code> manifest and fill the App Privacy answers from the same list.</li>
+<li>Debug builds send nothing.</li>
+</ul>
+</section>
+
+<section id="s-port"><h2>Logic to port, with test vectors</h2>
+<p class="lede">These must behave byte-for-byte like the TypeScript, because the server recomputes them. Port the test tables first, then the code.</p>
+<div class="tw"><table>
+<tr><th>Swift unit</th><th>Source of truth</th><th>Vectors</th><th>Watch for</th></tr>
+<tr><td><code>UrlNormalizer</code> (<code>normalize</code>, <code>urlHash</code>, <code>displayDomain</code>, <code>extractFirstUrl</code>, <code>isHttpUrl</code>)</td><td><code>packages/shared/src/url.ts</code>, <code>docs/api.md</code> §13; Kotlin port <code>apps/android/core/model/…/UrlNormalizer.kt</code></td><td><code>packages/shared/src/url.test.ts</code>, mirrored in Android's <code>UrlNormalizerTest.kt</code></td><td>The server uses the WHATWG URL parser. Foundation's <code>URL</code> and <code>URLComponents</code> differ on percent-encoding, IDN to punycode, and query re-serialisation (space becomes <code>+</code>). Write the normaliser by hand as Android did. Tracking parameters are dropped; <code>www.</code>, <code>http</code> and trailing slashes are kept.</td></tr>
+<tr><td><code>UUIDv7</code></td><td><code>packages/shared/src/ids.ts</code>; <code>apps/android/core/model/…/UuidV7.kt</code></td><td><code>ids.test.ts</code></td><td>Monotonic within a millisecond and when the clock moves backwards. Lower-case string.</td></tr>
+<tr><td><code>normalizeTagName</code>, <code>tagKey</code></td><td><code>packages/shared/src/model.ts</code>; <code>apps/android/core/model/…/Tags.kt</code></td><td><code>contract.test.ts</code></td><td>NFC, trim, collapse whitespace, then locale-independent lower-casing. Use <code>lowercased()</code>, never the user's locale. 1 to 64 characters, 100 tags per item.</td></tr>
+<tr><td><code>OpClock</code></td><td><code>packages/shared/src/hlc.ts</code></td><td></td><td>Persist the last value so it survives restarts.</td></tr>
+<tr><td>Wire ops and DTOs</td><td><code>packages/shared/src/ops.ts</code>, <code>api.ts</code>, <code>model.ts</code>; <code>apps/android/core/network/…/Dtos.kt</code></td><td><code>ops.test.ts</code></td><td>Omit nil fields rather than sending <code>null</code>; ignore unknown keys.</td></tr>
+<tr><td><code>LocalOpApplier</code></td><td><code>apps/android/core/data/…/ops/LocalOpApplier.kt</code>, rules in <code>lww.ts</code></td><td>Android's applier and engine tests under <code>apps/android/core/data/src/test</code></td><td><code>add</code> on an existing item resets it to unread, clears <code>archived_at</code>, takes the later <code>saved_at</code> and unions tags.</td></tr>
+<tr><td>Vocabulary and failure reasons</td><td><code>packages/shared/src/vocab.ts</code></td><td><code>vocab.test.ts</code></td><td>Copy strings exactly into the String Catalog; Android mirrors them in <code>strings.xml</code>.</td></tr>
+<tr><td>Limits</td><td><code>packages/shared/src/limits.ts</code></td><td></td><td>URL 4096, title 1000, tag 64, 500 ops per push.</td></tr>
+</table></div>
+<p>Worth doing in the first week: export the URL and tag tables from the TypeScript tests to one JSON fixture that the Swift, Kotlin and TypeScript tests all read. Today each platform keeps its own copy.</p>
+</section>
+
+<section id="s-test"><h2>Testing and CI</h2>
+<div class="cols">
+<div>
+<h3>Unit (Swift Testing)</h3>
+<ul>
+<li>Core ports against the shared vectors.</li>
+<li>Op building and coalescing.</li>
+<li><code>SyncEngine</code> against a stubbed <code>URLProtocol</code> and an in-memory GRDB queue: push, each rejection reason, aliases, rebase, 410 resync, 401. Android's cases are the checklist (A12).</li>
+<li>Package installer: every path attack, entry and size limits, SHA mismatch, interrupted swap.</li>
+<li>Migrations from every released schema; query plans for list sorts.</li>
+<li>View models with fake repositories, one fake per domain protocol as in <code>apps/android/core/testing</code>.</li>
+</ul>
+</div>
+<div>
+<h3>UI and end to end</h3>
+<ul>
+<li>Snapshot tests of stateless screen content with fixed fixtures, light and dark, iPhone and iPad, large Dynamic Type. Same idea as Android's <code>…Content</code> composables (<code>apps/android/docs/SCREENSHOT_TESTING.md</code>).</li>
+<li>XCUITest journeys against the local stack: sign in with the OTP read from the wrangler log, save, sync, read offline, archive, search, sign out. <code>scripts/e2e-local.sh</code> shows how the stack is driven.</li>
+<li>Manual device pass for what the Simulator cannot prove: Share Extension from Safari and other apps, background downloads, low-storage and Low Data Mode behaviour.</li>
+</ul>
+<h3>CI</h3>
+<ul>
+<li>Build and unit tests per package on every PR; snapshots when UI packages change; journeys nightly.</li>
+<li>A release preflight like <code>scripts/release-preflight.sh</code>: fail if the archive contains a placeholder Firebase config or is not distribution-signed. Android shipped two releases with a placeholder config before that check existed.</li>
+</ul>
+</div>
+</div>
+</section>
+
+<section id="s-plan"><h2>Milestones</h2>
+<p class="lede">Estimate for three iOS engineers; it is a planning figure, not a commitment. Streams A, B and C run in parallel once the foundation lands, because the protocol and schema are already fixed by the server and by Android.</p>
+<div class="gantt" aria-label="Milestone chart by week">
+  <div class="gr"><span></span><div class="track"><i class="wk">1</i><i class="wk">2</i><i class="wk">3</i><i class="wk">4</i><i class="wk">5</i><i class="wk">6</i><i class="wk">7</i><i class="wk">8</i><i class="wk">9</i><i class="wk">10</i><i class="wk">11</i></div></div>
+  <div class="gr"><span>M0 Foundation</span><div class="track" data-on="1-1"></div></div>
+  <div class="gr"><span>M1 Auth, database, sync</span><div class="track" data-on="2-4"></div></div>
+  <div class="gr"><span>M2 Library UI</span><div class="track" data-on="2-5"></div></div>
+  <div class="gr"><span>M3 Content and reader</span><div class="track" data-on="3-6"></div></div>
+  <div class="gr"><span>M4 Share Extension, PDF</span><div class="track" data-on="5-7"></div></div>
+  <div class="gr"><span>M5 Settings, transfer, telemetry</span><div class="track" data-on="6-8"></div></div>
+  <div class="gr"><span>M6 iPad, accessibility, polish</span><div class="track" data-on="8-9"></div></div>
+  <div class="gr"><span>TestFlight, review, release</span><div class="track" data-on="10-11" data-rel="1"></div></div>
+</div>
+<div class="tw"><table>
+<tr><th>Milestone</th><th>Delivers</th><th>Done when</th></tr>
+<tr><td><b>M0</b> Foundation</td><td>Xcode project, packages, App Group and Keychain group, CI, colour and type tokens, <code>SrokaCore</code> ports with vectors, API client skeleton, app icon</td><td>CI green; vector tests pass; app launches to an empty shell on device.</td></tr>
+<tr><td><b>M1</b> Auth, database, sync <span class="tag">stream A</span></td><td>Sign-in flow, session store, GRDB schema, outbox, full sync engine, status model, wipe</td><td>Engine test suite matches Android's cases; a library created on Android appears and round-trips edits against the local stack.</td></tr>
+<tr><td><b>M2</b> Library UI <span class="tag">stream B</span></td><td>Tabs, list rows and badges, filters, sort, swipe, context menu, toast with Undo, add link, tags and tag editor, search, onboarding and empty states</td><td>Built first against fake repositories and the fixed schema; wired to M1 in week 4. Snapshot set approved against the UI view.</td></tr>
+<tr><td><b>M3</b> Content and reader <span class="tag">stream C</span></td><td>Content store, installer, eviction, web reader with appearance and progress, end-of-article card, reader states, PDF viewer</td><td>Article saved on Android opens offline on iOS at the same position, in each theme.</td></tr>
+<tr><td><b>M4</b> Share Extension, PDF</td><td>Extension with all sheet states, PDF upload and thumbnail, drop target</td><td>Save from Safari in airplane mode appears in the app and syncs later; memory stays under the extension limit on a real device.</td></tr>
+<tr><td><b>M5</b> Settings, transfer, telemetry</td><td>Settings, import, export, consent prompt, telemetry provider, background tasks, version gate</td><td>Consent off sends nothing (verified with a proxy); import of a Pocket export completes after leaving the screen.</td></tr>
+<tr><td><b>M6</b> iPad and polish</td><td>Split view, keyboard shortcuts, VoiceOver, Dynamic Type, Reduce Transparency and Increase Contrast, performance pass on a 5,000-item library</td><td>Accessibility audit clean; launch to list and scroll are smooth on the oldest supported phone.</td></tr>
+<tr><td><b>Release</b></td><td>TestFlight, App Store listing, review account, privacy answers</td><td>Approved build; ledger and docs updated.</td></tr>
+</table></div>
+</section>
+
+<section id="s-open"><h2>Decisions for the owner</h2>
+<p class="lede">Each has a recommendation so work can start; none blocks M0.</p>
+<div class="tw"><table>
+<tr><th>#</th><th>Question</th><th>Recommendation</th><th>Alternative</th></tr>
+<tr><td>I1</td><td>Phone navigation. Android removed the bottom bar and uses destination chips (R17.1).</td><td>A tab bar on iOS: My List, Archive, Tags, plus the search tab. It is what iPhone users expect and what Liquid Glass is built around. Filters stay as chips.</td><td>Copy Android exactly: one screen, destination chips, search pill at the top.</td></tr>
+<tr><td>I2</td><td>Telemetry provider. D15 is written around Firebase but does not name one for iOS.</td><td>Firebase Analytics and Crashlytics as a new iOS app in the existing Firebase project, so both platforms report to one place.</td><td>No analytics; crashes through Xcode Organizer and MetricKit only. Simpler privacy answers, no shared dashboard.</td></tr>
+<tr><td>I3</td><td>Minimum OS.</td><td>iOS and iPadOS 26. Liquid Glass, the search tab role and continued background tasks need it, and there are no existing iOS users to strand.</td><td>iOS 18 with fallbacks for every glass surface; roughly two extra weeks and a second visual style to test.</td></tr>
+<tr><td>I4</td><td>UI typeface. Android uses Outfit everywhere.</td><td>San Francisco for interface text (Dynamic Type, native feel), Outfit only for brand headings: sign-in, onboarding and empty-state titles.</td><td>Outfit everywhere, as on Android.</td></tr>
+<tr><td>I5</td><td>Mac and Vision.</td><td>Not in this plan. Leave "Designed for iPad" on Apple silicon Macs enabled once iPad works.</td><td>Mac Catalyst later.</td></tr>
+<tr><td>I6</td><td>Onboarding step "Save from Chrome".</td><td>Keep it; it links to <code>https://sroka.app/#get</code> and is ticked from <code>/v1/me</code>.</td><td>Reword to "Save from your computer".</td></tr>
+</table></div>
+<h3>Steps only the owner can do</h3>
+<ul>
+<li>Apple Developer Program team; register App IDs <code>app.sroka</code> and <code>app.sroka.share</code>, App Group <code>group.app.sroka</code>, and the shared Keychain group.</li>
+<li>App Store Connect record, listing text and screenshots, privacy answers, export compliance (the app uses only standard HTTPS and system crypto).</li>
+<li>If I2 is Firebase: add the iOS app in project <code>sroka-95489</code> and provide <code>GoogleService-Info.plist</code>.</li>
+<li>Set <code>REVIEW_EMAIL</code> and <code>REVIEW_OTP</code> on the production Worker and put them in the review notes.</li>
+<li>Distribution certificate and provisioning for CI.</li>
+</ul>
+</section>
+
+<section id="s-risk"><h2>Risks and lessons from Android</h2>
+<div class="tw"><table>
+<tr><th>Risk</th><th>What to do</th></tr>
+<tr><td>URL normalisation diverges from the server, so duplicates are not detected locally and aliases pile up.</td><td>Hand-written normaliser, shared vectors, plus a test that round-trips 1,000 real URLs through the local API and compares <code>canonicalUrl</code>.</td></tr>
+<tr><td>App and extension contend for the database; the app is killed while suspended with a lock.</td><td>GRDB shared-database setup from day one; a device test that saves from the extension while the app is suspended mid-sync.</td></tr>
+<tr><td>Background sync rarely runs, so users expect Android-like freshness and do not get it.</td><td>Sync on every activation and after every write; pull to refresh; the extension's own push. Treat background tasks as a bonus in QA.</td></tr>
+<tr><td>App Review: sign-in needs an emailed code.</td><td>Review account (D4). Email-only sign-in does not require Sign in with Apple, and in-app account deletion exists.</td></tr>
+<tr><td>An <code>Origin</code> header sneaks in through a web view or a proxy library and sign-in fails with <code>TURNSTILE_FAILED</code>.</td><td>All API traffic through the one <code>URLSession</code> client; a unit test asserts no request carries <code>Origin</code>. Android hit this (fixed server-side in 4df8e3b for requests with no Origin).</td></tr>
+<tr><td>Docs drift. <code>apps/android/docs/DECISIONS.md</code> says diacritics mode 2, schema version 1, a 2.5 s save-sheet timeout and fewer preference keys than the code has.</td><td>Read the code when a detail matters. This plan uses the code's values: schema 3, 4 s, the preference table above.</td></tr>
+<tr><td>New server field ignored by installed apps.</td><td>Tolerant decoding everywhere, and a cursor reset in the migration that starts using the field.</td></tr>
+<tr><td>Placeholder telemetry config ships (Android 1.3.1 to 1.5.0 sent nothing).</td><td>Release preflight in CI; a manual check that one event arrives from the TestFlight build with consent on.</td></tr>
+<tr><td>A restored backup shows another person's library.</td><td>Token is device-only; account marker check on sign-in; content folders excluded from backup.</td></tr>
+</table></div>
+</section>
+</main>
+
+<!-- ============================== UI ============================== -->
+<main id="ui" class="wrap view">
+<div class="hero">
+  <h1>UI design: the Android product, rebuilt from iOS parts</h1>
+  <p>Same screens, words, colours and icon as Android. What changes is the furniture: a floating tab bar instead of chips for destinations, toolbar buttons instead of a floating action button, context menus and sheets instead of bottom sheets and snackbars, all on Liquid Glass. The frames below are drawn in HTML to show layout and intent; build them from system components so the real material, motion and accessibility come for free.</p>
+</div>
+
+<section style="border-top:0;padding-top:8px"><h2>Principles</h2>
+<div class="cols">
+<div><h3>Content is paper, controls are glass</h3><p>The list and the article sit on the brand Paper colour edge to edge. Navigation floats above them in glass: tab bar, toolbar buttons, the reader's bottom bar, menus and partial-height sheets. Never put glass on a row, a card or a banner, and never stack glass on glass.</p></div>
+<div><h3>Brand through tint, not chrome</h3><p>Brand blue is the app tint: selected tab, links, switches, primary buttons. Beak yellow is reserved for reading progress and the favorite star, as on Android. Nothing else gets a custom colour.</p></div>
+<div><h3>System components first</h3><p><code>TabView</code>, <code>NavigationStack</code>, <code>List</code>, <code>Form</code>, <code>.searchable</code>, <code>.swipeActions</code>, <code>.contextMenu</code>, <code>.sheet</code> with detents, <code>Menu</code>, <code>ShareLink</code>. Custom views only for the row, the chip row, the toast, the end-of-article card and the theme swatches.</p></div>
+<div><h3>Same words</h3><p>Every label and message is copied from Android (<code>apps/android/**/res/values/strings.xml</code>) and <code>packages/shared/src/vocab.ts</code>: "My List", "Archive", "Favorites", "Preparing…", "Couldn't save the text", "Partial copy", "Preview only". English only, US spelling.</p></div>
+</div>
+</section>
+
+<section><h2>Screens</h2>
+<div class="bar">
+  <span style="color:var(--muted);font-size:13px">App appearance in the frames</span>
+  <div class="seg" id="scheme"><button aria-pressed="true" data-s="light">Light</button><button aria-pressed="false" data-s="dark">Dark</button></div>
+</div>
+<div class="gallery">
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"><span class="av">M</span><span class="sp"></span><span class="gb glass"><svg class="ic"><use href="#i-sort"/></svg></span><span class="gb glass tint"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+    <div class="lt">My List</div>
+    <div class="chips"><span class="chip"><svg class="ic"><use href="#i-star"/></svg>Favorites</span><span class="chip on"><svg class="ic"><use href="#i-clock"/></svg>Under 10 min</span><span class="chip">#birds</span><span class="chip">#sqlite</span><span class="chip">#ios</span></div>
+    <div class="sec">Continue reading</div>
+    <div class="cont">
+      <div class="cc"><b>Eurasian magpie</b><span>9 min left</span><div class="pb"><i style="width:42%"></i></div></div>
+      <div class="cc"><b>Local-first software</b><span>21 min left</span><div class="pb"><i style="width:28%"></i></div></div>
+      <div class="cc"><b>Mirror test</b><span>6 min left</span><div class="pb"><i style="width:70%"></i></div></div>
+    </div>
+    <div data-rows="list"></div>
+  </div>
+  <div class="fade"></div>
+  <div class="tabs glass"><span class="on"><svg class="ic f"><use href="#i-book"/></svg>My List</span><span><svg class="ic"><use href="#i-archive"/></svg>Archive</span><span><svg class="ic"><use href="#i-tag"/></svg>Tags</span></div>
+  <div class="tsearch glass"><svg class="ic"><use href="#i-search"/></svg></div>
+</div>
+<figcaption><b>My List</b><ul>
+<li>Large title that collapses into the bar. Avatar opens Settings; sort is a <code>Menu</code>; the tinted <code>+</code> replaces Android's "Save" button.</li>
+<li>Tab bar holds My List, Archive, Tags; search is the separate tab with the search role. The bar shrinks while scrolling down.</li>
+<li>Filter chips and the row (thumbnail, two-line title, <code>domain · N min</code>, badge, star, progress) are unchanged from Android.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"><span class="av">M</span><span class="sp"></span><span class="gb glass"><svg class="ic"><use href="#i-sort"/></svg></span><span class="gb glass tint"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+    <div class="lt">My List</div>
+    <div class="ban w"><svg class="ic"><use href="#i-cloud"/></svg><span>Offline. 2 changes will sync later.</span></div>
+    <div class="swipe"><div class="act"><div><svg class="ic"><use href="#i-archive"/></svg>Archive</div></div><div data-rows="one"></div></div>
+    <div class="swipe r"><div class="act l"><div><svg class="ic f"><use href="#i-star"/></svg>Favorite</div></div><div data-rows="two"></div></div>
+    <div data-rows="rest"></div>
+  </div>
+  <div class="fade"></div>
+  <div class="toast glass">Archived<u>Undo</u></div>
+  <div class="tabs glass"><span class="on"><svg class="ic f"><use href="#i-book"/></svg>My List</span><span><svg class="ic"><use href="#i-archive"/></svg>Archive</span><span><svg class="ic"><use href="#i-tag"/></svg>Tags</span></div>
+  <div class="tsearch glass"><svg class="ic"><use href="#i-search"/></svg></div>
+</div>
+<figcaption><b>Swipe, status and undo</b><ul>
+<li>Trailing and leading <code>.swipeActions</code> read the two Settings values; full swipe commits. Haptic at the threshold via <code>.sensoryFeedback</code>.</li>
+<li>Snackbars become a glass capsule above the tab bar with "Undo", gone after 4 s, announced to VoiceOver.</li>
+<li>One status banner at a time, on paper, by the same priority as Android: sign in again, catching up, offline, downloading.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"></div><div class="lt">My List</div>
+    <div data-rows="list"></div>
+  </div>
+  <div class="dim"></div>
+  <div class="lift"><div data-rows="one"></div></div>
+  <div class="menu glass">
+    <div>Add to Favorites<svg class="ic"><use href="#i-star"/></svg></div>
+    <div>Archive<svg class="ic"><use href="#i-archive"/></svg></div>
+    <div>Edit Tags<svg class="ic"><use href="#i-tag"/></svg></div>
+    <div class="sepr">Share Link<svg class="ic"><use href="#i-share"/></svg></div>
+    <div>Open Original<svg class="ic"><use href="#i-safari"/></svg></div>
+    <div>Refresh Article<svg class="ic"><use href="#i-sync"/></svg></div>
+    <div class="sepr d">Delete<svg class="ic"><use href="#i-trash"/></svg></div>
+  </div>
+</div>
+<figcaption><b>Long press</b><ul>
+<li>Android's actions sheet becomes a <code>.contextMenu</code>: same seven actions, same order, Delete as a destructive item in its own group.</li>
+<li>Delete confirms with a <code>confirmationDialog</code>: "Delete article?" / "It will be removed from this device and your account."</li>
+<li>On iPad the same menu appears on secondary click.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="rd">
+    <div class="site">Wikipedia</div><h4>Eurasian magpie</h4><div class="meta">9 min read · 42%</div>
+    <p>The Eurasian magpie, <i>Pica pica</i>, lives year-round across most of Europe and northern Asia. It belongs to the crow family and is hard to mistake: black and white plumage, a long tail, and a blue-green sheen on the wings.</p>
+    <p>Magpies are among the most capable birds studied. They are one of the few animals outside the mammals known to <a>recognise themselves in a mirror</a>, and they hide food and remember where.</p>
+    <p>In Polish the bird is called <i>sroka</i>. Folklore across the continent gives it a taste for shiny things, although experiments suggest it is wary of them.</p>
+    <p>Pairs build large domed nests of sticks, lined with mud and fine roots, and reuse a territory for years.</p>
+  </div>
+  <div class="rprog"><i></i></div>
+  <div class="rnav"><span class="gb glass"><svg class="ic"><use href="#i-back"/></svg></span><span class="sp"></span><span class="gb glass"><b style="font-size:14px">Aa</b><svg class="ic"><use href="#i-more"/></svg></span></div>
+  <div class="rbar glass"><svg class="ic f star"><use href="#i-star"/></svg><svg class="ic"><use href="#i-archive"/></svg><svg class="ic"><use href="#i-tag"/></svg><svg class="ic"><use href="#i-share"/></svg></div>
+</div>
+<figcaption><b>Reader</b><ul>
+<li>Header inside the page as on Android: site, title, "N min read · P%". Body in New York (Serif) or San Francisco (Sans).</li>
+<li>Top: back, and a glass group with Appearance and the menu (Open in Browser, Refresh Article, Delete). Bottom glass bar: Favorite, Archive, Tags, Share, within thumb reach.</li>
+<li>Both bars hide on scroll down and return on scroll up or tap. The 3 pt progress line stays: blue on light and sepia, yellow on dark.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-reader="sepia" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="rd">
+    <div class="site">Wikipedia</div><h4>Eurasian magpie</h4><div class="meta">9 min read · 42%</div>
+    <p>The Eurasian magpie, <i>Pica pica</i>, lives year-round across most of Europe and northern Asia. It belongs to the crow family and is hard to mistake: black and white plumage, a long tail, and a blue-green sheen on the wings.</p>
+    <p>Magpies are among the most capable birds studied.</p>
+  </div>
+  <div class="rprog"><i></i></div>
+  <div class="sheet g">
+    <div class="grab"></div>
+    <div class="lab" style="margin-top:0">Theme</div>
+    <div class="themes">
+      <div><i style="background:#FBFBF9;color:#15171C">Aa</i>Light</div>
+      <div class="sel"><i style="background:#F3EAD8;color:#40321F">Aa</i>Sepia</div>
+      <div><i style="background:#121314;color:#D9D7D1">Aa</i>Dark</div>
+      <div><i style="background:linear-gradient(90deg,#FBFBF9 50%,#121314 50%);color:#888">Aa</i>Auto</div>
+    </div>
+    <div class="lab">Font</div>
+    <div class="sg"><span class="on" style="font-family:ui-serif,Georgia,serif">Serif</span><span>Sans</span></div>
+    <div class="lab">Size</div>
+    <div class="sl"><span style="font-size:11px">A</span><i></i><span style="font-size:19px">A</span></div>
+    <div class="lab">Spacing</div>
+    <div class="sg"><span>Tight</span><span class="on">Normal</span><span>Loose</span></div>
+  </div>
+</div>
+<figcaption><b>Appearance</b><ul>
+<li>A sheet at a fitted detent with the glass background, so the article stays visible and updates live behind it.</li>
+<li>Same four groups and order as Android: Theme swatches, Font, Size (9 stops), Spacing. Segments are system <code>Picker(.segmented)</code>.</li>
+<li>Shown here with the Sepia reader theme.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-scheme="dark" data-fixed>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="rd">
+    <p>Outside the breeding season magpies gather in loose groups and roost together in thickets.</p>
+    <p>The species is common and its numbers are stable across most of its range.</p>
+    <p style="color:var(--r-muted);font-size:12px">Retrieved from en.wikipedia.org</p>
+  </div>
+  <div class="rprog"><i style="width:100%"></i></div>
+  <div class="endc glass">
+    <div class="h"><svg class="ic"><use href="#i-check"/></svg>Finished · 9 min</div>
+    <div class="btns"><span class="btn"><svg class="ic"><use href="#i-archive"/></svg>Archive &amp; next</span><span class="btn q">Keep</span></div>
+    <div class="lab" style="margin-top:0">Up next</div>
+    <div class="next"><span class="th p2"></span><div class="rt"><b>Durable Objects: Easy, Fast, Correct — Choose three</b><span>12 min</span></div></div>
+  </div>
+  <div class="rbar glass"><svg class="ic"><use href="#i-star"/></svg><svg class="ic"><use href="#i-archive"/></svg><svg class="ic"><use href="#i-tag"/></svg><svg class="ic"><use href="#i-share"/></svg></div>
+</div>
+<figcaption><b>End of article, dark</b><ul>
+<li>The card slides up at the end of the text: "Finished · N min", "Archive &amp; next", "Keep", and the next item from My List.</li>
+<li>Dark reader palette <code>#121314</code> / <code>#D9D7D1</code> with the yellow progress line.</li>
+<li>Hidden when the copy is partial or the item is already archived, as on Android.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="lt" style="margin-top:10px">Search</div>
+    <div class="chips"><span class="chip on"><svg class="ic"><use href="#i-check"/></svg>All</span><span class="chip">Archive</span><span class="chip">Favorites</span></div>
+    <div class="sec">3 results, searched on this phone</div>
+    <div class="row"><span class="th p1"></span><div class="rt"><b>Eurasian <mark>magpie</mark></b><span>en.wikipedia.org · Title and text</span><p>…the <mark>magpie</mark> is one of the few animals known to recognise itself…</p></div></div>
+    <div class="row"><span class="th">E</span><div class="rt"><b>Mirror test</b><span>Archive · en.wikipedia.org · In text</span><p>…European <mark>magpie</mark>s removed a mark placed on their feathers…</p></div></div>
+    <div class="row"><span class="th p3"></span><div class="rt"><b>Why <mark>magpie</mark>s are not thieves</b><span>birdguides.com · In title</span></div></div>
+  </div>
+  <div class="tabs glass" style="width:52px;padding:0;justify-content:center;align-items:center"><svg class="ic f"><use href="#i-book"/></svg></div>
+  <div class="glass" style="position:absolute;left:74px;right:14px;bottom:14px;height:52px;border-radius:26px;display:flex;align-items:center;gap:8px;padding:0 16px;font-size:15px;z-index:5"><svg class="ic" style="color:var(--a-muted)"><use href="#i-search"/></svg>magpie<span class="sp"></span><svg class="ic" style="color:var(--a-muted);width:15px;height:15px"><use href="#i-x"/></svg></div>
+</div>
+<figcaption><b>Search</b><ul>
+<li>The search tab expands into a glass field at the bottom (<code>Tab(role: .search)</code> with <code>.searchable</code>); the other tabs collapse to one button.</li>
+<li>Scopes All / Archive / Favorites; count line "N results, searched on this phone"; matches highlighted on the yellow container colour.</li>
+<li>Idle: "Search the articles saved on this phone". Empty: "No results" / "Try different words".</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr" style="background:var(--a-fill)">
+    <div style="padding:10px 18px;font-size:12px;color:var(--a-muted);opacity:.7">Safari · en.wikipedia.org</div>
+    <div style="margin:0 14px;height:240px;border-radius:14px;background:var(--a-bg);opacity:.6"></div>
+  </div>
+  <div class="dim" style="backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div>
+  <div class="sheet g">
+    <div class="grab"></div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px"><span style="width:38px;height:38px;border-radius:50%;background:#1E6F8F;color:#F6F5F1;display:grid;place-items:center"><svg class="ic"><use href="#i-check"/></svg></span><b style="font-size:20px">Saved</b></div>
+    <div style="display:flex;gap:12px;align-items:center;padding:10px;border:1px solid var(--a-line);border-radius:14px;background:var(--a-card)"><span class="th p1"></span><div class="rt"><b>Eurasian magpie</b><span>en.wikipedia.org · 9 min</span></div></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:14px"><span class="chip"><svg class="ic"><use href="#i-tag"/></svg>Tags</span><span class="chip"><svg class="ic"><use href="#i-star"/></svg>Favorite</span><span class="sp"></span><span class="lk" style="font-weight:600">Open</span></div>
+    <div class="pb" style="margin-top:16px"><i style="width:60%;background:var(--a-tint)"></i></div>
+  </div>
+</div>
+<figcaption><b>Share Extension</b><ul>
+<li>Appears over the sharing app at a small detent. Saved at once, also offline; the line at the bottom counts down the 4 s auto-dismiss and stops on touch.</li>
+<li>Variants: "Already saved" with progress and "Continue reading"; "Sign in to Sroka to save articles"; "Adding PDF to Sroka".</li>
+<li>Listed in the share sheet as "Sroka" with the brand icon.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="auth">
+      <svg class="mk" viewBox="0 0 100 100"><use href="#mk"/></svg>
+      <h4>Sign in to Sroka</h4>
+      <p>We'll email you a 6-digit code. No password needed.</p>
+      <div class="field">Email</div>
+      <span class="btn w">Send code</span>
+      <span class="lk">Self-hosting?</span>
+    </div>
+  </div>
+</div>
+<figcaption><b>Sign in: email</b><ul>
+<li>Brand mark, Outfit heading, one field with email keyboard and content type, one full-width tinted button.</li>
+<li>"Self-hosting?" opens the Server URL sheet with Android's copy.</li>
+<li>On iPad the form is a centred column 400 pt wide.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"><span class="gb glass"><svg class="ic"><use href="#i-back"/></svg></span></div>
+    <div class="auth" style="padding-top:14px">
+      <h4>Check your inbox</h4>
+      <p>Enter the code sent to <b style="color:var(--a-fg)">magda@example.com</b></p>
+      <div class="otp"><span>4</span><span>1</span><span>7</span><span class="f"></span><span></span><span></span></div>
+      <span class="lk" style="color:var(--a-muted)">Resend code in 24 s</span>
+      <span class="lk">Use another email</span>
+    </div>
+  </div>
+  <div class="kb"><span class="ac">From Mail <b>417 902</b></span><div class="ks"><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i></div></div>
+</div>
+<figcaption><b>Sign in: code</b><ul>
+<li>Six cells backed by one hidden field with <code>.oneTimeCode</code>, so the keyboard offers the code from Mail. Submits on the sixth digit.</li>
+<li>Errors inline under the cells with Android's sentences; the cells shake once and a failure haptic plays.</li>
+<li>Resend countdown and "Use another email" as on Android.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"><span class="sp"></span><span class="gb glass txt">Done</span></div>
+    <div class="lt">Settings</div>
+    <div class="gh">Reading</div>
+    <div class="grp">
+      <div><span class="ib"><svg class="ic"><use href="#i-moon"/></svg></span>Theme<span class="v">System<svg class="ic"><use href="#i-fwd"/></svg></span></div>
+      <div><span class="ib" style="background:#F2C84B;color:#4A3600"><b style="font-size:11px">Aa</b></span>Reader theme<span class="v">Auto<svg class="ic"><use href="#i-fwd"/></svg></span></div>
+      <div><span class="ib" style="background:var(--a-fill2);color:var(--a-fg)"><b style="font-size:11px">A</b></span>Text size<span class="v">18 pt</span></div>
+    </div>
+    <div class="gh">Swipe actions</div>
+    <div class="grp">
+      <div><span class="ib"><svg class="ic"><use href="#i-archive"/></svg></span>Swipe left<span class="v">Archive<svg class="ic"><use href="#i-fwd"/></svg></span></div>
+      <div><span class="ib" style="background:var(--a-fill2);color:var(--a-fg)"><svg class="ic"><use href="#i-x"/></svg></span>Swipe right<span class="v">None<svg class="ic"><use href="#i-fwd"/></svg></span></div>
+    </div>
+    <div class="gh">Library</div>
+    <div class="grp">
+      <div><span class="ib"><svg class="ic"><use href="#i-down"/></svg></span>Offline downloads<span class="v">Wi-Fi only<svg class="ic"><use href="#i-fwd"/></svg></span></div>
+      <div style="color:var(--a-tint)"><span class="ib" style="visibility:hidden"></span>Download all now</div>
+      <div class="d"><span class="ib" style="visibility:hidden"></span>Remove downloaded articles</div>
+    </div>
+    <div class="gh">Privacy</div>
+    <div class="grp"><div>Share usage analytics<span class="sw-t"></span></div><div>Send crash reports<span class="sw-t on"></span></div></div>
+  </div>
+  <div class="fade"></div>
+</div>
+<figcaption><b>Settings</b><ul>
+<li>Presented as a sheet from the avatar. A grouped <code>Form</code> with Android's sections and labels: Reading, Swipe actions, Library, Privacy, Account.</li>
+<li>Choices are inline <code>Picker</code> menus, not dialogs. The Library footer shows "12 MB used". Below the fold: Server, Export library, Import, Privacy policy, Terms of service, Sign out (with the email), Delete account, Version.</li>
+<li>Destructive rows are red and confirm with Android's dialog copy.</li>
+</ul></figcaption></figure>
+
+<figure><div class="phone" data-sw>
+  <div class="sb"><span>9:41</span><i></i><em><b></b></em></div>
+  <div class="scr">
+    <div class="nav"><span class="av">M</span><span class="sp"></span><span class="gb glass tint"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+    <div class="lt">My List</div>
+    <div class="ob">
+      <h4>Start your list</h4>
+      <div><i><svg class="ic"><use href="#i-share"/></svg></i>Share any link to Sroka</div>
+      <div><i class="done"><svg class="ic"><use href="#i-check"/></svg></i><span class="t">Save from Chrome</span></div>
+      <div><i><svg class="ic"><use href="#i-link"/></svg></i><span class="t">Paste a link</span></div>
+    </div>
+  </div>
+  <div class="dim" style="backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(0,0,0,.18)"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div style="display:flex;align-items:center;margin-bottom:14px"><span class="lk">Cancel</span><b style="flex:1;text-align:center;font-size:15px">Add link or PDF</b><span class="lk" style="font-weight:600">Save</span></div>
+    <div class="field" style="color:var(--a-fg)">https://en.wikipedia.org/wiki/Eurasian_magpie</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><span class="btn q"><svg class="ic"><use href="#i-link"/></svg>Paste</span><span class="btn q">Choose PDF file</span></div>
+    <div style="height:150px"></div>
+  </div>
+</div>
+<figcaption><b>Empty list and Add link</b><ul>
+<li>First run shows "Start your list" with the three steps; a finished step turns blue with a check.</li>
+<li><code>+</code> opens a sheet with one URL field, the system Paste button and "Choose PDF file". Invalid input shows "Enter a valid web address".</li>
+<li>A duplicate answers "Already saved. Moved to My List."</li>
+</ul></figcaption></figure>
+
+</div>
+
+<h3 style="margin-top:36px">iPad</h3>
+<p>Three columns in landscape, two in portrait, one when the window is narrow. The sidebar is the tab bar's content in list form, with the tag list underneath. Links dragged from Safari drop on the list ("Drop to save").</p>
+<div class="padw"><div class="phone pad" data-sw>
+  <div class="side glass"><h6>Sroka</h6>
+    <div class="on"><svg class="ic f"><use href="#i-book"/></svg>My List<em>24</em></div>
+    <div><svg class="ic"><use href="#i-archive"/></svg>Archive</div>
+    <div><svg class="ic"><use href="#i-star"/></svg>Favorites</div>
+    <small>Tags</small>
+    <div><svg class="ic"><use href="#i-tag"/></svg>birds<em>6</em></div>
+    <div><svg class="ic"><use href="#i-tag"/></svg>sqlite<em>4</em></div>
+    <div><svg class="ic"><use href="#i-tag"/></svg>ios<em>3</em></div>
+    <div><svg class="ic"><use href="#i-tag"/></svg>local-first<em>2</em></div>
+  </div>
+  <div class="mid"><div class="srch"><svg class="ic"><use href="#i-search"/></svg><span style="color:var(--a-muted)">Search My List</span></div><div data-rows="pad"></div></div>
+  <div class="det">
+    <div class="rd">
+      <div class="site">Wikipedia</div><h4 style="font-size:30px">Eurasian magpie</h4><div class="meta">9 min read · 42%</div>
+      <p>The Eurasian magpie, <i>Pica pica</i>, lives year-round across most of Europe and northern Asia. It belongs to the crow family and is hard to mistake: black and white plumage, a long tail, and a blue-green sheen on the wings.</p>
+      <p>Magpies are among the most capable birds studied. They are one of the few animals outside the mammals known to <a>recognise themselves in a mirror</a>, and they hide food and remember where.</p>
+      <p>In Polish the bird is called <i>sroka</i>. Folklore across the continent gives it a taste for shiny things, although experiments suggest it is wary of them.</p>
+    </div>
+    <div class="rprog"><i></i></div>
+    <div class="rnav" style="left:14px;right:14px"><span class="sp"></span><span class="gb glass"><b style="font-size:14px">Aa</b><svg class="ic f star"><use href="#i-star"/></svg><svg class="ic"><use href="#i-archive"/></svg><svg class="ic"><use href="#i-more"/></svg></span></div>
+  </div>
+</div></div>
+</section>
+
+<section><h2>Colour</h2>
+<p class="lede">The Android palette, unchanged, as named colours in the asset catalog with light and dark variants. Source: <code>apps/android/core/designsystem/…/theme/Color.kt</code> and <code>ExtendedColors.kt</code>.</p>
+<div class="sw" id="swatches"></div>
+<p>Reader themes are separate from the app theme and identical to Android: Light <code>#FBFBF9</code> on <code>#15171C</code>, Sepia <code>#F3EAD8</code> on <code>#40321F</code>, Dark <code>#121314</code> on <code>#D9D7D1</code>; links <code>#1E6F8F</code>, <code>#1F6F6A</code>, <code>#7CC0DA</code>. Set <code>AccentColor</code> to Brand blue so system controls pick it up. Check Favorite star and warning text against Increase Contrast.</p>
+</section>
+
+<section><h2>App icon</h2>
+<p class="lede">The "6a" bookmark-magpie stays as it is. One source generates every platform's assets: <code>scripts/make-icons.mjs</code> (SVG in <code>docs/brand/icon.svg</code>, single-colour glyph in <code>docs/brand/glyph.svg</code>).</p>
+<div class="icons">
+  <figure><svg viewBox="0 0 100 100"><use href="#mk"/></svg>Default</figure>
+  <figure><svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#15171c"/><path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#F1EFE9"/><polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"/><polygon points="69,27 83,33 69,39" fill="#f2c84b"/><circle cx="58" cy="32" r="4" fill="#15171c"/></svg>Dark</figure>
+  <figure><svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#2a2e35"/><path fill-rule="evenodd" d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z M30 56 L70 46 L70 58 L30 68 Z M54 32 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z" fill="#d7dade"/><polygon points="69,27 83,33 69,39" fill="#d7dade"/></svg>Tinted / clear</figure>
+</div>
+<ul>
+<li>Build the icon in Icon Composer as layers on the white tile: body, blue band, beak, eye. The system then renders the default, dark, tinted and clear appearances and applies the glass edge. Supply the square artwork; iOS masks it.</li>
+<li>Dark keeps the blue band and yellow beak and inverts body and tile. Tinted and clear use the single-colour glyph with the band and eye cut out.</li>
+<li>Extend <code>scripts/make-icons.mjs</code> to emit the iOS layers, so the mark still has one source.</li>
+</ul>
+</section>
+
+<section><h2>Android to iOS component map</h2>
+<div class="tw"><table>
+<tr><th>Android</th><th>iOS</th><th>Notes</th></tr>
+<tr><td>Destination chips (phone), navigation rail (wide)</td><td><code>TabView</code>; sidebar in <code>NavigationSplitView</code></td><td><code>.tabBarMinimizeBehavior(.onScrollDown)</code> on iPhone.</td></tr>
+<tr><td>Search pill at the top</td><td>Search tab, <code>.searchable</code>, <code>.searchScopes</code></td><td>On iPad the field sits at the top of the list column.</td></tr>
+<tr><td>Extended FAB "Save"</td><td>Toolbar <code>+</code>, <code>.buttonStyle(.glassProminent)</code>, brand tint</td><td>Also ⌘N on iPad.</td></tr>
+<tr><td>Avatar in the search pill</td><td>Leading toolbar avatar, opens Settings as a sheet</td><td></td></tr>
+<tr><td>Sort dropdown with radio items</td><td><code>Menu</code> with an inline <code>Picker</code></td><td>Checkmark on the current choice.</td></tr>
+<tr><td>Filter chips</td><td>Custom capsule toggles in a horizontal <code>ScrollView</code></td><td>Paper fill, tinted when on. Not glass.</td></tr>
+<tr><td><code>SwipeToDismissBox</code></td><td><code>.swipeActions(edge:allowsFullSwipe:)</code></td><td>Tint: brand blue for Archive and Tags, beak yellow for Favorite.</td></tr>
+<tr><td>Item actions bottom sheet</td><td><code>.contextMenu</code> with preview</td><td></td></tr>
+<tr><td>Snackbar with action</td><td>Custom glass capsule toast</td><td>One at a time; never covers the tab bar.</td></tr>
+<tr><td><code>AlertDialog</code> for confirmation</td><td><code>.confirmationDialog</code> or <code>.alert</code></td><td>Type-your-email delete uses <code>.alert</code> with a text field.</td></tr>
+<tr><td>Radio choice dialogs in Settings</td><td><code>Picker</code> in a <code>Form</code> (menu style)</td><td></td></tr>
+<tr><td>Modal bottom sheets (tags, appearance, save)</td><td><code>.sheet</code> with <code>.presentationDetents</code></td><td>Partial detents get the glass background from the system.</td></tr>
+<tr><td>Pull to refresh</td><td><code>.refreshable</code></td><td>Runs "Fetch new articles"; result as a toast.</td></tr>
+<tr><td>Top app bar that hides on scroll (reader)</td><td>Toolbar items plus <code>.toolbarVisibility</code> driven by scroll direction</td><td>Status bar stays visible.</td></tr>
+<tr><td>Custom Tabs</td><td><code>SFSafariViewController</code></td><td></td></tr>
+<tr><td>Share intent, <code>FileProvider</code></td><td><code>ShareLink</code>, <code>.fileExporter</code></td><td></td></tr>
+<tr><td>Linear progress cards</td><td><code>ProgressView</code> inside a paper banner row</td><td></td></tr>
+<tr><td>Swipe-peek hint on first run</td><td>Same offset animation on the first row, once</td><td>Skipped with Reduce Motion.</td></tr>
+<tr><td>List-detail scene with draggable divider</td><td><code>NavigationSplitView</code></td><td>"Expand article" maps to hiding the columns.</td></tr>
+<tr><td>Empty-detail "Pick something to read"</td><td><code>ContentUnavailableView</code> with a "Read next" button</td><td></td></tr>
+</table></div>
+<h3>Symbols</h3>
+<p>Android ships Material Symbols Rounded (<code>apps/android/core/designsystem/…/icon/SrokaIcons.kt</code>). Use SF Symbols, outline by default and the <code>.fill</code> variant for selected or active states, which is the same rule Android follows.</p>
+<div class="tw"><table>
+<tr><th>Meaning</th><th>SF Symbol</th><th>Meaning</th><th>SF Symbol</th></tr>
+<tr><td>My List</td><td><code>bookmark</code></td><td>Archive / Unarchive</td><td><code>archivebox</code> / <code>tray.and.arrow.up</code></td></tr>
+<tr><td>Tags / edit tags</td><td><code>tag</code></td><td>Favorite</td><td><code>star</code>, <code>star.fill</code></td></tr>
+<tr><td>Search</td><td><code>magnifyingglass</code></td><td>Save</td><td><code>plus</code></td></tr>
+<tr><td>Sort</td><td><code>arrow.up.arrow.down</code></td><td>Appearance</td><td><code>textformat.size</code></td></tr>
+<tr><td>Share</td><td><code>square.and.arrow.up</code></td><td>Open original</td><td><code>safari</code></td></tr>
+<tr><td>Refresh article, try again</td><td><code>arrow.clockwise</code></td><td>Delete</td><td><code>trash</code></td></tr>
+<tr><td>Under 10 min</td><td><code>clock</code></td><td>More</td><td><code>ellipsis</code></td></tr>
+<tr><td>Waiting to sync</td><td><code>arrow.triangle.2.circlepath</code></td><td>Downloading</td><td><code>arrow.down</code></td></tr>
+<tr><td>Not on this device</td><td><code>icloud.slash</code></td><td>Preview only</td><td><code>lock.fill</code></td></tr>
+<tr><td>Partial copy</td><td><code>exclamationmark.triangle.fill</code></td><td>Couldn't save the text</td><td><code>exclamationmark.circle.fill</code></td></tr>
+<tr><td>PDF</td><td><code>doc.richtext</code></td><td>Paste a link</td><td><code>link.badge.plus</code></td></tr>
+<tr><td>Sign out</td><td><code>rectangle.portrait.and.arrow.right</code></td><td>Server</td><td><code>server.rack</code></td></tr>
+</table></div>
+</section>
+
+<section><h2>Type, shape, motion, accessibility</h2>
+<div class="cols">
+<div><h3>Type</h3><ul>
+<li>Interface: San Francisco through text styles, so Dynamic Type works everywhere. Row title <code>.headline</code>, two lines; meta <code>.subheadline</code> secondary; section labels <code>.footnote</code> semibold.</li>
+<li>Brand headings (sign-in, "Start your list", empty states): Outfit 600, bundled from <code>apps/android/core/designsystem/src/main/res/font/outfit.ttf</code> (OFL), scaled with <code>relativeTo:</code>.</li>
+<li>Article text: New York or San Francisco at 18 px × the user's scale. The reader scale is independent of Dynamic Type, as on Android.</li>
+</ul></div>
+<div><h3>Shape</h3><ul>
+<li>Thumbnails 48 pt with a 9 pt continuous corner; status badge 18 pt on the top-right corner.</li>
+<li>Banners and cards 16 pt; end-of-article card 22 pt; chips and buttons are capsules.</li>
+<li>Let sheets, menus, the tab bar and toolbar buttons keep their system shapes so they stay concentric with the screen corners.</li>
+<li>Row dividers are inset to the text, the iOS convention (Android has none).</li>
+</ul></div>
+<div><h3>Motion and haptics</h3><ul>
+<li>System transitions only: push, zoom from the row into the reader (<code>.navigationTransition(.zoom)</code>), sheet detents.</li>
+<li>Haptics: selection tick at swipe threshold, success on save, warning on destructive confirm, error on a wrong code.</li>
+<li>Rows animate in and out of the list on archive and undo.</li>
+</ul></div>
+<div><h3>Accessibility</h3><ul>
+<li>Row reads as one element: title, site, time or progress, status ("Waiting to sync"), then custom actions for Archive, Favorite, Tags.</li>
+<li>Reduce Transparency and Increase Contrast: system glass falls back to solid; check the toast and end card do too.</li>
+<li>Reduce Motion: no swipe-peek, no zoom transition.</li>
+<li>All targets at least 44 pt; the trailing star is decoration, the action is in swipe and the menu.</li>
+<li>iPad keyboard: ⌘N save, ⌘F search, ⌘R fetch, E archive, S favorite, arrows to move between rows.</li>
+</ul></div>
+</div>
+</section>
+
+<section><h2>Liquid Glass rules for this app</h2>
+<div class="tw"><table>
+<tr><th>Surface</th><th>Material</th><th>How</th></tr>
+<tr><td>Tab bar, toolbar buttons, menus, alerts, partial sheets</td><td>System glass</td><td>Automatic with the iOS 26 SDK. Do not set a custom toolbar or tab bar background; that removes the effect.</td></tr>
+<tr><td>Save button</td><td>Tinted glass</td><td><code>.buttonStyle(.glassProminent)</code> with brand blue. It is the only tinted glass in the app.</td></tr>
+<tr><td>Reader bottom bar, toast, end-of-article card</td><td>Custom glass</td><td><code>.glassEffect(.regular, in: .capsule)</code> (card: rounded rectangle). Wrap neighbours in one <code>GlassEffectContainer</code>.</td></tr>
+<tr><td>List rows, continue-reading cards, banners, chips, Settings groups</td><td>Opaque paper tones</td><td>These are content. Glass here would hurt legibility.</td></tr>
+<tr><td>Article</td><td>Reader theme colour, edge to edge</td><td>The web view extends under both bars; set its under-page colour to the reader background so the scroll edge effect blends in.</td></tr>
+</table></div>
+<p>API names are from the iOS 26 SDK; confirm them against the current documentation when you start, since this area is new.</p>
+</section>
+</main>
+
+<script>
+(function(){
+  // view routing on plain hash names
+  var views={plan:document.getElementById('plan'),ui:document.getElementById('ui')};
+  function show(){
+    var h=(location.hash||'#plan').slice(1); if(!views[h]) h='plan';
+    for(var k in views){ views[k].hidden = k!==h; }
+    document.querySelectorAll('.views a').forEach(function(a){ if(a.dataset.v===h) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  }
+  window.addEventListener('hashchange',function(){show();window.scrollTo(0,0);}); show();
+
+  // plan table of contents (scrolls without touching the hash)
+  var toc=document.getElementById('toc');
+  function go(id){ var el=document.getElementById(id); if(el){ var y=el.getBoundingClientRect().top+window.scrollY-64; window.scrollTo({top:y,behavior:'smooth'}); } }
+  document.querySelectorAll('#plan section').forEach(function(s){
+    var b=document.createElement('button'); b.type='button'; b.textContent=s.querySelector('h2').textContent; b.onclick=function(){go(s.id)}; toc.appendChild(b);
+  });
+  document.querySelectorAll('[data-go]').forEach(function(a){ a.addEventListener('click',function(e){ e.preventDefault(); go(a.dataset.go); }); });
+
+  // milestone bars
+  document.querySelectorAll('.track[data-on]').forEach(function(t){
+    var r=t.dataset.on.split('-').map(Number), h='';
+    for(var i=1;i<=11;i++){ h+='<i class="'+(i>=r[0]&&i<=r[1]?(t.dataset.rel?'rel':'on'):'')+'"></i>'; }
+    t.innerHTML=h;
+  });
+
+  // list rows
+  function ic(n,c){return '<svg class="ic '+(c||'')+'"><use href="#i-'+n+'"/></svg>';}
+  var R={
+    magpie:{t:'Eurasian magpie',m:'en.wikipedia.org · 9 min left',th:'p1',p:42,star:1},
+    local:{t:'Local-first software: you own your data, in spite of the cloud',m:'inkandswitch.com · 38 min',l:'I'},
+    durable:{t:'Durable Objects: Easy, Fast, Correct — Choose three',m:'blog.cloudflare.com · 12 min',th:'p2',b:'down'},
+    fts:{t:'SQLite FTS5 Extension',m:'sqlite.org · ✓ Read',l:'S'},
+    pdf:{t:'sync-protocol-notes.pdf',m:'PDF · 2.3 MB',th:'pdf',l:'PDF'},
+    glass:{t:'Adopting Liquid Glass',m:'developer.apple.com · 6 min',l:'D',b:'sync',bw:1},
+    mirror:{t:'Mirror test',m:'en.wikipedia.org · 6 min left',th:'p3',p:70}
+  };
+  function row(o,sel){
+    return '<div class="row'+(sel?' sel':'')+'"><span class="th '+(o.th||'')+'">'+(o.th&&o.th!=='pdf'?'':(o.l||''))+
+      (o.p?'<span class="tp"><i style="width:'+o.p+'%"></i></span>':'')+
+      (o.b?'<span class="bd'+(o.bw?' w':'')+'">'+ic(o.b)+'</span>':'')+'</span>'+
+      '<div class="rt"><b>'+o.t+'</b><span>'+o.m+'</span></div>'+(o.star?ic('star','f star'):'')+'</div>';
+  }
+  var sets={list:['magpie','local','durable','fts','pdf','glass'],one:['local'],two:['durable'],rest:['fts','pdf','glass','mirror'],pad:['magpie','local','durable','fts','pdf','glass']};
+  document.querySelectorAll('[data-rows]').forEach(function(el){
+    var k=el.dataset.rows; el.innerHTML=sets[k].map(function(n,i){return row(R[n],k==='pad'&&i===0)}).join('');
+  });
+
+  // app appearance toggle for the frames
+  var seg=document.getElementById('scheme');
+  seg.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+    document.querySelectorAll('.phone[data-sw]').forEach(function(p){ if(b.dataset.s==='dark') p.setAttribute('data-scheme','dark'); else p.removeAttribute('data-scheme'); });
+  });
+
+  // colour swatches: [name, role, light, dark]
+  var C=[['Paper','Background and surface','#F6F5F1','#15171C'],['Ink','Primary text','#15171C','#F1EFE9'],['Secondary text','Meta lines, icons','#55595F','#A5A8AE'],
+    ['Brand blue','Tint: links, selection, buttons','#1E6F8F','#7CC0DA'],['Blue container','Selected chip, avatar, badges','#CDE7F1','#1D3A47'],['Brand (fixed)','Save button, "Saved" check','#1E6F8F','#1E6F8F'],
+    ['Beak yellow','Progress bars, reader star','#F2C84B','#F2C84B'],['Favorite star','Star in lists','#7A5A00','#F2C84B'],['Highlight','Search match background','#F6E7B0','#3A3220'],
+    ['Warning container','Offline and partial banners','#F6ECC9','#2A2619'],['Error','Destructive actions','#B3261E','#F08F7F'],['Fill','Chips, letter tiles, fields','#E8E6DF','#262A31'],
+    ['Card','Cards and sheets','#FBFAF7','#1B1E23'],['Separator','Dividers, outlines','#D3D1C9','#3A3F48']];
+  document.getElementById('swatches').innerHTML=C.map(function(c){
+    return '<div><i><span style="background:'+c[2]+'"></span><span style="background:'+c[3]+'"></span></i><p><b>'+c[0]+'</b>'+c[1]+'<br><code>'+c[2]+' / '+c[3]+'</code></p></div>';
+  }).join('');
+})();
+</script>
+
+</body></html>

@@ -108,10 +108,13 @@ struct LibraryList: View {
     var body: some View {
         ScrollViewReader { proxy in
             List {
-                Color.clear.frame(height: 0).id(Self.topID)
+                // A list row never gets shorter than the default minimum (44 pt), so this anchor is 1 pt tall
+                // and zero-height rows are allowed list-wide; otherwise it reserves a band under the title.
+                Color.clear.frame(height: 1).id(Self.topID)
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .accessibilityHidden(true)
                 accessories
                 if let empty = state.emptyState {
                     LibraryEmptyView(
@@ -133,6 +136,7 @@ struct LibraryList: View {
                 }
             }
             .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, 1)
             .scrollContentBackground(.hidden)
             .refreshable { await actions.refresh() }
             .onChange(of: scrollToTopCount) {

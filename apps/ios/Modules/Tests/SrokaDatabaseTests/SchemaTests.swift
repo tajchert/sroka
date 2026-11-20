@@ -22,7 +22,7 @@ struct SchemaTests {
                     "index_tags_name_key",
                 ])
             #expect(try Schema.migrator.hasCompletedMigrations(db))
-            #expect(try Schema.migrator.appliedIdentifiers(db) == Set(Schema.migrationIds))
+            #expect(try Schema.migrator.appliedIdentifiers(db) == Set(Schema.migrator.migrations))
         }
     }
 
@@ -69,6 +69,10 @@ struct SchemaTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try DatabaseQueue(path: url.path).write { db in try db.execute(sql: "CREATE TABLE t (x)") }
         #expect(throws: DatabaseOpenError.needsAppUpdate) { try AppDatabase.openForExtension(at: url) }
+        let untouched = try DatabaseQueue(path: url.path).read { db in
+            try String.fetchOne(db, sql: "PRAGMA journal_mode")
+        }
+        #expect(untouched == "delete")
         try FileManager.default.removeItem(at: directory)
 
         let app = try AppDatabase.openShared(at: url)

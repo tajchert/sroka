@@ -50,16 +50,17 @@ public final class AppDatabase: Sendable {
     /// Never migrates. Throws `DatabaseOpenError.needsAppUpdate` otherwise ("Open Sroka to finish
     /// updating").
     public static func openForExtension(at url: URL) throws -> AppDatabase {
-        guard FileManager.default.fileExists(atPath: url.path) else { throw DatabaseOpenError.needsAppUpdate }
         let pool = try coordinated(url) { url in
-            try DatabasePool(path: url.path, configuration: configuration(readonly: false))
-        }
-        let current = try pool.read { db in
-            try Schema.migrator.hasCompletedMigrations(db) && !Schema.migrator.hasBeenSuperseded(db)
-        }
-        guard current else {
-            try? pool.close()
-            throw DatabaseOpenError.needsAppUpdate
+            // Validate through a read-only connection first, so a missing or unmigrated file is
+            // neither created nor touched (no WAL switch) by the extension.
+            guard FileManager.default.fileExists(atPath: url.path) else { throw DatabaseOpenError.needsAppUpdate }
+            let probe = try DatabaseQueue(path: url.path, configuration: configuration(readonly: true, shared: false))
+            let current = try probe.read { db in
+                try Schema.migrator.hasCompletedMigrations(db) && !Schema.migrator.hasBeenSuperseded(db)
+            }
+            try probe.close()
+            guard current else { throw DatabaseOpenError.needsAppUpdate }
+            return try DatabasePool(path: url.path, configuration: configuration(readonly: false))
         }
         return AppDatabase(writer: pool)
     }

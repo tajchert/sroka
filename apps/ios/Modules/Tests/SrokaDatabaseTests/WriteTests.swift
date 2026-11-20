@@ -43,6 +43,17 @@ struct PendingOpTests {
         }
     }
 
+    @Test func `Re-enqueueing a queued coalescing op keeps its sequence and attempts`() throws {
+        try database.run { db in
+            let seq = try PendingOpDao.enqueue(db, op("s1", item: "a", type: "item.setStatus"))
+            try PendingOpDao.markAttempted(db, opIds: ["s1"], error: "http_500")
+            #expect(try PendingOpDao.enqueue(db, op("s1", item: "a", type: "item.setStatus")) == nil)
+            let kept = try #require(try PendingOpDao.forItem(db, "a").first)
+            #expect(kept.localSeq == seq)
+            #expect(kept.attempts == 1)
+        }
+    }
+
     @Test func `Reads, attempts, deletes and retargeting`() throws {
         try database.run { db in
             try PendingOpDao.enqueue(db, op("1", item: "a", type: "item.add", payload: "{\"itemId\":\"a\"}"))

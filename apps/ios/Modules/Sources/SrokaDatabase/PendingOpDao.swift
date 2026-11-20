@@ -12,6 +12,10 @@ public enum PendingOpDao {
     /// `op_id` is already queued is ignored. Returns the new `local_seq`, or nil when ignored.
     @discardableResult
     public static func enqueue(_ db: Database, _ op: PendingOpRecord) throws -> Int64? {
+        // A retry of an already queued op must not coalesce it away (or any sibling) first.
+        let queued = try Bool.fetchOne(
+            db, sql: "SELECT EXISTS(SELECT 1 FROM pending_ops WHERE op_id = ?)", arguments: [op.opId])
+        if queued == true { return nil }
         if let itemId = op.itemId, coalescingTypes.contains(op.type) {
             try db.execute(sql: "DELETE FROM pending_ops WHERE item_id = ? AND type = ?", arguments: [itemId, op.type])
         }

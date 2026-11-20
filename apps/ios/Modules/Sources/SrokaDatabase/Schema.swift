@@ -8,19 +8,10 @@ import GRDB
 /// Rules: migrations are append-only and never destructive (no drop-and-recreate). A migration that
 /// starts reading a new server field also sets `sync_state.cursor = 0` so every row is pulled again.
 public enum Schema {
-    /// Identifiers of every registered migration, oldest first.
-    public static let migrationIds = ["v1"]
-
     /// Every table, FTS index included.
     public static let tables = [
         "items", "item_tags", "tags", "items_fts", "pending_ops", "sync_state", "content_files",
     ]
-
-    /// Enum literals as stored (upper case, as on Android).
-    enum Literal {
-        static let unread = "UNREAD"
-        static let archived = "ARCHIVED"
-    }
 
     /// The migrator for every database file. `eraseDatabaseOnSchemaChange` stays off on purpose.
     public static var migrator: DatabaseMigrator {

@@ -10,7 +10,7 @@
 #       SIM_NAME/SIM_OS  simulator (default iPhone 18 Pro / 27.2); a booted copy is created if shut down
 #       TIME_LIMIT    seconds for the whole xcodebuild run (default 900)
 #       OUT_DIR       screenshots (default apps/ios/docs/shots/journeys)
-# The simulator is ERASED on every run (keychain survives an uninstall): use your own, SIM_NAME must start with 'sroka-'.
+# The app is uninstalled from the simulator on every run (fresh install, signed out): use your own, SIM_NAME must start with 'sroka-'.
 # --direct: no proxy, the app uses the Dev build default server (http://localhost:8787); the offline journey skips.
 # TestName: a test method (e.g. testB_SaveAndRead) or class/method; default = all journeys in SrokaJourneyTests.
 set -euo pipefail
@@ -66,12 +66,12 @@ for (const list of Object.values(d)) for (const s of list) if (s.name === name) 
 ' "$SIM_NAME")"
 [[ -n "$UDID" ]] || { echo "error: no simulator named '$SIM_NAME'" >&2; exit 1; }
 [[ "$SIM_NAME" == sroka-* ]] ||
-    { echo "error: the journeys erase the simulator; use your own one (xcrun simctl create sroka-<stream> \"iPhone 18 Pro\")" >&2; exit 1; }
-# Erase (not just uninstall): the simulator keeps keychain items across an uninstall, so the app would start signed in
-# as the previous run's account. Only run this against a simulator made for the journeys (SIM_NAME=sroka-<stream>).
-xcrun simctl shutdown "$UDID" 2>/dev/null || true
-xcrun simctl erase "$UDID"
+    { echo "error: the journeys uninstall the app from the simulator; use your own one (xcrun simctl create sroka-<stream> \"iPhone 18 Pro\")" >&2; exit 1; }
+# Only uninstall: the app clears an earlier install's Keychain session on its first launch, so a reinstall starts signed
+# out (journey a asserts it). Use a simulator made for the journeys (SIM_NAME=sroka-<stream>).
+xcrun simctl boot "$UDID" 2>/dev/null || true
 xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || true
+xcrun simctl uninstall "$UDID" app.sroka.dev 2>/dev/null || true
 # A full run starts from an empty screenshot folder; a run of selected tests only replaces its own shots.
 [[ ${#TESTS[@]} -eq 0 ]] && rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"

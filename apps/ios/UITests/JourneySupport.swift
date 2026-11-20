@@ -198,15 +198,8 @@ struct Screens {
     @discardableResult
     func waitForArticleRow(timeout: TimeInterval = 120) -> XCUIElement {
         let row = row(containing: Journey.articleTitle)
-        // The app pulls the parser's result only on foreground / after a local change (no polling while a row says
-        // "Preparing…", which docs/api.md asks of clients), so the journey nudges it by backgrounding the app.
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if row.waitForExistence(timeout: 6) { return row }
-            XCUIDevice.shared.press(.home)
-            app.activate()
-        }
-        test.expect(row, "row '\(Journey.articleTitle)' (saved and parsed)", timeout: 1, app: app)
+        // No nudge: the app polls for the parse result by itself while it is active.
+        test.expect(row, "row '\(Journey.articleTitle)' (saved and parsed)", timeout: timeout, app: app)
         return row
     }
 

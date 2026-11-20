@@ -172,14 +172,7 @@ final class SrokaJourneyTests: XCTestCase {
 
         Journey.setNetwork(up: true)
         let second = offlineScreens.row(containing: "Zero-latency SQLite")
-        let deadline = Date().addingTimeInterval(120)
-        // The app pulls the parse result only on foreground (see waitForArticleRow), so nudge it like there.
-        while !second.exists && Date() < deadline {
-            if second.waitForExistence(timeout: 8) { break }
-            XCUIDevice.shared.press(.home)
-            offline.activate()
-        }
-        expect(second, "offline save synced and parsed", timeout: 1, app: offline)
+        expect(second, "offline save synced and parsed", timeout: 120, app: offline)
         shot("e3-synced")
     }
 

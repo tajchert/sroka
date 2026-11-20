@@ -42,6 +42,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 - After K2: an unknown `sroka://item/{id}` should open the library; `clearTables` must stay safe to run twice; a PDF can upload twice if the extension is killed mid-upload (declined S8).
 - Device-only checks: opening the app from the extension, extension memory limit, writes drained before suspend (0xdead10cc), Keychain access group on a signed build, background tasks.
 
+- Gate on 0d67a1d (after K2): format, full `unit`, `build Dev` all pass. Not rerun after P2.
+
 ## Open items for the owner
 
 - `GoogleService-Info.plist` for the iOS app in Firebase project `sroka-95489` → `apps/ios/Config/GoogleService-Info.plist`.

@@ -141,7 +141,7 @@ struct SuspensionGateTests {
 }
 
 extension SuspensionGateTests {
-    @Test func `Expiry suspends despite holds until they are released`() {
+    @Test func `Expiry suspends despite earlier holds, and a later hold resumes`() {
         let log = StepLog()
         let gate = SuspensionGate(suspend: { log.add("suspend") }, resume: { log.add("resume") })
         gate.enterForeground()
@@ -149,9 +149,10 @@ extension SuspensionGateTests {
         gate.enterBackground()
         gate.expire()
         #expect(log.all == ["suspend"])
-        flush.release()
-        #expect(log.all == ["suspend"])
+        // A background task while the expired flush has not let go yet.
         let task = gate.hold()
+        #expect(log.all == ["suspend", "resume"])
+        flush.release()
         #expect(log.all == ["suspend", "resume"])
         task.release()
         #expect(log.all == ["suspend", "resume", "suspend"])
@@ -334,6 +335,56 @@ struct LiveContentHooksTests {
         content.releaseRuns()
         await cancel.value
         #expect(log.all == ["joined"])
+    }
+
+    @Test func `The wipe also joins a run cancelled earlier that is still stopping`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        try await waitFor { content.waitingRuns == 1 }
+        hooks.cancelAutomatic()
+        let log = StepLog()
+        let wipe = Task {
+            await hooks.cancelAutomaticAndWait()
+            log.add("joined")
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(log.all.isEmpty)
+        content.releaseRuns()
+        await wipe.value
+        #expect(log.all == ["joined"])
+    }
+
+    @Test func `A new run waits for a cancelled one to stop`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        try await waitFor { content.waitingRuns == 1 }
+        hooks.cancelAutomatic()
+        await hooks.queueAutomaticDownloads()
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(content.log.all == ["auto:anyNetwork"])
+        content.releaseRuns()
+        try await waitFor { content.waitingRuns == 1 }
+        content.releaseRuns()
+        try await waitFor { content.log.all.count == 2 }
+    }
+
+    @Test func `A background caller's expiry leaves a run the foreground now owns`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        let background = Task { await hooks.runAutomaticNow() }
+        try await waitFor { content.waitingRuns == 1 }
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        background.cancel()
+        content.releaseRuns()
+        try await waitFor { content.waitingRuns == 1 }
+        content.releaseRuns()
+        try await waitFor { content.log.all.count == 2 }
+        await background.value
     }
 
     @Test func `The background task joins a run already in progress`() async throws {

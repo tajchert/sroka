@@ -31,6 +31,8 @@ public final class LiveContentHooks: SyncContentHooks {
         var taskId = 0
         var rerun = false
         var foreground = false
+        /// Cancelled runs that have not exited yet: the next run waits for them, and the wipe joins them.
+        var retiring: [Int: Task<Void, Never>] = [:]
     }
 
     private let content: any ContentEngine
@@ -67,17 +69,20 @@ public final class LiveContentHooks: SyncContentHooks {
     }
 
     public func queueAutomaticDownloads() async {
-        if policy() == .manual || wipeGuard.isWiping { return }
-        let started = state.withLock { state -> Bool in
-            guard state.foreground else { return false }
+        if policy() == .manual { return }
+        // The wipe raises its guard before it takes the runs to join, so checking it under this lock means a run
+        // either starts before the wipe looks or not at all.
+        let deferred = state.withLock { state -> Bool in
+            if wipeGuard.isWiping { return false }
+            guard state.foreground else { return true }
             if state.task != nil {
                 state.rerun = true
-                return true
+            } else {
+                startLocked(&state)
             }
-            startLocked(&state)
-            return true
+            return false
         }
-        if !started { onDeferred() }
+        if deferred { onDeferred() }
     }
 
     public func evict() async {
@@ -103,32 +108,37 @@ public final class LiveContentHooks: SyncContentHooks {
     // MARK: App lifecycle
 
     /// Runs the automatic downloads now and returns when they end (background processing task). Joins a run already
-    /// in progress instead of starting a second one. Cancelling the calling task cancels the run.
+    /// in progress instead of starting a second one. Cancelling the calling task cancels the run, unless the app is in
+    /// the foreground again by then (the run then belongs to the foreground and may have a rerun queued).
     public func runAutomaticNow() async {
-        if policy() == .manual || wipeGuard.isWiping { return }
-        let task = state.withLock { state -> Task<Void, Never> in
+        if policy() == .manual { return }
+        let joined = state.withLock { state -> Task<Void, Never>? in
+            if wipeGuard.isWiping { return nil }
             if let task = state.task { return task }
             return startLocked(&state)
         }
+        guard let task = joined else { return }
         await withTaskCancellationHandler {
             await task.value
         } onCancel: {
-            task.cancel()
+            if !state.withLock({ $0.foreground }) { task.cancel() }
         }
     }
 
-    /// Cancels the running automatic run (backgrounding, policy change). Returns without waiting for it to stop.
+    /// Cancels the running automatic run (backgrounding, policy change). Returns without waiting for it to stop; the
+    /// next run starts only after it has.
     public func cancelAutomatic() {
-        takeTask()?.cancel()
+        takeTasks().current?.cancel()
         progress.send(nil)
     }
 
-    /// Cancels the running automatic run and returns once it has stopped (wipe: no download may write files after the
-    /// content is removed).
+    /// Cancels the running automatic run and returns once it and every earlier cancelled run have stopped (wipe: no
+    /// automatic download may write files after the content is removed).
     public func cancelAutomaticAndWait() async {
-        let task = takeTask()
-        task?.cancel()
-        await task?.value
+        let (current, retiring) = takeTasks()
+        current?.cancel()
+        await current?.value
+        for task in retiring { await task.value }
         progress.send(nil)
     }
 
@@ -141,13 +151,16 @@ public final class LiveContentHooks: SyncContentHooks {
 
     // MARK: Private
 
-    private func takeTask() -> Task<Void, Never>? {
-        state.withLock { state -> Task<Void, Never>? in
-            let task = state.task
+    /// Detaches the current run (kept in `retiring` until it exits) and returns it with the earlier retiring runs.
+    private func takeTasks() -> (current: Task<Void, Never>?, retiring: [Task<Void, Never>]) {
+        state.withLock { state in
+            let retiring = Array(state.retiring.values)
+            let current = state.task
+            if let current { state.retiring[state.taskId] = current }
             state.task = nil
             state.rerun = false
             state.taskId += 1
-            return task
+            return (current, retiring)
         }
     }
 
@@ -155,7 +168,10 @@ public final class LiveContentHooks: SyncContentHooks {
     private func startLocked(_ state: inout State) -> Task<Void, Never> {
         state.taskId += 1
         let id = state.taskId
+        let previous = Array(state.retiring.values)
         let task = Task { [self] in
+            // Never overlap a cancelled run that is still winding down.
+            for earlier in previous { await earlier.value }
             while true {
                 let policy = policy()
                 let proceed = !(policy == .manual || wipeGuard.isWiping || Task.isCancelled)
@@ -173,6 +189,7 @@ public final class LiveContentHooks: SyncContentHooks {
                 }
                 if !again { break }
             }
+            self.state.withLock { _ = $0.retiring.removeValue(forKey: id) }
         }
         state.task = task
         return task

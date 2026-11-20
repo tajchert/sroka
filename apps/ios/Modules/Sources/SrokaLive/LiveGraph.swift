@@ -256,6 +256,24 @@ public final class LiveGraph: Sendable {
     /// The server requests go to now (custom server or the build default); version answers are keyed by it.
     public func currentServer() -> String { provider.currentServer() }
 
+    /// The effective server, current value first, then on every change.
+    public func serverChanges() -> AsyncStream<String> {
+        let source = preferences.preferencesStream()
+        let provider = provider
+        return AsyncStream { continuation in
+            let task = Task {
+                var last: String?
+                for await _ in source {
+                    let server = provider.currentServer()
+                    if server != last { continuation.yield(server) }
+                    last = server
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     /// `/v1/config` `minVersions.ios`; nil when the read failed.
     public func fetchMinimumBuild() async -> Int?? {
         do {

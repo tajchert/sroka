@@ -73,6 +73,25 @@ struct VersionGateTests {
         #expect(!gate.updateRequired)
     }
 
+    @Test func `A server switch while signed out triggers a check`() async throws {
+        let servers = AsyncStream<String>.makeStream()
+        let fetches = Mutex(0)
+        let model = AppModel(
+            sessionStates: { AsyncStream { $0.yield(.signedOut) } },
+            serverChanges: { servers.stream },
+            versionGate: VersionGate(
+                build: 5,
+                fetchMinimum: {
+                    fetches.withLock { $0 += 1 }
+                    return .some(nil)
+                }),
+            deepLinks: DeepLinkInbox(scheme: "sroka-dev"))
+        model.start()
+        servers.continuation.yield("https://a.example")
+        servers.continuation.yield("https://b.example")
+        try await waitUntil { fetches.withLock { $0 } == 1 }
+    }
+
     @Test func `A server without a minimum never blocks`() async {
         let gate = VersionGate(build: 5, fetchMinimum: { .some(nil) })
         await gate.check()

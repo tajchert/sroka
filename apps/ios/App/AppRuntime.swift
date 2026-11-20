@@ -29,7 +29,7 @@ final class AppRuntime {
     static func live(_ graph: LiveGraph) -> AppRuntime {
         let sessionStore = graph.sessionStore
         let model = AppModel(
-            sessionStates: { sessionStore.state },
+            sessionStates: { sessionStore.state }, serverChanges: { graph.serverChanges() },
             versionGate: VersionGate(
                 build: graph.configuration.build, server: { graph.currentServer() },
                 fetchMinimum: { await graph.fetchMinimumBuild() }),

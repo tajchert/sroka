@@ -9,10 +9,15 @@ import Synchronization
 public final class SuspensionGate: Sendable {
     private struct State {
         var foreground = false
-        var holds = 0
         var suspended = false
-        /// Background time ran out: suspended even with holds outstanding, until the next foreground.
-        var expired = false
+        /// Outstanding holds by the epoch they were taken in.
+        var holds: [Int: Int] = [:]
+        var epoch = 0
+        /// Holds from epochs below this no longer keep the database running (background time expired after they were
+        /// taken). 0: every hold counts.
+        var barrier = 0
+
+        var liveHolds: Int { holds.reduce(0) { $0 + ($1.key >= barrier ? $1.value : 0) } }
     }
 
     private let state = Mutex(State())
@@ -27,7 +32,7 @@ public final class SuspensionGate: Sendable {
     public func enterForeground() {
         update {
             $0.foreground = true
-            $0.expired = false
+            $0.barrier = 0
         }
     }
 
@@ -36,18 +41,24 @@ public final class SuspensionGate: Sendable {
     }
 
     /// The system is about to suspend the app (UIKit background time expired): suspend the database now, whatever
-    /// still holds it. It stays suspended until the next foreground or until every hold from before has been released.
+    /// still holds it. Holds taken before this no longer count until the next foreground; a hold taken later (a new
+    /// background task) resumes it.
     public func expire() {
         update {
             $0.foreground = false
-            $0.expired = true
+            $0.epoch += 1
+            $0.barrier = $0.epoch
         }
     }
 
     /// Keeps the database running until the returned hold is released.
     public func hold() -> Hold {
-        update { $0.holds += 1 }
-        return Hold(gate: self)
+        var epoch = 0
+        update {
+            epoch = $0.epoch
+            $0.holds[epoch, default: 0] += 1
+        }
+        return Hold(gate: self, epoch: epoch)
     }
 
     /// Runs `body` with the database held.
@@ -57,11 +68,10 @@ public final class SuspensionGate: Sendable {
         return await body()
     }
 
-    fileprivate func release() {
+    fileprivate func release(epoch: Int) {
         update {
-            $0.holds = max(0, $0.holds - 1)
-            // The holds from before the expiry are gone: a later background task may hold and resume again.
-            if $0.holds == 0 { $0.expired = false }
+            let left = ($0.holds[epoch] ?? 0) - 1
+            $0.holds[epoch] = left > 0 ? left : nil
         }
     }
 
@@ -70,7 +80,7 @@ public final class SuspensionGate: Sendable {
     private func update(_ change: (inout State) -> Void) {
         state.withLock { state in
             change(&state)
-            let wantSuspended = !state.foreground && (state.holds == 0 || state.expired)
+            let wantSuspended = !state.foreground && state.liveHolds == 0
             guard wantSuspended != state.suspended else { return }
             state.suspended = wantSuspended
             if wantSuspended { suspend() } else { resume() }
@@ -80,10 +90,12 @@ public final class SuspensionGate: Sendable {
     /// A claim on the running database. Release it exactly once; later calls do nothing.
     public final class Hold: Sendable {
         private let gate: SuspensionGate
+        private let epoch: Int
         private let released = Mutex(false)
 
-        fileprivate init(gate: SuspensionGate) {
+        fileprivate init(gate: SuspensionGate, epoch: Int) {
             self.gate = gate
+            self.epoch = epoch
         }
 
         public func release() {
@@ -91,7 +103,7 @@ public final class SuspensionGate: Sendable {
                 defer { released = true }
                 return !released
             }
-            if first { gate.release() }
+            if first { gate.release(epoch: epoch) }
         }
     }
 }

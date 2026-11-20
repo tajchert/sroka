@@ -39,7 +39,8 @@ public final class VersionGate {
     @ObservationIgnored private let build: Int?
     @ObservationIgnored private let server: @Sendable () -> String
     @ObservationIgnored private let fetchMinimum: FetchMinimum
-    @ObservationIgnored private var inFlight: (server: String, task: Task<Void, Never>)?
+    @ObservationIgnored private var inFlight: (id: Int, server: String, task: Task<Void, Never>)?
+    @ObservationIgnored private var latestRequest = 0
     @ObservationIgnored private var answeredServer: String?
 
     /// - Parameter server: the effective server requests go to now (the key answers are stored under).
@@ -65,18 +66,21 @@ public final class VersionGate {
             return
         }
         let fetch = fetchMinimum
+        latestRequest += 1
+        let id = latestRequest
         let task = Task { @MainActor [weak self] in
             let result = await fetch()
-            guard let self, self.server() == key else { return }
+            // Only the newest request publishes, and only if the server is still the one it was made for.
+            guard let self, self.latestRequest == id, self.server() == key else { return }
             // A failed read keeps the previous answer.
             guard case .some(let minimum) = result else { return }
             self.answeredServer = key
             self.minimumBuild = minimum
             self.updateRequired = isUpdateRequired(build: self.build, minimum: minimum)
         }
-        inFlight = (key, task)
+        inFlight = (id, key, task)
         await task.value
-        if inFlight?.server == key { inFlight = nil }
+        if inFlight?.id == id { inFlight = nil }
     }
 
     private func forget() {

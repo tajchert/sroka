@@ -23,14 +23,19 @@ public final class AppModel {
     public let deepLinks: DeepLinkInbox
 
     @ObservationIgnored private let sessionStates: @Sendable () -> AsyncStream<SessionState>
+    @ObservationIgnored private let serverChanges: @Sendable () -> AsyncStream<String>
     @ObservationIgnored private var observation: Task<Void, Never>?
+    @ObservationIgnored private var serverObservation: Task<Void, Never>?
 
+    /// - Parameter serverChanges: the effective server, current value first; a change triggers a version check.
     public init(
         sessionStates: @escaping @Sendable () -> AsyncStream<SessionState>,
+        serverChanges: @escaping @Sendable () -> AsyncStream<String> = { AsyncStream { $0.finish() } },
         versionGate: VersionGate,
         deepLinks: DeepLinkInbox
     ) {
         self.sessionStates = sessionStates
+        self.serverChanges = serverChanges
         self.versionGate = versionGate
         self.deepLinks = deepLinks
     }
@@ -44,9 +49,19 @@ public final class AppModel {
         }
     }
 
-    /// Starts following the session. Idempotent.
+    /// Starts following the session and the server. Idempotent.
     public func start() {
         guard observation == nil else { return }
+        let servers = serverChanges()
+        serverObservation = Task { [weak self] in
+            var last: String?
+            for await server in servers {
+                let changed = last != nil && last != server
+                last = server
+                // Switching servers while signed out changes no session: check the new server's minimum here.
+                if changed { await self?.versionGate.check() }
+            }
+        }
         let stream = sessionStates()
         observation = Task { [weak self] in
             for await state in stream {

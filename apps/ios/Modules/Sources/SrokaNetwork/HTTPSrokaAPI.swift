@@ -148,11 +148,12 @@ public final class HTTPSrokaAPI: SrokaAPI {
     public func createImport(
         source: URL, fileName: String, mimeType: String, format: ImportFormat
     ) async throws -> JobDto {
+        // Endpoint first: the caller checked the session just before, and building the body can take a while.
+        var request = try await apiRequest("POST", "/v1/imports", timeout: Self.uploadTimeout)
         let body = try MultipartBody.make(
             fields: [("format", format.rawValue)], fileField: "file", fileName: fileName, mimeType: mimeType,
             source: source)
         defer { try? FileManager.default.removeItem(at: body.fileURL) }
-        var request = try await apiRequest("POST", "/v1/imports", timeout: Self.uploadTimeout)
         request.setValue(body.contentType, forHTTPHeaderField: "Content-Type")
         let data = try await perform(request, uploadFile: body.fileURL).data
         return (try decode(data) as JobEnvelope).job

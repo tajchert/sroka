@@ -63,8 +63,10 @@ public final class LiveAuthRepository: AuthRepository {
         guard Self.isValidEmail(address) else { return .failure(.invalidEmail) }
         let otp = String(code.filter { !$0.isWhitespace })
         guard !otp.isEmpty else { return .failure(.invalidCode) }
-        let server = provider.currentServer()
+        // Generation before server: a switch bumps the generation before it changes the server, so any switch that
+        // could redirect this request either changes the generation read here or leaves the server read below stale.
         let started = generation.withLock { $0 }
+        let server = provider.currentServer()
         switch await apiCall({ try await api.signIn(email: address, otp: otp) }) {
         case .failure(let error):
             return .failure(Self.authError(error))

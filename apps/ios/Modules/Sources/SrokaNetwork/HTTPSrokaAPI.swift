@@ -195,7 +195,9 @@ public final class HTTPSrokaAPI: SrokaAPI {
         rawBody: Data? = nil,
         timeout: TimeInterval? = nil
     ) async throws -> URLRequest {
-        let base = await provider.baseUrl()
+        // One snapshot: the token always belongs to the server the request goes to.
+        let endpoint = await provider.endpoint()
+        let base = endpoint.baseUrl
         guard let scheme = base.scheme?.lowercased(), scheme == "https" || scheme == "http",
             var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
         else { throw ApiError.invalidRequest }
@@ -212,7 +214,7 @@ public final class HTTPSrokaAPI: SrokaAPI {
         if let timeout { request.timeoutInterval = timeout }
         request.setValue(identity.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(await provider.deviceId(), forHTTPHeaderField: "X-Sroka-Device")
-        if let token = await provider.token() {
+        if let token = endpoint.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         request.setValue("application/json", forHTTPHeaderField: "Accept")

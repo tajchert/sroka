@@ -48,17 +48,28 @@ public final class LiveApiSessionProvider: ApiSessionProvider {
         return server
     }
 
-    public func baseUrl() async -> URL {
-        // The stored value was validated when it was set; a corrupt one falls back to the build default.
-        URL(string: currentServer()) ?? URL(string: defaultServerUrl) ?? URL(string: "https://api.sroka.app")!
-    }
+    public func baseUrl() async -> URL { endpointSnapshot().baseUrl }
 
-    public func token() async -> String? {
-        guard let token = sessionStore.token else { return nil }
+    public func token() async -> String? { endpointSnapshot().token }
+
+    /// Base URL and token from one read of the server preference: the token is only paired with the server it was
+    /// issued for.
+    public func endpoint() async -> ApiEndpoint { endpointSnapshot() }
+
+    func endpointSnapshot() -> ApiEndpoint {
+        let server = currentServer()
+        guard let url = URL(string: server) else {
+            // The stored value was validated when it was set; a corrupt one falls back to the build default, and a
+            // fallback URL never carries a token.
+            let fallback = URL(string: defaultServerUrl) ?? URL(string: "https://api.sroka.app")!
+            return ApiEndpoint(baseUrl: fallback, token: nil)
+        }
         // Sign-in always records the server; a token without that record (e.g. a Keychain delete that failed during a
-        // wipe) is never sent anywhere.
-        guard preferences.accountServer == currentServer() else { return nil }
-        return token
+        // wipe), or recorded for another server, is never sent anywhere.
+        guard let token = sessionStore.token, preferences.accountServer == server else {
+            return ApiEndpoint(baseUrl: url, token: nil)
+        }
+        return ApiEndpoint(baseUrl: url, token: token)
     }
 
     public func deviceId() async -> String { sessionStore.deviceId() }

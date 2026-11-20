@@ -68,6 +68,8 @@
 	<!-- Team prefix for the shared Keychain access group (empty in unsigned simulator builds). -->
 	<key>AppIdentifierPrefix</key>
 	<string>$(AppIdentifierPrefix)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>app.sroka.refresh</string>

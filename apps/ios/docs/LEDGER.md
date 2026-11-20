@@ -16,14 +16,17 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 | A | Core logic + network | Sonnet | merged | 17ecc0f |
 | B | Database | Opus | merged | 13acf50 |
 | C | Library UI | Sonnet | merged | 6e5be88 |
-| D | Reader UI | Sonnet | running |  |
+| D | Reader UI | Sonnet | merged | 4306803 |
 | E | Auth + settings UI | Sonnet | merged | 0b26f9b |
 | G | Sync | Opus | merged, Sol approved | e12c538 |
 | H | Content | Opus | merged, Sol nits declined | 7be6b6a |
 | I | Session | Opus | merged, Sol reviewed | b05c56b |
-| J | Tags + search UI | Sonnet | running |  |
-| K | Share extension | Opus | running (sheet UI; live wiring after L) |  |
-| L | App composition | Opus | next |  |
+| J | Tags + search UI | Sonnet | merged | 1dcc69a |
+| K | Share extension (K1 sheet, K2 live) | Opus | merged; final-review fixes S1-S3 | d95403b, eb7e4bd, 87cda1b |
+| L | App composition (L1 live graph, L2 navigation) | Opus | merged; final-review fixes S4-S7 | 811ca9a, ea87cdf, 85edefc |
+| P | UI fix rounds (P1, P2), flaky test (R) | Sonnet | merged | 1c0feae, 41531a5, a4d9cdb |
+| Q | Journeys against the local stack | Sonnet | running |  |
+| Z | Final Sol review | Sol | round 1: CHANGES (S1-S8); re-check pending |  |
 | M | Firebase telemetry + release preflight | Sonnet | merged (no archive/export run; Release path not in verify.sh) | 58c60d8 |
 
 ## Open items
@@ -43,6 +46,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 - Device-only checks: opening the app from the extension, extension memory limit, writes drained before suspend (0xdead10cc), Keychain access group on a signed build, background tasks.
 
 - Gate on 0d67a1d (after K2): format, full `unit`, `build Dev` all pass. Not rerun after P2.
+- Final review round 1 (on be1ec6a): S1 PDF upload owner/credentials, S2 double upload across processes, S3 extension writes during a wipe (87cda1b); S4 reauth resumes uploads and import, S5 late delete-account, S6 background expiry, S7 account switch (85edefc). S8 (late 401 signs out a new account) declined: needs an `ApiError`/`SyncSession` protocol change across 8 call sites; open risk.
+- Not rerun after P2 or the final-review fixes: full gate. K2's new tests were not run with their fixes reverted.
 
 ## Open items for the owner
 

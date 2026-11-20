@@ -36,6 +36,31 @@ struct AppRouterTests {
 
     // MARK: Opening items
 
+    /// The Tags tab pushes a tag's item list itself (`navigationDestination(item:)`, not part of `paths`); the
+    /// reader opened from that list goes on the same tab's typed path, and leaving it returns to the list.
+    @Test func `A reader opened from a tag's items lives on the Tags path and closes back to it`() {
+        let router = signedInRouter()
+        router.select(.tags)
+        router.open(itemId: "tagged-1")
+        #expect(router[path: .tags] == [ReaderRoute(itemId: "tagged-1")])
+        #expect(router.readerItemId(in: .tags) == "tagged-1")
+        #expect(router[path: .myList].isEmpty)
+
+        router.closeReader()
+        #expect(router[path: .tags].isEmpty)
+        #expect(router.selectedTab == .tags)
+    }
+
+    @Test func `Archive and next from a tag's reader stays on the Tags path`() {
+        let router = signedInRouter()
+        router.select(.tags)
+        router.open(itemId: "tagged-1")
+        router.readerArchivedAndOpenNext(archivedId: "tagged-1", nextId: "tagged-2")
+        #expect(router[path: .tags] == [ReaderRoute(itemId: "tagged-2")])
+        router.closeReader()
+        #expect(router[path: .tags].isEmpty)
+    }
+
     @Test(arguments: AppTab.allCases)
     func `Opening an item from a tab pushes the reader on that tab`(tab: AppTab) {
         let router = signedInRouter()

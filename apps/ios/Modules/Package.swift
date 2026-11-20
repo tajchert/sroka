@@ -98,7 +98,10 @@ let package = Package(
         .testTarget(name: "SrokaTestingTests", dependencies: testDependencies("SrokaTesting")),
         .testTarget(name: "SrokaDesignTests", dependencies: testDependencies("SrokaDesign")),
         .testTarget(name: "SrokaNetworkTests", dependencies: testDependencies("SrokaNetwork")),
-        .testTarget(name: "SrokaDatabaseTests", dependencies: testDependencies("SrokaDatabase")),
+        .testTarget(
+            name: "SrokaDatabaseTests",
+            dependencies: testDependencies("SrokaDatabase") + [.product(name: "GRDB", package: "GRDB.swift")]
+        ),
         .testTarget(name: "SrokaSyncTests", dependencies: testDependencies("SrokaSync")),
         .testTarget(name: "SrokaContentTests", dependencies: testDependencies("SrokaContent")),
         .testTarget(name: "SrokaSessionTests", dependencies: testDependencies("SrokaSession")),

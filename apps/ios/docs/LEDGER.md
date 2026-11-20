@@ -39,6 +39,9 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 
 - Gate on 5b6e921 (L1 + L2 joined): format, `build Dev`, `build Prod` pass; full `unit` fails on two tests that pass alone: `LibraryViewModelTests` "Filters combine with AND" (P1) and `AppModelTests` "The root follows the session and the version gate" (R).
 
+- After K2: an unknown `sroka://item/{id}` should open the library; `clearTables` must stay safe to run twice; a PDF can upload twice if the extension is killed mid-upload (declined S8).
+- Device-only checks: opening the app from the extension, extension memory limit, writes drained before suspend (0xdead10cc), Keychain access group on a signed build, background tasks.
+
 ## Open items for the owner
 
 - `GoogleService-Info.plist` for the iOS app in Firebase project `sroka-95489` → `apps/ios/Config/GoogleService-Info.plist`.

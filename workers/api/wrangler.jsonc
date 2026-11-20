@@ -44,6 +44,6 @@
     "BROWSER_RENDER_ENABLED": "false",
     "TURNSTILE_SITE_KEY": "0x4AAAAAAFXEWydv4XHizEV8"
   }
-  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY, TURNSTILE_SECRET_KEY, ADMIN_EMAILS (comma-separated; kept out of git), optional REVIEW_EMAIL, REVIEW_OTP.
+  // Secrets (wrangler secret put): BETTER_AUTH_SECRET, CONTENT_URL_SIGNING_KEY, TURNSTILE_SECRET_KEY, ADMIN_EMAILS (comma-separated; kept out of git), optional REVIEW_EMAIL, REVIEW_OTP; optional silent-push credentials (D17) FCM_SERVICE_ACCOUNT (service-account JSON), APNS_KEY (.p8 PEM), APNS_KEY_ID, APNS_TEAM_ID.
   // Local dev overrides vars via .dev.vars (see .dev.vars.example).
 }

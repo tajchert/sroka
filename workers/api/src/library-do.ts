@@ -7,6 +7,7 @@ import {
   type ParseJob,
   type ParseResult,
   type PullResponse,
+  type PushTokenRequest,
   type UpdateItemRequest,
   Op as OpSchema,
   ParseResultSchema,
@@ -18,6 +19,8 @@ import type { Env } from "./env.ts";
 import { CLIENT_KINDS, type ClientKind } from "./clients.ts";
 import { patchToOps } from "./do/rest.ts";
 import { migrate } from "./do/schema.ts";
+import { deletePushDevice, hasPushDevices, listPushDevices, prunePushDevice, putPushDevice, setPushApnsEnv } from "./do/push-store.ts";
+import { PushSender } from "./push/index.ts";
 import { deletePrefix } from "./r2.ts";
 import { withLeadImageUrls } from "./do/sign.ts";
 import { type AddInfo, type ApplyResult, LibraryStore, type TagWithCount } from "./do/store.ts";
@@ -66,6 +69,14 @@ const REF_BATCH = 50;
 /** A PDF upload reservation older than this without a referencing item is reclaimed by the alarm. */
 const PDF_RESERVATION_MS = 60 * 60 * 1000;
 const REF_RETRY_MS = 10 * 60 * 1000;
+/**
+ * Silent sync push coalescing (D17): content becoming ready sets `push_due_at` = max(now + PUSH_DELAY_MS,
+ * push_last_sent_at + PUSH_INTERVAL_MS) unless one is pending, so a big import sends at most one push a minute.
+ */
+const PUSH_DELAY_MS = 10 * 1000;
+const PUSH_INTERVAL_MS = 60 * 1000;
+/** An alarm firing this close before a due time handles it. */
+const ALARM_SLACK_MS = 1000;
 
 export class LibraryDestroyedError extends Error {
   constructor() {
@@ -84,6 +95,8 @@ export class LibraryDO extends DurableObject<Env> {
   private destroyed: boolean | null = null;
   /** Serializes content-ref flushes (flushContentRefs). */
   private refChain: Promise<unknown> = Promise.resolve();
+  /** Lazily built from env secrets; tests replace it (runInDurableObject) to inject fetch/credentials. */
+  private pusher: PushSender | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -198,11 +211,64 @@ export class LibraryDO extends DurableObject<Env> {
     return jobs.slice(0, granted);
   }
 
-  private async scheduleSweepIn(ms: number): Promise<void> {
-    const at = Date.now() + ms;
+  /** Arms the (single) alarm at `at` unless it already fires earlier. */
+  private async armAlarm(at: number): Promise<void> {
     const cur = await this.ctx.storage.getAlarm();
     if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /**
+   * Maintenance (prune + sweeps) is due at meta `maint_due_at`; push-only alarm firings skip it. 0 = unknown
+   * (libraries from before schema v7) and counts as due.
+   */
+  private async scheduleSweepIn(ms: number): Promise<void> {
+    const at = Date.now() + ms;
+    const due = this.store.getMeta("maint_due_at");
+    if (due === 0 || due > at) this.store.setMetaNumber("maint_due_at", at);
+    await this.armAlarm(at);
     this.alarmChecked = true;
+  }
+
+  /** Content became downloadable: coalesce one silent sync push to the user's phones (D17). */
+  private async schedulePush(now = Date.now()): Promise<void> {
+    if (!hasPushDevices(this.ctx.storage)) return;
+    let due = this.store.getMeta("push_due_at");
+    if (due === 0) {
+      due = Math.max(now + PUSH_DELAY_MS, this.store.getMeta("push_last_sent_at") + PUSH_INTERVAL_MS);
+      this.store.setMetaNumber("push_due_at", due);
+    }
+    await this.armAlarm(due);
+  }
+
+  /** Sends the pending push to every registered device, prunes dead tokens. Never throws. */
+  private async sendPush(): Promise<void> {
+    try {
+      const devices = listPushDevices(this.ctx.storage);
+      if (devices.length === 0) return;
+      this.pusher ??= new PushSender(this.env);
+      const t0 = Date.now();
+      const r = await this.pusher.send(devices);
+      if (this.isDestroyed()) return;
+      for (const { device, outcome } of r.outcomes) {
+        if (outcome.status === "prune") prunePushDevice(this.ctx.storage, device.deviceId, device.token);
+        else if (outcome.status === "sent" && outcome.apnsEnv) setPushApnsEnv(this.ctx.storage, device.deviceId, device.token, outcome.apnsEnv);
+      }
+      const failures: Record<string, number> = {};
+      for (const { outcome } of r.outcomes) if (outcome.status === "failed") failures[outcome.reason] = (failures[outcome.reason] ?? 0) + 1;
+      log.info("push sent", {
+        event: "push_sent",
+        devices: devices.length,
+        fcm: r.fcm,
+        apns: r.apns,
+        pruned: r.pruned,
+        failed: r.failed,
+        skipped: r.skipped,
+        ...(r.failed ? { failures } : {}),
+        durationMs: Date.now() - t0,
+      });
+    } catch (e) {
+      log.exception("push send failed", e, { event: "push_send_failed" });
+    }
   }
 
   private userId(): string {
@@ -219,7 +285,11 @@ export class LibraryDO extends DurableObject<Env> {
   private async ensureAlarm(): Promise<void> {
     if (this.alarmChecked) return;
     this.alarmChecked = true;
-    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      const at = Date.now() + DAY_MS;
+      this.store.setMetaNumber("maint_due_at", at);
+      await this.ctx.storage.setAlarm(at);
+    }
   }
 
   private sign(items: Parameters<typeof withLeadImageUrls>[2]): Promise<Item[]> {
@@ -383,9 +453,22 @@ export class LibraryDO extends DurableObject<Env> {
     const p = ParseResultSchema.safeParse(result);
     if (!p.success) return { ok: false };
     const r = this.store.markParsed(itemId, p.data);
+    if (r.ok && p.data.status !== "failed") await this.schedulePush();
     await this.flushCleanup();
     await this.flushRefsIfPending();
     return r;
+  }
+
+  /** PUT /v1/push-token (api.md §17). */
+  putPushToken(deviceId: string, req: PushTokenRequest, now: number = Date.now()): void {
+    this.ensureSchema();
+    putPushDevice(this.ctx.storage, deviceId, req, now);
+  }
+
+  /** DELETE /v1/push-token: idempotent. */
+  deletePushToken(deviceId: string): void {
+    this.ensureSchema();
+    deletePushDevice(this.ctx.storage, deviceId);
   }
 
   /**
@@ -578,15 +661,37 @@ export class LibraryDO extends DurableObject<Env> {
     return total;
   }
 
-  override async alarm(): Promise<void> {
+  /**
+   * One alarm, two jobs: maintenance (prune, content-ref retry, PDF + stale-pending sweeps; daily or earlier via
+   * scheduleSweepIn, meta `maint_due_at`) and the coalesced sync push (meta `push_due_at`). It always re-arms at
+   * the earliest remaining due time, so push firings never lose the daily maintenance.
+   */
+  override async alarm(info?: { retryCount: number; isRetry: boolean }): Promise<void> {
     if (this.isDestroyed()) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     this.ensureSchema();
-    this.store.prune();
-    // Reschedule before the sweep: a failing queue send makes the alarm retry, but the daily cadence stays.
-    await this.ctx.storage.setAlarm(Date.now() + DAY_MS);
+    const now = Date.now();
+    const maintDue = this.store.getMeta("maint_due_at");
+    const pushDue = this.store.getMeta("push_due_at");
+    // A retry (the previous run threw in a sweep) repeats the maintenance it was meant to do.
+    const doMaint = maintDue === 0 || maintDue <= now + ALARM_SLACK_MS || info?.isRetry === true;
+    const doPush = pushDue > 0 && pushDue <= now + ALARM_SLACK_MS;
+    if (doMaint) {
+      this.store.prune();
+      this.store.setMetaNumber("maint_due_at", now + DAY_MS);
+    }
+    if (doPush) {
+      this.store.setMetaNumber("push_due_at", 0);
+      this.store.setMetaNumber("push_last_sent_at", now);
+    }
+    // Re-arm before any network work: a failing queue send makes the alarm retry, but the cadence stays.
+    const nextMaint = this.store.getMeta("maint_due_at");
+    const nextPush = this.store.getMeta("push_due_at");
+    await this.ctx.storage.setAlarm(nextPush > 0 ? Math.min(nextMaint, nextPush) : nextMaint);
+    if (doPush) await this.sendPush();
+    if (!doMaint) return;
     await this.flushRefsIfPending(); // retries failed content-ref flushes (errors are swallowed)
     const t0 = Date.now();
     try {

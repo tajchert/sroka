@@ -31,6 +31,13 @@ export interface Env {
   TURNSTILE_SITE_KEY?: string;
   /** Turnstile secret (wrangler secret). Unset = verification skipped (local dev / self-host). */
   TURNSTILE_SECRET_KEY?: string;
+  /** Silent sync push (D17), all optional secrets; a platform without its credentials is skipped. */
+  /** FCM HTTP v1: the whole Google service-account JSON key (project sroka-95489). */
+  FCM_SERVICE_ACCOUNT?: string;
+  /** APNs auth key: contents of the .p8 file (PKCS#8 PEM). */
+  APNS_KEY?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
   REVIEW_EMAIL?: string;
   REVIEW_OTP?: string;
 }

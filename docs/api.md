@@ -3,7 +3,7 @@
 Source of truth for shapes: `packages/shared/src/*.ts` (zod). This document defines **semantics** the schemas can't express.
 If this document and `docs/decisions.md` disagree, decisions.md wins; if this document and the schemas disagree on a *shape*, the schema wins — fix the doc.
 
-Contents: 1 Conventions · 2 Hosts, auth, CORS · 3 Errors · 4 Objects · 5 Items endpoints · 6 Tags endpoints · 7 Sync · 8 Mutation semantics (applyOps) · 9 Parse pipeline interface · 10 Content delivery · 11 Imports/exports · 12 Account, me, config · 13 URL normalization · 14 Limits & rate limits · 15 Storage notes for implementers
+Contents: 1 Conventions · 2 Hosts, auth, CORS · 3 Errors · 4 Objects · 5 Items endpoints · 6 Tags endpoints · 7 Sync · 8 Mutation semantics (applyOps) · 9 Parse pipeline interface · 10 Content delivery · 11 Imports/exports · 12 Account, me, config · 13 URL normalization · 14 Limits & rate limits · 15 Storage notes for implementers · 16 Admin · 17 Push tokens
 
 ---
 
@@ -457,3 +457,27 @@ All `/v1/admin/*` routes require a session **and** an email listed in env `ADMIN
 - `GET /v1/admin/stats/popular?days=&limit=` (D16; `days` 1..365 optional, `limit` 1..200 default 50; else `400`) → `AdminPopularResponse` `{minSavers: 5, days|null, domainDays, articles:[{url, title|null, savers, lastSavedAt}], domains:[{domain, savers}]}`. Only entries with ≥ `minSavers` distinct users. `articles`: live public saves from `content_refs` × `content` grouped by `url_hash`, `days` filters on when the save was attached (omitted = all live saves), sorted by savers then recency. `domains`: `parse_attempts` without captures (`url` not null), distinct `user_hash`, last `domainDays` = min(`days` ?? 30, 30) days.
 - `GET /v1/admin/site-rules` → `{rules:[{host, rule}]}` (sorted by host).
 - `GET /v1/admin/site-rules/:host` → `{host, rule}` or `404`. `PUT` body `SiteRule` (strict; `400` with zod issues otherwise) → `{host, rule}`; host is normalized with `ruleHost` (lowercase, no `www.`), `updatedAt` is set by the server. `DELETE` → `204`.
+
+## 17. Push tokens (silent sync push, D17)
+
+Phones register a push token so the server can wake them when saved content becomes downloadable (an item's parse result is `ok`/`partial`, incl. PDFs and refresh re-parses; never on `failed`). The push carries no data beyond `type: "sync"`: the app runs its normal sync and downloads per its own download policy.
+
+`PUT /v1/push-token` (auth, `PushTokenRequest` in api.ts) → `204`. The device is the `X-Sroka-Device` header; missing, invalid or `"rest"` → `400 {"error":"validation","message":"device header required"}` (also on `DELETE`). Body failures → the usual `400 {error:"invalid_request", message, issues}`.
+```json
+{ "platform": "fcm" | "apns",
+  "token": "<1..4096 chars; apns: hex>",
+  "apnsEnvironment": "sandbox" | "production",   // required for apns, ignored for fcm
+  "apnsTopic": "app.sroka" | "app.sroka.dev" }    // required for apns, ignored for fcm
+```
+Upsert keyed by device id (LibraryDO `push_devices`, schema v7); a row holding the same token under another device id is deleted; max 10 rows per user (the least recently updated beyond that are dropped). Account deletion wipes them with the library.
+
+`DELETE /v1/push-token` → removes the row of `X-Sroka-Device`; `204` even if there was none.
+
+**Sending** (LibraryDO alarm): content becoming ready sets a pending push due at `max(now + 10 s, lastSent + 60 s)` unless one is already pending, so bursts (imports) coalesce to at most one push per minute; each due time sends once to every registered device. Dead tokens are deleted: FCM `404` / `UNREGISTERED` / `400 INVALID_ARGUMENT` naming the token; APNs `410`, `400 BadDeviceToken` (after one retry on the other APNs environment — on success the stored `apnsEnvironment` is switched), `400 DeviceTokenNotForTopic`. `429`/`5xx`/network errors are logged and not retried (the apps' periodic sync is the fallback). A platform whose credentials are not configured is skipped.
+
+Payloads (clients act on any message with `type == "sync"` and ignore other types):
+- FCM HTTP v1 (`POST https://fcm.googleapis.com/v1/projects/{project}/messages:send`), data-only:
+  `{"message":{"token":T,"data":{"type":"sync"},"android":{"priority":"HIGH","collapse_key":"sync","ttl":"43200s"}}}`
+- APNs (`POST https://api[.sandbox].push.apple.com/3/device/<token>`, host by stored environment): headers `apns-push-type: background`, `apns-priority: 5`, `apns-topic: <stored topic>`, `apns-collapse-id: sync`, `apns-expiration: <now + 43200 s>`, `authorization: bearer <ES256 provider JWT>`; body `{"aps":{"content-available":1},"type":"sync"}`.
+
+Server secrets (all optional): `FCM_SERVICE_ACCOUNT` (service-account JSON key), `APNS_KEY` (`.p8` PEM), `APNS_KEY_ID`, `APNS_TEAM_ID`.

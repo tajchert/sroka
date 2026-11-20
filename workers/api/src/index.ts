@@ -14,6 +14,7 @@ import { clientErrorRoutes } from "./routes/client-errors.ts";
 import { exportsRoutes } from "./routes/exports.ts";
 import { pdfLinkRoutes } from "./routes/pdf-link.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { pushRoutes } from "./routes/push.ts";
 import { onError, requestLogger } from "./middleware/logging.ts";
 
 export { LibraryDO } from "./library-do.ts";
@@ -43,6 +44,7 @@ app.route("/v1", clientErrorRoutes);
 // Authenticated /v1.
 app.use("/v1/*", requireAuth);
 app.route("/v1", accountRoutes);
+app.route("/v1", pushRoutes);
 app.route("/v1/items", itemsRoutes);
 app.route("/v1/tags", tagsRoutes);
 app.route("/v1/sync", syncRoutes);

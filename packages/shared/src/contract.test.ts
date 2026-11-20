@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CreateItemRequest, toApiError } from "./api.ts";
+import { CreateItemRequest, PushTokenRequest, toApiError } from "./api.ts";
 import { pairWins } from "./lww.ts";
 import { tagKey } from "./model.ts";
 import { ParseJobSchema, ParseResultSchema } from "./parse.ts";
@@ -49,5 +49,29 @@ describe("tags", () => {
     expect(pairWins({ at: 10, dev: "a" }, { at: 10, dev: "b" })).toBe(false);
     expect(pairWins({ at: 10, dev: "c" }, { at: 10, dev: "b" })).toBe(true);
     expect(pairWins({ at: 9, dev: "z" }, { at: 10, dev: "a" })).toBe(false);
+  });
+});
+
+describe("PushTokenRequest", () => {
+  it("accepts fcm and apns bodies", () => {
+    expect(PushTokenRequest.parse({ platform: "fcm", token: "abc:def" })).toEqual({ platform: "fcm", token: "abc:def" });
+    // apns-only keys on an fcm body (e.g. explicit nulls) are stripped
+    expect(PushTokenRequest.parse({ platform: "fcm", token: "t", apnsEnvironment: null, apnsTopic: null })).toEqual({ platform: "fcm", token: "t" });
+    const apns = { platform: "apns", token: "a1B2", apnsEnvironment: "sandbox", apnsTopic: "app.sroka.dev" };
+    expect(PushTokenRequest.parse(apns)).toEqual(apns);
+  });
+  it("rejects bad bodies", () => {
+    const bad = [
+      {},
+      { platform: "gcm", token: "x" },
+      { platform: "fcm", token: "" },
+      { platform: "fcm", token: "x".repeat(4097) },
+      { platform: "apns", token: "zz", apnsEnvironment: "sandbox", apnsTopic: "app.sroka" },
+      { platform: "apns", token: "ab", apnsTopic: "app.sroka" },
+      { platform: "apns", token: "ab", apnsEnvironment: "production" },
+      { platform: "apns", token: "ab", apnsEnvironment: "dev", apnsTopic: "app.sroka" },
+      { platform: "apns", token: "ab", apnsEnvironment: "production", apnsTopic: "com.other" },
+    ];
+    for (const b of bad) expect(PushTokenRequest.safeParse(b).success, JSON.stringify(b)).toBe(false);
   });
 });

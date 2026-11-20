@@ -116,6 +116,18 @@ export const MIGRATIONS: readonly string[][] = [
   [`CREATE TABLE pdf_uploads (content_id TEXT PRIMARY KEY, at INTEGER NOT NULL)`],
   // v6: backs `sort=archived` (ORDER BY COALESCE(archived_at, saved_at) DESC, id DESC), which otherwise scanned + sorted every item.
   [`CREATE INDEX items_archived_sort ON items(COALESCE(archived_at, saved_at), id)`],
+  // v7: silent sync push (D17, api.md §17): one row per signed-in phone (X-Sroka-Device), max 10 per library.
+  [
+    `CREATE TABLE push_devices (
+      device_id  TEXT PRIMARY KEY,
+      platform   TEXT NOT NULL,
+      token      TEXT NOT NULL,
+      apns_env   TEXT,
+      apns_topic TEXT,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX push_devices_token ON push_devices(token)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -4,6 +4,7 @@ import type { ParseJob } from "@sroka/shared";
 import { Hono } from "hono";
 import type { Env } from "../../src/env.ts";
 import { itemsRoutes } from "../../src/routes/items.ts";
+import { pushRoutes } from "../../src/routes/push.ts";
 import { syncRoutes } from "../../src/routes/sync.ts";
 import { tagsRoutes } from "../../src/routes/tags.ts";
 
@@ -29,6 +30,7 @@ export function makeApp(envOverride: Partial<Env> = {}) {
   app.route("/v1/items", itemsRoutes);
   app.route("/v1/tags", tagsRoutes);
   app.route("/v1/sync", syncRoutes);
+  app.route("/v1", pushRoutes);
 
   let n = 0;
   const user = `rt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

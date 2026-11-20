@@ -219,6 +219,35 @@ export type MeResponse = z.infer<typeof MeResponse>;
 export const DeleteAccountRequest = z.object({ confirm: z.literal("DELETE") });
 export const DeleteAccountResponse = z.object({ deleted: z.literal(true) });
 
+// ---------- push tokens (docs/api.md §17) ----------
+
+export const PushPlatform = z.enum(["fcm", "apns"]);
+export type PushPlatform = z.infer<typeof PushPlatform>;
+export const ApnsEnvironment = z.enum(["sandbox", "production"]);
+export type ApnsEnvironment = z.infer<typeof ApnsEnvironment>;
+/** APNs topics (iOS bundle ids) the server accepts. */
+export const ApnsTopic = z.enum(["app.sroka", "app.sroka.dev"]);
+export type ApnsTopic = z.infer<typeof ApnsTopic>;
+
+/**
+ * PUT /v1/push-token — this device's (`X-Sroka-Device`) push token. Unknown keys are stripped, so an FCM body
+ * carrying `apnsEnvironment: null` etc. still parses.
+ */
+export const PushTokenRequest = z.discriminatedUnion("platform", [
+  z.object({ platform: z.literal("fcm"), token: z.string().min(1).max(4096) }),
+  z.object({
+    platform: z.literal("apns"),
+    token: z
+      .string()
+      .min(1)
+      .max(4096)
+      .regex(/^[0-9a-fA-F]+$/, "apns token must be hex"),
+    apnsEnvironment: ApnsEnvironment,
+    apnsTopic: ApnsTopic,
+  }),
+]);
+export type PushTokenRequest = z.infer<typeof PushTokenRequest>;
+
 // ---------- imports / exports ----------
 
 /** POST /v1/imports multipart/form-data fields (file is validated separately as a File/Blob). */

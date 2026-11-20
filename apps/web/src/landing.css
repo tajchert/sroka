@@ -225,6 +225,17 @@ svg {
 .nav-how:hover {
   color: var(--blue);
 }
+.nav-gh {
+  display: inline-flex;
+  color: var(--ink);
+}
+.nav-gh:hover {
+  color: var(--blue);
+}
+.nav-gh svg {
+  width: 26px;
+  height: 26px;
+}
 .hero-body {
   padding-top: 72px;
   display: flex;
@@ -993,6 +1004,26 @@ html.signed-in .signed-in.btn {
 .foot-brand svg {
   width: 18px;
   height: 21px;
+}
+.foot-gh {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.foot-gh:hover {
+  border-color: var(--ink);
+}
+.foot-gh svg {
+  width: 22px;
+  height: 22px;
 }
 .foot-links {
   display: flex;

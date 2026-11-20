@@ -1,142 +1,128 @@
-import LibraryFeature
-import SearchFeature
+import AppNavigation
+import Dependencies
+import SettingsFeature
+import SrokaCore
 import SrokaDesign
+import SrokaTesting
 import SwiftUI
-import TagsFeature
 
-/// Top-level destinations. Selection lives above the layout branch so rotating or resizing keeps it.
-enum RootTab: String, Hashable, CaseIterable, Identifiable {
-    case myList
-    case archive
-    case tags
-    case search
-
-    var id: Self { self }
-
-    var title: LocalizedStringResource {
-        switch self {
-        case .myList: "My List"
-        case .archive: "Archive"
-        case .tags: "Tags"
-        case .search: "Search"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .myList: "bookmark"
-        case .archive: "archivebox"
-        case .tags: "tag"
-        case .search: "magnifyingglass"
-        }
-    }
-}
-
-/// Tab bar on compact width; sidebar + detail split on regular width (iPad, wide windows).
+/// The app's root. Picks one of four screens, in this order:
+/// 1. the blocking "update needed" screen (`versionGate`),
+/// 2. the shell for a signed-in (or expired) session,
+/// 3. the sign-in flow for a signed-out session,
+/// 4. a plain paper-coloured screen until the session is known.
+///
+/// **Seams for the live graph (stream L1).** All three have working defaults, so the app runs on the fakes today:
+/// - `session`: the session root. `nil` follows `authRepository.session` itself; pass a value to drive it from the
+///   live graph instead (changes are applied; signing out resets all navigation state).
+/// - `versionGate`: `.open` by default; `.updateRequired(storeURL:)` replaces the whole app.
+/// - `pendingDeepLinkItemId` with `onDeepLinkHandled`: an item id from `sroka://item/{id}` or a notification. The
+///   shell opens it as soon as it is on screen (immediately when it already is) and then calls `onDeepLinkHandled`
+///   so the owner can clear it.
 struct RootView: View {
+    var session: SessionState?
+    var versionGate: VersionGate
+    var pendingDeepLinkItemId: String?
+    var onDeepLinkHandled: () -> Void
+
+    @State private var router: AppRouter
+    @State private var models: ShellModels
+    @Dependency(\.authRepository) private var auth
+
+    init(
+        session: SessionState? = nil,
+        versionGate: VersionGate = .open,
+        pendingDeepLinkItemId: String? = nil,
+        onDeepLinkHandled: @escaping () -> Void = {}
+    ) {
+        self.session = session
+        self.versionGate = versionGate
+        self.pendingDeepLinkItemId = pendingDeepLinkItemId
+        self.onDeepLinkHandled = onDeepLinkHandled
+        let router = AppRouter(session: session)
+        _router = State(initialValue: router)
+        _models = State(initialValue: ShellModels(router: router))
+    }
+
+    var body: some View {
+        RootContent(router: router, models: models, versionGate: versionGate)
+            .task(id: session) { await followSession() }
+            .onChange(of: pendingDeepLinkItemId, initial: true) { _, itemId in
+                guard let itemId else { return }
+                router.open(itemId: itemId)
+                onDeepLinkHandled()
+            }
+            .task { await DebugRoute.applyIfRequested(to: router, consent: models.consent) }
+    }
+
+    private func followSession() async {
+        if let session {
+            router.sessionChanged(session)
+            return
+        }
+        for await state in auth.session {
+            router.sessionChanged(state)
+        }
+    }
+}
+
+private struct RootContent: View {
+    let router: AppRouter
+    let models: ShellModels
+    let versionGate: VersionGate
+
+    var body: some View {
+        switch versionGate {
+        case .updateRequired(let storeURL):
+            UpdateRequiredView(storeURL: storeURL)
+        case .open:
+            if router.showsShell {
+                ShellView(router: router, models: models)
+            } else if router.showsAuth {
+                AuthRoot(intents: models.intents)
+            } else {
+                SrokaColor.background.ignoresSafeArea()
+            }
+        }
+    }
+}
+
+/// The signed-in shell: compact tabs or regular split view (size class decides), plus everything presented over
+/// either: Settings and the tag editor, the sign-in-again cover, the undo toast and the consent prompt.
+private struct ShellView: View {
+    @Bindable var router: AppRouter
+    let models: ShellModels
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var selection: RootTab = .myList
 
     var body: some View {
+        layout
+            .consentPrompt(models.consent)
+            .overlay(alignment: .bottom) {
+                UndoToastOverlay(router: router)
+                    .padding(.bottom, sizeClass == .regular ? 16 : 76)
+            }
+            .animation(.snappy, value: router.toast?.id)
+            .sheet(item: $router.sheet) { sheet in
+                ShellSheetContent(sheet: sheet, router: router, intents: models.intents)
+            }
+            .fullScreenCover(isPresented: $router.isSignInAgainPresented) {
+                AuthRoot(intents: models.intents)
+            }
+    }
+
+    @ViewBuilder private var layout: some View {
         if sizeClass == .regular {
-            RootSplitView(selection: $selection)
+            RegularShell(router: router, models: models)
         } else {
-            RootTabView(selection: $selection)
+            CompactShell(router: router, models: models)
         }
-    }
-}
-
-struct RootTabView: View {
-    @Binding var selection: RootTab
-
-    var body: some View {
-        TabView(selection: $selection) {
-            ForEach([RootTab.myList, .archive, .tags]) { tab in
-                Tab(value: tab) {
-                    NavigationStack { RootDestination(tab: tab) }
-                } label: {
-                    Label(String(localized: tab.title), systemImage: tab.systemImage)
-                }
-            }
-            Tab(value: RootTab.search, role: .search) {
-                NavigationStack { RootDestination(tab: .search) }
-            }
-        }
-    }
-}
-
-struct RootSplitView: View {
-    @Binding var selection: RootTab
-
-    var body: some View {
-        NavigationSplitView {
-            List(RootTab.allCases, selection: optionalSelection) { tab in
-                Label(String(localized: tab.title), systemImage: tab.systemImage)
-            }
-            .navigationTitle("Sroka")
-        } detail: {
-            NavigationStack { RootDestination(tab: selection) }
-        }
-    }
-
-    private var optionalSelection: Binding<RootTab?> {
-        Binding {
-            selection
-        } set: {
-            if let tab = $0 { selection = tab }
-        }
-    }
-}
-
-/// Placeholder screens until the feature streams land.
-struct RootDestination: View {
-    let tab: RootTab
-
-    var body: some View {
-        Group {
-            switch tab {
-            case .myList: LibraryTab(scope: .myList)
-            case .archive: LibraryTab(scope: .archive)
-            case .tags: TagsTab()
-            case .search: SearchTab()
-            }
-        }
-    }
-}
-
-/// Owns the library view model for one tab. `LibraryIntent`s (open item, edit tags, Settings,
-/// sign in, open URL) are handled here once the reader, tags and settings features land.
-private struct LibraryTab: View {
-    @State private var model: LibraryViewModel
-
-    init(scope: LibraryScope) {
-        _model = State(initialValue: LibraryViewModel(scope: scope))
-    }
-
-    var body: some View {
-        LibraryView(model: model)
-    }
-}
-
-/// Owns the tags view model. `TagsIntent`s (open item, edit tags, Settings, open URL) are handled
-/// here by stream L together with the tag editor sheet (`TagEditorSheet`).
-private struct TagsTab: View {
-    @State private var model = TagsViewModel()
-
-    var body: some View {
-        TagsView(model: model)
-    }
-}
-
-/// Owns the search view model. `SearchIntent.openItem` is handled here once the reader lands.
-private struct SearchTab: View {
-    @State private var model = SearchViewModel()
-
-    var body: some View {
-        SearchView(model: model)
     }
 }
 
 #Preview {
-    RootView()
+    withDependencies {
+        $0.useFakes(Fakes())
+    } operation: {
+        RootView()
+    }
 }

@@ -22,6 +22,7 @@
 		AA000000000000000000020C /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010C /* ReaderFeature */; };
 		AA000000000000000000020D /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010D /* SettingsFeature */; };
 		AA000000000000000000020E /* ShareFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010E /* ShareFeature */; };
+		AA0000000000000000000213 /* AppNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000113 /* AppNavigation */; };
 		AA0000000000000000000210 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000110 /* FirebaseCore */; };
 		AA0000000000000000000211 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000111 /* FirebaseAnalyticsCore */; };
 		AA0000000000000000000212 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000112 /* FirebaseCrashlytics */; };
@@ -156,6 +157,7 @@
 				AA000000000000000000020C /* ReaderFeature in Frameworks */,
 				AA000000000000000000020D /* SettingsFeature in Frameworks */,
 				AA000000000000000000020E /* ShareFeature in Frameworks */,
+				AA0000000000000000000213 /* AppNavigation in Frameworks */,
 				AA0000000000000000000210 /* FirebaseCore in Frameworks */,
 				AA0000000000000000000211 /* FirebaseAnalyticsCore in Frameworks */,
 				AA0000000000000000000212 /* FirebaseCrashlytics in Frameworks */,
@@ -264,6 +266,7 @@
 				AA000000000000000000010C /* ReaderFeature */,
 				AA000000000000000000010D /* SettingsFeature */,
 				AA000000000000000000010E /* ShareFeature */,
+				AA0000000000000000000113 /* AppNavigation */,
 				AA0000000000000000000110 /* FirebaseCore */,
 				AA0000000000000000000111 /* FirebaseAnalyticsCore */,
 				AA0000000000000000000112 /* FirebaseCrashlytics */,
@@ -802,6 +805,10 @@
 		AA000000000000000000010D /* SettingsFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SettingsFeature;
+		};
+		AA0000000000000000000113 /* AppNavigation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppNavigation;
 		};
 		AA000000000000000000010E /* ShareFeature */ = {
 			isa = XCSwiftPackageProductDependency;

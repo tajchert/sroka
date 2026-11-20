@@ -48,6 +48,7 @@ let package = Package(
         .library(name: "ReaderFeature", targets: ["ReaderFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "ShareFeature", targets: ["ShareFeature"]),
+        .library(name: "AppNavigation", targets: ["AppNavigation"]),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
@@ -106,6 +107,8 @@ let package = Package(
         .target(name: "ReaderFeature", dependencies: featureDependencies, resources: featureResources),
         .target(name: "SettingsFeature", dependencies: featureDependencies, resources: featureResources),
         .target(name: "ShareFeature", dependencies: featureDependencies, resources: featureResources),
+        // MARK: App navigation (stream L2): router and pure routing logic of the app root, SrokaCore only.
+        .target(name: "AppNavigation", dependencies: ["SrokaCore"]),
         // MARK: Tests
         .testTarget(name: "SrokaCoreTests", dependencies: testDependencies("SrokaCore")),
         .testTarget(name: "SrokaTestingTests", dependencies: testDependencies("SrokaTesting")),
@@ -141,6 +144,7 @@ let package = Package(
         .testTarget(name: "ReaderFeatureTests", dependencies: testDependencies("ReaderFeature")),
         .testTarget(name: "SettingsFeatureTests", dependencies: testDependencies("SettingsFeature")),
         .testTarget(name: "ShareFeatureTests", dependencies: testDependencies("ShareFeature")),
+        .testTarget(name: "AppNavigationTests", dependencies: testDependencies("AppNavigation")),
         .testTarget(
             name: "SnapshotTests",
             dependencies: [

@@ -17,6 +17,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Rule
@@ -58,5 +60,12 @@ class PushSyncSchedulingTest {
         assertEquals(WorkInfo.State.ENQUEUED, fresh.state)
         assertNotEquals(first, fresh.id)
         assertEquals(emptyList<WorkInfo.State>(), states(SyncWork.SYNC_PUSH))
+    }
+
+    @Test fun pushSyncIsExpeditedOnlyFromApi31() {
+        assertFalse(WorkScheduler.pushSyncExpedited(26))
+        assertFalse(WorkScheduler.pushSyncExpedited(30))
+        assertTrue(WorkScheduler.pushSyncExpedited(31))
+        assertTrue(WorkScheduler.pushSyncExpedited(34))
     }
 }

@@ -1,6 +1,7 @@
 package app.sroka.core.data.sync
 
 import android.content.Context
+import android.os.Build
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -85,8 +86,8 @@ class WorkScheduler @Inject internal constructor(
         val mainRunning = main.any { it.state == WorkInfo.State.RUNNING }
         val operation = when {
             pushRunning -> return
-            mainRunning -> workManager.enqueueUniqueWork(SyncWork.SYNC_PUSH, ExistingWorkPolicy.REPLACE, syncRequest(user = false))
-            else -> workManager.enqueueUniqueWork(SyncWork.SYNC, ExistingWorkPolicy.REPLACE, syncRequest(user = false))
+            mainRunning -> workManager.enqueueUniqueWork(SyncWork.SYNC_PUSH, ExistingWorkPolicy.REPLACE, pushSyncRequest())
+            else -> workManager.enqueueUniqueWork(SyncWork.SYNC, ExistingWorkPolicy.REPLACE, pushSyncRequest())
         }
         operation.await()
     }
@@ -166,10 +167,13 @@ class WorkScheduler @Inject internal constructor(
         workManager.pruneWork()
     }
 
-    private fun syncRequest(user: Boolean): OneTimeWorkRequest {
+    /** Expedited work is a foreground service (with the "Syncing" notification) before API 31: a silent push must not show one. */
+    private fun pushSyncRequest(): OneTimeWorkRequest = syncRequest(user = false, expedited = pushSyncExpedited(Build.VERSION.SDK_INT))
+
+    private fun syncRequest(user: Boolean, expedited: Boolean = true): OneTimeWorkRequest {
         val builder = OneTimeWorkRequestBuilder<SyncWorker>()
             .setInputData(workDataOf(SyncWork.KEY_USER to user))
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .apply { if (expedited) setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST) }
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
             .addTag(SyncWork.TAG_ALL)
             .addTag(SyncWork.TAG_SYNC)
@@ -193,8 +197,11 @@ class WorkScheduler @Inject internal constructor(
         DownloadPolicy.MANUAL -> null
     }
 
-    private companion object {
-        const val BACKOFF_SECONDS = 30L
+    internal companion object {
+        private const val BACKOFF_SECONDS = 30L
+
+        /** Expedited work only from API 31; before that WorkManager runs it as a foreground service. */
+        fun pushSyncExpedited(sdkInt: Int): Boolean = sdkInt >= Build.VERSION_CODES.S
     }
 }
 

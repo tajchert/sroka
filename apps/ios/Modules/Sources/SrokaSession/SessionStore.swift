@@ -129,6 +129,27 @@ public final class SessionStore: Sendable {
         }
     }
 
+    /// A fresh install found an earlier install's Keychain items: removes the session and the device id (both belong
+    /// to the earlier install), so the app starts signed out with a new device id. False when the Keychain refused (a
+    /// launch before first unlock); the caller tries again at the next launch.
+    @discardableResult public func clearForFreshInstall() -> Bool {
+        lock.withLock { cached in
+            var cleared = true
+            for key in [Self.sessionKey, Self.deviceIdKey] {
+                do {
+                    try store.delete(key)
+                } catch {
+                    cleared = false
+                    sessionLog.error(
+                        "Could not delete a Keychain item: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            cached = nil
+            value.send(nil)
+            return cleared
+        }
+    }
+
     /// `ios_<uuidv7>`, generated once per install and never changed (not even by sign-out).
     /// The stored device id, or nil; never creates one (the share extension does not write the Keychain).
     public func existingDeviceId() -> String? {

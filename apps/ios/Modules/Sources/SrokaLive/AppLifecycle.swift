@@ -32,6 +32,8 @@ public struct LifecycleActions: Sendable {
     public var expireBackground: @Sendable () -> Void
     /// Returns once launch recovery (an interrupted wipe) is done; awaited before any account work.
     public var ready: @Sendable () async -> Void
+    /// The scene is active (true) or leaving the foreground (false): polls for parse results only while active.
+    public var setParsePolling: @Sendable (Bool) -> Void
 
     public init(
         enterForeground: @escaping @Sendable () -> Void,
@@ -52,7 +54,8 @@ public struct LifecycleActions: Sendable {
         needsBackgroundDownload: @escaping @Sendable () async -> Bool,
         scheduleDownload: @escaping @Sendable () -> Void,
         expireBackground: @escaping @Sendable () -> Void = {},
-        ready: @escaping @Sendable () async -> Void = {}
+        ready: @escaping @Sendable () async -> Void = {},
+        setParsePolling: @escaping @Sendable (Bool) -> Void = { _ in }
     ) {
         self.enterForeground = enterForeground
         self.enterBackground = enterBackground
@@ -73,6 +76,7 @@ public struct LifecycleActions: Sendable {
         self.scheduleDownload = scheduleDownload
         self.expireBackground = expireBackground
         self.ready = ready
+        self.setParsePolling = setParsePolling
     }
 }
 
@@ -97,6 +101,8 @@ public final class AppLifecycle {
         let current = transition
         actions.enterForeground()
         actions.setDownloadsForeground(true)
+        // At the call, so a quick background after it wins; signed out, the poller waits (a sign-in's sync kicks it).
+        actions.setParsePolling(true)
         // An interrupted wipe finishes before the stores are read and before any account work.
         await actions.ready()
         actions.reloadStores()
@@ -126,6 +132,7 @@ public final class AppLifecycle {
     /// database background. Pass the result to `flush(_:)`, and to `backgroundExpired(_:)` if the time runs out.
     public func beginBackground() -> BackgroundFlush {
         transition += 1
+        actions.setParsePolling(false)
         let release = actions.holdDatabase()
         actions.setDownloadsForeground(false)
         actions.cancelAutomaticDownloads()

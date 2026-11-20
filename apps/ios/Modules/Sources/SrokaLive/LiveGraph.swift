@@ -66,6 +66,8 @@ public final class LiveGraph: Sendable {
     public let syncSession: LiveSyncSession
     /// Awaited before the account is used: finishes a wipe a dead process left in progress.
     public let launchRecovery: LaunchRecovery
+    /// Pulls while the app is active and an item waits for its parse result.
+    public let parsePoller: ParsePoller
 
     public let library: any LibraryRepository
     public let tags: any TagRepository
@@ -193,9 +195,24 @@ public final class LiveGraph: Sendable {
         self.importTracker = importTracker
         self.syncSession = syncSession
         self.launchRecovery = Self.launchRecovery(
+            firstRun: { Self.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore) },
             interrupted: { Self.hasInterruptedWipe(database) },
             serialize: { await auth.finishInterruptedWipe($0) }, wiper: wiper, local: localWiper)
         self.auth = auth
+        let recovery = self.launchRecovery
+        let parsePoller = ParsePoller(
+            clock: ContinuousClock(),
+            canPoll: { !wipeGuard.isWiping && sessionStore.current.map { !$0.expired } == true },
+            hasPendingParse: {
+                await recovery.ready()
+                return await Self.hasPendingParse(database)
+            },
+            pull: { await suspension.holding { _ = await scheduler.syncNow() } })
+        self.parsePoller = parsePoller
+        // Each finished pass (a save's push, the pull after it) starts a round while the app is active.
+        Task {
+            for await running in scheduler.observeRunning() where !running { parsePoller.kick() }
+        }
         self.library = TelemetryLibraryRepository(
             LiveLibraryRepository(
                 database: database, writer: writer, syncController: scheduler, hooks: hooks, thumbnailBase: paths.root),
@@ -284,19 +301,37 @@ public final class LiveGraph: Sendable {
 
     /// Finishes an interrupted wipe through the transition gate (`serialize`, never beside a sign-out) and the wipe
     /// guard. With no interrupted wipe it only reads the epoch file: no database write delays the launch.
+    ///
+    /// `firstRun` runs before anything else: a session an earlier install left in the Keychain is gone before the
+    /// session is first read.
     static func launchRecovery(
+        firstRun: @escaping @Sendable () -> Void = {},
         interrupted: @escaping @Sendable () -> Bool,
         serialize: @escaping @Sendable (@escaping @Sendable () async -> Void) async -> Void,
         wiper: GuardedWiper,
         local: LocalDataWiper
     ) -> LaunchRecovery {
         LaunchRecovery {
+            firstRun()
             guard interrupted() else { return }
             await serialize {
                 // `finishInterruptedWipe` checks the epoch again: a wipe that ran meanwhile needs no second one.
                 _ = await wiper.guarded { await local.finishInterruptedWipe() }
             }
         }
+    }
+
+    /// The App Group suite goes with an uninstall, the Keychain does not. Without the install marker, a Keychain
+    /// session belongs to an earlier install whose data is gone: clear it, then set the marker. Only the app runs
+    /// this; the share extension needs the database the app creates, so it never runs before the app's first launch.
+    ///
+    /// An install that predates the marker (an update) still has its account marker, so it keeps its session.
+    static func clearEarlierInstall(preferences: PreferencesStore, sessionStore: SessionStore) {
+        guard !preferences.installMarker else { return }
+        if preferences.accountEmail == nil {
+            guard sessionStore.clearForFreshInstall() else { return }
+        }
+        preferences.installMarker = true
     }
 
     /// The `WipeEpoch` beside the database says a wipe is in progress (no process runs one at launch).
@@ -357,7 +392,15 @@ public final class LiveGraph: Sendable {
             needsBackgroundDownload: { [self] in await needsBackgroundDownload() },
             scheduleDownload: { background.scheduleDownload() },
             expireBackground: { [suspension] in suspension.expire() },
-            ready: { [launchRecovery] in await launchRecovery.ready() })
+            ready: { [launchRecovery] in await launchRecovery.ready() },
+            setParsePolling: { [parsePoller] in parsePoller.setActive($0) })
+    }
+
+    /// An item still waits for the server's parse.
+    static func hasPendingParse(_ database: AppDatabase) async -> Bool {
+        (try? await database.read { db in
+            try Bool.fetchOne(db, sql: "SELECT EXISTS(SELECT 1 FROM items WHERE parse_status = 'PENDING')") ?? false
+        }) ?? false
     }
 
     /// The work of the background tasks.

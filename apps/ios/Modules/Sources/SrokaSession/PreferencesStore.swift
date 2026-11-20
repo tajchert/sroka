@@ -24,6 +24,7 @@ public final class PreferencesStore: Sendable {
         static let accountEmail = "account_email"
         static let accountServer = "account_server"
         static let activeImport = "active_import"
+        static let installed = "installed"
     }
 
     public init(defaults: UserDefaults) {
@@ -137,6 +138,13 @@ public final class PreferencesStore: Sendable {
     public var accountServer: String? {
         get { defaults.object(forKey: InternalKey.accountServer) as? String }
         set { store(newValue, InternalKey.accountServer) }
+    }
+
+    /// Set by the app's first launch of this install. The App Group suite goes with an uninstall, the Keychain does
+    /// not, so an absent marker means the Keychain may hold an earlier install's session.
+    public var installMarker: Bool {
+        get { defaults.bool(forKey: InternalKey.installed) }
+        set { store(newValue ? true : nil, InternalKey.installed) }
     }
 
     // MARK: Active import (not a preference)

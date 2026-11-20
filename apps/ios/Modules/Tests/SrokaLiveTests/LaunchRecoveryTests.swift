@@ -157,3 +157,81 @@ struct UploadAPITests {
         #expect(await uploadAPI(own) != nil)
     }
 }
+
+/// The App Group suite goes with an uninstall, the Keychain does not.
+struct FirstRunTests {
+    private let keychain = InMemorySecureStore()
+    private let preferences = PreferencesStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+
+    /// What a reinstall finds: an earlier install's session and device id in the Keychain.
+    private func earlierInstall() throws -> SessionStore {
+        let earlier = SessionStore(store: keychain)
+        try earlier.save(token: "t", email: "a@b.co", server: "https://api.example")
+        _ = earlier.deviceId()
+        return SessionStore(store: keychain)
+    }
+
+    @Test func `A fresh install starts signed out with a new device id`() throws {
+        let sessionStore = try earlierInstall()
+        let earlierDevice = try #require(sessionStore.existingDeviceId())
+        let fresh = SessionStore(store: keychain)
+        LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: fresh)
+
+        #expect(fresh.current == nil)
+        #expect(SessionStore(store: keychain).current == nil)
+        #expect(fresh.existingDeviceId() == nil)
+        #expect(fresh.deviceId() != earlierDevice)
+        #expect(preferences.installMarker)
+    }
+
+    @Test func `An app update keeps the session`() throws {
+        let sessionStore = try earlierInstall()
+        preferences.installMarker = true
+        preferences.accountEmail = "a@b.co"
+        LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+
+        #expect(sessionStore.current?.email == "a@b.co")
+        #expect(SessionStore(store: keychain).current?.token == "t")
+    }
+
+    @Test func `An update from a build before the marker keeps the session and sets the marker`() throws {
+        let sessionStore = try earlierInstall()
+        preferences.accountEmail = "a@b.co"
+        LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+
+        #expect(sessionStore.current?.token == "t")
+        #expect(preferences.installMarker)
+    }
+
+    @Test func `A Keychain that refuses leaves the marker unset for the next launch`() throws {
+        let sessionStore = try earlierInstall()
+        keychain.setFailure(SecureStoreError(status: -25308))
+        LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+        #expect(!preferences.installMarker)
+
+        keychain.setFailure(nil)
+        LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+        #expect(SessionStore(store: keychain).current == nil)
+        #expect(preferences.installMarker)
+    }
+
+    @Test func `Launch recovery clears an earlier install before anything else`() async throws {
+        let log = StepLog()
+        let local = LocalDataWiper(
+            database: try AppDatabase.inMemory(),
+            cancelAllWork: {}, clearTables: {}, deleteFiles: {}, transferDirectories: [],
+            sessionStore: SessionStore(store: InMemorySecureStore()), preferences: preferences,
+            importJobs: ImportJobStore(preferences: preferences))
+        let recovery = LiveGraph.launchRecovery(
+            firstRun: { log.add("firstRun") },
+            interrupted: {
+                log.add("interrupted")
+                return false
+            },
+            serialize: { await $0() },
+            wiper: GuardedWiper(local, guard: WipeGuard()),
+            local: local)
+        await recovery.ready()
+        #expect(log.all == ["firstRun", "interrupted"])
+    }
+}

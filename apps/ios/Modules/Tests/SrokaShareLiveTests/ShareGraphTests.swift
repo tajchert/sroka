@@ -9,6 +9,7 @@ import SrokaDatabase
 import SrokaNetwork
 import SrokaSession
 import SrokaSync
+import Synchronization
 import Testing
 
 @testable import SrokaShareLive
@@ -127,6 +128,33 @@ struct ShareGraphTests {
         gate.open()
     }
 
+    @Test func `A 401 leaves the shared Keychain untouched and the op queued`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        api.onPush { _ in throw ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil) }
+        let before = group.secureStore.snapshot
+
+        let model = model(graph)
+        await model.start(.link(url: "https://example.com/expired", title: nil))
+
+        #expect(api.events == ["push"])
+        #expect(group.secureStore.snapshot == before)
+        #expect(try await group.queuedOps().count == 1)
+    }
+
+    @Test func `Without the app's device id the link is saved and nothing is sent`() async throws {
+        try group.appOpened(deviceId: false)
+        let graph = try group.graph(api: api)
+        let before = group.secureStore.snapshot
+
+        let model = model(graph)
+        await model.start(.link(url: "https://example.com/new-install", title: nil))
+
+        #expect(api.events.isEmpty)
+        #expect(group.secureStore.snapshot == before)
+        #expect(try await group.queuedOps().count == 1)
+    }
+
     @Test func `Signed out: nothing is saved and nothing is sent`() async throws {
         try group.appOpened(signedIn: false)
         let graph = try group.graph(api: api)
@@ -203,5 +231,36 @@ struct ShareConfigurationTests {
         var unexpanded = info
         unexpanded["AppIdentifierPrefix"] = "$(AppIdentifierPrefix)"
         #expect(try #require(ShareConfiguration(infoDictionary: unexpanded)).keychainAccessGroup == nil)
+    }
+}
+
+struct WithTimeoutTests {
+    @Test func `A cancelled caller returns without waiting for the operation or the timeout`() async {
+        let gate = Gate()
+        let caller = Task {
+            await withTimeout(.seconds(3600), clock: TestClock()) { await gate.wait() }
+        }
+        caller.cancel()
+        await caller.value
+        gate.open()
+    }
+
+    @Test func `An already cancelled caller does not start the operation`() async {
+        let started = Gate()
+        let ran = Mutex(false)
+        let caller = Task {
+            await started.wait()
+            await withTimeout(.seconds(1), clock: ImmediateClock()) { ran.withLock { $0 = true } }
+        }
+        caller.cancel()
+        started.open()
+        await caller.value
+        #expect(ran.withLock { $0 } == false)
+    }
+
+    @Test func `A fast operation returns before the timeout`() async {
+        let ran = Mutex(false)
+        await withTimeout(.seconds(3600), clock: TestClock()) { ran.withLock { $0 = true } }
+        #expect(ran.withLock { $0 })
     }
 }

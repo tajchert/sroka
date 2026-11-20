@@ -129,6 +129,18 @@ public final class SessionStore: Sendable {
     }
 
     /// `ios_<uuidv7>`, generated once per install and never changed (not even by sign-out).
+    /// The stored device id, or nil; never creates one (the share extension does not write the Keychain).
+    public func existingDeviceId() -> String? {
+        lock.withLock { cached in
+            if let cached { return cached }
+            guard let stored = try? store.read(Self.deviceIdKey), stored.hasPrefix(Self.devicePrefix) else {
+                return nil
+            }
+            cached = stored
+            return stored
+        }
+    }
+
     public func deviceId() -> String {
         lock.withLock { cached in
             if let cached { return cached }

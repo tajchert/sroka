@@ -331,7 +331,12 @@ enum SyncTransactions {
         response: PushResponseDto,
         now: Int64
     ) throws -> (acknowledged: Bool, removed: [String]) {
-        let byOpId = Dictionary(batch.map { ($0.opId, $0) }, uniquingKeysWith: { first, _ in first })
+        // Only ops still queued exactly as sent. The app and the share extension may push the same batch at once;
+        // by the time the later response lands, the earlier one may have deleted, coalesced or re-keyed (rewritten)
+        // an op, and acting on the stale copy would delete the rewritten op from the queue.
+        let live = try queuedPayloads(db, opIds: batch.map(\.opId))
+        let byOpId = Dictionary(
+            batch.filter { live[$0.opId] == $0.payload }.map { ($0.opId, $0) }, uniquingKeysWith: { first, _ in first })
         let acknowledged = (response.applied + response.rejected.map(\.opId)).filter { byOpId[$0] != nil }
         var removed: [String] = []
 
@@ -386,7 +391,10 @@ enum SyncTransactions {
             }
             removed.append(clientId)
         }
-        return (!acknowledged.isEmpty, removed)
+        // Whether the server answered for this batch at all, including ops another writer has since replaced.
+        let sent = Set(batch.map(\.opId))
+        let answered = (response.applied + response.rejected.map(\.opId)).contains { sent.contains($0) }
+        return (answered, removed)
     }
 
     /// Applies one pull page and its cursor; returns the deleted item ids whose files must go.
@@ -418,6 +426,20 @@ enum SyncTransactions {
     /// old ones), drop the old row and rebuild the new one from the ops. Returns false (nothing
     /// changed) when no add is queued.
     @discardableResult
+    /// `op_id` → `payload` of the queued ops among `opIds`.
+    static func queuedPayloads(_ db: Database, opIds: [String]) throws -> [String: String] {
+        var result: [String: String] = [:]
+        for start in stride(from: 0, to: opIds.count, by: sqlChunk) {
+            let chunk = Array(opIds[start..<min(start + sqlChunk, opIds.count)])
+            let marks = Array(repeating: "?", count: chunk.count).joined(separator: ",")
+            let rows = try Row.fetchAll(
+                db, sql: "SELECT op_id, payload FROM pending_ops WHERE op_id IN (\(marks))",
+                arguments: StatementArguments(chunk))
+            for row in rows { result[row["op_id"]] = row["payload"] }
+        }
+        return result
+    }
+
     static func rekeyReAdd(_ db: Database, oldId: String, now: Int64) throws -> Bool {
         let adds = try PendingOpDao.forItem(db, oldId).filter { isAdd($0) }
         if adds.isEmpty { return false }

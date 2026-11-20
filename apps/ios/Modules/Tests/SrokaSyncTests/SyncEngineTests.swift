@@ -152,6 +152,30 @@ struct SyncEngineTests {
         #expect(second.allSatisfy { $0.contains("\"itemId\":\"\(newId)\"") })
     }
 
+    @Test func `A second answer for the same batch leaves the re-keyed ops queued`() async throws {
+        // The app and the share extension pushed the same batch; both answers say item_deleted.
+        let h = try Harness()
+        try await h.insert("y")
+        _ = await h.library.save(url: "https://example.com/y", title: nil, tags: [], source: .share)
+        await h.library.setFavorite(id: "y", favorite: true)
+        let batch = try await h.queued()
+        let json = pushJson(rejected: batch.map { ($0.opId, "item_deleted") }, cursor: 1)
+        let response = try JSONDecoder().decode(PushResponseDto.self, from: Data(json.utf8))
+        let now = h.now
+
+        for _ in 0..<2 {
+            _ = try await h.db.write { db in
+                try SyncTransactions.applyPushResponse(db, batch: batch, response: response, now: now)
+            }
+        }
+
+        let queued = try await h.queued()
+        #expect(queued.map(\.type) == [WireOp.Kind.add.rawValue, WireOp.Kind.setFavorite.rawValue])
+        let newId = try #require(queued.first?.itemId)
+        #expect(newId != "y" && queued[1].itemId == newId)
+        #expect(try await h.item(newId)?.isFavorite == true)
+    }
+
     @Test func `A re-save while the tombstone pulls in re-keys the pending add`() async throws {
         let h = try Harness()
         try await h.insert("y")

@@ -106,9 +106,12 @@ final class AppGroupFixture: Sendable {
     deinit { try? FileManager.default.removeItem(at: root) }
 
     /// The app opened once (created and migrated the file) and the user signed in.
-    func appOpened(signedIn: Bool = true) throws {
+    func appOpened(signedIn: Bool = true, deviceId: Bool = true) throws {
         _ = try AppDatabase.openShared(at: databaseURL)
-        if signedIn { try SessionStore(store: secureStore).save(token: "token", email: "reader@example.test") }
+        guard signedIn else { return }
+        let session = SessionStore(store: secureStore)
+        try session.save(token: "token", email: "reader@example.test")
+        if deviceId { _ = session.deviceId() }
     }
 
     func graph(api: any SrokaAPI, clock: any Clock<Duration> = ContinuousClock()) throws -> ShareGraph {

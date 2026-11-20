@@ -56,6 +56,7 @@ public struct ShareGraph: Sendable {
     let auth: ShareAuthRepository
     let uploader: LivePdfUploader
     let engine: SyncEngine
+    let sessionStore: SessionStore
     let clock: any Clock<Duration>
 
     /// The graph, or why the sheet cannot save.
@@ -84,9 +85,11 @@ public struct ShareGraph: Sendable {
             store: KeychainSecureStore(
                 service: ShareConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup))
         let api = HTTPSrokaAPI(
-            provider: LiveApiSessionProvider(
-                sessionStore: sessionStore, preferences: preferences,
-                defaultServerUrl: environment.apiBaseURL.absoluteString),
+            provider: ShareApiSessionProvider(
+                base: LiveApiSessionProvider(
+                    sessionStore: sessionStore, preferences: preferences,
+                    defaultServerUrl: environment.apiBaseURL.absoluteString),
+                store: sessionStore),
             identity: ClientIdentity(appVersion: configuration.appVersion))
         return .ready(
             ShareGraph(
@@ -142,9 +145,10 @@ public struct ShareGraph: Sendable {
         auth = ShareAuthRepository(store: sessionStore)
         // Copies each PDF into the App Group queue first, then uploads while the sheet is up; the app's
         // `resumePendingUploads()` finishes whatever the extension could not.
+        // No thumbnail here: PDFKit may decode a first-page scan at full size, past the extension's memory limit.
         uploader = LivePdfUploader(
-            api: api, paths: paths, syncController: controller,
-            onUnauthorized: { sessionStore.markExpired() })
+            api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil })
+        self.sessionStore = sessionStore
         engine = SyncEngine(database: database, api: api, session: ShareSyncSession(store: sessionStore), now: now)
     }
 
@@ -160,6 +164,8 @@ public struct ShareGraph: Sendable {
 
     /// One push batch, at most `pushTimeout`. Never throws: a failed or slow push leaves the ops queued for the app.
     public func pushOnce() async {
+        // The app creates the device id at sign-in; without it, leave the push to the app.
+        guard sessionStore.existingDeviceId() != nil else { return }
         let engine = engine
         await withTimeout(Self.pushTimeout, clock: clock) {
             let outcome = await engine.pushOnce()

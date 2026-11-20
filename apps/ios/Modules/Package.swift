@@ -85,7 +85,13 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
-        .target(name: "SrokaSession", dependencies: ["SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies]),
+        .target(
+            name: "SrokaSession",
+            dependencies: [
+                "SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies,
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         // MARK: Features — features never depend on other features or on data/engine modules.
         .target(name: "AuthFeature", dependencies: featureDependencies, resources: featureResources),
         .target(name: "LibraryFeature", dependencies: featureDependencies, resources: featureResources),
@@ -111,7 +117,12 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
-        .testTarget(name: "SrokaSessionTests", dependencies: testDependencies("SrokaSession")),
+        .testTarget(
+            name: "SrokaSessionTests",
+            dependencies: testDependencies("SrokaSession") + [
+                "SrokaNetwork", "SrokaDatabase", .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         .testTarget(name: "AuthFeatureTests", dependencies: testDependencies("AuthFeature")),
         .testTarget(name: "LibraryFeatureTests", dependencies: testDependencies("LibraryFeature")),
         .testTarget(name: "TagsFeatureTests", dependencies: testDependencies("TagsFeature")),

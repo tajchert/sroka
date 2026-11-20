@@ -280,7 +280,7 @@ enum ReaderHtml {
         .sk-head{margin:0 0 1.4em}.sk-site{font-size:14px;font-weight:500;color:var(--link);margin-bottom:14px}.sk-title{font-size:28px;font-weight:600;line-height:1.2;margin-bottom:14px}.sk-meta{font-size:14px;color:var(--muted)}.sk-warn{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--warn);margin-top:14px}
         .sk-head~article>h1:first-child{display:none}.sk-head~article>h1:first-child+.byline{font-size:14px;color:var(--muted);margin-top:0}
         html{background:var(--bg);-webkit-text-size-adjust:100%}
-        body{margin:0 auto;max-width:42em;padding:1.25rem 1.1rem var(--end);background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;font-size:calc(18px*var(--scale));line-height:var(--lh);overflow-wrap:break-word}
+        body{margin:0 auto;max-width:min(42em,720px);padding:1.25rem 1.1rem var(--end);background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;font-size:calc(18px*var(--scale));line-height:var(--lh);overflow-wrap:break-word}
         html[data-font=serif] body{font-family:ui-serif,'New York',Georgia,serif}
         h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.6em 0 .6em}h1{font-size:1.6em}h2{font-size:1.35em}h3{font-size:1.15em}
         p,ul,ol,pre,blockquote,figure,table{margin:0 0 1.1em}

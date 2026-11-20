@@ -99,3 +99,11 @@ Progress: `apps/ios/docs/LEDGER.md` (orchestrator only).
 - Every feature module has its own `Localizable.xcstrings`; placeholders are `<Name>PlaceholderView`, replace them.
 - App and share extension still run on fakes (`App/AppComposition.swift` TODO, stream L). Info.plist does not yet allow http to localhost (stream A adds it).
 - A changed domain protocol must be changed together with its fake in `SrokaTesting`; keep such changes minimal and list them in your report, because other streams compile against them.
+
+## Wave 1 notes: A (core logic, network) and B (database) merged
+
+- `SrokaCore/Logic`: `UrlNormalizer`, `UUIDv7`, `normalizeTagName`/`tagKey`, `OpClock` + `OpClockStore` (`save` is called under the clock's lock: keep it quick, no re-entry), `WireOp` (`payload`, `parse(payload:)`, `rewrite(payload:itemId:opId:)`).
+- `SrokaNetwork`: protocol `SrokaAPI` (live `HTTPSrokaAPI`), `ApiSessionProvider` and `ClientIdentity` (implemented by stream I), `ApiError` (`remoteFailure`, `retryAfter`, `isResyncRequired`, `isNotParsed`, `isUnauthorized`, `pdfUploadError`), DTOs. An empty `push` is sent to the server, so do not call it with no ops; more than 500 is refused client-side. `download` has no auth header.
+- `SrokaDatabase`: `AppDatabase` (`openShared(at:)`, `openForExtension(at:)`, `inMemory()`, `read`, `write`, `suspend/resume`, `notifyExternalChanges()`, `observe…` streams), DAOs `ItemDao`, `SearchDao`, `TagDao`, `PendingOpDao`, `SyncStateDao`, `ContentFileDao`, `MaintenanceDao.wipeAll`; DAO writes take a GRDB `Database` so several combine in one transaction.
+- Database facts: re-keying an item deletes its `content_files` row (queue the download again); `PendingOpDao.retargetItem` takes a payload-rewriting closure (use `WireOp.rewrite`); `thumb_path` is stored as given and mapped with a `thumbnailBase`; the app must call `notifyExternalChanges()` on activation.
+- `Share/Info.plist` has no ATS local-networking entry yet (stream K).

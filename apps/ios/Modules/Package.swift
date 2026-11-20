@@ -51,6 +51,7 @@ let package = Package(
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "ShareFeature", targets: ["ShareFeature"]),
         .library(name: "AppNavigation", targets: ["AppNavigation"]),
+        .library(name: "SrokaShareLive", targets: ["SrokaShareLive"]),
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
@@ -119,6 +120,14 @@ let package = Package(
         .target(name: "ShareFeature", dependencies: featureDependencies, resources: featureResources),
         // MARK: App navigation (stream L2): router and pure routing logic of the app root, SrokaCore only.
         .target(name: "AppNavigation", dependencies: ["SrokaCore"]),
+        // MARK: Share extension composition (stream K2): live graph over the App Group, no UI.
+        .target(
+            name: "SrokaShareLive",
+            dependencies: [
+                "SrokaCore", "SrokaNetwork", "SrokaDatabase", "SrokaSync", "SrokaContent", "SrokaSession",
+                "ShareFeature", dependencies,
+            ]
+        ),
         // MARK: Tests
         .testTarget(name: "SrokaCoreTests", dependencies: testDependencies("SrokaCore")),
         .testTarget(name: "SrokaTestingTests", dependencies: testDependencies("SrokaTesting")),
@@ -162,6 +171,13 @@ let package = Package(
         .testTarget(name: "SettingsFeatureTests", dependencies: testDependencies("SettingsFeature")),
         .testTarget(name: "ShareFeatureTests", dependencies: testDependencies("ShareFeature")),
         .testTarget(name: "AppNavigationTests", dependencies: testDependencies("AppNavigation")),
+        .testTarget(
+            name: "SrokaShareLiveTests",
+            dependencies: testDependencies("SrokaShareLive") + [
+                "ShareFeature", "SrokaDatabase", "SrokaNetwork", "SrokaSync", "SrokaContent", "SrokaSession",
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         .testTarget(
             name: "SnapshotTests",
             dependencies: [

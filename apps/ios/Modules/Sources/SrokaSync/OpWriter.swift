@@ -29,7 +29,8 @@ public struct OpWriter: Sendable {
     let admission: (any OpWriteAdmission)?
 
     /// - Parameters:
-    ///   - opClock: source of op `at` values (shared with the share extension through its store).
+    ///   - opClock: source of op `at` values; give it a `FileOpClockStore` next to the shared database so the app
+    ///     and the share extension share one clock.
     ///   - now: wall-clock milliseconds for `pending_ops.created_at`.
     ///   - admission: closes the write path during a wipe (app); nil writes always.
     public init(
@@ -44,14 +45,18 @@ public struct OpWriter: Sendable {
 
     /// `build` runs inside the transaction and returns the ops plus a value for the caller.
     /// Returns whether any op was queued, and the value.
+    ///
+    /// The clock ticks inside the write transaction. Write transactions are `IMMEDIATE`, so SQLite serialises them
+    /// across processes: with a shared `OpClockStore` (`FileOpClockStore`), the app and the share extension never
+    /// issue the same `at`, and `at` grows in commit (`local_seq`) order.
     public func write<T: Sendable>(
         _ build: @escaping @Sendable (Database, OpContext) throws -> (ops: [WireOp], value: T)
     ) async throws -> (queued: Bool, value: T) {
         let database = database
         let commit: @Sendable () async throws -> (queued: Bool, value: T) = { [opClock, now] in
-            let context = OpContext(at: opClock.next())
             let createdAt = now()
             return try await database.write { db in
+                let context = OpContext(at: opClock.next())
                 let (ops, value) = try build(db, context)
                 var queued = false
                 for op in ops where try LocalOpApplier.apply(db, op) {

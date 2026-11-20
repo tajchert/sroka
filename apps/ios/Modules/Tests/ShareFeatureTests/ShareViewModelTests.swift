@@ -244,6 +244,15 @@ struct ShareViewModelTests {
         #expect(log.intents == [.dismiss])
     }
 
+    @Test func `An editor that saved tags itself closes and the sheet pushes once more`() async {
+        let model = await savedModel()
+        model.tagsButtonTapped()
+        model.tagEditorFinished()
+        #expect(model.tagEditor == nil)
+        await model.closeButtonTapped()
+        #expect(log.pushes == 2)
+    }
+
     @Test func `Swiping the sheet away completes the request once`() async {
         let model = await savedModel()
         await model.sheetDismissed()

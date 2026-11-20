@@ -2,7 +2,11 @@ import Foundation
 import Synchronization
 
 /// Where an `OpClock` keeps its last value so ordering survives restarts. Implementations must be fast and
-/// synchronous (a `UserDefaults` key, a row written in the caller's transaction).
+/// synchronous (a small file, a `UserDefaults` key).
+///
+/// A store may be shared by two processes (the app and the share extension). The clock reads it on every tick, so
+/// each process sees the other's values; callers in different processes must serialise their ticks (`OpWriter`
+/// ticks inside the database write transaction, which SQLite serialises across processes).
 public protocol OpClockStore: Sendable {
     /// The last persisted value, or 0 when there is none.
     func load() -> Int64
@@ -19,18 +23,19 @@ public final class OpClock: Sendable {
 
     /// - Parameters:
     ///   - now: current time in unix milliseconds (inject `\.date` from the caller).
-    ///   - store: persists the last value; the clock resumes from it after a restart.
+    ///   - store: persists the last value; the clock resumes from it after a restart and follows values another
+    ///     process saved to the same store.
     public init(now: @escaping @Sendable () -> Int64, store: (any OpClockStore)? = nil) {
         self.now = now
         self.store = store
         self.last = Mutex(store?.load() ?? 0)
     }
 
-    /// Next `at` for a new local op: `max(now, last + 1)`.
+    /// Next `at` for a new local op: `max(now, last + 1)`, where `last` also covers the stored value.
     public func next() -> Int64 {
         // Persist under the lock so concurrent callers cannot store values out of order.
         last.withLock { last -> Int64 in
-            last = max(now(), last + 1)
+            last = max(now(), max(last, store?.load() ?? 0) + 1)
             store?.save(last)
             return last
         }
@@ -39,6 +44,7 @@ public final class OpClock: Sendable {
     /// Observe a remote/server time so local ops never go backwards relative to what this device has seen.
     public func observe(_ at: Int64) {
         last.withLock { last in
+            last = max(last, store?.load() ?? 0)
             guard at > last else { return }
             last = at
             store?.save(at)

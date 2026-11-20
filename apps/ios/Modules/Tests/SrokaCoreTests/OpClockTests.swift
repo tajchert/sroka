@@ -73,4 +73,13 @@ struct OpClockTests {
         restarted.observe(700)
         #expect(store.load() == 700)
     }
+
+    @Test func `Two clocks sharing a store never issue the same value`() {
+        // The app and the share extension: same store, same millisecond, alternating ticks.
+        let store = MemoryClockStore()
+        let app = OpClock(now: { 100 }, store: store)
+        let share = OpClock(now: { 100 }, store: store)
+        let values = [app.next(), share.next(), app.next(), share.next(), share.next(), app.next()]
+        #expect(values == [100, 101, 102, 103, 104, 105])
+    }
 }

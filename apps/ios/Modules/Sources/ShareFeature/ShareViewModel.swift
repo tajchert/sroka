@@ -214,6 +214,12 @@ public final class ShareViewModel {
         tagEditor = nil
     }
 
+    /// An editor that saved the tags itself closed (Save or Cancel): push once more before the sheet goes.
+    public func tagEditorFinished() {
+        changedSincePush = true
+        tagEditor = nil
+    }
+
     public func favoriteButtonTapped() async {
         sheetTouched()
         guard case .saved(let itemId, _) = state.phase, let item = state.item else { return }

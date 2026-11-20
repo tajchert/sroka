@@ -2,25 +2,49 @@ import Dependencies
 import Foundation
 import ShareFeature
 import SrokaCore
+import SrokaDatabase
 import SrokaDesign
+import SrokaShareLive
 import SrokaTesting
 import SwiftUI
+import TagsFeature
 import UIKit
 
 /// Share extension entry point (`NSExtensionPrincipalClass`). The system shows this controller's view over the
 /// sharing app; it stays clear and presents the save sheet as a small page sheet on top, so the sharing app
 /// remains visible behind it. Keep it light: no reader, Firebase or download code (extension memory limit).
 final class ShareViewController: UIViewController, UISheetPresentationControllerDelegate {
+    private var composition: ShareComposition?
     private var model: ShareViewModel?
     private var sheet: UIViewController?
     private var presented = false
     private var completed = false
+    private var hostObservers: [NSObjectProtocol] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
         SrokaFont.registerFonts()
-        model = ShareComposition.makeModel { [weak self] intent in self?.handle(intent) }
+        // A previous run of this process may have left the shared database suspended.
+        AppDatabase.resume()
+        observeHostLifecycle()
+        let composition = ShareComposition()
+        self.composition = composition
+        model = composition.makeModel { [weak self] intent in self?.handle(intent) }
+    }
+
+    /// While the host app is in the background the extension holds no SQLite lock (a lock held while suspended
+    /// gets the process killed: 0xdead10cc).
+    private func observeHostLifecycle() {
+        let center = NotificationCenter.default
+        hostObservers = [
+            center.addObserver(forName: .NSExtensionHostDidEnterBackground, object: nil, queue: .main) { _ in
+                AppDatabase.suspend()
+            },
+            center.addObserver(forName: .NSExtensionHostWillEnterForeground, object: nil, queue: .main) { _ in
+                AppDatabase.resume()
+            },
+        ]
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -38,8 +62,9 @@ final class ShareViewController: UIViewController, UISheetPresentationController
     // MARK: Sheet
 
     private func presentSheet(model: ShareViewModel) {
+        let composition = composition
         let root = ShareSheetView(model: model) { context in
-            ShareComposition.tagEditor(context)
+            composition?.tagEditor(context)
         }
         let host = UIHostingController(rootView: root)
         host.modalPresentationStyle = .pageSheet
@@ -81,6 +106,9 @@ final class ShareViewController: UIViewController, UISheetPresentationController
     private func complete() {
         guard !completed else { return }
         completed = true
+        for observer in hostObservers { NotificationCenter.default.removeObserver(observer) }
+        hostObservers = []
+        AppDatabase.suspend()
         extensionContext?.completeRequest(returningItems: nil)
     }
 
@@ -107,58 +135,69 @@ final class ShareViewController: UIViewController, UISheetPresentationController
 
 // MARK: - Composition
 
-/// The only place that decides which services the extension runs on. TODO(live graph): replace the fakes with
-/// the live graph once the sync engine merges. It must provide `libraryRepository`, `tagRepository`,
-/// `authRepository`, `pdfUploader` and `appEnvironment` (live value reads the extension's Info.plist), the
-/// `ShareStartup` result of opening the shared database, and a bounded `pushOnce` (one `sync/push` with a
-/// short timeout that never throws).
+/// The only place that decides which services the extension runs on: the live graph over the App Group database
+/// the app created (`SrokaShareLive`). When it cannot open, the sheet shows "Open Sroka" or the error state and
+/// touches no service, so fakes stand in.
 @MainActor
-private enum ShareComposition {
-    static func makeModel(onIntent: @escaping @MainActor (ShareIntent) -> Void) -> ShareViewModel {
-        let fakes = Fakes(items: [], session: .signedIn(email: Fixtures.email))
-        return withDependencies {
-            $0.useFakes(fakes)
-        } operation: {
-            ShareViewModel(startup: .ready, pushOnce: {}, onIntent: onIntent)
+private final class ShareComposition {
+    let graph: ShareGraph?
+    let startup: ShareStartup
+    let environment: AppEnvironment?
+
+    init() {
+        let configuration = Bundle.main.infoDictionary.flatMap(ShareConfiguration.init(infoDictionary:))
+        environment = configuration?.environment
+        switch configuration.map(ShareGraph.open) {
+        case .ready(let graph):
+            self.graph = graph
+            startup = .ready
+        case .failed(let startup):
+            graph = nil
+            self.startup = startup
+        case nil:
+            graph = nil
+            startup = .unavailable
         }
     }
 
-    /// Placeholder tag editor: comma separated names. The app's tag editor replaces it with the live graph.
-    static func tagEditor(_ context: ShareTagEditorContext) -> some View {
-        PlaceholderTagEditor(context: context)
+    func install(into values: inout DependencyValues) {
+        if let graph {
+            graph.install(into: &values)
+        } else {
+            values.useFakes(.empty)
+            if let environment { values.appEnvironment = environment }
+        }
+    }
+
+    func makeModel(onIntent: @escaping @MainActor (ShareIntent) -> Void) -> ShareViewModel {
+        let graph = graph
+        return withDependencies {
+            install(into: &$0)
+        } operation: {
+            ShareViewModel(startup: startup, pushOnce: { await graph?.pushOnce() }, onIntent: onIntent)
+        }
+    }
+
+    /// The app's tag editor over the live graph. It writes the tags itself, then reports `finished`.
+    func tagEditor(_ context: ShareTagEditorContext) -> some View {
+        ShareTagEditor(
+            model: withDependencies {
+                install(into: &$0)
+            } operation: {
+                TagEditorViewModel(itemId: context.request.itemId) { await context.finished() }
+            })
     }
 }
 
-private struct PlaceholderTagEditor: View {
-    let context: ShareTagEditorContext
-    @State private var text: String
+/// Keeps one editor model for the sheet's lifetime.
+private struct ShareTagEditor: View {
+    @State private var model: TagEditorViewModel
 
-    init(context: ShareTagEditorContext) {
-        self.context = context
-        _text = State(initialValue: context.request.initialTags.joined(separator: ", "))
+    init(model: @autoclosure () -> TagEditorViewModel) {
+        _model = State(wrappedValue: model())
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Tags, separated by commas", text: $text)
-                    .textInputAutocapitalization(.never)
-            }
-            .navigationTitle("Tags")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: context.cancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let names = text.split(separator: ",")
-                            .map { $0.trimmingCharacters(in: .whitespaces) }
-                            .filter { !$0.isEmpty }
-                        Task { await context.save(names) }
-                    }
-                }
-            }
-        }
+        TagEditorSheet(model: model)
     }
 }

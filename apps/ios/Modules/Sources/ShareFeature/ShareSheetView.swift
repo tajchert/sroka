@@ -4,11 +4,13 @@ import SwiftUI
 
 /// What the app root's tag editor receives. The editor lives in another feature, so the host passes it
 /// as a view builder; the editor reports its result through `save` (writes the tags and closes the
-/// editor) or `cancel`.
+/// editor) or `cancel`. An editor that writes the tags itself (`TagEditorViewModel`) calls `finished`
+/// after Save or Cancel instead: it closes the editor and pushes once more before the sheet goes.
 public struct ShareTagEditorContext {
     public let request: ShareTagEditorRequest
     public let save: @MainActor ([String]) async -> Void
     public let cancel: @MainActor () -> Void
+    public let finished: @MainActor () async -> Void
 }
 
 /// The save sheet of the share extension. Host it in a partial-height sheet over the sharing app.
@@ -35,7 +37,8 @@ public struct ShareSheetView<TagEditor: View>: View {
                     ShareTagEditorContext(
                         request: request,
                         save: { names in await model.tagsSaved(itemId: request.itemId, names: names) },
-                        cancel: { model.tagEditor = nil }
+                        cancel: { model.tagEditor = nil },
+                        finished: { model.tagEditorFinished() }
                     ))
             }
             .sensoryFeedback(.success, trigger: model.state.phase.isSaved)

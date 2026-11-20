@@ -37,6 +37,8 @@
 		AB0000000000000000000206 /* SrokaContent in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000106 /* SrokaContent */; };
 		AB0000000000000000000207 /* SrokaSession in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000107 /* SrokaSession */; };
 		AB0000000000000000000208 /* ShareFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000108 /* ShareFeature */; };
+		AB0000000000000000000209 /* SrokaShareLive in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000109 /* SrokaShareLive */; };
+		AB000000000000000000020A /* TagsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AB000000000000000000010A /* TagsFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -179,6 +181,8 @@
 				AB0000000000000000000206 /* SrokaContent in Frameworks */,
 				AB0000000000000000000207 /* SrokaSession in Frameworks */,
 				AB0000000000000000000208 /* ShareFeature in Frameworks */,
+				AB0000000000000000000209 /* SrokaShareLive in Frameworks */,
+				AB000000000000000000020A /* TagsFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,6 +308,8 @@
 				AB0000000000000000000106 /* SrokaContent */,
 				AB0000000000000000000107 /* SrokaSession */,
 				AB0000000000000000000108 /* ShareFeature */,
+				AB0000000000000000000109 /* SrokaShareLive */,
+				AB000000000000000000010A /* TagsFeature */,
 			);
 			productName = SrokaShare;
 			productReference = AB000000000000000000000D /* SrokaShare.appex */;
@@ -871,6 +877,14 @@
 		AB0000000000000000000108 /* ShareFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShareFeature;
+		};
+		AB0000000000000000000109 /* SrokaShareLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaShareLive;
+		};
+		AB000000000000000000010A /* TagsFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TagsFeature;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

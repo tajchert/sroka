@@ -10,7 +10,29 @@ private final class MemoryClockStore: OpClockStore {
     func save(_ newValue: Int64) { value.withLock { $0 = newValue } }
 }
 
+private final class OrderCheckingStore: OpClockStore {
+    private let state = Mutex((last: Int64(0), outOfOrder: 0))
+    var last: Int64 { state.withLock { $0.last } }
+    var outOfOrder: Int { state.withLock { $0.outOfOrder } }
+    func load() -> Int64 { 0 }
+    func save(_ value: Int64) {
+        state.withLock { state in
+            if value <= state.last { state.outOfOrder += 1 }
+            state.last = value
+        }
+    }
+}
+
 struct OpClockTests {
+    @Test func `Concurrent callers persist in increasing order`() async {
+        let store = OrderCheckingStore()
+        let clock = OpClock(now: { 1 }, store: store)
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<8 { group.addTask { for _ in 0..<500 { _ = clock.next() } } }
+        }
+        #expect(store.outOfOrder == 0 && store.last == 4000)
+    }
+
     @Test func `Is strictly increasing within one millisecond`() {
         let clock = OpClock(now: { 100 })
         #expect([clock.next(), clock.next(), clock.next()] == [100, 101, 102])

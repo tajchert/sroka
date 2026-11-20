@@ -150,10 +150,11 @@ public struct PullResponseDto: Decodable, Sendable, Equatable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         cursor = try c.decode(Int64.self, forKey: .cursor)
-        hasMore = c.lenient(Bool.self, .hasMore, or: false)
+        // A page without `hasMore` or `deleted` must not be read as "done, nothing deleted": that would end a sync early.
+        hasMore = try c.decode(Bool.self, forKey: .hasMore)
         items = try c.decodeIfPresent([ItemDto].self, forKey: .items) ?? []
         tags = try c.decodeIfPresent([TagDto].self, forKey: .tags) ?? []
-        deleted = c.lenient(DeletedDto.self, .deleted, or: DeletedDto())
+        deleted = try c.decode(DeletedDto.self, forKey: .deleted)
     }
 }
 

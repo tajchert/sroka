@@ -122,7 +122,7 @@ struct RequestTests {
     }
 
     @Test func `Pull builds its query`() async throws {
-        let harness = Harness { _ in .json(#"{"cursor":9,"hasMore":false}"#) }
+        let harness = Harness { _ in .json(#"{"cursor":9,"hasMore":false,"deleted":{}}"#) }
         _ = try await harness.api.pull(cursor: 41, limit: 500, full: false)
         #expect(harness.last.path == "/v1/sync/pull")
         #expect(harness.last.query == "cursor=41&limit=500")
@@ -151,9 +151,8 @@ struct RequestTests {
         #expect(harness.last.bodyText.contains(op.payload))
     }
 
-    @Test func `Push refuses empty and oversized batches without calling the server`() async {
+    @Test func `Push refuses oversized batches without calling the server`() async {
         let harness = Harness.always()
-        #expect(await apiError { try await harness.api.push(payloads: []) } == .invalidRequest)
         let tooMany = Array(repeating: "{}", count: Limits.maxOpsPerPush + 1)
         #expect(await apiError { try await harness.api.push(payloads: tooMany) } == .invalidRequest)
         #expect(harness.requests.isEmpty)
@@ -170,11 +169,11 @@ struct RequestTests {
         #expect(harness.last.path == "/v1/items/x/content")
     }
 
-    @Test func `Item answers wrapped in item or bare both decode`() async throws {
+    @Test func `Item answers are wrapped in item`() async throws {
         let wrapped = Harness { _ in .json(#"{"item":{"id":"i1","url":"https://a.b/"}}"#) }
         #expect(try await wrapped.api.item(id: "i1").id == "i1")
         let bare = Harness { _ in .json(#"{"id":"i2","url":"https://a.b/"}"#) }
-        #expect(try await bare.api.item(id: "i2").id == "i2")
+        #expect(await apiError { try await bare.api.item(id: "i2") } == .malformedResponse)
     }
 
     @Test func `Content urls decode and a missing parse is a typed error`() async throws {

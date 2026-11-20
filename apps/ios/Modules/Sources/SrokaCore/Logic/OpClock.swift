@@ -28,21 +28,20 @@ public final class OpClock: Sendable {
 
     /// Next `at` for a new local op: `max(now, last + 1)`.
     public func next() -> Int64 {
-        let value = last.withLock { last -> Int64 in
+        // Persist under the lock so concurrent callers cannot store values out of order.
+        last.withLock { last -> Int64 in
             last = max(now(), last + 1)
+            store?.save(last)
             return last
         }
-        store?.save(value)
-        return value
     }
 
     /// Observe a remote/server time so local ops never go backwards relative to what this device has seen.
     public func observe(_ at: Int64) {
-        let changed = last.withLock { last -> Int64? in
-            guard at > last else { return nil }
+        last.withLock { last in
+            guard at > last else { return }
             last = at
-            return at
+            store?.save(at)
         }
-        if let changed { store?.save(changed) }
     }
 }

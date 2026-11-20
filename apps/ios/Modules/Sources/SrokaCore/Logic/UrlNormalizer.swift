@@ -20,7 +20,7 @@ public enum UrlNormalizer {
 
     public static func isTrackingParam(_ name: String) -> Bool {
         let lowered = jsLowercased(name)
-        return lowered.hasPrefix("utm_") || trackingParams.contains(lowered)
+        return lowered.utf8.starts(with: "utm_".utf8) || trackingParams.contains(lowered)
     }
 
     /// Canonical form of `input`, or nil if it is not an absolute http(s) URL with a host.
@@ -30,7 +30,8 @@ public enum UrlNormalizer {
         // hostname setter ignores an empty value, so such a host is kept as parsed.
         if parsed.host.hasSuffix(".") {
             let stripped = String(parsed.host.reversed().drop(while: { $0 == "." }).reversed())
-            if !stripped.isEmpty { parsed.host = stripped }
+            // The hostname setter re-parses; if that fails the host stays as it was.
+            if !stripped.isEmpty, let reparsed = parseHost(Array(stripped.utf8)) { parsed.host = reparsed }
         }
         var kept: [(index: Int, name: String, value: String)] = []
         for (index, pair) in parseQuery(parsed.query ?? "").enumerated() where !isTrackingParam(pair.name) {
@@ -143,8 +144,10 @@ public enum UrlNormalizer {
         guard let host = parseHost(rawHost) else { return nil }
         var port: Int?
         if !rawPort.isEmpty {
-            guard rawPort.allSatisfy(isDigit), rawPort.count <= 8,
-                let value = Int(String(decoding: rawPort, as: UTF8.self)),
+            guard rawPort.allSatisfy(isDigit) else { return nil }
+            let digits = Array(rawPort.drop(while: { $0 == 0x30 }))  // leading zeros are allowed: ":000443"
+            guard digits.count <= 5,
+                let value = digits.isEmpty ? 0 : Int(String(decoding: digits, as: UTF8.self)),
                 value <= 65535
             else { return nil }
             if !((scheme == "http" && value == 80) || (scheme == "https" && value == 443)) { port = value }
@@ -172,6 +175,8 @@ public enum UrlNormalizer {
             return "[" + serializeIPv6(pieces) + "]"
         }
         let decoded = String(decoding: percentDecode(raw), as: UTF8.self)
+        // Invalid UTF-8 (e.g. `%FF`) decodes to U+FFFD, which UTS 46 rejects.
+        if decoded.unicodeScalars.contains(where: { $0.value == 0xFFFD }) { return nil }
         guard let ascii = domainToAscii(decoded), !ascii.isEmpty else { return nil }
         if ascii.unicodeScalars.contains(where: isForbiddenDomainScalar) { return nil }
         if endsInNumber(ascii) {
@@ -213,8 +218,9 @@ public enum UrlNormalizer {
             }
             var mapped = String.UnicodeScalarView()
             for scalar in label.unicodeScalars where !isIdnaIgnored(scalar) { mapped.append(scalar) }
-            let folded = String(mapped).lowercased().precomposedStringWithCompatibilityMapping
-            let normalized = folded.precomposedStringWithCanonicalMapping
+            // Compatibility-map first so that e.g. U+210C becomes `H`, then fold case, then settle on NFC.
+            let folded = String(mapped).precomposedStringWithCompatibilityMapping.lowercased()
+            let normalized = folded.precomposedStringWithCompatibilityMapping.precomposedStringWithCanonicalMapping
             if normalized.unicodeScalars.allSatisfy({ $0.isASCII }) {
                 out.append(normalized)
             } else {

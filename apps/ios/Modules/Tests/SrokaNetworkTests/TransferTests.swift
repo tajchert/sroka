@@ -197,6 +197,23 @@ struct TransferTests {
         #expect(progress.withLock { $0.last?.0 } == Int64(payload.count))
     }
 
+    @Test func `A download replaces an existing file but never a directory`() async throws {
+        let harness = Harness { _ in StubResponse(body: Data("new".utf8)) }
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = try #require(URL(string: "https://\(harness.host)/c/x"))
+        let file = directory.appendingPathComponent("old.bin")
+        try Data("old".utf8).write(to: file)
+        try await harness.api.download(from: url, to: file, onProgress: nil)
+        #expect(try Data(contentsOf: file) == Data("new".utf8))
+        let folder = directory.appendingPathComponent("folder")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let error = await apiError { try await harness.api.download(from: url, to: folder, onProgress: nil) }
+        #expect(error == .transport(.cannotWriteToFile))
+        var isDirectory: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory) && isDirectory.boolValue)
+    }
+
     @Test func `A failed download leaves nothing behind and reports the status`() async throws {
         let harness = Harness { _ in .json(#"{"error":"forbidden"}"#, status: 403) }
         let directory = try temporaryDirectory()

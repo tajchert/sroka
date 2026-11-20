@@ -57,6 +57,26 @@ struct WireOpTests {
         #expect(!progress.payload.contains("anchor"))
     }
 
+    @Test func `Progress is clamped when encoding even after a later mutation`() {
+        var op = WireOp.SetProgress(opId: "x", itemId: itemId, at: at, progress: 0.5)
+        op.progress = .nan
+        #expect(WireOp.setProgress(op).payload.contains(#""progress":0"#))
+        op.progress = 7
+        #expect(WireOp.setProgress(op).payload.contains(#""progress":1"#))
+    }
+
+    @Test func `Titles are trimmed like JavaScript, so U+0085 stays and U+FEFF goes`() {
+        func sent(_ title: String) -> String? {
+            guard
+                case .setTitle(let op)? = WireOp.parse(
+                    payload: WireOp.setTitle(.init(opId: "y", itemId: itemId, at: at, title: title)).payload)
+            else { return nil }
+            return op.title
+        }
+        #expect(sent("\u{FEFF} Hi \u{3000}") == "Hi")
+        #expect(sent("\u{85}Hi") == "\u{85}Hi")
+    }
+
     @Test func `Slashes and non-ASCII are not escaped`() {
         let add = WireOp.add(.init(opId: "x", itemId: itemId, at: at, url: "https://a.b/ü/c", tags: ["żółw"]))
         #expect(add.payload.contains(#""url":"https://a.b/ü/c""#))

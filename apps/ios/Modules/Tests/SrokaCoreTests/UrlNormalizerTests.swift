@@ -46,12 +46,15 @@ struct UrlNormalizerTests {
     }
 
     @Test func `Differential vectors from the server parser normalise identically`() {
-        for (input, expected) in urlVectors {
+        for (input, expected) in urlVectors + urlVectorsRound2 {
             #expect(UrlNormalizer.normalize(input) == expected, "\(input.debugDescription)")
         }
     }
 
     @Test func `Differential vectors agree on what is an http url`() {
+        for (input, expected) in httpUrlVectorsRound2 {
+            #expect(UrlNormalizer.isHttpUrl(input) == expected, "\(input.debugDescription)")
+        }
         for (input, expected) in httpUrlVectors {
             #expect(UrlNormalizer.isHttpUrl(input) == expected, "\(input.debugDescription)")
         }

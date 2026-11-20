@@ -130,13 +130,23 @@ struct ErrorAndDecodingTests {
     }
 
     @Test func `Pull answers without optional collections still decode`() async throws {
-        let harness = Harness { _ in .json(#"{"cursor":1}"#) }
+        let harness = Harness { _ in .json(#"{"cursor":1,"hasMore":false,"deleted":{}}"#) }
         let page = try await harness.api.pull(cursor: 0, limit: 500, full: false)
         #expect(page.items.isEmpty && page.tags.isEmpty && page.deleted == DeletedDto() && !page.hasMore)
     }
 
+    @Test func `A pull answer without hasMore or deleted is malformed, not an empty last page`() async {
+        for body in [#"{"cursor":1,"deleted":{}}"#, #"{"cursor":1,"hasMore":false}"#, #"{"cursor":1}"#] {
+            let harness = Harness { _ in .json(body) }
+            #expect(
+                await apiError { try await harness.api.pull(cursor: 0, limit: 1, full: false) } == .malformedResponse)
+        }
+    }
+
     @Test func `An item without an id is a malformed page`() async {
-        let harness = Harness { _ in .json(#"{"cursor":1,"items":[{"url":"https://a.b/"}]}"#) }
+        let harness = Harness { _ in
+            .json(#"{"cursor":1,"hasMore":false,"deleted":{},"items":[{"url":"https://a.b/"}]}"#)
+        }
         #expect(await apiError { try await harness.api.pull(cursor: 0, limit: 1, full: false) } == .malformedResponse)
     }
 

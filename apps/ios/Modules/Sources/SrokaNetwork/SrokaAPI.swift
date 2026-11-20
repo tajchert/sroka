@@ -13,7 +13,7 @@ public protocol SrokaAPI: Sendable {
     func signOut() async throws
 
     // Sync
-    /// `POST /v1/sync/push` with canonical op payloads (`WireOp.payload`), 1...500 of them, sent byte for byte.
+    /// `POST /v1/sync/push` with canonical op payloads (`WireOp.payload`), up to 500 of them, sent byte for byte.
     func push(payloads: [String]) async throws -> PushResponseDto
     /// `GET /v1/sync/pull`. A 410 `resync_required` throws an `ApiError` whose `isResyncRequired` is true.
     func pull(cursor: Int64, limit: Int, full: Bool) async throws -> PullResponseDto

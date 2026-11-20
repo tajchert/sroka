@@ -121,9 +121,12 @@ public enum WireOp: Sendable, Hashable {
             self.opId = opId
             self.itemId = itemId
             self.at = at
-            self.progress = progress.isNaN ? 0 : min(1, max(0, progress))
+            self.progress = Self.clamp(progress)
             self.anchor = anchor.map { max(0, $0) }
         }
+
+        /// 0...1; NaN becomes 0. Also applied when encoding, since the fields are mutable.
+        static func clamp(_ progress: Double) -> Double { progress.isNaN ? 0 : min(1, max(0, progress)) }
     }
 
     public struct Tag: Sendable, Hashable {
@@ -335,6 +338,20 @@ public enum WireOp: Sendable, Hashable {
         parse(payload: payload)?.rewriting(itemId: itemId, opId: opId).payload
     }
 
+    /// Title as zod sees it: JavaScript `trim()`, at most `Limits.maxTitleLength` UTF-16 units (never splitting a
+    /// surrogate pair), nil when empty. Not `Limits.clampTitle`, whose Unicode whitespace set differs from JS.
+    static func clampTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        var units = Array(jsTrim(title).utf16)
+        if units.count > Limits.maxTitleLength {
+            var end = Limits.maxTitleLength
+            if UTF16.isLeadSurrogate(units[end - 1]) { end -= 1 }
+            units = Array(units[0..<end])
+        }
+        let result = jsTrim(String(decoding: units, as: UTF16.self))
+        return result.isEmpty ? nil : result
+    }
+
     /// The fixed encoder configuration: sorted keys, compact, slashes unescaped. Nil fields are omitted by `Wire`.
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -378,7 +395,7 @@ public enum WireOp: Sendable, Hashable {
             case .add(let op):
                 self.init(opId: op.opId, type: .add, at: op.at, itemId: op.itemId)
                 url = op.url
-                title = Limits.clampTitle(op.title)
+                title = WireOp.clampTitle(op.title)
                 tags = op.tags
                 source = op.source.flatMap { $0 == .unknown ? nil : $0.rawValue }
                 savedAt = op.savedAt
@@ -393,15 +410,15 @@ public enum WireOp: Sendable, Hashable {
                 value = op.value
             case .setProgress(let op):
                 self.init(opId: op.opId, type: .setProgress, at: op.at, itemId: op.itemId)
-                progress = op.progress
-                anchor = op.anchor
+                progress = SetProgress.clamp(op.progress)
+                anchor = op.anchor.map { max(0, $0) }
             case .tag(let op):
                 self.init(opId: op.opId, type: .tag, at: op.at, itemId: op.itemId)
                 tag = op.tag
                 present = op.present
             case .setTitle(let op):
                 self.init(opId: op.opId, type: .setTitle, at: op.at, itemId: op.itemId)
-                title = Limits.clampTitle(op.title) ?? ""
+                title = WireOp.clampTitle(op.title) ?? ""
             case .delete(let op):
                 self.init(opId: op.opId, type: .delete, at: op.at, itemId: op.itemId)
             case .refresh(let op):

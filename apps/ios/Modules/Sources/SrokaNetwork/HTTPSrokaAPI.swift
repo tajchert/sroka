@@ -72,7 +72,7 @@ public final class HTTPSrokaAPI: SrokaAPI {
     // MARK: Sync
 
     public func push(payloads: [String]) async throws -> PushResponseDto {
-        guard !payloads.isEmpty, payloads.count <= Limits.maxOpsPerPush else { throw ApiError.invalidRequest }
+        guard payloads.count <= Limits.maxOpsPerPush else { throw ApiError.invalidRequest }
         // The ops go out exactly as the canonical payloads were stored: no decode/re-encode round trip.
         let deviceId = await provider.deviceId()
         guard let device = try? JSONEncoder().encode(deviceId), let deviceJson = String(data: device, encoding: .utf8)
@@ -96,9 +96,7 @@ public final class HTTPSrokaAPI: SrokaAPI {
     public func item(id: String) async throws -> ItemDto {
         let request = try await apiRequest("GET", "/v1/items/\(Self.segment(id))")
         let data = try await perform(request).data
-        // api.md §5.3 answers `{"item": …}`; accept a bare item too.
-        if let envelope = try? JSONDecoder().decode(ItemEnvelope.self, from: data) { return envelope.item }
-        return try decode(data)
+        return (try decode(data) as ItemEnvelope).item
     }
 
     public func contentUrls(itemId: String) async throws -> ContentUrlsDto {
@@ -282,10 +280,14 @@ public final class HTTPSrokaAPI: SrokaAPI {
                 (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
             try FileManager.default.createDirectory(
                 at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDirectory) {
+                // Never replace a directory; replaceItemAt swaps a file in one step.
+                if isDirectory.boolValue { throw ApiError.transport(.cannotWriteToFile) }
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
+            } else {
+                try FileManager.default.moveItem(at: temporary, to: destination)
             }
-            try FileManager.default.moveItem(at: temporary, to: destination)
             progress?(size, size)
             return (size, http)
         } catch {

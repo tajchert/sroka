@@ -304,7 +304,6 @@ public final class ReaderViewModel {
             if unsaved { saveReported(at: date.now) }
             atEnd = false
             touchActivity()
-            if case .ready = new { announceResumeIfNeeded() }
         case .rendererGone:
             break  // keep `isReady`: the position reported so far is still saved on leave
         default:

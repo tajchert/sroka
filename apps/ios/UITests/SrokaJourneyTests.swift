@@ -23,6 +23,10 @@ final class SrokaJourneyTests: XCTestCase {
         screens.signIn()
         expect(app.navigationBars["My List"].firstMatch, "My List title", app: app)
         shot("a2-empty-library")
+        screens.openTab("Archive")
+        expect(app.navigationBars["Archive"].firstMatch, "Archive title", app: app)
+        shot("a3-archive-empty")
+        screens.openTab("My List")
         XCTAssertFalse(screens.row(containing: Journey.articleTitle).exists, "a new account has no articles")
     }
 
@@ -58,7 +62,11 @@ final class SrokaJourneyTests: XCTestCase {
         expect(
             app2.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "Resumed at")).firstMatch,
             "'Resumed at N%' toast after reopening", timeout: 40, app: app2)
+        // The notice must not outrun the page: the text is on screen the moment "Resumed at N%" shows.
         shot("b5-reader-resumed")
+        XCTAssertGreaterThan(
+            screens2.visibleBodyTexts(in: app2.webViews.firstMatch), 0,
+            "article text is on screen when the resume notice shows, not only in the DOM")
         XCTAssertGreaterThan(screens2.readingProgress(), 0, "the progress line starts where the reader left")
     }
 

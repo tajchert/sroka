@@ -144,6 +144,12 @@ extension ReaderViewModel {
         toast = nil
     }
 
+    /// The article page finished loading and applied its saved position: only now is the resume notice true.
+    /// (Announcing it when the state turns ready showed "Resumed at N%" over a still blank page.)
+    func articleDisplayed() {
+        announceResumeIfNeeded()
+    }
+
     /// Offers "Start over" when the article opened part-way through.
     func announceResumeIfNeeded() {
         guard !resumeAnnounced else { return }

@@ -130,7 +130,8 @@ private struct ReaderContent: View {
                     model.touchActivity()
                 },
                 onOpenLink: onOpenLink,
-                onProcessTerminated: { model.webProcessTerminated() }
+                onProcessTerminated: { model.webProcessTerminated() },
+                onLoaded: { model.articleDisplayed() }
             )
             .ignoresSafeArea()
         case .pdfReady(let file):

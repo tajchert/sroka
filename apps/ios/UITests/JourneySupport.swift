@@ -240,6 +240,18 @@ struct Screens {
         return Int(value.split(separator: " ").first ?? "") ?? -1
     }
 
+    /// Number of article text blocks whose frame is on the screen right now (the web view also lists off-screen text).
+    func visibleBodyTexts(in web: XCUIElement) -> Int {
+        let screen = app.windows.firstMatch.frame
+        let texts = web.staticTexts.matching(NSPredicate(format: "label MATCHES %@", ".{40,}"))
+        var count = 0
+        for index in 0..<min(texts.count, 80) {
+            let frame = texts.element(boundBy: index).frame
+            if frame.height > 0, frame.intersects(screen.insetBy(dx: 0, dy: 100)) { count += 1 }
+        }
+        return count
+    }
+
     func closeReader() {
         let back = app.navigationBars.buttons.firstMatch
         // The chrome hides while reading (after scrolling): a tap on the page brings it back.

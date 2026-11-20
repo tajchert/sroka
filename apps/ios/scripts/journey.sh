@@ -72,7 +72,9 @@ for (const list of Object.values(d)) for (const s of list) if (s.name === name) 
 xcrun simctl shutdown "$UDID" 2>/dev/null || true
 xcrun simctl erase "$UDID"
 xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1 || true
-rm -rf "$OUT_DIR" && mkdir -p "$OUT_DIR"
+# A full run starts from an empty screenshot folder; a run of selected tests only replaces its own shots.
+[[ ${#TESTS[@]} -eq 0 ]] && rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR"
 
 ONLY=()
 if [[ ${#TESTS[@]} -eq 0 ]]; then

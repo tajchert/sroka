@@ -199,6 +199,9 @@ struct ReaderResumeTests {
         let h = ReaderHarness(itemId: Fixtures.longRead.id)
         h.start()
         defer { h.stop() }
+        #expect(await h.until { h.model.readyDocument != nil })
+        #expect(h.model.toast == nil, "not announced before the page is displayed")
+        h.model.articleDisplayed()
         #expect(await h.until { h.model.toast == .resumed(percent: 42) })
     }
 
@@ -207,6 +210,7 @@ struct ReaderResumeTests {
         h.start()
         defer { h.stop() }
         #expect(await h.until { h.model.readyDocument != nil })
+        h.model.articleDisplayed()
         await h.idle()
         #expect(h.model.toast == nil)
     }
@@ -218,6 +222,7 @@ struct ReaderResumeTests {
         h.start()
         defer { h.stop() }
         #expect(await h.until { h.model.readyDocument != nil })
+        h.model.articleDisplayed()
         await h.idle()
         #expect(h.model.toast == nil)
     }
@@ -226,6 +231,8 @@ struct ReaderResumeTests {
         let h = ReaderHarness(itemId: Fixtures.longRead.id)
         h.start()
         defer { h.stop() }
+        #expect(await h.until { h.model.readyDocument != nil })
+        h.model.articleDisplayed()
         #expect(await h.until { h.model.toast != nil })
         await h.idle()
         await h.clock.advance(by: .seconds(7))
@@ -236,6 +243,8 @@ struct ReaderResumeTests {
         let h = ReaderHarness(itemId: Fixtures.longRead.id)
         h.start()
         defer { h.stop() }
+        #expect(await h.until { h.model.readyDocument != nil })
+        h.model.articleDisplayed()
         #expect(await h.until { h.model.toast != nil })
         h.model.startOverTapped()
         await h.model.writesSettled()

@@ -71,6 +71,8 @@ struct ArticleWebView: UIViewRepresentable {
     let onTap: () -> Void
     let onOpenLink: (URL) -> Void
     let onProcessTerminated: () -> Void
+    /// The document finished loading (the reader script has run and restored the saved position).
+    let onLoaded: () -> Void
 
     func makeCoordinator() -> ArticleWebViewCoordinator {
         ArticleWebViewCoordinator()
@@ -332,7 +334,10 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard navigation === currentNavigation else { return }
         scriptReady = true
-        if let parent { update(from: parent, webView: webView) }
+        if let parent {
+            update(from: parent, webView: webView)
+            parent.onLoaded()
+        }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

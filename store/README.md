@@ -27,7 +27,7 @@ Prereqs: developer account ($5 one-time), reviewer secrets set, extension built 
 ## Google Play upload checklist
 Prereqs: developer account, `./gradlew :app:bundlePlayRelease` (JDK 21) producing a release-signed `.aab` in `store/upload/`. Reviewer secrets set.
 1. Create app: name from `google-play/listing.md`, default language English, App, Free.
-2. Main store listing: short and full description, icon 512x512, feature graphic 1024x500, phone screenshots (2-8), optional tablet screenshots.
+2. Main store listing: short and full description, icon 512x512, feature graphic 1024x500, phone screenshots (2-8), foldable screenshots (`images/foldable-*.png`, see `google-play/listing.md`), optional tablet screenshots.
 3. Store settings: category Productivity, tags, contact email, website.
 4. App content (all of `google-play/app-content.md`): privacy policy URL, App access (reviewer sign-in), Ads = No, Content rating questionnaire, Target audience 18+, News app = No, Data safety (`data-safety.md`), Government = No, Financial = No, Health = No, Advertising ID = No, Foreground service declaration (dataSync, with the screen recording), account deletion URL.
 5. Testing: Play requires a closed test with the required number of testers for new personal accounts before production; upload the `.aab` to Internal/Closed testing first.

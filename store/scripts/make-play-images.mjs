@@ -1,6 +1,6 @@
-// Google Play graphics generator: icon-512, feature graphic, framed phone screenshots.
+// Google Play graphics generator: icon-512, feature graphic, framed phone screenshots, framed foldable screenshots.
 // Inputs: docs/brand/icon.svg and the Compose screenshot-test references (see apps/android/docs/SCREENSHOT_TESTING.md;
-// StoreScreenshotTests.kt in feature/library/impl and feature/settings/impl). Output: store/google-play/images/.
+// StoreScreenshotTests.kt in feature/library/impl, feature/settings/impl and app). Output: store/google-play/images/.
 //
 //   SHARP_PREFIX=<dir with node_modules/sharp> node store/scripts/make-play-images.mjs
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
@@ -62,5 +62,30 @@ for (const [name, headline, src] of shots) {
   const text = lines.map((l, i) => `<text x="540" y="${150 + i * 96}" text-anchor="middle" font-family="${FONT}" font-size="84" font-weight="800" fill="#fff">${l}</text>`).join("");
   const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${BLUE}"/><rect x="480" y="${150 + (lines.length - 1) * 96 + 40}" width="120" height="8" rx="4" fill="${BEAK}"/>${text}</svg>`;
   await sharp(Buffer.from(bg)).composite([{ input: clipped, left: (W - SW) / 2, top: SY }]).flatten({ background: INK }).removeAlpha().png({ compressionLevel: 9 }).toFile(join(out, `phone-${name}.png`));
+}
+// 4. Foldable screenshots (Play: 3-8, incl. unfolded 1:1, unfolded 4:3, outer screen 10:16). Same brand frame as the
+// phone shots, adapted per canvas. Each raw render is scaled to `sw` wide and centred under the headline; the canvas
+// is exactly 1:1 / 4:3 / 10:16, every side 960-3840 px. Raw renders: unfolded 1520x1520 (1:1) and 1760x1320 (4:3), folded 1080x1728 (10:16).
+const app = refs("apps/android/app/src/screenshotTestPlayDebug/reference");
+const foldables = [
+  // [file name, headline, source, canvas w, canvas h, shot width, shot top, headline font size, headline baseline y, corner radius]
+  ["01-unfolded-library", "Made for unfolded screens", find(app, "StoreFoldUnfoldedLibrary"), 1920, 1920, 1480, 330, 92, 160, 48],
+  ["02-unfolded-tags", "Tags and their articles, together", find(app, "StoreFoldUnfoldedTags"), 2160, 1620, 1760, 250, 84, 130, 48],
+  ["03-folded-library", "Save now.\nRead later.", find(lib, "StoreFoldedLibraryLight"), 1200, 1920, 920, 400, 84, 150, 56],
+  ["04-unfolded-search", "Search the full text of everything", find(app, "StoreFoldUnfoldedSearch"), 2160, 1620, 1760, 250, 84, 130, 48],
+  ["05-unfolded-dark", "Easy on the eyes at night", find(app, "StoreFoldUnfoldedLibraryDark"), 1920, 1920, 1480, 330, 92, 160, 48],
+];
+for (const [name, headline, src, CW, CH, fw, top, fs, y0, rx] of foldables) {
+  const meta = await sharp(src).metadata();
+  const fh = Math.round((fw * meta.height) / meta.width);
+  const shot = await sharp(src).resize(fw, fh).png().toBuffer();
+  const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${fw}" height="${fh}"><rect width="${fw}" height="${fh}" rx="${rx}"/></svg>`);
+  const clipped = await sharp(shot).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+  const lines = headline.split("\n");
+  const step = Math.round(fs * 1.14);
+  const text = lines.map((l, i) => `<text x="${CW / 2}" y="${y0 + i * step}" text-anchor="middle" font-family="${FONT}" font-size="${fs}" font-weight="800" fill="#fff">${l}</text>`).join("");
+  const bar = `<rect x="${CW / 2 - 60}" y="${y0 + (lines.length - 1) * step + 40}" width="120" height="8" rx="4" fill="${BEAK}"/>`;
+  const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CW}" height="${CH}"><rect width="${CW}" height="${CH}" fill="${BLUE}"/>${bar}${text}</svg>`;
+  await sharp(Buffer.from(bg)).composite([{ input: clipped, left: Math.round((CW - fw) / 2), top }]).flatten({ background: INK }).removeAlpha().png({ compressionLevel: 9 }).toFile(join(out, `foldable-${name}.png`));
 }
 console.log("done");

@@ -196,3 +196,14 @@ fun StorePhoneTags() {
         )
     }
 }
+
+// Google Play foldable screenshot, outer (folded) screen in portrait: 360x576dp at 480dpi renders 1080x1728 px (10:16).
+@PreviewTest
+@Preview(name = "StoreFoldedLibraryLight", showBackground = true, device = "spec:width=360dp,height=576dp,dpi=480", apiLevel = 36)
+@Composable
+fun StoreFoldedLibraryLight() = StoreList(dark = false)
+
+@PreviewTest
+@Preview(name = "StoreFoldedLibraryDark", showBackground = true, device = "spec:width=360dp,height=576dp,dpi=480", apiLevel = 36)
+@Composable
+fun StoreFoldedLibraryDark() = StoreList(dark = true)

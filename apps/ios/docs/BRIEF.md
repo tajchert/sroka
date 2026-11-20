@@ -90,3 +90,12 @@ Each stream edits only its modules (Sources + matching Tests) plus its own lines
 - **Wave 3**: L app composition, background work, telemetry · K share extension · iPad and polish · journeys against the local stack · docs and release preflight.
 
 Progress: `apps/ios/docs/LEDGER.md` (orchestrator only).
+
+## Foundation notes (F landed at 3fa36fe)
+
+- Domain protocols and dependency keys live in `SrokaCore`; previews and tests call `useFakes(Fakes())` from `SrokaTesting` (keys have no preview value and the test value reports an issue).
+- `SrokaCore/Logic/` holds stubs `UrlNormalizer.hostOf(_:)`, `normalizeTagName`, `tagKey`; stream A replaces the bodies and keeps the signatures.
+- Android's `SortOrder` is `LibrarySortOrder`. List paging is a growing limit: `observeItems(_:limit:)` returns `ItemPage` with `hasMore`.
+- Every feature module has its own `Localizable.xcstrings`; placeholders are `<Name>PlaceholderView`, replace them.
+- App and share extension still run on fakes (`App/AppComposition.swift` TODO, stream L). Info.plist does not yet allow http to localhost (stream A adds it).
+- A changed domain protocol must be changed together with its fake in `SrokaTesting`; keep such changes minimal and list them in your report, because other streams compile against them.

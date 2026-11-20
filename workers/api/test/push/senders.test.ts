@@ -6,13 +6,14 @@ import { ecKey, fakeFetch, json, serviceAccount, verifyJwt, withOauth } from "./
 
 beforeEach(() => resetPushState());
 
-const fcmDevice = (token = "fcm-token-1"): PushDevice => ({ deviceId: "and_1", platform: "fcm", token, apnsEnv: null, apnsTopic: null });
+const fcmDevice = (token = "fcm-token-1"): PushDevice => ({ deviceId: "and_1", platform: "fcm", token, apnsEnv: null, apnsTopic: null, updatedAt: 1 });
 const apnsDevice = (env: "sandbox" | "production" = "sandbox", token = "abcdef0123"): PushDevice => ({
   deviceId: "ios_1",
   platform: "apns",
   token,
   apnsEnv: env,
   apnsTopic: "app.sroka.dev",
+  updatedAt: 1,
 });
 
 async function apnsConfig() {
@@ -170,6 +171,56 @@ describe("APNs sender", () => {
     const flaky = fakeFetch((c) => (c.url.startsWith("https://api.push.") ? json(400, { reason: "BadDeviceToken" }) : json(503, { reason: "ServiceUnavailable" })));
     const r3 = await new PushSender(cfg, flaky.fetch).send([apnsDevice("production")]);
     expect(r3.outcomes[0]!.outcome.status).toBe("failed");
+  });
+});
+
+describe("deadlines, liveness, shared signing", () => {
+  it("a stalled provider request times out as failed", async () => {
+    const { json: saJson } = await serviceAccount();
+    const { cfg } = await apnsConfig();
+    const stall = (signal?: AbortSignal | null) =>
+      new Promise<Response>((_, reject) => signal?.addEventListener("abort", () => reject(signal.reason)));
+    const calls: string[] = [];
+    const f = async (url: string, init: RequestInit) => {
+      calls.push(url);
+      if (url.includes("oauth2")) return json(200, { access_token: "a", expires_in: 3600 });
+      return stall(init.signal);
+    };
+    const r = await new PushSender({ FCM_SERVICE_ACCOUNT: saJson, ...cfg }, f, Date.now, 50).send([fcmDevice(), apnsDevice()]);
+    expect(r.outcomes.map((o) => o.outcome)).toEqual([
+      { status: "failed", reason: "timeout" },
+      { status: "failed", reason: "timeout" },
+    ]);
+  });
+
+  it("stops before provider requests (and before the APNs fallback) once not alive", async () => {
+    const { cfg } = await apnsConfig();
+    let alive = true;
+    const f = fakeFetch(() => {
+      alive = false; // e.g. destroy() ran during the first request
+      return json(400, { reason: "BadDeviceToken" });
+    });
+    const r = await new PushSender(cfg, f.fetch).send([apnsDevice()], () => alive);
+    expect(r.outcomes[0]!.outcome).toEqual({ status: "skipped" });
+    expect(f.calls).toHaveLength(1);
+    const none = fakeFetch(() => new Response(null, { status: 200 }));
+    expect((await new PushSender(cfg, none.fetch).send([apnsDevice(), apnsDevice("production")], () => false)).skipped).toBe(2);
+    expect(none.calls).toEqual([]);
+  });
+
+  it("a cold batch signs one APNs provider token and does one OAuth exchange", async () => {
+    const { json: saJson } = await serviceAccount();
+    const { cfg } = await apnsConfig();
+    const f = fakeFetch(withOauth(() => new Response(null, { status: 200 })));
+    const devices = [0, 1, 2].flatMap((i) => [
+      { ...apnsDevice("sandbox", `ab${i}`), deviceId: `ios_${i}` },
+      { ...fcmDevice(`f${i}`), deviceId: `and_${i}` },
+    ]);
+    const r = await new PushSender({ FCM_SERVICE_ACCOUNT: saJson, ...cfg }, f.fetch).send(devices);
+    expect(r).toMatchObject({ apns: 3, fcm: 3 });
+    const apnsAuth = new Set(f.calls.filter((c) => c.url.includes("apple.com")).map((c) => c.headers.authorization));
+    expect(apnsAuth.size).toBe(1);
+    expect(f.calls.filter((c) => c.url.includes("oauth2"))).toHaveLength(1);
   });
 });
 

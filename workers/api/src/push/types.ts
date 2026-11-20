@@ -9,7 +9,15 @@ export interface PushDevice {
   apnsEnv: ApnsEnvironment | null;
   /** APNs only (bundle id). */
   apnsTopic: string | null;
+  /** Row revision at snapshot time; prune/env updates only apply while it is unchanged. */
+  updatedAt: number;
 }
+
+/** Returns false once the sends should stop (e.g. the library was destroyed meanwhile). */
+export type Alive = () => boolean;
+
+/** Per provider/OAuth request deadline (headers + body). */
+export const PUSH_FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * Result of one send. `prune` = the token is dead (delete the row). `apnsEnv` on `sent` = delivered only after

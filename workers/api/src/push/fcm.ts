@@ -4,7 +4,7 @@
  */
 import { log } from "@sroka/shared";
 import { type Fetch, importSigningKey, signJwt } from "./jwt.ts";
-import { PUSH_TTL_S, type SendOutcome } from "./types.ts";
+import { type Alive, PUSH_FETCH_TIMEOUT_MS, PUSH_TTL_S, type SendOutcome } from "./types.ts";
 
 const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 const DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token";
@@ -51,6 +51,7 @@ export class FcmSender {
     private readonly sa: ServiceAccount,
     private readonly fetchImpl: Fetch,
     private readonly now: () => number = Date.now,
+    private readonly timeoutMs: number = PUSH_FETCH_TIMEOUT_MS,
   ) {}
 
   private accessToken(): Promise<string> {
@@ -79,6 +80,7 @@ export class FcmSender {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }).toString(),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     if (!res.ok) throw new Error(`fcm oauth ${res.status}`);
     const data = (await res.json()) as { access_token?: string; expires_in?: number };
@@ -87,7 +89,7 @@ export class FcmSender {
     return data.access_token;
   }
 
-  async send(token: string): Promise<SendOutcome> {
+  async send(token: string, alive: Alive = () => true): Promise<SendOutcome> {
     let access: string;
     try {
       access = await this.accessToken();
@@ -95,25 +97,28 @@ export class FcmSender {
       log.warnException("fcm access token failed", e, { event: "push_auth_failed", platform: "fcm" });
       return { status: "failed", reason: "auth" };
     }
+    if (!alive()) return { status: "skipped" };
     let res: Response;
+    let err: FcmError = {};
     try {
       res = await this.fetchImpl(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.sa.project_id)}/messages:send`, {
         method: "POST",
         headers: { authorization: `Bearer ${access}`, "content-type": "application/json" },
         body: JSON.stringify(fcmMessage(token)),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
-    } catch {
-      return { status: "failed", reason: "network" };
-    }
-    if (res.ok) {
-      await res.body?.cancel();
-      return { status: "sent" };
-    }
-    let err: FcmError = {};
-    try {
-      err = (await res.json()) as FcmError;
-    } catch {
-      // non-JSON error body
+      if (res.ok) {
+        await res.body?.cancel();
+        return { status: "sent" };
+      }
+      const text = await res.text();
+      try {
+        err = JSON.parse(text) as FcmError;
+      } catch {
+        // non-JSON error body
+      }
+    } catch (e) {
+      return { status: "failed", reason: e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network" };
     }
     const codes = (err.error?.details ?? []).map((d) => d.errorCode).filter(Boolean);
     if (res.status === 404 || codes.includes("UNREGISTERED")) return { status: "prune", reason: "unregistered" };

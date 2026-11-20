@@ -5,22 +5,27 @@ import type { PushDevice } from "../push/types.ts";
 /** Max registered phones per library; the least recently updated rows beyond it are dropped. */
 export const MAX_PUSH_DEVICES = 10;
 
-type Row = { device_id: string; platform: string; token: string; apns_env: string | null; apns_topic: string | null };
+type Row = { device_id: string; platform: string; token: string; apns_env: string | null; apns_topic: string | null; updated_at: number };
 
-/** Upsert keyed by device id; the same token under another device id is dropped (reinstall / id reset). */
+/**
+ * Upsert keyed by device id; the same token under another device id is dropped (reinstall / id reset). APNs tokens
+ * are hex and stored lowercase so casing can't bypass the dedupe. `updated_at` strictly increases per row: it is the
+ * revision that guards prune/env updates from a send that started before this registration.
+ */
 export function putPushDevice(storage: DurableObjectStorage, deviceId: string, req: PushTokenRequest, now: number): void {
   const sql = storage.sql;
+  const token = req.platform === "apns" ? req.token.toLowerCase() : req.token;
   const apnsEnv = req.platform === "apns" ? req.apnsEnvironment : null;
   const apnsTopic = req.platform === "apns" ? req.apnsTopic : null;
   storage.transactionSync(() => {
-    sql.exec("DELETE FROM push_devices WHERE token = ? AND device_id <> ?", req.token, deviceId);
+    sql.exec("DELETE FROM push_devices WHERE token = ? AND device_id <> ?", token, deviceId);
     sql.exec(
       `INSERT INTO push_devices (device_id, platform, token, apns_env, apns_topic, updated_at) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(device_id) DO UPDATE SET platform = excluded.platform, token = excluded.token, apns_env = excluded.apns_env,
-         apns_topic = excluded.apns_topic, updated_at = excluded.updated_at`,
+         apns_topic = excluded.apns_topic, updated_at = MAX(excluded.updated_at, push_devices.updated_at + 1)`,
       deviceId,
       req.platform,
-      req.token,
+      token,
       apnsEnv,
       apnsTopic,
       now,
@@ -43,7 +48,7 @@ export function hasPushDevices(storage: DurableObjectStorage): boolean {
 
 export function listPushDevices(storage: DurableObjectStorage): PushDevice[] {
   return storage.sql
-    .exec<Row>("SELECT device_id, platform, token, apns_env, apns_topic FROM push_devices ORDER BY device_id")
+    .exec<Row>("SELECT device_id, platform, token, apns_env, apns_topic, updated_at FROM push_devices ORDER BY device_id")
     .toArray()
     .map((r) => ({
       deviceId: r.device_id,
@@ -51,15 +56,16 @@ export function listPushDevices(storage: DurableObjectStorage): PushDevice[] {
       token: r.token,
       apnsEnv: r.apns_env === "sandbox" || r.apns_env === "production" ? r.apns_env : null,
       apnsTopic: r.apns_topic,
+      updatedAt: Number(r.updated_at),
     }));
 }
 
-/** Deletes a dead token — only if the row still holds it (the phone may have re-registered during the send). */
-export function prunePushDevice(storage: DurableObjectStorage, deviceId: string, token: string): void {
-  storage.sql.exec("DELETE FROM push_devices WHERE device_id = ? AND token = ?", deviceId, token);
+/** Deletes a dead token — only if the row is unchanged since the snapshot (the phone may have re-registered during the send). */
+export function prunePushDevice(storage: DurableObjectStorage, d: PushDevice): void {
+  storage.sql.exec("DELETE FROM push_devices WHERE device_id = ? AND token = ? AND updated_at = ?", d.deviceId, d.token, d.updatedAt);
 }
 
-/** APNs environment fallback succeeded: remember the environment that works for this token. */
-export function setPushApnsEnv(storage: DurableObjectStorage, deviceId: string, token: string, env: ApnsEnvironment): void {
-  storage.sql.exec("UPDATE push_devices SET apns_env = ? WHERE device_id = ? AND token = ?", env, deviceId, token);
+/** APNs environment fallback succeeded: remember the environment that works (same snapshot guard as prune). */
+export function setPushApnsEnv(storage: DurableObjectStorage, d: PushDevice, env: ApnsEnvironment): void {
+  storage.sql.exec("UPDATE push_devices SET apns_env = ? WHERE device_id = ? AND token = ? AND updated_at = ?", env, d.deviceId, d.token, d.updatedAt);
 }

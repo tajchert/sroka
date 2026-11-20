@@ -1,6 +1,8 @@
 import { runInDurableObject } from "cloudflare:test";
 import { PARSER_VERSION, type ParseResult, type PushTokenRequest, uuidv7 } from "@sroka/shared";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { LibraryStore } from "../../src/do/store.ts";
+import { putPushDevice } from "../../src/do/push-store.ts";
 import type { LibraryDO } from "../../src/library-do.ts";
 import { PushSender, resetPushState } from "../../src/push/index.ts";
 import { ecKey, fakeFetch, json, serviceAccount, withOauth } from "../push/helpers.ts";
@@ -224,5 +226,118 @@ describe("coalesced sync push", () => {
     expect(f.calls).toEqual([]);
     expect(await rows(lib)).toHaveLength(1);
     expect(await meta(lib, "push_due_at")).toBe(0);
+  });
+});
+
+describe("review hardening", () => {
+  it("APNs tokens are stored lowercase, so casing can't bypass the same-token dedupe", async () => {
+    const { lib } = freshLibrary("push");
+    await lib.putPushToken("ios_b", apns("ABCDEF"), 1);
+    await lib.putPushToken("ios_c", apns("abcdef"), 2);
+    expect((await rows(lib)).map((r) => [r.device_id, r.token])).toEqual([["ios_c", "abcdef"]]);
+  });
+
+  it("a stale provider response doesn't prune or rewrite a registration renewed during the send", async () => {
+    const { lib } = freshLibrary("push");
+    await lib.putPushToken("and_a", fcm("same"), 1000);
+    await lib.putPushToken("ios_b", apns("abcd", "sandbox"), 1000);
+    let storage: DurableObjectStorage | null = null;
+    await runInDurableObject(lib, (_i: LibraryDO, state) => {
+      storage = state.storage;
+    });
+    await installSender(
+      lib,
+      withOauth((c) => {
+        // The phones re-register (same tokens) while their sends are in flight.
+        putPushDevice(storage!, "and_a", fcm("same"), 1000);
+        putPushDevice(storage!, "ios_b", apns("abcd", "sandbox"), 1000);
+        if (c.url.includes("fcm.googleapis.com")) return json(404, { error: { status: "NOT_FOUND" } });
+        return c.url.startsWith("https://api.sandbox.") ? json(400, { reason: "BadDeviceToken" }) : new Response(null, { status: 200 });
+      }),
+    );
+    await setMeta(lib, "push_due_at", Date.now() - 1);
+    await runInDurableObject(lib, (inst: LibraryDO) => inst.alarm());
+    const r = await rows(lib);
+    expect(r.map((x) => [x.device_id, x.apns_env])).toEqual([
+      ["and_a", null],
+      ["ios_b", "sandbox"],
+    ]);
+    expect(r.every((x) => Number(x.updated_at) > 1000)).toBe(true); // same-ms re-registration still bumps the revision
+  });
+
+  it("a dispatch interrupted mid-send is resent by the next alarm; the 60 s floor counts it", async () => {
+    const { lib } = freshLibrary("push");
+    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    const f = await installSender(lib);
+    const started = Date.now() - 5_000;
+    await setMeta(lib, "push_sending_at", started); // as left behind by a reset during sendPush
+    // Content ready while "sending": due no earlier than the interrupted send + 60 s.
+    const [id] = await addItems(lib, 1);
+    await lib.markParsed(id!, ok());
+    expect(await meta(lib, "push_due_at")).toBe(started + 60_000);
+    await runInDurableObject(lib, (inst: LibraryDO) => inst.alarm());
+    expect(f.calls.filter((c) => c.url.includes("fcm.googleapis.com"))).toHaveLength(1);
+    expect(await meta(lib, "push_sending_at")).toBe(0);
+    expect(await meta(lib, "push_due_at")).toBe(started + 60_000); // the newer content still gets its own push
+    expect(await alarmAt(lib)).toBe(started + 60_000);
+  });
+
+  it("no slack for pushes: an alarm just before the due time doesn't send", async () => {
+    const { lib } = freshLibrary("push");
+    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    const f = await installSender(lib);
+    await addItems(lib, 1);
+    const due = Date.now() + 500;
+    await setMeta(lib, "push_due_at", due);
+    await runInDurableObject(lib, (inst: LibraryDO) => inst.alarm());
+    expect(f.calls).toEqual([]);
+    expect(await alarmAt(lib)).toBe(due);
+  });
+
+  it("failed maintenance is retried in 5 minutes, not a day", async () => {
+    const { lib } = freshLibrary("push");
+    await addItems(lib, 1);
+    await setMeta(lib, "maint_due_at", 0);
+    await runInDurableObject(lib, async (inst: LibraryDO) => {
+      (inst as unknown as { sweepStalePending: () => Promise<number> }).sweepStalePending = async () => {
+        throw new Error("queue down");
+      };
+      await inst.alarm();
+    });
+    const due = await meta(lib, "maint_due_at");
+    expect(due).toBeGreaterThan(Date.now() + 4 * 60_000);
+    expect(due).toBeLessThan(Date.now() + 6 * 60_000);
+    expect(await alarmAt(lib)).toBe(due);
+  });
+
+  it("a failed sweep send leaves the requeued rows due again (parse-gen guarded)", async () => {
+    const { lib } = freshLibrary("push");
+    const ids = await addItems(lib, 2);
+    const stamped = await runInDurableObject(lib, (inst: LibraryDO, state) => {
+      const store = (inst as unknown as { store: LibraryStore }).store;
+      state.storage.sql.exec("UPDATE items SET parse_requested_at = 1");
+      const jobs = store.requeueStalePending(10, 10, 5000);
+      // Item 2 got a newer parse request meanwhile: its row must not be touched.
+      state.storage.sql.exec("UPDATE items SET parse_gen = parse_gen + 1 WHERE id = ?", ids[1]!);
+      store.unmarkRequeued(jobs, 5000);
+      return state.storage.sql.exec("SELECT id, parse_requested_at AS t FROM items ORDER BY id").toArray();
+    });
+    expect(stamped).toEqual([
+      { id: ids[0], t: 0 },
+      { id: ids[1], t: 5000 },
+    ]);
+  });
+
+  it("first maintenance schedule on a pre-v7 library keeps a sooner legacy alarm as maintenance", async () => {
+    const { lib } = freshLibrary("push");
+    await addItems(lib, 1);
+    const legacy = Date.now() + 2 * 60_000;
+    await runInDurableObject(lib, async (_i: LibraryDO, state) => {
+      state.storage.sql.exec("DELETE FROM meta WHERE k = 'maint_due_at'");
+      await state.storage.setAlarm(legacy);
+    });
+    await lib.scheduleParseSweep(); // 31 min out
+    expect(await meta(lib, "maint_due_at")).toBe(legacy);
+    expect(await alarmAt(lib)).toBe(legacy);
   });
 });

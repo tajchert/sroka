@@ -760,6 +760,24 @@ export class LibraryStore {
     );
   }
 
+  /**
+   * Undoes requeueStalePending's attempt stamp after the queue send failed. Guarded by parse gen and the stamp, so
+   * an item re-requested or parsed meanwhile is left alone.
+   */
+  unmarkRequeued(jobs: readonly ParseJob[], stampedAt: number): void {
+    if (jobs.length === 0) return;
+    this.txn(() => {
+      for (const j of jobs) {
+        this.exec(
+          "UPDATE items SET parse_requested_at = 0 WHERE id = ? AND parse_gen = ? AND parse_status = 'pending' AND parse_requested_at = ?",
+          j.itemId,
+          j.parseGen,
+          stampedAt,
+        );
+      }
+    });
+  }
+
   /** Marks jobs that were not sent (parse budget exhausted) so the next sweep picks them up first. */
   deferParse(itemIds: readonly string[]): void {
     if (itemIds.length === 0) return;

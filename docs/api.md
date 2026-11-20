@@ -469,11 +469,11 @@ Phones register a push token so the server can wake them when saved content beco
   "apnsEnvironment": "sandbox" | "production",   // required for apns, ignored for fcm
   "apnsTopic": "app.sroka" | "app.sroka.dev" }    // required for apns, ignored for fcm
 ```
-Upsert keyed by device id (LibraryDO `push_devices`, schema v7); a row holding the same token under another device id is deleted; max 10 rows per user (the least recently updated beyond that are dropped). Account deletion wipes them with the library.
+Upsert keyed by device id (LibraryDO `push_devices`, schema v7; APNs tokens are stored lowercase); a row holding the same token under another device id is deleted; max 10 rows per user (the least recently updated beyond that are dropped). Account deletion wipes them with the library.
 
 `DELETE /v1/push-token` → removes the row of `X-Sroka-Device`; `204` even if there was none.
 
-**Sending** (LibraryDO alarm): content becoming ready sets a pending push due at `max(now + 10 s, lastSent + 60 s)` unless one is already pending, so bursts (imports) coalesce to at most one push per minute; each due time sends once to every registered device. Dead tokens are deleted: FCM `404` / `UNREGISTERED` / `400 INVALID_ARGUMENT` naming the token; APNs `410`, `400 BadDeviceToken` (after one retry on the other APNs environment — on success the stored `apnsEnvironment` is switched), `400 DeviceTokenNotForTopic`. `429`/`5xx`/network errors are logged and not retried (the apps' periodic sync is the fallback). A platform whose credentials are not configured is skipped.
+**Sending** (LibraryDO alarm): content becoming ready sets a pending push due at `max(now + 10 s, lastSent + 60 s)` unless one is already pending, so bursts (imports) coalesce to at most one push per minute; each due time sends once to every registered device (a send interrupted by an instance reset is repeated; a duplicate push is harmless). Every provider/OAuth request has a 10 s deadline. Dead tokens are deleted: FCM `404` / `UNREGISTERED` / `400 INVALID_ARGUMENT` naming the token; APNs `410`, `400 BadDeviceToken` (after one retry on the other APNs environment — on success the stored `apnsEnvironment` is switched), `400 DeviceTokenNotForTopic`. `429`/`5xx`/network errors are logged and not retried (the apps' periodic sync is the fallback). A platform whose credentials are not configured is skipped.
 
 Payloads (clients act on any message with `type == "sync"` and ignore other types):
 - FCM HTTP v1 (`POST https://fcm.googleapis.com/v1/projects/{project}/messages:send`), data-only:

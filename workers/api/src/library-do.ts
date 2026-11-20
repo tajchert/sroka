@@ -75,8 +75,10 @@ const REF_RETRY_MS = 10 * 60 * 1000;
  */
 const PUSH_DELAY_MS = 10 * 1000;
 const PUSH_INTERVAL_MS = 60 * 1000;
-/** An alarm firing this close before a due time handles it. */
+/** An alarm firing this close before the maintenance due time runs it (not applied to pushes: keeps the 60 s floor). */
 const ALARM_SLACK_MS = 1000;
+/** Retry delay after alarm maintenance threw (queue send, D1). */
+const MAINT_RETRY_MS = 5 * 60 * 1000;
 
 export class LibraryDestroyedError extends Error {
   constructor() {
@@ -224,7 +226,11 @@ export class LibraryDO extends DurableObject<Env> {
   private async scheduleSweepIn(ms: number): Promise<void> {
     const at = Date.now() + ms;
     const due = this.store.getMeta("maint_due_at");
-    if (due === 0 || due > at) this.store.setMetaNumber("maint_due_at", at);
+    if (due === 0) {
+      // First time on a pre-v7 library: an existing (legacy) alarm may be a sooner sweep — keep it as maintenance.
+      const cur = await this.ctx.storage.getAlarm();
+      this.store.setMetaNumber("maint_due_at", cur !== null ? Math.min(cur, at) : at);
+    } else if (due > at) this.store.setMetaNumber("maint_due_at", at);
     await this.armAlarm(at);
     this.alarmChecked = true;
   }
@@ -234,10 +240,25 @@ export class LibraryDO extends DurableObject<Env> {
     if (!hasPushDevices(this.ctx.storage)) return;
     let due = this.store.getMeta("push_due_at");
     if (due === 0) {
-      due = Math.max(now + PUSH_DELAY_MS, this.store.getMeta("push_last_sent_at") + PUSH_INTERVAL_MS);
+      // A dispatch in progress (push_sending_at) counts as the last send for the 60 s floor.
+      const last = Math.max(this.store.getMeta("push_last_sent_at"), this.store.getMeta("push_sending_at"));
+      due = Math.max(now + PUSH_DELAY_MS, last + PUSH_INTERVAL_MS);
       this.store.setMetaNumber("push_due_at", due);
     }
     await this.armAlarm(due);
+  }
+
+  /**
+   * Next alarm time: maintenance, a pending push, and — while a dispatch is marked in progress (push_sending_at,
+   * e.g. the instance was reset mid-send) — a recovery firing one interval after it started.
+   */
+  private nextAlarmAt(): number {
+    const times = [this.store.getMeta("maint_due_at") || Date.now() + DAY_MS];
+    const push = this.store.getMeta("push_due_at");
+    if (push > 0) times.push(push);
+    const sending = this.store.getMeta("push_sending_at");
+    if (sending > 0) times.push(sending + PUSH_INTERVAL_MS);
+    return Math.min(...times);
   }
 
   /** Sends the pending push to every registered device, prunes dead tokens. Never throws. */
@@ -247,11 +268,11 @@ export class LibraryDO extends DurableObject<Env> {
       if (devices.length === 0) return;
       this.pusher ??= new PushSender(this.env);
       const t0 = Date.now();
-      const r = await this.pusher.send(devices);
+      const r = await this.pusher.send(devices, () => !this.isDestroyed());
       if (this.isDestroyed()) return;
       for (const { device, outcome } of r.outcomes) {
-        if (outcome.status === "prune") prunePushDevice(this.ctx.storage, device.deviceId, device.token);
-        else if (outcome.status === "sent" && outcome.apnsEnv) setPushApnsEnv(this.ctx.storage, device.deviceId, device.token, outcome.apnsEnv);
+        if (outcome.status === "prune") prunePushDevice(this.ctx.storage, device);
+        else if (outcome.status === "sent" && outcome.apnsEnv) setPushApnsEnv(this.ctx.storage, device, outcome.apnsEnv);
       }
       const failures: Record<string, number> = {};
       for (const { outcome } of r.outcomes) if (outcome.status === "failed") failures[outcome.reason] = (failures[outcome.reason] ?? 0) + 1;
@@ -653,8 +674,14 @@ export class LibraryDO extends DurableObject<Env> {
         break;
       }
       if (jobs.length === 0) break;
-      if (jobs.length === 1) await this.env.PARSE_QUEUE.send(jobs[0]!);
-      else await this.env.PARSE_QUEUE.sendBatch(jobs.map((body) => ({ body })));
+      try {
+        if (jobs.length === 1) await this.env.PARSE_QUEUE.send(jobs[0]!);
+        else await this.env.PARSE_QUEUE.sendBatch(jobs.map((body) => ({ body })));
+      } catch (e) {
+        // Not sent: don't leave the rows looking freshly attempted (the retry should pick them up first).
+        this.store.unmarkRequeued(jobs, now);
+        throw e;
+      }
       total += jobs.length;
       if (jobs.length < budget) break;
     }
@@ -675,31 +702,48 @@ export class LibraryDO extends DurableObject<Env> {
     const now = Date.now();
     const maintDue = this.store.getMeta("maint_due_at");
     const pushDue = this.store.getMeta("push_due_at");
-    // A retry (the previous run threw in a sweep) repeats the maintenance it was meant to do.
+    const sendingAt = this.store.getMeta("push_sending_at");
+    // A retry (the previous run threw or the instance was reset) repeats the maintenance it was meant to do.
     const doMaint = maintDue === 0 || maintDue <= now + ALARM_SLACK_MS || info?.isRetry === true;
-    const doPush = pushDue > 0 && pushDue <= now + ALARM_SLACK_MS;
+    // sendingAt > 0 at alarm start = a dispatch never finished (alarms don't overlap): send that batch again.
+    const doPush = (pushDue > 0 && pushDue <= now) || sendingAt > 0;
     if (doMaint) {
       this.store.prune();
       this.store.setMetaNumber("maint_due_at", now + DAY_MS);
     }
     if (doPush) {
-      this.store.setMetaNumber("push_due_at", 0);
-      this.store.setMetaNumber("push_last_sent_at", now);
+      // push_due_at is free again (content ready during the send schedules the next push); the batch stays
+      // marked in push_sending_at until dispatch completes, so a reset mid-send resends it (duplicates are harmless).
+      if (pushDue > 0 && pushDue <= now) this.store.setMetaNumber("push_due_at", 0); // a later one (recovery case) stays
+      this.store.setMetaNumber("push_sending_at", now);
     }
     // Re-arm before any network work: a failing queue send makes the alarm retry, but the cadence stays.
-    const nextMaint = this.store.getMeta("maint_due_at");
-    const nextPush = this.store.getMeta("push_due_at");
-    await this.ctx.storage.setAlarm(nextPush > 0 ? Math.min(nextMaint, nextPush) : nextMaint);
-    if (doPush) await this.sendPush();
-    if (!doMaint) return;
-    await this.flushRefsIfPending(); // retries failed content-ref flushes (errors are swallowed)
-    const t0 = Date.now();
-    try {
-      await this.sweepPdfUploads();
-    } catch (e) {
-      log.exception("pdf upload sweep failed", e, { event: "pdf_reservation_sweep_failed" });
+    await this.ctx.storage.setAlarm(this.nextAlarmAt());
+    if (doPush) {
+      await this.sendPush();
+      if (this.isDestroyed()) return;
+      this.store.setMetaNumber("push_sending_at", 0);
+      this.store.setMetaNumber("push_last_sent_at", now);
+      await this.ctx.storage.setAlarm(this.nextAlarmAt());
     }
-    const resent = await this.sweepStalePending();
-    log.info("LibraryDO alarm sweep", { event: "do_alarm_sweep", resent, durationMs: Date.now() - t0 });
+    if (!doMaint || this.isDestroyed()) return;
+    try {
+      await this.flushRefsIfPending(); // retries failed content-ref flushes (errors are swallowed)
+      const t0 = Date.now();
+      try {
+        await this.sweepPdfUploads();
+      } catch (e) {
+        log.exception("pdf upload sweep failed", e, { event: "pdf_reservation_sweep_failed" });
+      }
+      const resent = await this.sweepStalePending();
+      log.info("LibraryDO alarm sweep", { event: "do_alarm_sweep", resent, durationMs: Date.now() - t0 });
+    } catch (e) {
+      if (this.isDestroyed()) return;
+      // Don't wait a day: retry the maintenance soon.
+      const retryAt = Date.now() + MAINT_RETRY_MS;
+      this.store.setMetaNumber("maint_due_at", retryAt);
+      await this.armAlarm(retryAt);
+      log.exception("LibraryDO alarm maintenance failed", e, { event: "do_alarm_sweep_failed", retryInMs: MAINT_RETRY_MS });
+    }
   }
 }

@@ -317,6 +317,16 @@ api GET "/v1/sync/pull?cursor=$C1"; check ".deleted.items|index(\"$SYNC_ID\")!=n
 api GET "/v1/sync/pull?cursor=abc"; expect 400 "pull bad cursor → 400"
 
 # ---------------------------------------------------------------------------------------------
+section "push token ($DEVICE)"
+PT='{"platform":"fcm","token":"e2e-fcm-token"}'
+req PUT "$BASE/v1/push-token" -H "Authorization: Bearer $TOKEN" -H "X-Sroka-Device: $DEVICE" -H 'Content-Type: application/json' --data-binary "$PT"
+expect 204 "PUT push-token"
+api PUT /v1/push-token "$PT"; expect 400 "PUT push-token without device header → 400"
+check '.error=="validation"' "device header required"
+req DELETE "$BASE/v1/push-token" -H "Authorization: Bearer $TOKEN" -H "X-Sroka-Device: $DEVICE"; expect 204 "DELETE push-token"
+req DELETE "$BASE/v1/push-token" -H "Authorization: Bearer $TOKEN" -H "X-Sroka-Device: $DEVICE"; expect 204 "DELETE push-token again (idempotent)"
+
+# ---------------------------------------------------------------------------------------------
 section "import (Pocket CSV + Netscape HTML via ImportWorkflow)"
 now_s=$(date +%s)
 cat > "$TMP/pocket.csv" <<CSV

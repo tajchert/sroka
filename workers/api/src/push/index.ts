@@ -7,7 +7,7 @@ import type { Env } from "../env.ts";
 import { ApnsSender, resetApnsCache } from "./apns.ts";
 import { FcmSender, parseServiceAccount, resetFcmCache } from "./fcm.ts";
 import type { Fetch } from "./jwt.ts";
-import type { PushDevice, SendOutcome } from "./types.ts";
+import { type Alive, PUSH_FETCH_TIMEOUT_MS, type PushDevice, type SendOutcome } from "./types.ts";
 
 export type { PushDevice, SendOutcome } from "./types.ts";
 export type { Fetch } from "./jwt.ts";
@@ -43,38 +43,47 @@ export class PushSender {
   private readonly fcm: FcmSender | null;
   private readonly apns: ApnsSender | null;
 
-  constructor(cfg: PushConfig, fetchImpl: Fetch = (input, init) => fetch(input, init), now: () => number = Date.now) {
+  constructor(
+    cfg: PushConfig,
+    fetchImpl: Fetch = (input, init) => fetch(input, init),
+    now: () => number = Date.now,
+    timeoutMs: number = PUSH_FETCH_TIMEOUT_MS,
+  ) {
     const sa = parseServiceAccount(cfg.FCM_SERVICE_ACCOUNT);
-    this.fcm = sa ? new FcmSender(sa, fetchImpl, now) : null;
+    this.fcm = sa ? new FcmSender(sa, fetchImpl, now, timeoutMs) : null;
     this.apns =
       cfg.APNS_KEY && cfg.APNS_KEY_ID && cfg.APNS_TEAM_ID
-        ? new ApnsSender({ key: cfg.APNS_KEY, keyId: cfg.APNS_KEY_ID, teamId: cfg.APNS_TEAM_ID }, fetchImpl, now)
+        ? new ApnsSender({ key: cfg.APNS_KEY, keyId: cfg.APNS_KEY_ID, teamId: cfg.APNS_TEAM_ID }, fetchImpl, now, timeoutMs)
         : null;
   }
 
-  private sendOne(d: PushDevice): Promise<SendOutcome> {
+  private sendOne(d: PushDevice, alive: Alive): Promise<SendOutcome> {
+    if (!alive()) return Promise.resolve({ status: "skipped" });
     if (d.platform === "fcm") {
       if (!this.fcm) {
         warnMissing("fcm");
         return Promise.resolve({ status: "skipped" });
       }
-      return this.fcm.send(d.token);
+      return this.fcm.send(d.token, alive);
     }
     if (!this.apns) {
       warnMissing("apns");
       return Promise.resolve({ status: "skipped" });
     }
     if (!d.apnsEnv || !d.apnsTopic) return Promise.resolve({ status: "prune", reason: "incomplete_row" });
-    return this.apns.send(d.token, d.apnsEnv, d.apnsTopic);
+    return this.apns.send(d.token, d.apnsEnv, d.apnsTopic, alive);
   }
 
-  /** Sends one sync push to each device. Never throws. */
-  async send(devices: readonly PushDevice[]): Promise<PushReport> {
+  /**
+   * Sends one sync push to each device. Never throws. Every provider/OAuth request has a deadline; `alive` is
+   * checked before each provider request (a destroyed library stops sending).
+   */
+  async send(devices: readonly PushDevice[], alive: Alive = () => true): Promise<PushReport> {
     const outcomes = await Promise.all(
       devices.map(async (device) => {
         let outcome: SendOutcome;
         try {
-          outcome = await this.sendOne(device);
+          outcome = await this.sendOne(device, alive);
         } catch {
           outcome = { status: "failed", reason: "exception" };
         }

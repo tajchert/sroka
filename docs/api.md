@@ -469,7 +469,7 @@ Phones register a push token so the server can wake them when saved content beco
   "apnsEnvironment": "sandbox" | "production",   // required for apns, ignored for fcm
   "apnsTopic": "app.sroka" | "app.sroka.dev" }    // required for apns, ignored for fcm
 ```
-Upsert keyed by device id (LibraryDO `push_devices`, schema v7; APNs tokens are stored lowercase); a row holding the same token under another device id is deleted; max 10 rows per user (the least recently updated beyond that are dropped). Account deletion wipes them with the library.
+Upsert keyed by device id (LibraryDO `push_devices`, schema v7; APNs tokens are stored lowercase); a row holding the same token under another device id is deleted; max 10 rows per user (the least recently updated beyond that are dropped). Registrations expire after 30 days without a refresh (apps re-`PUT` at least every 7 days while used; expired rows are skipped by sends and deleted, also by daily maintenance). Account deletion wipes them with the library.
 
 `DELETE /v1/push-token` → removes the row of `X-Sroka-Device`; `204` even if there was none.
 

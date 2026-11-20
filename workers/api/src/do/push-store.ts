@@ -5,6 +5,9 @@ import type { PushDevice } from "../push/types.ts";
 /** Max registered phones per library; the least recently updated rows beyond it are dropped. */
 export const MAX_PUSH_DEVICES = 10;
 
+/** Registration lease: rows not refreshed (re-PUT) for 30 days are dropped (apps re-PUT at least weekly while used). */
+export const PUSH_LEASE_MS = 30 * 24 * 60 * 60 * 1000;
+
 type Row = { device_id: string; platform: string; token: string; apns_env: string | null; apns_topic: string | null; updated_at: number };
 
 /**
@@ -40,6 +43,11 @@ export function putPushDevice(storage: DurableObjectStorage, deviceId: string, r
 
 export function deletePushDevice(storage: DurableObjectStorage, deviceId: string): void {
   storage.sql.exec("DELETE FROM push_devices WHERE device_id = ?", deviceId);
+}
+
+/** Deletes registrations whose lease ran out (updated_at older than 30 days). */
+export function expirePushDevices(storage: DurableObjectStorage, now: number): void {
+  storage.sql.exec("DELETE FROM push_devices WHERE updated_at < ?", now - PUSH_LEASE_MS);
 }
 
 export function hasPushDevices(storage: DurableObjectStorage): boolean {

@@ -11,6 +11,8 @@ import { T0, add, freshLibrary } from "./helpers.ts";
 beforeEach(() => resetPushState());
 
 const DAY = 24 * 60 * 60 * 1000;
+/** Recent registration time base: rows older than the 30-day lease are expired by sends and maintenance. */
+const R = Date.now();
 const fcm = (token: string): PushTokenRequest => ({ platform: "fcm", token });
 const apns = (token: string, env: "sandbox" | "production" = "sandbox"): PushTokenRequest => ({
   platform: "apns",
@@ -114,13 +116,38 @@ describe("push_devices", () => {
     );
     expect(tables).toEqual([]);
   });
+
+  it("daily maintenance drops registrations not refreshed for 30 days", async () => {
+    const { lib } = freshLibrary("push");
+    const now = Date.now();
+    await lib.putPushToken("and_old", fcm("old"), now - 31 * DAY);
+    await lib.putPushToken("and_edge", fcm("edge"), now - 29 * DAY);
+    await lib.putPushToken("and_new", fcm("new"), now);
+    await setMeta(lib, "maint_due_at", 0); // maintenance due
+    await runInDurableObject(lib, (inst: LibraryDO) => inst.alarm());
+    expect((await rows(lib)).map((r) => r.device_id)).toEqual(["and_edge", "and_new"]);
+  });
+
+  it("a send skips and deletes expired registrations", async () => {
+    const { lib } = freshLibrary("push");
+    const now = Date.now();
+    await lib.putPushToken("and_old", fcm("old"), now - 31 * DAY);
+    await lib.putPushToken("and_new", fcm("new"), now);
+    const f = await installSender(lib);
+    await setMeta(lib, "maint_due_at", now + DAY); // maintenance not due: only the send path runs
+    await setMeta(lib, "push_due_at", now - 1);
+    await runInDurableObject(lib, (inst: LibraryDO) => inst.alarm());
+    const sent = f.calls.filter((c) => c.url.includes("fcm.googleapis.com")).map((c) => (JSON.parse(c.body) as { message: { token: string } }).message.token);
+    expect(sent).toEqual(["new"]);
+    expect((await rows(lib)).map((r) => r.device_id)).toEqual(["and_new"]);
+  });
 });
 
 describe("coalesced sync push", () => {
   it("several markParsed → one alarm-driven send per device; failed results don't trigger", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("ftok"), 1);
-    await lib.putPushToken("ios_b", apns("abcd"), 2);
+    await lib.putPushToken("and_a", fcm("ftok"), R + 1);
+    await lib.putPushToken("ios_b", apns("abcd"), R + 2);
     const f = await installSender(lib);
     const ids = await addItems(lib, 4);
 
@@ -163,7 +190,7 @@ describe("coalesced sync push", () => {
 
   it("a push firing keeps the daily maintenance alarm; maintenance is not run early", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    await lib.putPushToken("and_a", fcm("ftok"), R + 1);
     const f = await installSender(lib);
     await addItems(lib, 1); // ensureAlarm → maint_due_at ≈ now + 1 day
     const maint = await meta(lib, "maint_due_at");
@@ -192,9 +219,9 @@ describe("coalesced sync push", () => {
 
   it("prunes dead tokens and stores the APNs environment that worked", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_dead", fcm("dead"), 1);
-    await lib.putPushToken("ios_swap", apns("abcd", "sandbox"), 2);
-    await lib.putPushToken("ios_gone", apns("ef01", "production"), 3);
+    await lib.putPushToken("and_dead", fcm("dead"), R + 1);
+    await lib.putPushToken("ios_swap", apns("abcd", "sandbox"), R + 2);
+    await lib.putPushToken("ios_gone", apns("ef01", "production"), R + 3);
     await installSender(
       lib,
       withOauth((c) => {
@@ -212,7 +239,7 @@ describe("coalesced sync push", () => {
 
   it("without credentials nothing is fetched and rows are kept", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    await lib.putPushToken("and_a", fcm("ftok"), R + 1);
     const f = fakeFetch(() => {
       throw new Error("must not fetch");
     });
@@ -232,15 +259,15 @@ describe("coalesced sync push", () => {
 describe("review hardening", () => {
   it("APNs tokens are stored lowercase, so casing can't bypass the same-token dedupe", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("ios_b", apns("ABCDEF"), 1);
-    await lib.putPushToken("ios_c", apns("abcdef"), 2);
+    await lib.putPushToken("ios_b", apns("ABCDEF"), R + 1);
+    await lib.putPushToken("ios_c", apns("abcdef"), R + 2);
     expect((await rows(lib)).map((r) => [r.device_id, r.token])).toEqual([["ios_c", "abcdef"]]);
   });
 
   it("a stale provider response doesn't prune or rewrite a registration renewed during the send", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("same"), 1000);
-    await lib.putPushToken("ios_b", apns("abcd", "sandbox"), 1000);
+    await lib.putPushToken("and_a", fcm("same"), R + 1000);
+    await lib.putPushToken("ios_b", apns("abcd", "sandbox"), R + 1000);
     let storage: DurableObjectStorage | null = null;
     await runInDurableObject(lib, (_i: LibraryDO, state) => {
       storage = state.storage;
@@ -249,8 +276,8 @@ describe("review hardening", () => {
       lib,
       withOauth((c) => {
         // The phones re-register (same tokens) while their sends are in flight.
-        putPushDevice(storage!, "and_a", fcm("same"), 1000);
-        putPushDevice(storage!, "ios_b", apns("abcd", "sandbox"), 1000);
+        putPushDevice(storage!, "and_a", fcm("same"), R + 1000);
+        putPushDevice(storage!, "ios_b", apns("abcd", "sandbox"), R + 1000);
         if (c.url.includes("fcm.googleapis.com")) return json(404, { error: { status: "NOT_FOUND" } });
         return c.url.startsWith("https://api.sandbox.") ? json(400, { reason: "BadDeviceToken" }) : new Response(null, { status: 200 });
       }),
@@ -262,12 +289,12 @@ describe("review hardening", () => {
       ["and_a", null],
       ["ios_b", "sandbox"],
     ]);
-    expect(r.every((x) => Number(x.updated_at) > 1000)).toBe(true); // same-ms re-registration still bumps the revision
+    expect(r.every((x) => Number(x.updated_at) > R + 1000)).toBe(true); // same-ms re-registration still bumps the revision
   });
 
   it("a dispatch interrupted mid-send is resent by the next alarm; the 60 s floor counts it", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    await lib.putPushToken("and_a", fcm("ftok"), R + 1);
     const f = await installSender(lib);
     const started = Date.now() - 5_000;
     await setMeta(lib, "push_sending_at", started); // as left behind by a reset during sendPush
@@ -284,7 +311,7 @@ describe("review hardening", () => {
 
   it("no slack for pushes: an alarm just before the due time doesn't send", async () => {
     const { lib } = freshLibrary("push");
-    await lib.putPushToken("and_a", fcm("ftok"), 1);
+    await lib.putPushToken("and_a", fcm("ftok"), R + 1);
     const f = await installSender(lib);
     await addItems(lib, 1);
     const due = Date.now() + 500;

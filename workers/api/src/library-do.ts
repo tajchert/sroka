@@ -19,7 +19,7 @@ import type { Env } from "./env.ts";
 import { CLIENT_KINDS, type ClientKind } from "./clients.ts";
 import { patchToOps } from "./do/rest.ts";
 import { migrate } from "./do/schema.ts";
-import { deletePushDevice, hasPushDevices, listPushDevices, prunePushDevice, putPushDevice, setPushApnsEnv } from "./do/push-store.ts";
+import { deletePushDevice, expirePushDevices, hasPushDevices, listPushDevices, prunePushDevice, putPushDevice, setPushApnsEnv } from "./do/push-store.ts";
 import { PushSender } from "./push/index.ts";
 import { deletePrefix } from "./r2.ts";
 import { withLeadImageUrls } from "./do/sign.ts";
@@ -261,9 +261,10 @@ export class LibraryDO extends DurableObject<Env> {
     return Math.min(...times);
   }
 
-  /** Sends the pending push to every registered device, prunes dead tokens. Never throws. */
+  /** Sends the pending push to every device with a live lease (expired rows are deleted first), prunes dead tokens. Never throws. */
   private async sendPush(): Promise<void> {
     try {
+      expirePushDevices(this.ctx.storage, Date.now()); // never wake a phone whose registration lapsed
       const devices = listPushDevices(this.ctx.storage);
       if (devices.length === 0) return;
       this.pusher ??= new PushSender(this.env);
@@ -709,6 +710,7 @@ export class LibraryDO extends DurableObject<Env> {
     const doPush = (pushDue > 0 && pushDue <= now) || sendingAt > 0;
     if (doMaint) {
       this.store.prune();
+      expirePushDevices(this.ctx.storage, now);
       this.store.setMetaNumber("maint_due_at", now + DAY_MS);
     }
     if (doPush) {

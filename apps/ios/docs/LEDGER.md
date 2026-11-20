@@ -25,7 +25,7 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 | K | Share extension (K1 sheet, K2 live) | Opus | merged; final-review fixes S1-S3 | d95403b, eb7e4bd, 87cda1b |
 | L | App composition (L1 live graph, L2 navigation) | Opus | merged; final-review fixes S4-S7 | 811ca9a, ea87cdf, 85edefc |
 | P | UI fix rounds (P1, P2), flaky test (R) | Sonnet | merged | 1c0feae, 41531a5, a4d9cdb |
-| Q | Journeys a-h against the local stack (`scripts/journey.sh`) | Sonnet | merged; reader follow-up running | ea5995a, 5f7de50, b4770c0 |
+| Q | Journeys a-h against the local stack (`scripts/journey.sh`) | Sonnet | merged | ea5995a, 5f7de50, b4770c0, 8415efc |
 | Z | Final Sol review | Sol | 5 rounds; APPROVE on 44f4470 |  |
 | M | Firebase telemetry + release preflight | Sonnet | merged (no archive/export run; Release path not in verify.sh) | 58c60d8 |
 
@@ -50,6 +50,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 - Rounds 2-5 fixes: 2349ca6, 5a5e9ff, 15d53c9, d6b2f35, d8b9426, 44f4470. Declined nits: S8 (above), S14 (parse poll 5-minute limit counts only sleeps), S15 (sync observer task has no owner), S16 (OTP sign-in can succeed while the install check is unresolved; sync starts at the next reload).
 - Journey findings fixed: parse polling while active (`ParsePoller`: 2, 4, 8, 16 s, then 30 s, gives up after 5 min), first-run Keychain clear (`InstallCheck`), resume notice after the page is displayed.
 - Gate on b4770c0 (after Sol approval and journeys): format, full `unit`, `build Dev`, `build Prod` pass. Journeys a-h pass on the same code (8 tests).
+- Reader follow-up 8415efc: header rests below the floating controls; native header while the page loads (about 1.3 s in a debug simulator). Not checked: sepia, two-line title, iPad reader. Byline shows "Wikipedia · Wikipedia" when author equals site.
+- Gate on 8415efc (final): format, full `unit`, `build Dev`, `build Prod` pass. Journeys a, b, g rerun on it; c-h last run on b4770c0.
 
 ## Open items for the owner
 

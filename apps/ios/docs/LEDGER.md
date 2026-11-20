@@ -25,8 +25,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 | K | Share extension (K1 sheet, K2 live) | Opus | merged; final-review fixes S1-S3 | d95403b, eb7e4bd, 87cda1b |
 | L | App composition (L1 live graph, L2 navigation) | Opus | merged; final-review fixes S4-S7 | 811ca9a, ea87cdf, 85edefc |
 | P | UI fix rounds (P1, P2), flaky test (R) | Sonnet | merged | 1c0feae, 41531a5, a4d9cdb |
-| Q | Journeys against the local stack | Sonnet | running |  |
-| Z | Final Sol review | Sol | round 1: CHANGES (S1-S8); re-check pending |  |
+| Q | Journeys a-h against the local stack (`scripts/journey.sh`) | Sonnet | merged; reader follow-up running | ea5995a, 5f7de50, b4770c0 |
+| Z | Final Sol review | Sol | 5 rounds; APPROVE on 44f4470 |  |
 | M | Firebase telemetry + release preflight | Sonnet | merged (no archive/export run; Release path not in verify.sh) | 58c60d8 |
 
 ## Open items
@@ -47,7 +47,9 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 
 - Gate on 0d67a1d (after K2): format, full `unit`, `build Dev` all pass. Not rerun after P2.
 - Final review round 1 (on be1ec6a): S1 PDF upload owner/credentials, S2 double upload across processes, S3 extension writes during a wipe (87cda1b); S4 reauth resumes uploads and import, S5 late delete-account, S6 background expiry, S7 account switch (85edefc). S8 (late 401 signs out a new account) declined: needs an `ApiError`/`SyncSession` protocol change across 8 call sites; open risk.
-- Not rerun after P2 or the final-review fixes: full gate. K2's new tests were not run with their fixes reverted.
+- Rounds 2-5 fixes: 2349ca6, 5a5e9ff, 15d53c9, d6b2f35, d8b9426, 44f4470. Declined nits: S8 (above), S14 (parse poll 5-minute limit counts only sleeps), S15 (sync observer task has no owner), S16 (OTP sign-in can succeed while the install check is unresolved; sync starts at the next reload).
+- Journey findings fixed: parse polling while active (`ParsePoller`: 2, 4, 8, 16 s, then 30 s, gives up after 5 min), first-run Keychain clear (`InstallCheck`), resume notice after the page is displayed.
+- Gate on b4770c0 (after Sol approval and journeys): format, full `unit`, `build Dev`, `build Prod` pass. Journeys a-h pass on the same code (8 tests).
 
 ## Open items for the owner
 

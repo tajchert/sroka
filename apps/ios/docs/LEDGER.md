@@ -29,7 +29,7 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 ## Open items
 
 - Stream L: `HTTPSrokaAPI` takes base URL and token from one snapshot.
-- Polish: feature String Catalogs are empty.
+- Polish: feature String Catalogs are empty; remove unused `ContentStoreURL`; check reader glass and insets on a simulator.
 - Final review: untested race fixes in H (4) and G (2).
 - Merged-state engine `unit` + `build Dev` passed on 5e4392f; not rerun after J.
 

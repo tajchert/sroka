@@ -122,3 +122,11 @@ Progress: `apps/ios/docs/LEDGER.md` (orchestrator only).
 - Ports the composition root supplies: `SyncSession` (from `SrokaSession`), `SyncContentHooks` (from `SrokaContent`; `NoContentHooks` is the default), `OpClockStore`.
 - A push op gets 6 attempts in total. `pushOnce` does not update `sync_state`. Search rows carry no thumbnail base.
 - Two scheduler race fixes from review have no test; the final review looks at them.
+
+## Wave 2 notes: D (reader) and J (tags, search) merged
+
+- Reader entry point: `ReaderView(itemId:onIntent:)`. `ReaderIntent`: `close`, `editTags(itemId:)`, `openItem(String)`, `archived(itemId:)`, `archivedAndOpenNext(archivedId:nextId:)`, `deleted(itemId:)`.
+- The reader serves packages itself from `sroka-article://{itemId}/` (`ArticleScheme.name`), reading `ContentStore.articlesDirectory()/{itemId}/`. This is the scheme that stays: each article gets its own origin. `ContentStoreURL` (`sroka-content`) in `SrokaCore` is unused; remove it in polish.
+- From the content store the reader calls `articleHtml`, `downloadNow`, `observeOffline`, `pdfFile`, `ensurePdfFile`.
+- Tags and search entry points: `TagsView`, `TagItemsView`, `TagEditorSheet`, `SearchView`, with `TagsIntent` and the search intent type in their modules.
+- Glass surfaces (reader bottom bar, end card) render blank in snapshots; check them on a simulator. `window.innerHeight` with iOS insets in the reader script is unverified.

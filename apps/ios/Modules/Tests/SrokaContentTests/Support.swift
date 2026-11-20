@@ -191,6 +191,8 @@ final class FakeAPI: SrokaAPI, Sendable {
     private let state = Mutex(State())
     /// Runs inside `download` before the file is written (to race other work against a download).
     let onDownload = Mutex<(@Sendable (URL) async -> Void)?>(nil)
+    /// Runs inside `uploadPdf` before it answers, with no progress reported (to hold a request open).
+    let onUpload = Mutex<(@Sendable () async -> Void)?>(nil)
 
     /// Answers for `contentUrls(itemId)`, consumed in order; the last one repeats.
     func setUrls(_ itemId: String, _ answers: Result<ContentUrlsDto, ApiError>...) {
@@ -258,6 +260,7 @@ final class FakeAPI: SrokaAPI, Sendable {
             state.uploadCalls += 1
             return Self.next(&state.uploads)
         }
+        if let hook = onUpload.withLock({ $0 }) { await hook() }
         guard let answer else { throw httpError(500) }
         onProgress?(1, 1)
         return try answer.get()

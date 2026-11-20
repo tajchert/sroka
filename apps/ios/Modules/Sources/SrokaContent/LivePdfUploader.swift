@@ -50,6 +50,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private let owner: @Sendable () -> String?
     private let boundAPI: @Sendable (_ owner: String?) async -> (any SrokaAPI)?
     private let claimToken: String
+    /// How often a running attempt renews its claim; well under `claimLease`.
+    private let claimRenewal: Duration
     /// Uploads run one at a time.
     private let lane = KeyedLock()
     var laneForTests: KeyedLock { lane }
@@ -73,9 +75,11 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         onUnauthorized: @escaping @Sendable () async -> Void = {},
         owner: @escaping @Sendable () -> String? = { nil },
         boundAPI: (@Sendable (_ owner: String?) async -> (any SrokaAPI)?)? = nil,
-        claimToken: String = LivePdfUploader.processToken
+        claimToken: String = LivePdfUploader.processToken,
+        claimRenewal: Duration = .seconds(30)
     ) {
         self.claimToken = claimToken
+        self.claimRenewal = claimRenewal
         self.boundAPI = boundAPI ?? { _ in api }
         self.api = api
         self.paths = paths
@@ -131,6 +135,15 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     public func resumePendingUploads() {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)) ?? []
         sweepOrphans(names)
+        // Rows this process left queued (it lost the claim) whose upload the other process finished or dropped.
+        let present = Set(names)
+        running.withLock { running in
+            list.update { uploads in
+                uploads.removeAll {
+                    $0.state == .queued && running.tasks[$0.id] == nil && !present.contains("\($0.id).json")
+                }
+            }
+        }
         for name in names.sorted() where name.hasSuffix(".json") {
             let id = String(name.dropLast(5))
             guard let meta = readMetadata(id), ownedByCurrentAccount(meta) else {
@@ -187,6 +200,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             PdfUpload(id: id, fileName: fileName, sizeBytes: size, state: .failed(error))
         }
         if declared > Limits.maxPdfBytes { return failed(.tooLarge) }
+        // The account this file is queued for, read before the copy: a switch during it cannot re-own the file.
+        guard let queuedBy = owner() else { return failed(.unknown) }
         guard let dest = paths.pdfUpload(id), let metaURL = paths.pdfUploadMetadata(id) else { return failed(.unknown) }
         try? paths.prepare(paths.pdfUploads)
         // Copied privately first: a process killed mid-copy (the share extension) leaves nothing in the shared queue.
@@ -205,7 +220,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             paths.removeIfPresent(staged)
             return failed(.storageFull, size: copied)
         }
-        let meta = Metadata(id: id, fileName: fileName, sizeBytes: copied, attempts: 0, tags: [], owner: owner())
+        let meta = Metadata(id: id, fileName: fileName, sizeBytes: copied, attempts: 0, tags: [], owner: queuedBy)
         do {
             try JSONEncoder().encode(meta).write(to: metaURL, options: .atomic)
         } catch {
@@ -315,14 +330,20 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             }
             setState(id, .uploading(progress: 0))
             let classification: Classification
-            let renewed = ClaimRenewal(now())
+            // Renews the claim for as long as this attempt runs, progress or not; a dead process stops renewing.
+            let heartbeat = Task { [weak self, renewal = claimRenewal] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: renewal)
+                    guard !Task.isCancelled else { return }
+                    self?.renewClaim(id)
+                }
+            }
+            defer { heartbeat.cancel() }
             do {
                 let response = try await api.uploadPdf(
                     file: file, fileName: meta.fileName, tags: meta.tags, source: .share
                 ) { [weak self] sent, total in
-                    guard let self else { return }
-                    self.renewClaim(id, last: renewed)
-                    guard total > 0 else { return }
+                    guard let self, total > 0 else { return }
                     self.setState(id, .uploading(progress: min(1, Double(sent) / Double(total))))
                 }
                 // Signed out (`cancelAll`) while the upload ran: nothing more goes out.
@@ -423,7 +444,6 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     public static let processToken = UUID().uuidString
     /// A claim not renewed for this long belongs to a process that died (the extension killed mid-upload).
     public static let claimLease: TimeInterval = 600
-    static let claimRenewal: TimeInterval = 30
 
     private func claimURL(_ id: String) -> URL? {
         guard isValidItemId(id) else { return nil }
@@ -456,21 +476,15 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         paths.removeIfPresent(url)
     }
 
-    /// Keeps a long upload's claim from expiring (progress callbacks, at most every `claimRenewal`).
-    private func renewClaim(_ id: String, last: ClaimRenewal) {
-        let current = now()
-        let due = last.at.withLock { last -> Bool in
-            guard current.timeIntervalSince(last) >= Self.claimRenewal else { return false }
-            last = current
-            return true
-        }
-        guard due, let url = claimURL(id) else { return }
-        try? FileManager.default.setAttributes([.modificationDate: current], ofItemAtPath: url.path)
+    /// Keeps a running upload's claim from expiring.
+    private func renewClaim(_ id: String) {
+        guard let url = claimURL(id), (try? Data(contentsOf: url)) == Data(claimToken.utf8) else { return }
+        try? FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: url.path)
     }
 
-    /// A sidecar without an owner predates the field and stays uploadable.
+    /// Only the account that queued the file uploads it; a sidecar without an owner is dropped (no build wrote one).
     private func ownedByCurrentAccount(_ meta: Metadata) -> Bool {
-        guard let queuedBy = meta.owner else { return true }
+        guard let queuedBy = meta.owner else { return false }
         return queuedBy == owner()
     }
 
@@ -483,10 +497,4 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         guard let url = paths.pdfUploadMetadata(meta.id), let data = try? JSONEncoder().encode(meta) else { return }
         try? data.write(to: url, options: .atomic)
     }
-}
-
-/// When a running upload last renewed its claim.
-final class ClaimRenewal: Sendable {
-    let at: Mutex<Date>
-    init(_ date: Date) { at = Mutex(date) }
 }

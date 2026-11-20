@@ -55,7 +55,9 @@ struct PdfUploaderTests {
     private func makeUploader(render: @escaping @Sendable (URL) -> Data? = { _ in Data(repeating: 9, count: 100) })
         -> LivePdfUploader
     {
-        LivePdfUploader(api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: render)
+        LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: render,
+            owner: { "owner-a" })
     }
 
     private func source(_ name: String, _ data: Data = pdfData) throws -> URL {
@@ -67,6 +69,11 @@ struct PdfUploaderTests {
     /// Waits until no upload is active and returns the list.
     private func settled(_ uploader: LivePdfUploader) async -> [PdfUpload] {
         for await list in uploader.uploads where !list.contains(where: \.isActive) { return list }
+        return []
+    }
+
+    private func current(_ uploader: LivePdfUploader) async -> [PdfUpload] {
+        for await list in uploader.uploads { return list }
         return []
     }
 
@@ -120,16 +127,16 @@ struct PdfUploaderTests {
         try paths.prepare(paths.pdfUploads)
         try pdfData.write(to: paths.pdfUploads.appending(path: "\(id).pdf"))
         let meta = LivePdfUploader.Metadata(
-            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: nil)
+            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: "owner-a")
         try JSONEncoder().encode(meta).write(to: paths.pdfUploads.appending(path: "\(id).json"))
         let extensionSide = LivePdfUploader(
             api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
-            claimToken: "extension")
+            owner: { "owner-a" }, claimToken: "extension")
         #expect(extensionSide.claim(id))
 
         let app = LivePdfUploader(
             api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
-            claimToken: "app")
+            owner: { "owner-a" }, claimToken: "app")
         app.resumePendingUploads()
         try await Task.sleep(for: .milliseconds(100))
         #expect(api.uploadCalls == 0)
@@ -143,6 +150,105 @@ struct PdfUploaderTests {
         _ = await settled(app)
         #expect(api.uploadCalls == 1)
         #expect(pendingFiles().isEmpty)
+    }
+
+    @Test func `A file is owned by the account signed in when it was shared, and an ownerless one is dropped`()
+        async throws
+    {
+        defer { dir.cleanUp() }
+        api.setUploads(.success(uploadResponse(itemId: "item1", leadImageKey: "img/x.webp")))
+        // The account switches while the file is copied: once the copy is in the queue, another account is current.
+        let queue = paths.pdfUploads
+        let uploader = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: {
+                let names = (try? FileManager.default.contentsOfDirectory(atPath: queue.path)) ?? []
+                return names.contains { $0.hasSuffix(".pdf") } ? "owner-b" : "owner-a"
+            })
+
+        let queued = await uploader.enqueue([try source("a.pdf")])
+        #expect(await settled(uploader).first?.state == .failed(.unknown))
+        #expect(queued.count == 1)
+        #expect(api.uploadCalls == 0)
+        #expect(pendingFiles().isEmpty)
+
+        // A sidecar without an owner is never sent, under any account.
+        let id = "0190a1b2-ownerless"
+        try pdfData.write(to: queue.appending(path: "\(id).pdf"))
+        let meta = LivePdfUploader.Metadata(
+            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: nil)
+        try JSONEncoder().encode(meta).write(to: queue.appending(path: "\(id).json"))
+        let next = makeUploader()
+        next.resumePendingUploads()
+        _ = await settled(next)
+        #expect(api.uploadCalls == 0)
+        #expect(pendingFiles().isEmpty)
+    }
+
+    @Test func `A request that reports no progress keeps its claim past the lease`() async throws {
+        defer { dir.cleanUp() }
+        api.setUploads(.success(uploadResponse(itemId: "item1", leadImageKey: "img/x.webp")))
+        let started = AsyncStream<Void>.makeStream()
+        let gate = AsyncStream<Void>.makeStream()
+        api.onUpload.withLock {
+            $0 = {
+                started.continuation.yield()
+                for await _ in gate.stream {}
+            }
+        }
+        let clock = Mutex(Date())
+        let uploader = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, now: { clock.withLock { $0 } },
+            renderThumbnail: { _ in nil }, owner: { "owner-a" }, claimToken: "app",
+            claimRenewal: .milliseconds(20))
+        let id = try #require(await uploader.enqueue([try source("a.pdf")]).first?.id)
+        for await _ in started.stream { break }
+
+        // The request outlives the lease without a progress callback.
+        clock.withLock { $0 = $0.addingTimeInterval(2 * LivePdfUploader.claimLease) }
+        let claimFile = paths.pdfUploads.appending(path: "\(id).claim")
+        let leaseStart = clock.withLock { $0 }.addingTimeInterval(-LivePdfUploader.claimLease)
+        for _ in 0..<100 {
+            let modified = (try? claimFile.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate
+            if let modified, modified > leaseStart { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let other = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, now: { clock.withLock { $0 } },
+            renderThumbnail: { _ in nil }, owner: { "owner-a" }, claimToken: "extension")
+        #expect(other.claim(id) == false)
+
+        gate.continuation.finish()
+        #expect(await settled(uploader).first?.state == .done(itemId: "item1", duplicate: false))
+        #expect(pendingFiles().isEmpty)
+    }
+
+    @Test func `A row queued behind the other process goes once that process finishes it`() async throws {
+        defer { dir.cleanUp() }
+        let id = "0190a1b2-share"
+        try paths.prepare(paths.pdfUploads)
+        try pdfData.write(to: paths.pdfUploads.appending(path: "\(id).pdf"))
+        let meta = LivePdfUploader.Metadata(
+            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: "owner-a")
+        try JSONEncoder().encode(meta).write(to: paths.pdfUploads.appending(path: "\(id).json"))
+        let extensionSide = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: { "owner-a" }, claimToken: "extension")
+        #expect(extensionSide.claim(id))
+
+        let app = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: { "owner-a" }, claimToken: "app")
+        app.resumePendingUploads()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await current(app).map(\.state) == [.queued])
+
+        // The extension sent it and removed the queue files.
+        for name in pendingFiles() { try FileManager.default.removeItem(at: paths.pdfUploads.appending(path: name)) }
+        app.resumePendingUploads()
+        #expect(await current(app).isEmpty)
+        #expect(api.uploadCalls == 0)
     }
 
     @Test func `A successful upload sends a preview, cleans up and requests a sync`() async throws {
@@ -229,7 +335,7 @@ struct PdfUploaderTests {
         let expired = CallRecorder<Bool>()
         let uploader = LivePdfUploader(
             api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
-            onUnauthorized: { expired.record(true) })
+            onUnauthorized: { expired.record(true) }, owner: { "owner-a" })
         _ = await uploader.enqueue([try source("a.pdf")])
         for await _ in uploader.uploads where !expired.calls.isEmpty { break }
         #expect(pendingFiles().count == 2)

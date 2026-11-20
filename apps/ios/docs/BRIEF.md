@@ -115,3 +115,10 @@ Progress: `apps/ios/docs/LEDGER.md` (orchestrator only).
 - `SrokaSession`: construct `KeychainSecureStore`, `SessionStore`, `PreferencesStore(appGroup:)`, `LiveApiSessionProvider`, `ImportJobStore`, `ImportTracker`, `LiveDataTransferRepository`, `LocalDataWiper` (closures `cancelAllWork`, `clearTables`, `deleteFiles`, `transferDirectories`), `LiveAuthRepository` (`hasLocalData`, `requestSync`, `markSessionExpired()` for 401s from sync, content and upload), `LiveSettingsRepository` (`onDownloadPolicyChanged`), `LiveAccountRepository`, `LiveConsentRepository`, `ConsentGatedTelemetry`, `ConsentApplier.start()`, decorators `TelemetryLibraryRepository`, `TelemetryPdfUploader`, `TelemetryDataTransferRepository`. Call `reload()` on both stores when the app becomes active. A token is sent only when the stored account server matches the current server.
 - Open fix (stream L): `HTTPSrokaAPI` reads base URL and token separately; it must take both from one snapshot so a server switch can never pair one server's URL with another's token.
 - Open (polish): feature String Catalogs are empty (English key text is used).
+
+## Wave 2 notes: G (sync) merged
+
+- Entry points in `SrokaSync`: `SyncScheduler` (`requestSync`, `fetchNewArticles`, `downloadItemNow`, `syncNow`, `handleBackgroundRefresh`, `wipe`, `events`, `observeRunning`), `LiveLibraryRepository`, `LiveTagRepository`, `LiveSyncStatusRepository`, `PathNetworkStatus`, `OpWriter`, `SyncEngine.pushOnce` (share extension), `systemNowMillis`.
+- Ports the composition root supplies: `SyncSession` (from `SrokaSession`), `SyncContentHooks` (from `SrokaContent`; `NoContentHooks` is the default), `OpClockStore`.
+- A push op gets 6 attempts in total. `pushOnce` does not update `sync_state`. Search rows carry no thumbnail base.
+- Two scheduler race fixes from review have no test; the final review looks at them.

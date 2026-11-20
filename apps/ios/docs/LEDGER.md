@@ -12,18 +12,26 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 
 | Stream | Scope | Model | Status | SHA |
 |---|---|---|---|---|
-| F | Foundation | Opus | running | |
-| A | Core logic + network | Sonnet | waiting on F | |
-| B | Database | Opus | waiting on F | |
-| C | Library UI | Sonnet | waiting on F | |
-| D | Reader UI | Sonnet | waiting on F | |
-| E | Auth + settings UI | Sonnet | waiting on F | |
-| G | Sync | Opus | waiting on A, B | |
-| H | Content | Opus | waiting on A, B | |
-| I | Session | Opus | waiting on A, B | |
-| J | Tags + search UI | Sonnet | waiting on C | |
-| K | Share extension | Opus | waiting on G | |
-| L | App composition | Opus | waiting on G, H, I | |
+| F | Foundation | Opus | merged | 3fa36fe |
+| A | Core logic + network | Sonnet | merged | 17ecc0f |
+| B | Database | Opus | merged | 13acf50 |
+| C | Library UI | Sonnet | merged | 6e5be88 |
+| D | Reader UI | Sonnet | running |  |
+| E | Auth + settings UI | Sonnet | merged | 0b26f9b |
+| G | Sync | Opus | merged, Sol approved | e12c538 |
+| H | Content | Opus | merged, Sol nits declined | 7be6b6a |
+| I | Session | Opus | merged, Sol reviewed | b05c56b |
+| J | Tags + search UI | Sonnet | running |  |
+| K | Share extension | Opus | running (sheet UI; live wiring after L) |  |
+| L | App composition | Opus | next |  |
+| M | Firebase telemetry + release preflight | Sonnet | running | |
+
+## Open items
+
+- Stream L: `HTTPSrokaAPI` takes base URL and token from one snapshot.
+- Polish: feature String Catalogs are empty.
+- Final review: untested race fixes in H (4) and G (2).
+- Merged-state `unit` + `build Dev` after G: not run yet.
 
 ## Open items for the owner
 

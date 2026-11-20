@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- Social preview card (1200×630). Rendered to apps/web/public/og.png by scripts/make-og.sh.
+     Bird shapes match scripts/make-icons.mjs (icon 6a), in brand colours on paper; the band is extended across the card. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;800&display=block" rel="stylesheet" />
+    <style>
+      html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #fbfaf7; }
+      .card { position: relative; width: 1200px; height: 630px; font-family: "Outfit", sans-serif; }
+      svg { position: absolute; inset: 0; }
+      .copy { position: absolute; left: 88px; top: 112px; color: #15171c; }
+      h1 { margin: 0; font-weight: 800; font-size: 188px; line-height: 0.9; letter-spacing: -0.045em; }
+      p { margin: 26px 0 0 6px; font-weight: 500; font-size: 44px; letter-spacing: -0.01em; color: #4a4c52; }
+      p b { font-weight: 600; color: #15171c; padding: 0 6px; margin: 0 -2px; background: linear-gradient(transparent 55%, #f2c84b 55%, #f2c84b 92%, transparent 92%); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <svg width="1200" height="630" viewBox="0 0 1200 630">
+        <defs>
+          <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#1e6f8f" />
+            <stop offset="0.6" stop-color="#4f9fbf" />
+            <stop offset="1" stop-color="#7cc0da" />
+          </linearGradient>
+          <radialGradient id="glow" cx="0.78" cy="0.45" r="0.55">
+            <stop offset="0" stop-color="#7cc0da" stop-opacity="0.28" />
+            <stop offset="1" stop-color="#7cc0da" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="1200" height="630" fill="url(#glow)" />
+        <!-- Bird in icon units (100×100 tile), scaled 8×; body spans x 800–1120. -->
+        <g transform="translate(560 -80) scale(8)">
+          <polygon points="66,28 70,28 83,33.5 70,39 66,39" fill="#f2c84b" />
+          <path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c" />
+          <!-- The band (30,56 70,46 70,58 30,68), carried on along the same line past both edges of the card. -->
+          <polygon points="-90,86 110,36 110,48 -90,98" fill="url(#sheen)" />
+          <circle cx="58" cy="32" r="4" fill="#ffffff" />
+        </g>
+      </svg>
+      <div class="copy">
+        <h1>Sroka</h1>
+        <p>Save it now. Read it <b>later.</b></p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -32,6 +32,7 @@ Run everything through `scripts/verify.sh` (any directory, any worktree):
 | `scripts/verify.sh unit [Target...]` | package unit + snapshot tests; e.g. `unit LibraryFeatureTests` |
 | `scripts/verify.sh build [Dev\|Prod]` | build the app for the simulator (default Dev) |
 | `scripts/verify.sh ui` | UI tests (slow; not part of `all`) |
+| `scripts/journey.sh` | live-backend journeys (`UITests/SrokaJourneyTests`) against a running `wrangler dev`; erases `SIM_NAME` (`sroka-*` only); see its header |
 | `scripts/verify.sh all` | format, unit, build Dev, build Prod |
 
 - Simulator: `SIM_NAME` (default `iPhone 18 Pro`) and `SIM_OS` (default `27.2`) select the destination.

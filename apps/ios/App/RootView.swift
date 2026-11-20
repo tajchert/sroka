@@ -95,12 +95,26 @@ struct RootDestination: View {
     var body: some View {
         Group {
             switch tab {
-            case .myList, .archive: LibraryPlaceholderView()
-            case .tags: TagsPlaceholderView()
-            case .search: SearchPlaceholderView()
+            case .myList: LibraryTab(scope: .myList)
+            case .archive: LibraryTab(scope: .archive)
+            case .tags: TagsPlaceholderView().navigationTitle(Text(tab.title))
+            case .search: SearchPlaceholderView().navigationTitle(Text(tab.title))
             }
         }
-        .navigationTitle(Text(tab.title))
+    }
+}
+
+/// Owns the library view model for one tab. `LibraryIntent`s (open item, edit tags, Settings,
+/// sign in, open URL) are handled here once the reader, tags and settings features land.
+private struct LibraryTab: View {
+    @State private var model: LibraryViewModel
+
+    init(scope: LibraryScope) {
+        _model = State(initialValue: LibraryViewModel(scope: scope))
+    }
+
+    var body: some View {
+        LibraryView(model: model)
     }
 }
 

@@ -63,7 +63,7 @@ struct ReaderScreen: View {
                 ReaderProgressLine(progress: model.progress, theme: theme).ignoresSafeArea(edges: .top)
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaBar(edge: .bottom) {
             ReaderBottomOverlay(model: model, theme: theme, isChromeVisible: isChromeVisible)
         }
         .animation(.snappy, value: isChromeVisible)
@@ -190,6 +190,15 @@ private struct ReaderBottomOverlay: View {
         }
         .environment(\.colorScheme, theme.isDark ? .dark : .light)
         .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background(alignment: .bottom) {
+            if hasChrome { ReaderChromeScrim(theme: theme) }
+        }
+    }
+
+    /// Something floats above the page (toast, end card or the bar), so the page needs the scrim.
+    private var hasChrome: Bool {
+        model.toast != nil || model.isEndCardShown || (isChromeVisible && model.isReaderShown && model.item != nil)
     }
 
     private var chrome: some View {

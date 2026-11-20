@@ -33,6 +33,28 @@ extension View {
     }
 }
 
+/// A short page-coloured fade under the floating chrome. The system's scroll-edge effect blurs the text there; the
+/// scrim takes what is left of it, so labels and icons never sit on smeared words. It spans the screen's width,
+/// starts 40 pt above the chrome and runs to the bottom edge, behind the home indicator.
+struct ReaderChromeScrim: View {
+    let theme: EffectiveTheme
+
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: theme.palette.background.opacity(0), location: 0),
+                .init(color: theme.palette.background.opacity(0.92), location: 0.3),
+                .init(color: theme.palette.background.opacity(0.97), location: 1),
+            ],
+            startPoint: .top, endPoint: .bottom
+        )
+        .padding(.top, -40)
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Floating glass bar: favorite, archive, tags, share.
 struct ReaderBottomBar<ShareContent: View>: View {
     let theme: EffectiveTheme

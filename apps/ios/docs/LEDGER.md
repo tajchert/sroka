@@ -24,7 +24,7 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 | J | Tags + search UI | Sonnet | running |  |
 | K | Share extension | Opus | running (sheet UI; live wiring after L) |  |
 | L | App composition | Opus | next |  |
-| M | Firebase telemetry + release preflight | Sonnet | running | |
+| M | Firebase telemetry + release preflight | Sonnet | merged (no archive/export run; Release path not in verify.sh) | 58c60d8 |
 
 ## Open items
 

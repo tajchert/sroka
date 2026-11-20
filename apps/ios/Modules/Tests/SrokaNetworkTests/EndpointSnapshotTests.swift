@@ -77,4 +77,12 @@ struct SameOriginTests {
         #expect(!HTTPSrokaAPI.sameOrigin(url("https://a.example"), url("https://a.example:8443")))
         #expect(!HTTPSrokaAPI.sameOrigin(nil, url("https://a.example")))
     }
+
+    @Test func `Endpoints match only on the same path and query`() {
+        let url = { (string: String) in URL(string: string) }
+        #expect(HTTPSrokaAPI.sameEndpoint(url("https://a.example/a/v1/me"), url("https://A.example:443/a/v1/me")))
+        #expect(!HTTPSrokaAPI.sameEndpoint(url("https://a.example/a/v1/me"), url("https://a.example/b/v1/me")))
+        #expect(!HTTPSrokaAPI.sameEndpoint(url("https://a.example/v1/x?f=1"), url("https://a.example/v1/x?f=2")))
+        #expect(!HTTPSrokaAPI.sameEndpoint(url("https://a.example/v1"), url("https://b.example/v1")))
+    }
 }

@@ -34,7 +34,8 @@ public actor SyncEngine {
     private let now: @Sendable () -> Int64
 
     private var locked = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var waiters: [(id: Int, continuation: CheckedContinuation<Bool, Never>)] = []
+    private var nextWaiterId = 0
     private var inFlight: [Int: Task<SyncOutcome, Never>] = [:]
     private var nextTaskId = 0
     private let running = ValueSubject(false)
@@ -73,7 +74,7 @@ public actor SyncEngine {
     /// later run after `body` and find the session signed out.
     public func wipe(_ body: @Sendable () async throws -> Void) async rethrows {
         for task in inFlight.values { task.cancel() }
-        await acquire()
+        _ = await acquire()
         defer { release() }
         try await body()
     }
@@ -99,24 +100,40 @@ public actor SyncEngine {
         return outcome
     }
 
-    private func acquire() async {
+    /// Waits for the lock; true once held. A `cancellable` wait leaves the queue when its task is cancelled and
+    /// returns false without the lock, so a pass that ran out of time (silent push) does not linger behind another one.
+    private func acquire(cancellable: Bool = false) async -> Bool {
         guard locked else {
             locked = true
-            return
+            return true
         }
-        await withCheckedContinuation { waiters.append($0) }
+        if cancellable, Task.isCancelled { return false }
+        nextWaiterId += 1
+        let id = nextWaiterId
+        guard cancellable else { return await withCheckedContinuation { waiters.append((id, $0)) } }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { waiters.append((id, $0)) }
+        } onCancel: {
+            // Runs after the append: the hop waits for this actor, which the append holds until it suspends.
+            Task { await self.leaveQueue(id) }
+        }
+    }
+
+    private func leaveQueue(_ id: Int) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }) else { return }
+        waiters.remove(at: index).continuation.resume(returning: false)
     }
 
     private func release() {
         if waiters.isEmpty {
             locked = false
         } else {
-            waiters.removeFirst().resume()
+            waiters.removeFirst().continuation.resume(returning: true)
         }
     }
 
     private func lockedPass(_ kind: PassKind) async -> SyncOutcome {
-        await acquire()
+        guard await acquire(cancellable: true) else { return .cancelled }
         defer { release() }
         if Task.isCancelled { return .cancelled }
         guard case .signedIn = await session.currentState() else { return .skipped }

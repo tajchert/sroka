@@ -10,8 +10,8 @@ public enum PushFetchResult: Sendable, Hashable {
 
 /// The outcome of the sync pass a push ran.
 public enum PushSyncOutcome: Sendable, Hashable {
-    /// The pass succeeded; `pulled` changes came down.
-    case synced(pulled: Int)
+    /// The pass succeeded; `changed` when it committed anything (items, tags or deletions).
+    case synced(changed: Bool)
     /// Nothing ran (signed out or the session expired).
     case skipped
     /// Network or server failure.
@@ -29,8 +29,8 @@ public enum SyncPushMessage {
 }
 
 /// Runs the work of one silent "sync" push: the background refresh's guarded path (launch recovery, fresh stores,
-/// database hold), a sync pass, then an automatic download batch under the policy, all within `deadline` (the system
-/// allows about 30 s). Downloads that do not fit go to the `BGProcessingTask`.
+/// database hold), a sync pass, then (in the background) an automatic download batch under the policy, all within
+/// `deadline` of the callback (the system allows about 30 s). Downloads that do not fit go to the `BGProcessingTask`.
 public struct SyncPushHandler: Sendable {
     public struct Steps: Sendable {
         /// Finishes an interrupted wipe before any data is touched.
@@ -38,35 +38,37 @@ public struct SyncPushHandler: Sendable {
         /// Re-reads preferences and the session (another process may have written).
         public var reloadStores: @Sendable () -> Void
         public var isSignedIn: @Sendable () -> Bool
-        /// Foreground: the normal debounced sync, which downloads on its own.
-        public var requestSync: @Sendable () -> Void
-        /// Runs the body with the database held (not suspended).
-        public var holding: @Sendable (@escaping @Sendable () async -> Void) async -> Void
+        /// Takes a database hold (not suspended) and returns its release.
+        public var hold: @Sendable () async -> @Sendable () -> Void
         public var sync: @Sendable () async -> PushSyncOutcome
-        /// One automatic download run under the current policy (none when Manual); stops when cancelled.
-        public var download: @Sendable () async -> Void
+        /// One automatic download run under the current policy (none when Manual); stops when cancelled. True when
+        /// it downloaded anything.
+        public var download: @Sendable () async -> Bool
+        /// Automatic downloads are on and articles wait for one (reads the database).
         public var needsBackgroundDownload: @Sendable () async -> Bool
+        /// Automatic downloads are on (signed in, policy not Manual); no database read.
+        public var automaticDownloads: @Sendable () -> Bool
         public var scheduleDownload: @Sendable () -> Void
 
         public init(
             ready: @escaping @Sendable () async -> Void,
             reloadStores: @escaping @Sendable () -> Void,
             isSignedIn: @escaping @Sendable () -> Bool,
-            requestSync: @escaping @Sendable () -> Void,
-            holding: @escaping @Sendable (@escaping @Sendable () async -> Void) async -> Void,
+            hold: @escaping @Sendable () async -> @Sendable () -> Void,
             sync: @escaping @Sendable () async -> PushSyncOutcome,
-            download: @escaping @Sendable () async -> Void,
+            download: @escaping @Sendable () async -> Bool,
             needsBackgroundDownload: @escaping @Sendable () async -> Bool,
+            automaticDownloads: @escaping @Sendable () -> Bool,
             scheduleDownload: @escaping @Sendable () -> Void
         ) {
             self.ready = ready
             self.reloadStores = reloadStores
             self.isSignedIn = isSignedIn
-            self.requestSync = requestSync
-            self.holding = holding
+            self.hold = hold
             self.sync = sync
             self.download = download
             self.needsBackgroundDownload = needsBackgroundDownload
+            self.automaticDownloads = automaticDownloads
             self.scheduleDownload = scheduleDownload
         }
     }
@@ -74,15 +76,13 @@ public struct SyncPushHandler: Sendable {
     /// Leaves a few seconds of the system's ~30 s for the bookkeeping after the work.
     public static let defaultDeadline: Duration = .seconds(25)
 
-    private let steps: Steps
-    private let deadline: Duration
-    private let clock: any Clock<Duration>
-
-    /// How much longer than `deadline` the whole handler may take (launch recovery, database hold, bookkeeping)
-    /// before it returns regardless.
+    /// How much longer than `deadline` the handler waits for cancelled work to wind down before it returns regardless.
     public static let defaultGrace: Duration = .seconds(3)
 
+    private let steps: Steps
+    private let deadline: Duration
     private let grace: Duration
+    private let clock: any Clock<Duration>
 
     public init(
         steps: Steps, deadline: Duration = Self.defaultDeadline, grace: Duration = Self.defaultGrace,
@@ -94,52 +94,50 @@ public struct SyncPushHandler: Sendable {
         self.clock = clock
     }
 
-    /// Returns within `deadline + grace` whatever the steps do: past that, the work is cancelled and left to wind down
-    /// (it keeps its database hold until it does), and the processing task is scheduled to pick up the rest.
+    /// The work is cancelled `deadline` after the call and the handler returns by `deadline + grace` whatever the
+    /// steps do. Its own database hold is released before it returns, so the app can be suspended at once; work still
+    /// winding down stops at its next database access.
     ///
-    /// - Parameter foreground: the app is active; its own sync then downloads as usual.
+    /// - Parameter foreground: the app is active; it syncs but leaves downloads to its own automatic run.
     public func handle(foreground: Bool) async -> PushFetchResult {
         let steps = steps
-        let result = await Self.value(within: deadline + grace, clock: clock) {
-            await self.run(foreground: foreground)
+        let hold = HoldSlot()
+        let result = await Self.value(within: deadline + grace, clock: clock) { [deadline, clock] in
+            await Self.run(within: deadline, clock: clock, otherwise: .failed) {
+                await self.run(foreground: foreground, hold: hold)
+            }
         }
+        hold.close()
         guard let result else {
             liveLog.notice("Sync push: out of time; handing the rest to the processing task")
-            steps.scheduleDownload()
+            if steps.automaticDownloads() { steps.scheduleDownload() }
             return .failed
         }
         return result
     }
 
-    private func run(foreground: Bool) async -> PushFetchResult {
+    private func run(foreground: Bool, hold: HoldSlot) async -> PushFetchResult {
         await steps.ready()
-        // Out of time already (`handle` returned): touch nothing.
+        // Out of time already: touch nothing.
         guard !Task.isCancelled else { return .failed }
         steps.reloadStores()
         guard steps.isSignedIn() else { return .noData }
-        if foreground {
-            steps.requestSync()
-            return .newData
-        }
-        let outcome = Mutex<PushSyncOutcome>(.cancelled)
-        let steps = steps
-        await steps.holding { [deadline, clock] in
-            await Self.run(within: deadline, clock: clock) {
-                let result = await steps.sync()
-                outcome.withLock { $0 = result }
-                // A failed pass means no network or no server: the downloads would fail the same way.
-                guard case .synced = result, !Task.isCancelled else { return }
-                await steps.download()
-            }
-        }
-        // Time ran out or the network dropped: the processing task finishes later.
-        if await steps.needsBackgroundDownload() { steps.scheduleDownload() }
-        return Self.result(outcome.withLock { $0 })
+        guard await hold.take(steps.hold) else { return .failed }
+        defer { hold.close() }
+        let outcome = await steps.sync()
+        // A failed pass means no network or no server: the downloads would fail the same way.
+        guard case .synced(let changed) = outcome else { return Self.result(outcome, downloaded: false) }
+        guard !foreground else { return Self.result(outcome, downloaded: false) }
+        let downloaded = Task.isCancelled ? false : await steps.download()
+        // Cut off by the deadline (a database read may refuse to run now) or articles still wait: finish later.
+        let remaining = Task.isCancelled ? steps.automaticDownloads() : await steps.needsBackgroundDownload()
+        if remaining { steps.scheduleDownload() }
+        return Self.result(.synced(changed: changed), downloaded: downloaded)
     }
 
-    static func result(_ outcome: PushSyncOutcome) -> PushFetchResult {
+    static func result(_ outcome: PushSyncOutcome, downloaded: Bool) -> PushFetchResult {
         switch outcome {
-        case .synced(let pulled): pulled > 0 ? .newData : .noData
+        case .synced(let changed): changed || downloaded ? .newData : .noData
         case .skipped: .noData
         case .failed, .cancelled: .failed
         }
@@ -171,16 +169,69 @@ public struct SyncPushHandler: Sendable {
         return value
     }
 
-    /// Runs `work` and cancels it once `deadline` passes; returns when `work` has returned.
-    static func run(
-        within deadline: Duration, clock: any Clock<Duration>, _ work: @escaping @Sendable () async -> Void
-    ) async {
-        await withTaskGroup(of: Void.self) { group in
+    /// Runs `work`, cancels it once `deadline` passes and returns its value when it returns.
+    static func run<T: Sendable>(
+        within deadline: Duration, clock: any Clock<Duration>, otherwise fallback: T,
+        _ work: @escaping @Sendable () async -> T
+    ) async -> T {
+        await withTaskGroup(of: T?.self) { group in
             group.addTask { await work() }
-            group.addTask { try? await clock.sleep(for: deadline) }
+            group.addTask {
+                try? await clock.sleep(for: deadline)
+                return nil
+            }
             // Whichever ends first, the other is cancelled; the work stops at its next cancellation check.
-            await group.next()
+            let first = await group.next() ?? nil
             group.cancelAll()
+            if let first { return first }
+            return (await group.next() ?? nil) ?? fallback
         }
+    }
+}
+
+/// The push's own database hold: released when the push ends, and refused once it has (late work never takes one).
+final class HoldSlot: Sendable {
+    private struct State {
+        var closed = false
+        var release: (@Sendable () -> Void)?
+    }
+
+    private let state = Mutex(State())
+
+    /// Takes the hold unless the push already ended; false when refused.
+    func take(_ acquire: @Sendable () async -> @Sendable () -> Void) async -> Bool {
+        if state.withLock({ $0.closed }) { return false }
+        let release = await acquire()
+        let kept = state.withLock { state -> Bool in
+            guard !state.closed else { return false }
+            state.release = release
+            return true
+        }
+        if !kept { release() }
+        return kept
+    }
+
+    /// Releases the hold (once) and refuses later ones.
+    func close() {
+        let release = state.withLock { state -> (@Sendable () -> Void)? in
+            state.closed = true
+            defer { state.release = nil }
+            return state.release
+        }
+        release?()
+    }
+}
+
+/// Push passes in progress. While one runs, the sync engine's deferred-download hook does not submit the processing
+/// task: the push downloads at once and submits it itself only when work remains.
+final class PushPasses: Sendable {
+    private let count = Mutex(0)
+
+    var active: Bool { count.withLock { $0 > 0 } }
+
+    func during<T: Sendable>(_ body: () async -> T) async -> T {
+        count.withLock { $0 += 1 }
+        defer { count.withLock { $0 -= 1 } }
+        return await body()
     }
 }

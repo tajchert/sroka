@@ -518,6 +518,29 @@ struct SyncEngineTests {
         #expect(h.api.pulls.count == 3)
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func `A pass cancelled while it waits for the running one leaves at once`() async throws {
+        let h = try Harness()
+        let gate = Gate()
+        let pulls = Mutex(0)
+        h.api.serve { _ in
+            pulls.withLock { $0 += 1 }
+            await gate.wait()
+            return .json(pullJson(1, items: []))
+        }
+        let engine = h.engine
+        let running = Task { await engine.sync() }
+        await eventually { pulls.withLock { $0 } == 1 }
+        // A silent push's pass queued behind it runs out of time.
+        let queued = Task { await engine.sync() }
+        try await Task.sleep(for: .milliseconds(20))
+        queued.cancel()
+        #expect(await queued.value == .cancelled)
+        await gate.open()
+        #expect(await running.value == .success(pulledItems: 0))
+        #expect(pulls.withLock { $0 } == 1)
+    }
+
     @Test func `Wipe waits for the running pass, cancels it and runs alone`() async throws {
         let h = try Harness()
         let gate = Gate()

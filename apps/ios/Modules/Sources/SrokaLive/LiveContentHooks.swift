@@ -33,6 +33,8 @@ public final class LiveContentHooks: SyncContentHooks {
         var foreground = false
         /// Cancelled runs that have not exited yet: the next run waits for them, and the wipe joins them.
         var retiring: [Int: Task<Void, Never>] = [:]
+        /// `runAutomaticNow()` callers waiting on the current run.
+        var waiters = 0
     }
 
     private let content: any ContentEngine
@@ -111,33 +113,64 @@ public final class LiveContentHooks: SyncContentHooks {
 
     // MARK: App lifecycle
 
-    /// Runs the automatic downloads now and returns when they end (background processing task). Joins a run already
-    /// in progress instead of starting a second one. Cancelling the calling task cancels the run, unless the app is in
-    /// the foreground again by then (the run then belongs to the foreground and may have a rerun queued).
+    /// Runs the automatic downloads now and returns when they end (background processing task, silent push). Joins a
+    /// run already in progress instead of starting a second one. When the calling task is cancelled, the last caller
+    /// still waiting cancels the run and returns once it stops, unless the app is in the foreground again by then (the
+    /// run then belongs to the foreground and may have a rerun queued); any other caller just stops waiting, so a
+    /// push that joined the processing task's run never cuts it short.
     public func runAutomaticNow() async {
         if policy() == .manual { return }
         let joined = state.withLock { state -> Task<Void, Never>? in
             if wipeGuard.isWiping { return nil }
-            if let task = state.task { return task }
-            return startLocked(&state)
+            let task = state.task ?? startLocked(&state)
+            state.waiters += 1
+            return task
         }
         guard let task = joined else { return }
-        await withTaskCancellationHandler {
-            await task.value
-        } onCancel: {
+        await Self.wait(for: task) { [self] in
             // Retired under the lock, so a foreground request arriving before the run exits starts a new one instead
             // of setting a rerun the cancelled run would drop.
             let cancel = state.withLock { state -> Bool in
-                guard !state.foreground else { return false }
-                if state.task == task {
-                    state.retiring[state.taskId] = task
-                    state.task = nil
-                    state.rerun = false
-                    state.taskId += 1
-                }
+                guard state.task == task else { return !state.foreground }
+                state.waiters -= 1
+                guard state.waiters == 0, !state.foreground else { return false }
+                state.retiring[state.taskId] = task
+                state.task = nil
+                state.rerun = false
+                state.taskId += 1
                 return true
             }
             if cancel { task.cancel() }
+            return cancel
+        }
+    }
+
+    /// Waits for `task` to end. When the caller is cancelled, `onCancel` decides: true (it cancelled the task) keeps
+    /// waiting until the task stops, false stops waiting at once.
+    private static func wait(for task: Task<Void, Never>, onCancel: @escaping @Sendable () -> Bool) async {
+        let slot = Mutex<CheckedContinuation<Void, Never>?>(nil)
+        let resume: @Sendable () -> Void = {
+            slot.withLock { continuation in
+                continuation?.resume()
+                continuation = nil
+            }
+        }
+        let leave = Mutex(false)
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                slot.withLock { $0 = continuation }
+                Task {
+                    await task.value
+                    resume()
+                }
+                // Cancelled before the continuation was stored: the handler's resume found nothing to resume.
+                if leave.withLock({ $0 }) { resume() }
+            }
+        } onCancel: {
+            if !onCancel() {
+                leave.withLock { $0 = true }
+                resume()
+            }
         }
     }
 
@@ -212,6 +245,7 @@ public final class LiveContentHooks: SyncContentHooks {
         state.taskId += 1
         let id = state.taskId
         let previous = Array(state.retiring.values)
+        state.waiters = 0
         let task = Task { [self] in
             // Never overlap a cancelled run that is still winding down.
             for earlier in previous { await earlier.value }

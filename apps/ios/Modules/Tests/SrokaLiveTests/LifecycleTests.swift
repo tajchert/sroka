@@ -465,6 +465,33 @@ struct LiveContentHooksTests {
         #expect(content.log.all == ["auto:anyNetwork"])
     }
 
+    @Test func `A caller that joined another's run stops waiting without cancelling it`() async throws {
+        let content = StubContent(blockRuns: true)
+        let policyReads = Mutex(0)
+        let hooks = LiveContentHooks(
+            content: content,
+            policy: {
+                policyReads.withLock { $0 += 1 }
+                return .anyNetwork
+            }, guard: WipeGuard())
+        let processing = Task { await hooks.runAutomaticNow() }
+        try await waitFor { content.waitingRuns == 1 }
+        // A silent push joins the processing task's run, then runs out of time.
+        let readsBeforePush = policyReads.withLock { $0 }
+        let push = Task { await hooks.runAutomaticNow() }
+        try await waitFor { policyReads.withLock { $0 } > readsBeforePush }
+        push.cancel()
+        await push.value
+        // The run is still the current one: a later caller joins it instead of starting another.
+        let readsBeforeLater = policyReads.withLock { $0 }
+        let later = Task { await hooks.runAutomaticNow() }
+        try await waitFor { policyReads.withLock { $0 } > readsBeforeLater }
+        content.releaseRuns()
+        await processing.value
+        await later.value
+        #expect(content.log.all == ["auto:anyNetwork"])
+    }
+
     @Test func `No automatic run starts during a wipe`() async {
         let content = StubContent()
         let wipeGuard = WipeGuard()

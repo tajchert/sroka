@@ -273,20 +273,22 @@ public final class LiveContentStore: ContentStore, Sendable {
         if state.withLock({ $0.recovered }) { return }
         await locks.withLock(Self.recoverKey) {
             if self.state.withLock({ $0.recovered }) { return }
-            await self.recover()
+            // A failed or cancelled pass (database suspended, push out of time) is tried again by the next caller.
+            guard await self.recover() else { return }
             self.state.withLock { $0.recovered = true }
         }
     }
 
     // MARK: Recovery
 
-    private func recover() async {
+    /// False when a database write failed, so the reconciliation did not complete.
+    private func recover() async -> Bool {
         guard
             let rows = try? await database.write({ db -> [ContentFileRecord] in
                 try ContentFileDao.resetDownloading(db)
                 return try ContentFileDao.all(db)
             })
-        else { return }
+        else { return false }
         var missing: [String] = []
         var staleThumbs: [ContentFileRecord] = []
         for row in rows {
@@ -308,18 +310,23 @@ public final class LiveContentStore: ContentStore, Sendable {
         }
         if !missing.isEmpty || !staleThumbs.isEmpty {
             log.notice("reconcile: \(missing.count) packages and \(staleThumbs.count) thumbnails missing")
-            _ = try? await database.write { [missing, staleThumbs] db in
-                try ContentFileDao.delete(db, itemIds: missing)
-                for var row in staleThumbs {
-                    row.thumbPath = nil
-                    row.thumbAttempts = 0
-                    try ContentFileDao.upsert(db, row)
+            do {
+                try await database.write { [missing, staleThumbs] db in
+                    try ContentFileDao.delete(db, itemIds: missing)
+                    for var row in staleThumbs {
+                        row.thumbPath = nil
+                        row.thumbAttempts = 0
+                        try ContentFileDao.upsert(db, row)
+                    }
                 }
+            } catch {
+                return false
             }
             for id in missing { paths.deleteItemFiles(id) }
         }
         let known = Set(rows.map(\.itemId)).subtracting(missing)
         sweepOrphans(known: known)
+        return true
     }
 
     /// Crash between "target → .old" and ".tmp → target": put the old package back.

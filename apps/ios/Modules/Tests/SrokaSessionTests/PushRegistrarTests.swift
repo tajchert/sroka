@@ -19,15 +19,21 @@ import Testing
         let now = Locked<Int64>(1_000 * PushRegistrarTests.day)
         let session = Locked<LivePushRegistrar.Session?>(PushRegistrarTests.alice)
         let sent = Locked<[PushTokenRequestDto]>([])
+        /// How often the registrar read the session.
+        let sessionReads = Locked(0)
 
         init() throws {
             let h = try Harness()
             self.h = h
             let now = now
             let session = session
+            let sessionReads = sessionReads
             registrar = LivePushRegistrar(
                 api: h.api, preferences: h.preferences, environment: PushRegistrarTests.environment,
-                session: { session.withLock { $0 } }, now: { now.withLock { $0 } })
+                session: {
+                    sessionReads.withLock { $0 += 1 }
+                    return session.withLock { $0 }
+                }, now: { now.withLock { $0 } })
             let sent = sent
             h.api.configure {
                 $0.putPushToken = { body in sent.withLock { $0.append(body) } }
@@ -181,6 +187,54 @@ import Testing
         #expect(s.h.preferences.pushRegistration == nil)
     }
 
+    /// A registration whose PUT stays open until `open` yields; `entered` yields once the PUT is on the wire.
+    static func slowPut(_ s: Setup) -> (entered: AsyncStream<Void>, open: AsyncStream<Void>.Continuation) {
+        let (entered, enter) = AsyncStream<Void>.makeStream()
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        s.h.api.configure {
+            $0.putPushToken = { _ in
+                enter.yield()
+                for await _ in gate { break }
+            }
+        }
+        return (entered, open)
+    }
+
+    @Test func `An unregister the sign-out gave up on sends nothing once its turn comes`() async throws {
+        let s = try Setup()
+        s.registrar.deviceTokenReceived("aa11")
+        let (entered, open) = Self.slowPut(s)
+        let registrar = s.registrar
+        let registration = Task { await registrar.register() }
+        for await _ in entered { break }
+        // The sign-out's 3 s ran out while the PUT held the line.
+        let removal = Task { await registrar.unregister() }
+        removal.cancel()
+        open.yield()
+        await registration.value
+        await removal.value
+        #expect(s.h.api.recorded == ["putPushToken"])
+    }
+
+    @Test func `An unregister that waited past the sign-out never runs under the next session`() async throws {
+        let s = try Setup()
+        s.registrar.deviceTokenReceived("aa11")
+        let (entered, open) = Self.slowPut(s)
+        let registrar = s.registrar
+        let registration = Task { await registrar.register() }
+        for await _ in entered { break }
+        let reads = s.sessionReads.withLock { $0 }
+        let removal = Task { await registrar.unregister() }
+        // It has taken Alice's session and waits behind the PUT.
+        while s.sessionReads.withLock({ $0 }) == reads { await Task.yield() }
+        // Meanwhile the sign-out finished and Bob signed in.
+        s.session.withLock { $0 = Self.bob }
+        open.yield()
+        await registration.value
+        await removal.value
+        #expect(!s.h.api.recorded.contains("deletePushToken"))
+    }
+
     @Test(arguments: [
         (nil as PushRegistrationRecord?, "aa", Int64(0), true),
         (PushRegistrationRecord(token: "aa", owner: "o", registeredAtMs: 0), "aa", 6 * day, false),
@@ -235,6 +289,36 @@ import Testing
         #expect(delete < revoke)
         #expect(h.preferences.pushRegistration == nil)
         #expect(h.preferences.apnsDeviceToken == "aa11")
+    }
+
+    @Test func `Signing in as another account unregisters the previous one first`() async throws {
+        let h = try Harness()
+        let sessionStore = h.sessionStore
+        let registrar = LivePushRegistrar(
+            api: h.api, preferences: h.preferences, environment: Self.environment,
+            session: {
+                sessionStore.current.flatMap { $0.expired ? nil : .init(owner: $0.ownerKey, token: $0.token) }
+            })
+        let auth = LiveAuthRepository(
+            api: h.api, sessionStore: h.sessionStore, preferences: h.preferences, provider: h.provider,
+            wiper: h.wiper, hasLocalData: { false }, requestSync: {}, clock: h.clock, pushRegistrar: registrar)
+        h.preferences.apnsDeviceToken = "aa11"
+        let provider = h.provider
+        let deletedWith = Locked<String?>(nil)
+        h.api.configure {
+            $0.signIn = { email, _ in SignInResult(token: "tok-\(email)", userEmail: email) }
+            $0.putPushToken = { _ in }
+            $0.deletePushToken = {
+                let token = await provider.token()
+                deletedWith.withLock { $0 = token }
+            }
+        }
+        #expect(await auth.signIn(email: "a@b.co", code: "1") == .success)
+        await registrar.register()
+        #expect(await auth.signIn(email: "c@d.co", code: "1") == .success)
+        #expect(deletedWith.withLock { $0 } == "tok-a@b.co")
+        await registrar.register()
+        #expect(h.preferences.pushRegistration?.owner == h.sessionStore.current?.ownerKey)
     }
 
     @Test func `The sign-out wipe clears the registration record`() async throws {

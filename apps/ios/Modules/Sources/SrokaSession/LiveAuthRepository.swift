@@ -106,6 +106,10 @@ public final class LiveAuthRepository: AuthRepository {
             otherAccount = await hasLocalData()
         }
         if otherAccount {
+            // The previous account's device row, while its token still works (not from the re-auth of an expired one).
+            if let pushRegistrar, let previous = sessionStore.current, !previous.expired {
+                await runWithTimeout(Self.pushUnregisterTimeout, clock: clock) { await pushRegistrar.unregister() }
+            }
             // Never show the previous account's rows or send its queued ops under the new account.
             guard await wipeLocked() else { return .failure(.server) }
         }

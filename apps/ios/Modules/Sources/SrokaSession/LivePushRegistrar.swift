@@ -12,7 +12,9 @@ import Synchronization
 /// - Calls run one at a time and each reads the latest device token when it runs, so an older token never replaces a
 ///   newer one on the server.
 /// - `unregister()` revokes the current session at once, before it waits its turn: a registration queued during the
-///   sign-out (a sign-in's late task, a token callback) finds the session revoked and sends nothing.
+///   sign-out (a sign-in's late task, a token callback) finds the session revoked and sends nothing. When its turn
+///   comes after the caller gave up or the session changed, it sends nothing either: the request would carry another
+///   session's credentials.
 /// - A registration whose session changed while the request was in flight records nothing, so a late success for one
 ///   account never makes the next account skip its own registration.
 public final class LivePushRegistrar: PushRegistrar {
@@ -73,9 +75,17 @@ public final class LivePushRegistrar: PushRegistrar {
     }
 
     public func unregister() async {
+        // Expired or already gone: the server cannot authenticate the call (its sign-out removes the row anyway).
+        guard let departing = session() else { return }
         // At once, not when this call's turn comes: everything queued behind a sign-out sees it.
-        if let token = session()?.token { revoked.withLock { $0 = token } }
+        revoked.withLock { $0 = departing.token }
         await gate.run {
+            // The caller gave up (sign-out timeout) or the session moved on while this waited behind a slow call: the
+            // request would carry the next session's credentials.
+            guard !Task.isCancelled, session()?.token == departing.token else {
+                sessionLog.notice("Push: unregister skipped: the session changed while it waited")
+                return
+            }
             // No token ever arrived: this install was never registered.
             guard preferences.apnsDeviceToken != nil || preferences.pushRegistration != nil else { return }
             do {

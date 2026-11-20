@@ -86,6 +86,7 @@ public final class LiveGraph: Sendable {
     public let syncStatus: any SyncStatusRepository
     public let telemetry: any Telemetry
     public let pushRegistrar: any PushRegistrar
+    private let pushPasses: PushPasses
     private let consentApplier: ConsentApplier
     private let provider: LiveApiSessionProvider
 
@@ -131,11 +132,12 @@ public final class LiveGraph: Sendable {
         // Content and sync.
         let content = LiveContentStore(
             database: database, api: api, wifiOnlyAPI: wifiOnlyAPI, paths: paths, onUnauthorized: onUnauthorized)
+        let pushPasses = PushPasses()
         let hooks = LiveContentHooks(
             content: content,
             policy: { preferences.preferences.downloadPolicy },
             guard: wipeGuard,
-            onDeferred: { background.scheduleDownload() })
+            onDeferred: { if !pushPasses.active { background.scheduleDownload() } })
         let network = PathNetworkStatus()
         let engine = SyncEngine(database: database, api: api, session: syncSession, hooks: hooks)
         let scheduler = SyncScheduler(engine: engine, session: syncSession, hooks: hooks, network: network)
@@ -257,6 +259,7 @@ public final class LiveGraph: Sendable {
             database: database, scheduler: scheduler, session: syncSession, hooks: hooks, network: network)
         self.telemetry = telemetry
         self.pushRegistrar = pushRegistrar
+        self.pushPasses = pushPasses
         // The SDK starts with collection off (Info.plist); the applier turns on what the stored consent allows.
         self.consentApplier = ConsentApplier(consent: consent, telemetry: telemetry)
     }
@@ -488,19 +491,31 @@ public final class LiveGraph: Sendable {
                     Self.reloadSession(sessionStore, installCheck: installCheck)
                 },
                 isSignedIn: { [self] in isSignedIn },
-                requestSync: { [scheduler] in scheduler.requestSync() },
-                holding: { [suspension, database] body in
-                    await suspension.holding {
-                        try? await database.notifyExternalChanges()
-                        await body()
+                hold: { [suspension, database] in
+                    let hold = suspension.hold()
+                    try? await database.notifyExternalChanges()
+                    return { hold.release() }
+                },
+                sync: { [scheduler, database, pushPasses] in
+                    await pushPasses.during {
+                        // The cursor moves for every committed change, tags and deletions included.
+                        let before = try? await database.read { db in try SyncStateDao.get(db).cursor }
+                        let outcome = await scheduler.syncNow()
+                        let after = try? await database.read { db in try SyncStateDao.get(db).cursor }
+                        return Self.pushOutcome(outcome, cursorMoved: before != after)
                     }
                 },
-                sync: { [scheduler] in Self.pushOutcome(await scheduler.syncNow()) },
                 download: { [content, hooks] in
                     await content.recoverInterrupted()
+                    let before = await content.eligibleCount()
                     await hooks.runAutomaticNow()
+                    let after = await content.eligibleCount()
+                    return !Task.isCancelled && after < before
                 },
                 needsBackgroundDownload: { [self] in await needsBackgroundDownload() },
+                automaticDownloads: { [self] in
+                    isSignedIn && preferences.preferences.downloadPolicy != .manual
+                },
                 scheduleDownload: { background.scheduleDownload() }))
         let registrar = pushRegistrar
         return PushJobs(
@@ -516,9 +531,9 @@ public final class LiveGraph: Sendable {
             syncRequested: { foreground in await handler.handle(foreground: foreground) })
     }
 
-    static func pushOutcome(_ outcome: SyncOutcome) -> PushSyncOutcome {
+    static func pushOutcome(_ outcome: SyncOutcome, cursorMoved: Bool) -> PushSyncOutcome {
         switch outcome {
-        case .success(let pulled): .synced(pulled: pulled)
+        case .success(let pulled): .synced(changed: pulled > 0 || cursorMoved)
         case .skipped: .skipped
         case .failure: .failed
         case .cancelled: .cancelled

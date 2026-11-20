@@ -156,6 +156,7 @@ struct TextSizeSection: View {
                 Slider(value: $model.textSizeStop, in: 0...Double(ReaderTextScale.lastIndex), step: 1) {
                     Text("Size", bundle: #bundle)
                 }
+                .tint(SrokaColor.brand)
                 .accessibilityValue(
                     Text("\(ReaderTextScale.px(model.preferences.readerTextScale)) pixels", bundle: #bundle))
                 Button {

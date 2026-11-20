@@ -18,7 +18,6 @@ import Testing
 struct SnapshotTargetTests {
     @Test func `Feature modules link`() {
         _ = LibraryView.self
-        _ = LibraryView.self
         _ = TagsView.self
         _ = SearchView.self
         _ = ReaderView.self

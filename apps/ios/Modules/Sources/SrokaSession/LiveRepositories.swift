@@ -71,10 +71,13 @@ public final class LiveSettingsRepository: SettingsRepository {
 public final class LiveAccountRepository: AccountRepository {
     private let api: any SrokaAPI
     private let auth: LiveAuthRepository
+    private let pin: @Sendable () async -> any SrokaAPI
 
-    public init(api: any SrokaAPI, auth: LiveAuthRepository) {
+    /// - Parameter pin: the API pinned to the current credentials (`HTTPSrokaAPI.pinned(to:)`); defaults to `api`.
+    public init(api: any SrokaAPI, auth: LiveAuthRepository, pin: (@Sendable () async -> any SrokaAPI)? = nil) {
         self.api = api
         self.auth = auth
+        self.pin = pin ?? { api }
     }
 
     public func connectedClients() async -> ConnectedClients? {
@@ -84,8 +87,10 @@ public final class LiveAccountRepository: AccountRepository {
     }
 
     public func deleteAccount() async -> DeleteAccountResult {
-        // The request carries the current account's token; its answer may only clear that account's data.
-        let mark = auth.transitionMark()
+        // The request carries the current account's token; its answer may only clear that account's data. Mark and
+        // credentials are taken together, so a switch halfway through cannot pair one account's token with the next
+        // account's mark.
+        let (mark, api) = await auth.transitionMark(pinning: pin)
         switch await apiCall({ try await api.deleteAccount() }) {
         case .success:
             await auth.clearLocal(ifUnchangedSince: mark)

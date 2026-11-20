@@ -387,6 +387,16 @@ struct AppRouterTests {
         #expect(router.toast == nil)
     }
 
+    @Test func `Only a different account changes the account generation the shell models are keyed by`() {
+        let router = signedInRouter()
+        let first = router.accountGeneration
+        router.sessionChanged(.expired(email: "reader@example.com"))
+        router.sessionChanged(.signedIn(email: "Reader@example.com"))
+        #expect(router.accountGeneration == first)
+        router.sessionChanged(.signedIn(email: "other@example.com"))
+        #expect(router.accountGeneration != first)
+    }
+
     @Test func `The same account signing in again keeps its place`() {
         let router = signedInRouter()
         router.select(.archive)

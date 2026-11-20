@@ -74,6 +74,9 @@ public final class AppRouter {
     public private(set) var session: SessionState?
     /// A deep link that arrived while the shell was not available; opened as soon as it is.
     public private(set) var pendingItemId: String?
+    /// Changes whenever the session moves to a different account, with or without a sign-out in between; the
+    /// root keys its per-account screen models (search query, list state) by it.
+    public private(set) var accountGeneration = 0
 
     private var nextToastId = 0
 
@@ -102,6 +105,7 @@ public final class AppRouter {
         let previousAccount = Self.account(of: session)
         session = state
         if let previousAccount, let account = Self.account(of: state), previousAccount != account {
+            accountGeneration += 1
             reset()
         }
         switch state {

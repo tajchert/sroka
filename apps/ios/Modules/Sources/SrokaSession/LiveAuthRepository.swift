@@ -133,6 +133,14 @@ public final class LiveAuthRepository: AuthRepository {
     /// Marks the current account state; pass it to `clearLocal(ifUnchangedSince:)`.
     public func transitionMark() -> Int { generation.withLock { $0 } }
 
+    /// The transition mark and `pin()` (a snapshot of the current credentials) taken together under the transition
+    /// gate: no wipe or sign-in is halfway through, so both belong to the same account.
+    public func transitionMark<T: Sendable>(pinning pin: @escaping @Sendable () async -> T) async -> (
+        mark: Int, pinned: T
+    ) {
+        await gate.run { (generation.withLock { $0 }, await pin()) }
+    }
+
     /// Wipes like `clearLocal()`, but only if no sign-out, wipe, server switch or sign-in as another account (which
     /// wipes) happened since `mark`: a late answer for one account never clears the next one's data.
     public func clearLocal(ifUnchangedSince mark: Int) async {

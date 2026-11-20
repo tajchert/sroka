@@ -34,6 +34,9 @@ struct RootView: View {
 
     var body: some View {
         RootContent(router: router, models: models)
+            // Another account gets fresh screen models (search query, list state) and fresh view state.
+            .id(router.accountGeneration)
+            .onChange(of: router.accountGeneration) { models = ShellModels(router: router) }
             .task { await followSession() }
             .onChange(of: pendingDeepLinkItemId, initial: true) { _, itemId in
                 guard let itemId else { return }

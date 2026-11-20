@@ -201,7 +201,8 @@ public final class LiveGraph: Sendable {
                 database: database, writer: writer, syncController: scheduler, hooks: hooks, thumbnailBase: paths.root),
             telemetry: telemetry)
         self.tags = LiveTagRepository(database: database, writer: writer, syncController: scheduler)
-        self.account = LiveAccountRepository(api: api, auth: auth)
+        self.account = LiveAccountRepository(
+            api: api, auth: auth, pin: { api.pinned(to: await provider.endpoint()) })
         self.settings = LiveSettingsRepository(
             store: preferences, sessionStore: sessionStore, auth: auth,
             defaultServerUrl: environment.apiBaseURL.absoluteString,

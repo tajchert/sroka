@@ -448,6 +448,39 @@ struct SignOutTests {
         #expect(try await h.itemCount() == 1)
     }
 
+    @Test func `A deletion started while an account switch wipes sends the token its mark belongs to`() async throws {
+        let h = try Harness()
+        let wiper = HeldWiper(h.wiper)
+        let auth = LiveAuthRepository(
+            api: h.api, sessionStore: h.sessionStore, preferences: h.preferences, provider: h.provider, wiper: wiper,
+            hasLocalData: { false }, requestSync: {}, clock: h.clock)
+        h.api.configure { $0.signIn = { _, _ in SignInResult(token: "old", userEmail: "a@b.co") } }
+        #expect(await auth.signIn(email: "a@b.co", code: "1") == .success)
+        // Signing in as another account wipes; hold that wipe while the old token is still stored.
+        h.api.configure {
+            $0.signIn = { _, _ in SignInResult(token: "new", userEmail: "c@d.co") }
+            $0.deleteAccount = {}
+        }
+        let signIn = Task { await auth.signIn(email: "c@d.co", code: "1") }
+        await wiper.entered()
+        let pinned = Locked<String?>(nil)
+        let sessionStore = h.sessionStore
+        let api = h.api
+        let account = LiveAccountRepository(
+            api: api, auth: auth,
+            pin: {
+                pinned.withLock { $0 = sessionStore.current?.token }
+                return api
+            })
+        let deletion = Task { await account.deleteAccount() }
+        try await Task.sleep(for: .milliseconds(50))
+        wiper.release()
+        #expect(await signIn.value == .success)
+        _ = await deletion.value
+        // The request went out with the replacement account's token, the one its mark belongs to.
+        #expect(pinned.withLock { $0 } == "new")
+    }
+
     @Test func `Failed account deletion keeps data and a 401 expires the session`() async throws {
         let h = try Harness()
         _ = await h.signIn("a@b.co")
@@ -470,6 +503,30 @@ struct SignOutTests {
         h.api.configure { $0.me = { throw ApiError.transport(.timedOut) } }
         #expect(await account.connectedClients() == nil)
     }
+}
+
+/// Holds the first wipe until `release()`; later wipes run straight through.
+final class HeldWiper: LocalDataWiping {
+    private let inner: any LocalDataWiping
+    private let held = Locked(false)
+    private let enteredStream = AsyncStream<Void>.makeStream()
+    private let releaseStream = AsyncStream<Void>.makeStream()
+
+    init(_ inner: any LocalDataWiping) { self.inner = inner }
+
+    func wipe() async -> Bool {
+        if held.withLock({ held in
+            defer { held = true }
+            return !held
+        }) {
+            enteredStream.continuation.yield()
+            for await _ in releaseStream.stream { break }
+        }
+        return await inner.wipe()
+    }
+
+    func entered() async { for await _ in enteredStream.stream { break } }
+    func release() { releaseStream.continuation.yield() }
 }
 
 final class LockedLog: Sendable {

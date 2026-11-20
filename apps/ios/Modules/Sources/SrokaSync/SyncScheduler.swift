@@ -27,11 +27,13 @@ public final class SyncScheduler: SyncController, Sendable {
 
     private struct State {
         var debounceTask: Task<Void, Never>?
+        var debounceGeneration = 0
         var worker: Task<Void, Never>?
         var workerId = 0
         var phase = WorkerPhase.idle
         var rerun = false
         var fetchTask: Task<Void, Never>?
+        var fetchGeneration = 0
     }
 
     private let state = Mutex(State())
@@ -70,13 +72,20 @@ public final class SyncScheduler: SyncController, Sendable {
     public func requestSync() {
         state.withLock { state in
             state.debounceTask?.cancel()
+            state.debounceGeneration += 1
+            let generation = state.debounceGeneration
             state.debounceTask = Task { [self] in
                 do {
                     try await clock.sleep(for: debounce)
                 } catch {
                     return
                 }
-                enqueueSync()
+                // A newer request, a fetch or a wipe may have superseded this one after the sleep returned.
+                self.state.withLock { state in
+                    guard state.debounceGeneration == generation else { return }
+                    state.debounceTask = nil
+                    enqueueSync(&state)
+                }
             }
         }
     }
@@ -85,9 +94,12 @@ public final class SyncScheduler: SyncController, Sendable {
         state.withLock { state in
             state.debounceTask?.cancel()
             state.debounceTask = nil
+            state.debounceGeneration += 1
             // REPLACE: a newer fetch supersedes a running one.
             state.fetchTask?.cancel()
-            state.fetchTask = Task { [self] in await runFetch() }
+            state.fetchGeneration += 1
+            let generation = state.fetchGeneration
+            state.fetchTask = Task { [self] in await runFetch(generation: generation) }
         }
     }
 
@@ -118,11 +130,13 @@ public final class SyncScheduler: SyncController, Sendable {
         let tasks = state.withLock { state -> [Task<Void, Never>] in
             let tasks = [state.debounceTask, state.worker, state.fetchTask].compactMap { $0 }
             state.debounceTask = nil
+            state.debounceGeneration += 1
             state.worker = nil
             state.workerId += 1
             state.phase = .idle
             state.rerun = false
             state.fetchTask = nil
+            state.fetchGeneration += 1
             return tasks
         }
         for task in tasks { task.cancel() }
@@ -133,18 +147,20 @@ public final class SyncScheduler: SyncController, Sendable {
 
     /// Android `WorkScheduler.enqueueSync`.
     func enqueueSync() {
-        state.withLock { state in
-            switch state.phase {
-            case .waiting:
-                return
-            case .running:
-                state.rerun = true
-            case .idle:
-                state.phase = .waiting
-                state.workerId += 1
-                let id = state.workerId
-                state.worker = Task { [self] in await workerLoop(id: id) }
-            }
+        state.withLock { enqueueSync(&$0) }
+    }
+
+    private func enqueueSync(_ state: inout State) {
+        switch state.phase {
+        case .waiting:
+            return
+        case .running:
+            state.rerun = true
+        case .idle:
+            state.phase = .waiting
+            state.workerId += 1
+            let id = state.workerId
+            state.worker = Task { [self] in await workerLoop(id: id) }
         }
     }
 
@@ -198,26 +214,35 @@ public final class SyncScheduler: SyncController, Sendable {
 
     // MARK: Passes
 
-    private func runFetch() async {
+    /// A replaced fetch (REPLACE) or a wipe bumps `fetchGeneration` and cancels this task; a
+    /// superseded fetch reports nothing.
+    private func runFetch(generation: Int) async {
         switch await session.currentState() {
         case .signedOut:
             return
         case .expired:
-            eventSubject.send(.fetchFailed(.auth))
+            send(.fetchFailed(.auth), generation)
             return
         case .signedIn:
             break
         }
         switch await runPass(user: true) {
         case .success:
-            let event = await hooks.fetchDownloads()
-            if !Task.isCancelled { eventSubject.send(event) }
+            if Task.isCancelled { return }
+            send(await hooks.fetchDownloads(), generation)
         case .failure(let kind):
-            eventSubject.send(.fetchFailed(kind))
+            send(.fetchFailed(kind), generation)
         case .skipped:
-            if case .expired = await session.currentState() { eventSubject.send(.fetchFailed(.auth)) }
+            if case .expired = await session.currentState() { send(.fetchFailed(.auth), generation) }
         case .cancelled:
             break
+        }
+    }
+
+    /// Publishes under the lock that replacement and wipe take, so a superseded fetch never publishes.
+    private func send(_ event: SyncEvent, _ generation: Int) {
+        state.withLock { state in
+            if state.fetchGeneration == generation { eventSubject.send(event) }
         }
     }
 

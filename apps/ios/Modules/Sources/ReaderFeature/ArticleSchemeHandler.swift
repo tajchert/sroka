@@ -49,7 +49,7 @@ struct ArticleResourceResolver: Sendable {
             components.user == nil, components.password == nil, components.port == nil,
             let host = components.host, isValidItemId(host), isValidItemId(itemId),
             host.caseInsensitiveCompare(itemId) == .orderedSame,
-            let itemDirectory = itemDirectory(forHost: host)
+            let itemDirectory = itemDirectory()
         else { return .notFound }
 
         let path = components.path
@@ -72,24 +72,14 @@ struct ArticleResourceResolver: Sendable {
         return .file(resolved, mimeType: mimeType)
     }
 
-    /// The package directory for `host`. WebKit may lower-case the host of a custom-scheme URL, so when there is no
-    /// exact match a unique case-insensitive match is accepted (item ids that differ only by case do not occur: they
-    /// are UUIDv7 strings).
-    private func itemDirectory(forHost host: String) -> URL? {
-        let exact = articlesDirectory.appendingPathComponent(host, isDirectory: true)
+    /// The package directory of this resolver's item, built from `itemId` (never from the request host, which WebKit
+    /// may lower-case; the host is only validated against `itemId`).
+    private func itemDirectory() -> URL? {
+        let directory = articlesDirectory.appendingPathComponent(itemId, isDirectory: true)
         var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: exact.path, isDirectory: &isDirectory), isDirectory.boolValue {
-            return exact
-        }
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: articlesDirectory.path) else {
-            return nil
-        }
-        let matches = names.filter { $0.caseInsensitiveCompare(host) == .orderedSame && isValidItemId($0) }
-        guard matches.count == 1, let name = matches.first else { return nil }
-        let candidate = articlesDirectory.appendingPathComponent(name, isDirectory: true)
-        guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue
+        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue
         else { return nil }
-        return candidate
+        return directory
     }
 }
 

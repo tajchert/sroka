@@ -129,6 +129,8 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     private var appliedHeader: ReaderHeader?
     private var appliedScrollToTop = 0
     private var allowInitialNavigation = false
+    /// True once the current document has finished loading, i.e. the reader script is installed.
+    private var scriptReady = false
     private var scrollObservation: NSKeyValueObservation?
     private var tracker = ScrollDirectionTracker()
     private var loadTask: Task<Void, Never>?
@@ -186,6 +188,9 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
             load(view, into: webView)
             return
         }
+        // Before the new document's reader script is installed these calls would do nothing: keep the pending
+        // values un-applied; `didFinish` reconciles them.
+        guard scriptReady else { return }
         if appliedAppearance != view.appearance {
             appliedAppearance = view.appearance
             let a = view.appearance
@@ -199,6 +204,8 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
         }
         if view.scrollToTopRequest != appliedScrollToTop {
             appliedScrollToTop = view.scrollToTopRequest
+            // The script call also cancels a restore still pending on image load (it marks the position as user-set).
+            run("window.__srokaScrollToFraction&&window.__srokaScrollToFraction(0);", in: webView)
             webView.scrollView.setContentOffset(
                 CGPoint(x: 0, y: -webView.scrollView.adjustedContentInset.top), animated: true)
         }
@@ -214,6 +221,7 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
 
     private func load(_ view: ArticleWebView, into webView: WKWebView) {
         loadedDocument = view.document
+        scriptReady = false
         appliedAppearance = view.appearance
         appliedHeader = view.header
         appliedScrollToTop = view.scrollToTopRequest
@@ -292,11 +300,13 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     /// A tapped http(s) link opens in the in-app browser, an in-page `#fragment` scrolls the reader, any other
     /// scheme (mailto:, tel:, javascript:, …) is ignored.
     private func decide(_ action: WKNavigationAction, in webView: WKWebView) -> WKNavigationActionPolicy {
-        guard action.targetFrame?.isMainFrame == true else { return .cancel }
-        if allowInitialNavigation, action.navigationType == .other {
+        if allowInitialNavigation, action.targetFrame?.isMainFrame == true, action.navigationType == .other {
             allowInitialNavigation = false
             return .allow
         }
+        // A `target="_blank"` link has no target frame; it is still a tap on a link and opens in the in-app browser.
+        // Anything aimed at a sub-frame is cancelled.
+        if let target = action.targetFrame, !target.isMainFrame { return .cancel }
         guard action.navigationType == .linkActivated, let url = action.request.url else { return .cancel }
         switch url.scheme?.lowercased() {
         case "http", "https":
@@ -310,6 +320,11 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
             logger.debug("ignored link with unsupported scheme")
         }
         return .cancel
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        scriptReady = true
+        if let parent { update(from: parent, webView: webView) }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

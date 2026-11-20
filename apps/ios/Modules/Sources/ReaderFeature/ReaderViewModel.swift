@@ -297,8 +297,9 @@ public final class ReaderViewModel {
         switch new {
         case .ready, .pdfReady:
             isReady = true
-            reported = nil
-            progress = latestItem?.progress ?? 0
+            // A scroll still waiting for its save survives a document replacement (refresh, reload).
+            if !unsaved { reported = nil }
+            progress = reported?.progress ?? latestItem?.progress ?? 0
             atEnd = false
             touchActivity()
             if case .ready = new { announceResumeIfNeeded() }

@@ -46,6 +46,27 @@ struct ReaderProgressTests {
         #expect(h.item(id)?.progressAnchor == 5)
     }
 
+    @Test func `A position waiting for its save survives a replacement of the document`() async throws {
+        let h = await openedShortNews()
+        defer { h.stop() }
+        let id = Fixtures.shortNews.id
+        h.model.readingPositionReported(ProgressReport(progress: 0.1, anchor: 3))
+        await h.model.writesSettled()
+        h.now.advance(0.5)
+        h.model.readingPositionReported(ProgressReport(progress: 0.2, anchor: 5))  // held back
+
+        let document = try #require(h.model.readyDocument)
+        var refreshed = document
+        refreshed.html += "<p>more</p>"
+        h.model.setState(.ready(refreshed))
+
+        #expect(h.model.restorePoint() == RestorePoint(anchor: 5, progress: 0.2))
+        #expect(h.model.progress == 0.2)
+        await h.idle()
+        await h.clock.advance(by: .seconds(1))
+        #expect(await h.until { h.item(id)?.progress == 0.2 })
+    }
+
     @Test func `A newer position restarts the debounce and only the last one is written`() async {
         let h = await openedShortNews()
         defer { h.stop() }

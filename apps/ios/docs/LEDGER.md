@@ -37,6 +37,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 - K2 must know: Keychain service `app.sroka.session`, session JSON has `server`, op clock key `sroka.opClock.last` in App Group defaults, extension `OpWriter` has no write gate.
 - After L2: zoom transition not done; app-target strings are literals; archive-and-next, delete in reader, sign-out not exercised on a simulator.
 
+- Gate on 5b6e921 (L1 + L2 joined): format, `build Dev`, `build Prod` pass; full `unit` fails on two tests that pass alone: `LibraryViewModelTests` "Filters combine with AND" (P1) and `AppModelTests` "The root follows the session and the version gate" (R).
+
 ## Open items for the owner
 
 - `GoogleService-Info.plist` for the iOS app in Firebase project `sroka-95489` → `apps/ios/Config/GoogleService-Info.plist`.

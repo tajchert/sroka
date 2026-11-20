@@ -1,13 +1,16 @@
 import Foundation
 import SrokaCore
 
-/// In-memory `ContentStore`: offline state comes from the library items; downloaded articles get
-/// `Fixtures.articleHtml`.
+/// In-memory `ContentStore`: offline state comes from the library items; downloaded articles get a real
+/// unpacked `SamplePackage` (article.html, images, and a PDF for PDF items) under this instance's own
+/// temporary `articlesDirectory()`, so the reader's scheme handler has files to serve.
 public final class FakeContentStore: ContentStore {
     public let library: FakeLibraryRepository
     public let downloadResult: FakeSubject<DownloadResult>
     public let usageBytes: FakeSubject<Int64>
     public let calls = CallRecorder<String>()
+    private let directory = URL(filePath: NSTemporaryDirectory())
+        .appending(path: "sroka-fake-articles-\(UUID().uuidString)", directoryHint: .isDirectory)
 
     public init(
         library: FakeLibraryRepository,
@@ -19,6 +22,10 @@ public final class FakeContentStore: ContentStore {
         self.usageBytes = FakeSubject(usageBytes)
     }
 
+    deinit {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     public func observeOffline(itemId: String) -> AsyncStream<OfflineState> {
         library.items.stream { items in items.first { $0.id == itemId }?.offline ?? .none }
     }
@@ -27,12 +34,10 @@ public final class FakeContentStore: ContentStore {
         guard let item = library.item(id: itemId), item.offline == .downloaded, item.kind == .article else {
             return nil
         }
-        return Fixtures.articleHtml(title: item.displayTitle)
+        return try? SamplePackage.install(itemId: itemId, title: item.displayTitle, in: directory)
     }
 
-    public func articlesDirectory() -> URL {
-        URL(filePath: NSTemporaryDirectory()).appending(path: "sroka-fake-articles", directoryHint: .isDirectory)
-    }
+    public func articlesDirectory() -> URL { directory }
 
     public func downloadNow(itemId: String) async -> DownloadResult {
         calls.record("downloadNow")
@@ -48,7 +53,7 @@ public final class FakeContentStore: ContentStore {
 
     public func pdfFile(itemId: String) async -> URL? {
         guard let item = library.item(id: itemId), item.kind == .pdf, item.offline == .downloaded else { return nil }
-        return articlesDirectory().appending(path: "\(itemId)/document.pdf")
+        return try? SamplePackage.installPdf(itemId: itemId, in: directory)
     }
 
     public func storageUsageBytes() async -> Int64 { usageBytes.value }

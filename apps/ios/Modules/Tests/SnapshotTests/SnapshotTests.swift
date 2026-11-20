@@ -20,7 +20,7 @@ struct SnapshotTargetTests {
         _ = LibraryView.self
         _ = TagsView.self
         _ = SearchView.self
-        _ = ReaderPlaceholderView()
+        _ = ReaderView.self
         _ = SharePlaceholderView()
         _ = Fixtures.items
     }

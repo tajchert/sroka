@@ -76,6 +76,7 @@
         <li><strong>Your library</strong>: the links, pages, PDFs and imports you save, with tags, favorites and reading progress.</li>
         <li><strong>Sign-in sessions</strong>: IP address and device type, to keep your account secure.</li>
         <li><strong>Crash reports</strong>: device model, OS and app version, the error, and an app install ID. They never include what you save or read.</li>
+        <li><strong>Push token</strong> (Android and iOS apps): a device address from Google or Apple, so we can quietly tell your phone that you saved something and it can download it for offline reading. These messages are empty signals: no links, titles or content. Signing out or deleting your account removes the token.</li>
         <li><strong>Usage analytics, only if you allow them</strong>: which features are used (for example "an article was saved"), with a random app ID. Never links, titles, searches or your email.</li>
         <li><strong>On your device</strong>: a sign-in cookie and your settings. The apps keep an offline copy of your library; signing out removes it.</li>
       </ul>
@@ -88,7 +89,8 @@
       <h2 id="processors">Services we use</h2>
       <ul>
         <li><strong>Cloudflare</strong>: hosting, storage, sign-in emails and bot protection.</li>
-        <li><strong>Google</strong>: Firebase Crashlytics (Android crash reports), Google Analytics (only if you allow it), and Google Fonts for our typeface.</li>
+        <li><strong>Google</strong>: Firebase Crashlytics (Android crash reports), Firebase Cloud Messaging (Android sync signals), Google Analytics (only if you allow it), and Google Fonts for our typeface.</li>
+        <li><strong>Apple</strong>: Apple Push Notification service (iOS sync signals).</li>
       </ul>
 
       <h2 id="retention">How long we keep it</h2>

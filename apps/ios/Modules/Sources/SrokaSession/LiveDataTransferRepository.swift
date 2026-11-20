@@ -79,20 +79,24 @@ public final class LiveDataTransferRepository: DataTransferRepository {
             break
         }
         let mime = Self.mimeType(for: name)
+        let generation = jobs.generation
         return await Task {
             defer { try? FileManager.default.removeItem(at: temp) }
-            return await upload(temp: temp, name: name, mime: mime, format: format)
+            return await upload(temp: temp, name: name, mime: mime, format: format, generation: generation)
         }.value
     }
 
-    private func upload(temp: URL, name: String, mime: String, format: ImportFormat) async -> ImportStartResult {
+    private func upload(
+        temp: URL, name: String, mime: String, format: ImportFormat, generation: Int
+    ) async -> ImportStartResult {
         switch await apiCall({
             try await api.createImport(source: temp, fileName: name, mimeType: mime, format: format)
         })
         {
         case .success(let dto):
             let job = dto.importJob(fallbackFormat: format)
-            jobs.set(job)
+            // Signed out (and wiped) while uploading: do not bring the job back.
+            guard jobs.set(job, ifNotClearedSince: generation) else { return .failed(.signedOut) }
             tracker.track(jobId: job.id)
             return .started(job)
         case .failure(let error):
@@ -111,17 +115,23 @@ public final class LiveDataTransferRepository: DataTransferRepository {
     }
 
     public func export(format: ExportFormat) async -> ExportResult {
-        let directory = exportsDirectory
+        // Each export gets its own folder, so cleaning up after one never touches another.
+        let directory = exportsDirectory.appending(path: UUID().uuidString)
         let fileManager = FileManager.default
         // Older exports hold the whole library: keep at most the newest one.
-        try? fileManager.removeItem(at: directory)
+        try? fileManager.removeItem(at: exportsDirectory)
         do {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
             return .failed(.server)
         }
         let temp = directory.appending(path: Self.downloadName)
+        let token = sessionStore.token
         switch await apiCall({ try await api.export(format: format, to: temp) }) {
+        case .success where sessionStore.token != token:
+            // Signed out (and wiped) while downloading: the library copy must not outlive the wipe.
+            try? fileManager.removeItem(at: directory)
+            return .failed(.signedOut)
         case .success(let file):
             let name = Self.safeExportName(file.fileName, format: format)
             let target = directory.appending(path: name)

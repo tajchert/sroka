@@ -96,3 +96,44 @@ func firstValue<T: Sendable>(of stream: AsyncStream<T>) async -> T? {
     for await value in stream { return value }
     return nil
 }
+
+/// Runs async bodies one at a time, in arrival order (an actor would interleave them at every `await`).
+final class SerialGate: Sendable {
+    private struct State {
+        var busy = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = Mutex(State())
+
+    func run<T: Sendable>(_ body: @Sendable () async -> T) async -> T {
+        await acquire()
+        defer { release() }
+        return await body()
+    }
+
+    private func acquire() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let enter = state.withLock { state in
+                if state.busy {
+                    state.waiters.append(continuation)
+                    return false
+                }
+                state.busy = true
+                return true
+            }
+            if enter { continuation.resume() }
+        }
+    }
+
+    private func release() {
+        let next = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            guard !state.waiters.isEmpty else {
+                state.busy = false
+                return nil
+            }
+            return state.waiters.removeFirst()
+        }
+        next?.resume()
+    }
+}

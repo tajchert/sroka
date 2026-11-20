@@ -40,6 +40,17 @@ struct SessionStoreTests {
         #expect(h.keychain.snapshot[SessionStore.sessionKey] == nil)
     }
 
+    @Test func `A stale 401 in another process does not write a signed-out token back`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co", token: "old")
+        let extensionStore = SessionStore(store: h.keychain)
+        h.sessionStore.clear()  // The app signs out.
+        extensionStore.markExpired()  // The extension's request with the old token gets a 401.
+        #expect(extensionStore.current == nil)
+        h.sessionStore.reload()
+        #expect(h.sessionStore.current == nil)
+    }
+
     @Test func `Token is stored verbatim and survives a new store instance`() async throws {
         let h = try Harness()
         _ = await h.signIn("a@b.co", token: "abc.def==")
@@ -97,6 +108,7 @@ struct SignInTests {
         (httpError(400, code: "INVALID_EMAIL"), .invalidEmail),
         (httpError(429, retryAfter: 30), .rateLimited(retryAfterSeconds: 30)),
         (httpError(429), .rateLimited(retryAfterSeconds: nil)),
+        (httpError(429, retryAfter: 1e30), .rateLimited(retryAfterSeconds: nil)),
         (httpError(500), .server),
         (ApiError.transport(.notConnectedToInternet), .network),
         (ApiError.malformedResponse, .server),
@@ -168,6 +180,65 @@ struct SignInTests {
         try await h.insertItem()
         _ = await h.signIn("a@b.co")
         #expect(try await h.itemCount() == 1)
+    }
+
+    @Test func `A token from the old server is dropped when the server changes during sign in`() async throws {
+        let h = try Harness()
+        let preferences = h.preferences
+        h.api.configure {
+            $0.signIn = { _, _ in
+                preferences.setServerUrl("https://other.example.com")
+                return SignInResult(token: "old-server", userEmail: "a@b.co")
+            }
+        }
+        #expect(await h.auth.signIn(email: "a@b.co", code: "1") == .failure(.server))
+        #expect(h.sessionStore.current == nil)
+        #expect(h.preferences.accountServer == nil)
+    }
+
+    @Test func `A sign in in flight across a switch away and back is dropped`() async throws {
+        let h = try Harness()
+        let settings = h.settings
+        h.api.configure {
+            $0.signIn = { _, _ in
+                _ = await settings.setServerUrl("https://other.example.com")
+                _ = await settings.setServerUrl(nil)
+                return SignInResult(token: "stale", userEmail: "a@b.co")
+            }
+        }
+        #expect(await h.auth.signIn(email: "a@b.co", code: "1") == .failure(.server))
+        #expect(h.sessionStore.current == nil)
+    }
+
+    @Test func `A sign in still in flight across a sign out does not restore the session`() async throws {
+        let h = try Harness()
+        let auth = h.auth
+        h.api.configure {
+            $0.signIn = { _, _ in
+                await auth.clearLocal()
+                return SignInResult(token: "late", userEmail: "a@b.co")
+            }
+        }
+        #expect(await h.auth.signIn(email: "a@b.co", code: "1") == .failure(.server))
+        #expect(h.sessionStore.current == nil)
+    }
+
+    @Test func `Signing in as another account fails when the old rows cannot be removed`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co")
+        try await h.insertItem()
+        struct Boom: Error {}
+        let wiper = LocalDataWiper(
+            database: h.database, cancelAllWork: {}, clearTables: { throw Boom() }, deleteFiles: {},
+            transferDirectories: [], sessionStore: h.sessionStore, preferences: h.preferences, importJobs: h.jobs)
+        let database = h.database
+        let auth = LiveAuthRepository(
+            api: h.api, sessionStore: h.sessionStore, preferences: h.preferences, provider: h.provider, wiper: wiper,
+            hasLocalData: { await LiveAuthRepository.hasAccountData(in: database) }, requestSync: {}, clock: h.clock)
+        h.api.configure { $0.signIn = { _, _ in SignInResult(token: "t2", userEmail: "other@b.co") } }
+        #expect(await auth.signIn(email: "other@b.co", code: "1") == .failure(.server))
+        #expect(h.sessionStore.current == nil)
+        #expect(h.preferences.accountEmail == nil)
     }
 
     @Test func `A 401 elsewhere keeps the library`() async throws {

@@ -5,8 +5,8 @@ import SrokaDatabase
 /// Removes everything that belongs to the signed-in account. Android: LocalDataWiper.kt.
 public protocol LocalDataWiping: Sendable {
     /// Runs every wipe step; never throws. A failed step is logged and the remaining steps still run, so the token is
-    /// always cleared.
-    func wipe() async
+    /// always cleared. Returns false when the account's rows could not be removed.
+    @discardableResult func wipe() async -> Bool
 }
 
 /// The wipe in the plan's order: cancel all work, clear every table inside the sync actor, delete files, checkpoint
@@ -65,12 +65,13 @@ public final class LocalDataWiper: LocalDataWiping {
             sessionStore: sessionStore, preferences: preferences, importJobs: importJobs)
     }
 
-    public func wipe() async {
+    @discardableResult public func wipe() async -> Bool {
         // Detached from the caller: leaving a screen must never leave half a wipe behind.
         await Task { await runSteps() }.value
     }
 
-    private func runSteps() async {
+    private func runSteps() async -> Bool {
+        var tablesCleared = true
         await cancelAllWork()
         // Stops import polling too: the tracker stops once its job is no longer the stored one.
         importJobs.clear()
@@ -79,11 +80,10 @@ public final class LocalDataWiper: LocalDataWiping {
         } catch {
             // The account marker is cleared below, so the next sign-in sees data with no owner and wipes again.
             sessionLog.error("Wipe: clearing tables failed: \(String(describing: error), privacy: .public)")
+            tablesCleared = false
         }
         await deleteFiles()
-        for directory in transferDirectories {
-            try? FileManager.default.removeItem(at: directory)
-        }
+        removeTransferDirectories()
         do {
             // DELETE never shrinks the file: reclaim the article text the FTS index held.
             try await database.writer.writeWithoutTransaction { db in
@@ -98,5 +98,15 @@ public final class LocalDataWiper: LocalDataWiping {
         sessionStore.clear()
         preferences.accountEmail = nil
         preferences.accountServer = nil
+        // An import or export that started while the token was still stored may have written since: clear again.
+        importJobs.clear()
+        removeTransferDirectories()
+        return tablesCleared
+    }
+
+    private func removeTransferDirectories() {
+        for directory in transferDirectories {
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 }

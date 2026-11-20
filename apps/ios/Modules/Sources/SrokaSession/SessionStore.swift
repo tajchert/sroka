@@ -85,6 +85,13 @@ public final class SessionStore: Sendable {
     public func markExpired() {
         lock.withLock { _ in
             guard var session = value.value, !session.expired else { return }
+            // The app and the share extension share the item: if the other process signed out or in since this value
+            // was cached, adopt what is stored instead of writing the old token back.
+            let stored = Self.load(store)
+            guard stored?.token == session.token else {
+                value.send(stored)
+                return
+            }
             session.expired = true
             do {
                 try write(session)

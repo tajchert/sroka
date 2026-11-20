@@ -6,7 +6,7 @@ import SrokaNetwork
 public final class LiveSettingsRepository: SettingsRepository {
     private let store: PreferencesStore
     private let sessionStore: SessionStore
-    private let auth: any AuthRepository
+    private let auth: LiveAuthRepository
     private let onDownloadPolicyChanged: @Sendable (DownloadPolicy) -> Void
     public let defaultServerUrl: String
 
@@ -14,7 +14,7 @@ public final class LiveSettingsRepository: SettingsRepository {
     public init(
         store: PreferencesStore,
         sessionStore: SessionStore,
-        auth: any AuthRepository,
+        auth: LiveAuthRepository,
         defaultServerUrl: String,
         onDownloadPolicyChanged: @escaping @Sendable (DownloadPolicy) -> Void
     ) {
@@ -52,12 +52,11 @@ public final class LiveSettingsRepository: SettingsRepository {
             normalized = nil
         }
         let stored = normalized == Self.trimmed(defaultServerUrl) ? nil : normalized
-        if stored != store.preferences.serverUrl, sessionStore.current != nil {
-            // The token, library, cursor and queued ops belong to the old server: never send them to the new host.
-            // Sign out first (revokes the token against the old base URL and wipes), then switch.
-            await auth.signOut()
-        }
-        store.setServerUrl(stored)
+        guard stored != store.preferences.serverUrl else { return true }
+        // The token, library, cursor and queued ops belong to the old server: never send them to the new host.
+        // Sign out first if signed in (revokes the token against the old base URL and wipes), then switch.
+        let store = store
+        await auth.switchServer { store.setServerUrl(stored) }
         return true
     }
 

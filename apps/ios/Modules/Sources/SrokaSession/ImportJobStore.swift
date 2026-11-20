@@ -39,6 +39,8 @@ public final class ImportJobStore: Sendable {
     private let preferences: PreferencesStore
     private let value: CurrentValue<ImportJob?>
     private let lock = NSLock()
+    /// Number of `clear()` calls (wipes); guarded by `lock`.
+    private nonisolated(unsafe) var clears = 0
 
     public init(preferences: PreferencesStore) {
         self.preferences = preferences
@@ -51,6 +53,18 @@ public final class ImportJobStore: Sendable {
 
     public func set(_ job: ImportJob) {
         lock.withLock { persist(job) }
+    }
+
+    /// Token for `set(_:ifNotClearedSince:)`; read it before starting an upload.
+    public var generation: Int { lock.withLock { clears } }
+
+    /// Writes `job` unless a wipe cleared the store after `generation` was read. Returns false when it was not written.
+    public func set(_ job: ImportJob, ifNotClearedSince generation: Int) -> Bool {
+        lock.withLock {
+            guard clears == generation else { return false }
+            persist(job)
+            return true
+        }
     }
 
     /// Writes `job` only while it is still the active one (a newer import may have replaced it).
@@ -66,6 +80,7 @@ public final class ImportJobStore: Sendable {
 
     public func clear() {
         lock.withLock {
+            clears += 1
             preferences.activeImportData = nil
             value.send(nil)
         }

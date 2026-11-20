@@ -225,6 +225,14 @@ struct ServerUrlTests {
         #expect(h.sessionStore.current != nil)
     }
 
+    @Test func `A token with no recorded server is never sent`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co", token: "tok")
+        // E.g. the wipe cleared the marker but the Keychain refused to delete the token.
+        h.preferences.accountServer = nil
+        #expect(await h.provider.token() == nil)
+    }
+
     @Test func `Token is withheld when the account marker names another server`() async throws {
         let h = try Harness()
         _ = await h.signIn("a@b.co", token: "tok")

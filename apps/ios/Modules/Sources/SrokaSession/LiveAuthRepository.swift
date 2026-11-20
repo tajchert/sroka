@@ -3,6 +3,7 @@ import GRDB
 import SrokaCore
 import SrokaDatabase
 import SrokaNetwork
+import Synchronization
 
 /// Email one-time-code sign-in (api.md §2.1, DECISIONS A5/A6). Android: AuthRepositoryImpl.kt.
 ///
@@ -18,6 +19,10 @@ public final class LiveAuthRepository: AuthRepository {
     private let hasLocalData: @Sendable () async -> Bool
     private let requestSync: @Sendable () -> Void
     private let clock: any Clock<Duration>
+    /// Sign-in completion, sign-out, wipes and server switches never interleave.
+    private let gate = SerialGate()
+    /// Bumped by every sign-out or wipe, so a sign-in that was in flight across one does not restore a session.
+    private let generation = Mutex(0)
 
     /// - Parameters:
     ///   - hasLocalData: true when the database holds items or pending ops (`LiveAuthRepository.hasAccountData(in:)`).
@@ -58,20 +63,31 @@ public final class LiveAuthRepository: AuthRepository {
         guard Self.isValidEmail(address) else { return .failure(.invalidEmail) }
         let otp = String(code.filter { !$0.isWhitespace })
         guard !otp.isEmpty else { return .failure(.invalidCode) }
+        let server = provider.currentServer()
+        let started = generation.withLock { $0 }
         switch await apiCall({ try await api.signIn(email: address, otp: otp) }) {
         case .failure(let error):
             return .failure(Self.authError(error))
         case .success(let result):
             // The token is valid on the server now: finish storing it even if the caller goes away.
-            return await Task { await finishSignIn(result, address: address) }.value
+            return await Task {
+                await gate.run {
+                    // The token belongs to the server that issued it; drop it if the user switched servers or signed
+                    // out meanwhile.
+                    guard provider.currentServer() == server, generation.withLock({ $0 }) == started else {
+                        sessionLog.notice("Sign-in result dropped: server or session changed during the request")
+                        return .failure(.server)
+                    }
+                    return await finishSignIn(result, address: address, server: server)
+                }
+            }.value
         }
     }
 
-    private func finishSignIn(_ result: SignInResult, address: String) async -> AuthResult {
+    private func finishSignIn(_ result: SignInResult, address: String, server: String) async -> AuthResult {
         let trimmedEmail = result.userEmail.trimmingCharacters(in: .whitespacesAndNewlines)
         let signedInAs = trimmedEmail.isEmpty ? address : trimmedEmail
         let owner = preferences.accountEmail ?? sessionStore.current?.email
-        let server = provider.currentServer()
         let dataServer = preferences.accountServer
         let otherAccount: Bool
         if let owner {
@@ -81,7 +97,10 @@ public final class LiveAuthRepository: AuthRepository {
         } else {
             otherAccount = await hasLocalData()
         }
-        if otherAccount { await wiper.wipe() }
+        if otherAccount {
+            // Never show the previous account's rows or send its queued ops under the new account.
+            guard await wipeLocked() else { return .failure(.server) }
+        }
         do {
             try sessionStore.save(token: result.token, email: signedInAs)
         } catch {
@@ -95,15 +114,35 @@ public final class LiveAuthRepository: AuthRepository {
     }
 
     public func signOut() async {
-        // Best effort: never block sign-out on the network. The token is still stored, so the call carries it.
-        let api = api
-        await runWithTimeout(Self.signOutTimeout, clock: clock) { _ = try? await api.signOut() }
-        await clearLocal()
+        await gate.run { await signOutLocked() }
     }
 
     /// Wipes local data and the session. Also used after account deletion.
     public func clearLocal() async {
-        await wiper.wipe()
+        await gate.run { _ = await wipeLocked() }
+    }
+
+    /// Switches the server with `apply`, signing out (revoke against the old server, then wipe) first when a session
+    /// exists. Runs under the transition gate so no sign-in completes between the two.
+    public func switchServer(_ apply: @escaping @Sendable () -> Void) async {
+        await gate.run {
+            if sessionStore.current != nil { await signOutLocked() }
+            // A sign-in in flight belongs to the old server even if the user switches back before it returns.
+            generation.withLock { $0 += 1 }
+            apply()
+        }
+    }
+
+    private func signOutLocked() async {
+        // Best effort: never block sign-out on the network. The token is still stored, so the call carries it.
+        let api = api
+        await runWithTimeout(Self.signOutTimeout, clock: clock) { _ = try? await api.signOut() }
+        _ = await wipeLocked()
+    }
+
+    private func wipeLocked() async -> Bool {
+        generation.withLock { $0 += 1 }
+        return await wiper.wipe()
     }
 
     /// The 401 entry point for the sync, content and upload engines: marks the session expired and keeps all data.
@@ -124,7 +163,9 @@ public final class LiveAuthRepository: AuthRepository {
         case .transport: return .network
         case .malformedResponse, .invalidRequest: return .server
         case .http(let status, let code, _, let retryAfter):
-            if status == 429 { return .rateLimited(retryAfterSeconds: retryAfter.map { Int($0.rounded(.up)) }) }
+            if status == 429 {
+                return .rateLimited(retryAfterSeconds: retryAfter.flatMap { Int(exactly: $0.rounded(.up)) })
+            }
             switch code {
             case "INVALID_OTP": return .invalidCode
             case "OTP_EXPIRED": return .codeExpired

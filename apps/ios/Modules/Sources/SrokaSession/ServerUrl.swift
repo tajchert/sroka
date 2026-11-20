@@ -55,7 +55,9 @@ public final class LiveApiSessionProvider: ApiSessionProvider {
 
     public func token() async -> String? {
         guard let token = sessionStore.token else { return nil }
-        if let owner = preferences.accountServer, owner != currentServer() { return nil }
+        // Sign-in always records the server; a token without that record (e.g. a Keychain delete that failed during a
+        // wipe) is never sent anywhere.
+        guard preferences.accountServer == currentServer() else { return nil }
         return token
     }
 

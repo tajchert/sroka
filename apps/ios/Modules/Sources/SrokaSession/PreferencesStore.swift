@@ -18,6 +18,7 @@ public final class PreferencesStore: Sendable {
     private nonisolated(unsafe) let defaults: UserDefaults
     private let preferencesValue: CurrentValue<UserPreferences>
     private let consentValue: CurrentValue<Consent>
+    private let writeLock = NSLock()
 
     enum InternalKey {
         static let accountEmail = "account_email"
@@ -39,8 +40,7 @@ public final class PreferencesStore: Sendable {
 
     /// Re-reads everything (another process may have written).
     public func reload() {
-        preferencesValue.send(Self.readPreferences(defaults))
-        consentValue.send(Self.readConsent(defaults))
+        writeLock.withLock { publish() }
     }
 
     // MARK: Preferences
@@ -67,7 +67,14 @@ public final class PreferencesStore: Sendable {
     public func setServerUrl(_ value: String?) { set(value, PreferenceKey.serverUrl) }
 
     private func set(_ value: Any?, _ key: String) {
-        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+        // Write, read back and publish as one step, so a slower setter never publishes a stale snapshot last.
+        writeLock.withLock {
+            if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+            publish()
+        }
+    }
+
+    private func publish() {
         preferencesValue.send(Self.readPreferences(defaults))
         consentValue.send(Self.readConsent(defaults))
     }

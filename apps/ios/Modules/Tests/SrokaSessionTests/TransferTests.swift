@@ -62,6 +62,40 @@ struct TransferTests {
         s.tracker.stop()
     }
 
+    @Test func `An upload that finishes after a wipe does not bring the job back`() async throws {
+        let s = try Setup()
+        _ = await s.h.signIn("a@b.co")
+        let file = try tempFile("pocket.csv", bytes: 10)
+        let wiper = s.h.wiper
+        s.h.api.configure {
+            $0.createImport = { _, _, _, _ in
+                await wiper.wipe()
+                return jobDto()
+            }
+        }
+        #expect(await s.repo.startImport(fileURL: file, format: .pocketCsv) == .failed(.signedOut))
+        #expect(s.h.jobs.current == nil)
+        #expect(!s.tracker.isTracking)
+    }
+
+    @Test func `An export that finishes after a wipe leaves no file behind`() async throws {
+        let s = try Setup()
+        _ = await s.h.signIn("a@b.co")
+        let wiper = s.h.wiper
+        s.h.api.configure {
+            $0.export = { _, destination in
+                await wiper.wipe()
+                try FileManager.default.createDirectory(
+                    at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data("a,b".utf8).write(to: destination)
+                return ExportFile(fileName: "sroka.csv", bytes: 3)
+            }
+        }
+        #expect(await s.repo.export(format: .csv) == .failed(.signedOut))
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: s.repo.exportsDirectory.path)) ?? []
+        #expect(left.isEmpty)
+    }
+
     @Test func `Files over 20 MiB are refused without uploading`() async throws {
         let s = try Setup()
         let file = try tempFile("big.csv", bytes: Int(Limits.maxImportBytes) + 1)
@@ -180,9 +214,15 @@ struct TransferTests {
             }
         }
         let result = await s.repo.export(format: .csv)
-        let expected = s.repo.exportsDirectory.appending(path: "sroka-2026-11-20.csv")
-        #expect(result == .ready(fileURL: expected, fileName: "sroka-2026-11-20.csv", bytes: 3))
-        #expect(try String(contentsOf: expected, encoding: .utf8) == "a,b")
+        guard case .ready(let url, let name, let bytes) = result else {
+            Issue.record("not ready: \(result)")
+            return
+        }
+        #expect(name == "sroka-2026-11-20.csv" && bytes == 3 && url.lastPathComponent == name)
+        #expect(
+            url.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL.path
+                == s.repo.exportsDirectory.standardizedFileURL.path)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "a,b")
         #expect(!FileManager.default.fileExists(atPath: old.path))
     }
 

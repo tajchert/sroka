@@ -20,7 +20,7 @@ class PushMessageHandler internal constructor(
         scheduler: WorkScheduler,
     ) : this(
         isSignedIn = { sessionStore.current()?.let { !it.expired } ?: false },
-        enqueueSync = scheduler::enqueueSync,
+        enqueueSync = scheduler::enqueuePushSync,
     )
 
     /** Returns true when a sync was enqueued. */

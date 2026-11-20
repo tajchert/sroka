@@ -2,7 +2,7 @@ package app.sroka.push
 
 import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.data.push.PushMessageHandler
-import app.sroka.core.data.push.PushTokenSyncer
+import app.sroka.core.domain.PushRegistrar
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -19,14 +20,14 @@ import javax.inject.Inject
 @AndroidEntryPoint
 internal class SrokaMessagingService : FirebaseMessagingService() {
     @Inject lateinit var handler: PushMessageHandler
-    @Inject lateinit var syncer: PushTokenSyncer
+    @Inject lateinit var registrar: PushRegistrar
     @Inject @ApplicationScope lateinit var scope: CoroutineScope
 
     override fun onNewToken(token: String) {
-        // Ignored when signed out; the sign-in registers the then-current token.
+        // Re-reads the current token under the registrar's lock; ignored when signed out.
         scope.launch {
             try {
-                syncer.sync(token)
+                registrar.register()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -35,12 +36,16 @@ internal class SrokaMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        // Enqueueing is a quick WorkManager call; do it before the ~20 s service window ends.
+        // Enqueueing is a quick WorkManager call; bound it well inside the ~20 s service window.
         try {
-            runBlocking { handler.onMessage(message.data) }
+            runBlocking { withTimeoutOrNull(ENQUEUE_TIMEOUT_MS) { handler.onMessage(message.data) } }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
         }
+    }
+
+    private companion object {
+        const val ENQUEUE_TIMEOUT_MS = 5_000L
     }
 }

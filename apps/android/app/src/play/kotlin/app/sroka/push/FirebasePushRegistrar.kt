@@ -6,6 +6,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -20,9 +21,12 @@ internal class FirebasePushRegistrar @Inject constructor(
     private val syncer: PushTokenSyncer,
 ) : PushRegistrar {
 
+    /** The in-flight `deleteToken()`; it can outlive the sign-out timeout, so a quick re-sign-in waits for it. */
+    @Volatile private var pendingDelete: Task<Void>? = null
+
+    /** All triggers (sign-in, app start, `onNewToken`) land here; the token is read inside the syncer's lock. */
     override suspend fun register() {
-        val token = fcmToken() ?: return
-        syncer.sync(token)
+        syncer.reconcile(::fcmToken)
     }
 
     override suspend fun unregister() {
@@ -30,18 +34,25 @@ internal class FirebasePushRegistrar @Inject constructor(
             syncer.remove()
         } finally {
             // The next sign-in then gets a fresh token instead of reusing one the server just forgot.
-            runCatching { messaging()?.deleteToken()?.await() }
+            val task = runCatching { messaging()?.deleteToken() }.getOrNull()
+            pendingDelete = task
+            runCatching { task?.await() }
         }
     }
 
     private suspend fun fcmToken(): String? =
         try {
+            pendingDelete?.let { withTimeoutOrNull(DELETE_WAIT_MS) { it.await() } }
             messaging()?.token?.await()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             null
         }
+
+    private companion object {
+        const val DELETE_WAIT_MS = 3_000L
+    }
 
     private fun messaging(): FirebaseMessaging? = runCatching { FirebaseMessaging.getInstance() }.getOrNull()
 }

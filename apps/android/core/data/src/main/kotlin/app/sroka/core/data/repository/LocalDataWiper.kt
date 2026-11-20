@@ -39,7 +39,14 @@ internal class LocalDataWiper @Inject constructor(
     suspend fun wipe() {
         scheduler.cancelAll()
         importJobs.clear()
-        pushTokenStore.clear()
+        // Best effort: the throttle record is scoped to the account, so a stale one is harmless.
+        try {
+            pushTokenStore.clear()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("LocalDataWiper", "push token state not cleared", e)
+        }
         syncController.resetPeriodic()
         engine.exclusive {
             maintenanceDao.wipeAll()

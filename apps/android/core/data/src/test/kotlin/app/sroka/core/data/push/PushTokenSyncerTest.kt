@@ -37,17 +37,19 @@ internal class PushTokenSyncerTest : DataTestBase() {
             override suspend fun baseUrl() = server.url("/").toString().trimEnd('/')
         }
         val api = SrokaApiFactory.create(provider, NetworkConfig("Sroka-Android/test"))
-        syncer = PushTokenSyncer(api, sessionStore, store, Clock { now })
+        syncer = PushTokenSyncer(api, sessionStore, provider, store, Clock { now })
     }
 
     @After
     fun tearDownSyncer() = scope.cancel()
 
+    private suspend fun sync(token: String) = syncer.reconcile { token }
+
     private fun ok() = server.enqueue(MockResponse.Builder().code(204).build())
 
     @Test fun firstRegistrationPutsTheTokenAndRemembersIt() = runBlocking {
         ok()
-        assertTrue(syncer.sync("tok1"))
+        assertTrue(sync("tok1"))
         val req = server.takeRequest()
         assertEquals("PUT", req.method)
         assertEquals("/v1/push-token", req.url.encodedPath)
@@ -58,18 +60,18 @@ internal class PushTokenSyncerTest : DataTestBase() {
 
     @Test fun unchangedTokenWithinSevenDaysIsNotPutAgain() = runBlocking {
         ok()
-        assertTrue(syncer.sync("tok1"))
+        assertTrue(sync("tok1"))
         now += TimeUnit.DAYS.toMillis(7) - 1
-        assertFalse(syncer.sync("tok1"))
+        assertFalse(sync("tok1"))
         assertEquals(1, server.requestCount)
     }
 
     @Test fun unchangedTokenIsRefreshedAfterSevenDays() = runBlocking {
         ok()
         ok()
-        assertTrue(syncer.sync("tok1"))
+        assertTrue(sync("tok1"))
         now += TimeUnit.DAYS.toMillis(7)
-        assertTrue(syncer.sync("tok1"))
+        assertTrue(sync("tok1"))
         assertEquals(2, server.requestCount)
         assertEquals(now, store.last()?.atMillis)
     }
@@ -77,34 +79,34 @@ internal class PushTokenSyncerTest : DataTestBase() {
     @Test fun changedTokenIsPutImmediately() = runBlocking {
         ok()
         ok()
-        syncer.sync("tok1")
+        sync("tok1")
         now += 1_000
-        assertTrue(syncer.sync("tok2"))
+        assertTrue(sync("tok2"))
         assertEquals("tok2", store.last()?.token)
     }
 
     @Test fun failedPutIsNotRememberedSoItRetries() = runBlocking {
         server.enqueue(MockResponse.Builder().code(500).build())
         ok()
-        assertFalse(syncer.sync("tok1"))
+        assertFalse(sync("tok1"))
         assertNull(store.last())
-        assertTrue(syncer.sync("tok1"))
+        assertTrue(sync("tok1"))
         assertEquals(2, server.requestCount)
     }
 
     @Test fun signedOutOrExpiredDoesNothing() = runBlocking {
         sessionStore.markExpired()
-        assertFalse(syncer.sync("tok1"))
+        assertFalse(sync("tok1"))
         sessionStore.clear()
-        assertFalse(syncer.sync("tok1"))
-        assertFalse(syncer.sync(" "))
+        assertFalse(sync("tok1"))
+        assertFalse(sync(" "))
         assertEquals(0, server.requestCount)
     }
 
     @Test fun removeDeletesOnTheServerAndClearsThrottleState() = runBlocking {
         ok()
         ok()
-        syncer.sync("tok1")
+        sync("tok1")
         syncer.remove()
         val put = server.takeRequest()
         val delete = server.takeRequest()
@@ -114,9 +116,53 @@ internal class PushTokenSyncerTest : DataTestBase() {
         assertEquals("PUT", put.method)
     }
 
+    @Test fun tokenIsReadInsideTheLockSoTheLatestWins() = runBlocking {
+        ok()
+        var current = "old"
+        assertTrue(syncer.reconcile { current.also { current = "new" } })
+        assertEquals("old", store.last()?.token)
+        ok()
+        now += 1_000
+        assertTrue(syncer.reconcile { current })
+        assertEquals("new", store.last()?.token)
+    }
+
+    @Test fun noRegistrationAfterSignOutStartedEvenIfTokenIsReregistered() = runBlocking {
+        ok()
+        syncer.remove()
+        assertFalse(sync("tok1"))
+        assertEquals(1, server.requestCount) // only the DELETE
+        assertNull(store.last())
+    }
+
+    @Test fun newSessionRegistersAgainAfterSignOut() = runBlocking {
+        ok()
+        syncer.remove()
+        sessionStore.clear()
+        sessionStore.save("tok-b", "me@example.com")
+        ok()
+        assertTrue(sync("tok1"))
+    }
+
+    @Test fun sessionChangingWhileTheTokenIsFetchedAbortsTheRegistration() = runBlocking {
+        val before = server.requestCount
+        assertFalse(syncer.reconcile { sessionStore.save("tok-b", "other@example.com"); "tok1" })
+        assertEquals(before, server.requestCount)
+        assertNull(store.last())
+    }
+
+    @Test fun throttleRecordOfAnotherAccountIsNotReused() = runBlocking {
+        ok()
+        ok()
+        assertTrue(sync("tok1"))
+        sessionStore.save("tok-b", "other@example.com")
+        assertTrue(sync("tok1"))
+        assertEquals(2, server.requestCount)
+    }
+
     @Test fun removeClearsThrottleStateEvenWhenOffline() = runBlocking {
         ok()
-        syncer.sync("tok1")
+        sync("tok1")
         server.enqueue(MockResponse.Builder().code(500).build())
         syncer.remove()
         assertNull(store.last())

@@ -12,6 +12,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.await
 import androidx.work.workDataOf
 import app.sroka.core.data.content.DownloadCanceller
 import app.sroka.core.datastore.UserPreferencesDataSource
@@ -28,6 +29,9 @@ object SyncWork {
 
     /** A user "Fetch": its own unique name so it never waits behind a constrained background sync. */
     const val FETCH = "sroka-fetch"
+
+    /** Push-triggered sync (repo-root D17): separate name so it never inherits a failing attempt of [SYNC]. */
+    const val SYNC_PUSH = "sroka-sync-push"
     const val PERIODIC_SYNC = "sroka-sync-periodic"
     const val DOWNLOAD = "sroka-download"
     const val ITEM_DOWNLOAD_PREFIX = "sroka-download-item-"
@@ -65,6 +69,26 @@ class WorkScheduler @Inject internal constructor(
     suspend fun enqueueSync() {
         if (hasWaiting(SyncWork.SYNC)) return
         workManager.enqueueUniqueWork(SyncWork.SYNC, ExistingWorkPolicy.APPEND_OR_REPLACE, syncRequest(user = false))
+    }
+
+    /**
+     * Silent-push sync (repo-root D17). A sync that is only waiting (network, retry backoff) would swallow
+     * the push, and one appended behind a failing attempt never runs, so: nothing running ⇒ replace with a
+     * fresh run; a sync running ⇒ a follow-up under its own name (replacing a stale waiting one); a
+     * push-triggered sync already running ⇒ nothing (pushes are ≥ 1 min apart; its own pull is that fresh).
+     * Awaits WorkManager's acknowledgement so a failure reaches the caller.
+     */
+    suspend fun enqueuePushSync() {
+        val main = workManager.getWorkInfosForUniqueWorkFlow(SyncWork.SYNC).first()
+        val push = workManager.getWorkInfosForUniqueWorkFlow(SyncWork.SYNC_PUSH).first()
+        val pushRunning = push.any { it.state == WorkInfo.State.RUNNING }
+        val mainRunning = main.any { it.state == WorkInfo.State.RUNNING }
+        val operation = when {
+            pushRunning -> return
+            mainRunning -> workManager.enqueueUniqueWork(SyncWork.SYNC_PUSH, ExistingWorkPolicy.REPLACE, syncRequest(user = false))
+            else -> workManager.enqueueUniqueWork(SyncWork.SYNC, ExistingWorkPolicy.REPLACE, syncRequest(user = false))
+        }
+        operation.await()
     }
 
     /**

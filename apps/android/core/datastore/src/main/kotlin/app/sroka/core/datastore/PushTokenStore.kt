@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.first
 import java.io.IOException
 import javax.inject.Inject
 
-/** The push token the server last accepted for this device and when (throttle state, repo-root D17). */
-data class RegisteredPushToken(val token: String, val atMillis: Long)
+/**
+ * The push token the server last accepted for this device and when (throttle state, repo-root D17),
+ * for the account [scope] (server + email) it was registered under: another account never reuses it.
+ */
+data class RegisteredPushToken(val token: String, val atMillis: Long, val scope: String)
 
 /** Throttle state for push-token registration, in the user preferences DataStore. Wiped with the account data. */
 class PushTokenStore @Inject constructor(
@@ -24,13 +27,15 @@ class PushTokenStore @Inject constructor(
             .first()
         val token = p[TOKEN] ?: return null
         val at = p[AT] ?: return null
-        return RegisteredPushToken(token, at)
+        val scope = p[SCOPE] ?: return null
+        return RegisteredPushToken(token, at, scope)
     }
 
-    suspend fun save(token: String, atMillis: Long) {
+    suspend fun save(token: String, atMillis: Long, scope: String) {
         dataStore.edit {
             it[TOKEN] = token
             it[AT] = atMillis
+            it[SCOPE] = scope
         }
     }
 
@@ -38,11 +43,13 @@ class PushTokenStore @Inject constructor(
         dataStore.edit {
             it.remove(TOKEN)
             it.remove(AT)
+            it.remove(SCOPE)
         }
     }
 
     private companion object {
         val TOKEN = stringPreferencesKey("push_token")
         val AT = longPreferencesKey("push_token_registered_at")
+        val SCOPE = stringPreferencesKey("push_token_scope")
     }
 }

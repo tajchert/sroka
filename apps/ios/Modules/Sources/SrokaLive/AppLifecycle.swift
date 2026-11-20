@@ -30,6 +30,8 @@ public struct LifecycleActions: Sendable {
     public var scheduleDownload: @Sendable () -> Void
     /// UIKit background time ran out: suspend the database whatever still holds it.
     public var expireBackground: @Sendable () -> Void
+    /// Returns once launch recovery (an interrupted wipe) is done; awaited before any account work.
+    public var ready: @Sendable () async -> Void
 
     public init(
         enterForeground: @escaping @Sendable () -> Void,
@@ -49,7 +51,8 @@ public struct LifecycleActions: Sendable {
         scheduleRefresh: @escaping @Sendable () -> Void,
         needsBackgroundDownload: @escaping @Sendable () async -> Bool,
         scheduleDownload: @escaping @Sendable () -> Void,
-        expireBackground: @escaping @Sendable () -> Void = {}
+        expireBackground: @escaping @Sendable () -> Void = {},
+        ready: @escaping @Sendable () async -> Void = {}
     ) {
         self.enterForeground = enterForeground
         self.enterBackground = enterBackground
@@ -69,6 +72,7 @@ public struct LifecycleActions: Sendable {
         self.needsBackgroundDownload = needsBackgroundDownload
         self.scheduleDownload = scheduleDownload
         self.expireBackground = expireBackground
+        self.ready = ready
     }
 }
 
@@ -93,6 +97,8 @@ public final class AppLifecycle {
         let current = transition
         actions.enterForeground()
         actions.setDownloadsForeground(true)
+        // An interrupted wipe finishes before the stores are read and before any account work.
+        await actions.ready()
         actions.reloadStores()
         await actions.notifyExternalChanges()
         guard transition == current, actions.isSignedIn() else { return }
@@ -138,6 +144,7 @@ public final class AppLifecycle {
     public func flush(_ background: BackgroundFlush) async {
         let actions = actions
         defer { background.release() }
+        await actions.ready()
         guard actions.isSignedIn() else { return }
         if await actions.pendingOpCount() > 0 {
             await actions.syncNow()

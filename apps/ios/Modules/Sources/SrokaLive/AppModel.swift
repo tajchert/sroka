@@ -24,18 +24,23 @@ public final class AppModel {
 
     @ObservationIgnored private let sessionStates: @Sendable () -> AsyncStream<SessionState>
     @ObservationIgnored private let serverChanges: @Sendable () -> AsyncStream<String>
+    @ObservationIgnored private let ready: @Sendable () async -> Void
     @ObservationIgnored private var observation: Task<Void, Never>?
     @ObservationIgnored private var serverObservation: Task<Void, Never>?
 
-    /// - Parameter serverChanges: the effective server, current value first; a change triggers a version check.
+    /// - Parameters:
+    ///   - serverChanges: the effective server, current value first; a change triggers a version check.
+    ///   - ready: launch recovery (an interrupted wipe); the session is read only after it returns.
     public init(
         sessionStates: @escaping @Sendable () -> AsyncStream<SessionState>,
         serverChanges: @escaping @Sendable () -> AsyncStream<String> = { AsyncStream { $0.finish() } },
         versionGate: VersionGate,
-        deepLinks: DeepLinkInbox
+        deepLinks: DeepLinkInbox,
+        ready: @escaping @Sendable () async -> Void = {}
     ) {
         self.sessionStates = sessionStates
         self.serverChanges = serverChanges
+        self.ready = ready
         self.versionGate = versionGate
         self.deepLinks = deepLinks
     }
@@ -63,8 +68,12 @@ public final class AppModel {
                 if changed { Task { await self?.versionGate.check() } }
             }
         }
-        let stream = sessionStates()
+        let ready = ready
+        let sessionStates = sessionStates
         observation = Task { [weak self] in
+            // The root stays on launching until an interrupted wipe is finished: no screen shows the old session.
+            await ready()
+            let stream = sessionStates()
             for await state in stream {
                 guard let self else { return }
                 guard self.session != state else { continue }

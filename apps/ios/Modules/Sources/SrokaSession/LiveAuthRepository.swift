@@ -124,6 +124,12 @@ public final class LiveAuthRepository: AuthRepository {
         await gate.run { _ = await wipeLocked() }
     }
 
+    /// Runs `finish` (completing a wipe that a dead process left) under the transition gate, so it never runs beside a
+    /// sign-out, a wipe or a sign-in's completion.
+    public func finishInterruptedWipe(_ finish: @escaping @Sendable () async -> Void) async {
+        await gate.run { await finish() }
+    }
+
     /// Marks the current account state; pass it to `clearLocal(ifUnchangedSince:)`.
     public func transitionMark() -> Int { generation.withLock { $0 } }
 

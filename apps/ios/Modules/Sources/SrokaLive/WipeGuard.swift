@@ -84,9 +84,14 @@ public struct GuardedWiper: LocalDataWiping {
 
     @discardableResult public func wipe() async -> Bool {
         let inner = inner
+        return await guarded { await inner.wipe() }
+    }
+
+    /// Runs another wipe entry point (finishing an interrupted wipe) the same way: guard up, database held.
+    @discardableResult public func guarded(_ body: @Sendable () async -> Bool) async -> Bool {
         let hold = suspension?.hold()
         defer { hold?.release() }
-        return await wipeGuard.during { await inner.wipe() }
+        return await wipeGuard.during { await body() }
     }
 }
 

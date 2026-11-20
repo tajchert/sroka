@@ -26,7 +26,8 @@ final class AppRuntime {
             versionGate: VersionGate(
                 build: graph.configuration.build, server: { graph.currentServer() },
                 fetchMinimum: { await graph.fetchMinimumBuild() }),
-            deepLinks: DeepLinkInbox(scheme: graph.configuration.environment.urlScheme))
+            deepLinks: DeepLinkInbox(scheme: graph.configuration.environment.urlScheme),
+            ready: { await graph.launchRecovery.ready() })
         return AppRuntime(
             model: model, lifecycle: AppLifecycle(actions: graph.lifecycleActions()),
             backgroundJobs: graph.backgroundJobs())

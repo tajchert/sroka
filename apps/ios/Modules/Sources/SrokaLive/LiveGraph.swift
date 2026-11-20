@@ -64,6 +64,8 @@ public final class LiveGraph: Sendable {
     public let suspension: SuspensionGate
     public let importTracker: ImportTracker
     public let syncSession: LiveSyncSession
+    /// Awaited before the account is used: finishes a wipe a dead process left in progress.
+    public let launchRecovery: LaunchRecovery
 
     public let library: any LibraryRepository
     public let tags: any TagRepository
@@ -131,7 +133,8 @@ public final class LiveGraph: Sendable {
             admission: wipeGuard)
         let uploader = LivePdfUploader(
             api: api, paths: paths, syncController: scheduler, onUnauthorized: onUnauthorized,
-            owner: { sessionStore.current?.ownerKey })
+            owner: { sessionStore.current?.ownerKey },
+            boundAPI: Self.uploadAPI(api: api, provider: provider, sessionStore: sessionStore))
 
         // Session engine.
         let importJobs = ImportJobStore(preferences: preferences)
@@ -143,27 +146,26 @@ public final class LiveGraph: Sendable {
             ?? FileManager.default.temporaryDirectory
         let dataTransfer = LiveDataTransferRepository(
             api: api, jobs: importJobs, tracker: importTracker, sessionStore: sessionStore, cachesDirectory: caches)
-        let wiper = GuardedWiper(
-            LocalDataWiper(
-                database: database,
-                cancelAllWork: {
-                    // Joined, not just cancelled: no automatic download may write files after the content is removed.
-                    await hooks.cancelAutomaticAndWait()
-                    uploader.cancelAll()
-                    importTracker.stop()
-                    background.cancelAll()
-                },
-                clearTables: {
-                    // The guard is up, so no local write starts; let the ones already running commit first.
-                    await wipeGuard.drainWrites()
-                    try await scheduler.wipe { try await database.write { try MaintenanceDao.wipeAll($0) } }
-                },
-                deleteFiles: { await content.removeAllContent() },
-                transferDirectories: dataTransfer.transferDirectories,
-                sessionStore: sessionStore,
-                preferences: preferences,
-                importJobs: importJobs),
-            guard: wipeGuard, suspension: suspension)
+        let localWiper = LocalDataWiper(
+            database: database,
+            cancelAllWork: {
+                // Joined, not just cancelled: no automatic download may write files after the content is removed.
+                await hooks.cancelAutomaticAndWait()
+                uploader.cancelAll()
+                importTracker.stop()
+                background.cancelAll()
+            },
+            clearTables: {
+                // The guard is up, so no local write starts; let the ones already running commit first.
+                await wipeGuard.drainWrites()
+                try await scheduler.wipe { try await database.write { try MaintenanceDao.wipeAll($0) } }
+            },
+            deleteFiles: { await content.removeAllContent() },
+            transferDirectories: dataTransfer.transferDirectories,
+            sessionStore: sessionStore,
+            preferences: preferences,
+            importJobs: importJobs)
+        let wiper = GuardedWiper(localWiper, guard: wipeGuard, suspension: suspension)
         let auth = LiveAuthRepository(
             api: api, sessionStore: sessionStore, preferences: preferences, provider: provider, wiper: wiper,
             hasLocalData: { await LiveAuthRepository.hasAccountData(in: database) },
@@ -190,6 +192,9 @@ public final class LiveGraph: Sendable {
         self.provider = provider
         self.importTracker = importTracker
         self.syncSession = syncSession
+        self.launchRecovery = Self.launchRecovery(
+            interrupted: { Self.hasInterruptedWipe(database) },
+            serialize: { await auth.finishInterruptedWipe($0) }, wiper: wiper, local: localWiper)
         self.auth = auth
         self.library = TelemetryLibraryRepository(
             LiveLibraryRepository(
@@ -268,6 +273,37 @@ public final class LiveGraph: Sendable {
         }
     }
 
+    /// The PDF uploader's API for one queued upload: pinned to the stored session's endpoint, and nil unless that
+    /// session belongs to the account that queued it.
+    static func uploadAPI(
+        api: HTTPSrokaAPI, provider: LiveApiSessionProvider, sessionStore: SessionStore
+    ) -> @Sendable (_ owner: String?) async -> (any SrokaAPI)? {
+        OwnerBoundAPI.make(api: api, provider: provider, current: { sessionStore.current })
+    }
+
+    /// Finishes an interrupted wipe through the transition gate (`serialize`, never beside a sign-out) and the wipe
+    /// guard. With no interrupted wipe it only reads the epoch file: no database write delays the launch.
+    static func launchRecovery(
+        interrupted: @escaping @Sendable () -> Bool,
+        serialize: @escaping @Sendable (@escaping @Sendable () async -> Void) async -> Void,
+        wiper: GuardedWiper,
+        local: LocalDataWiper
+    ) -> LaunchRecovery {
+        LaunchRecovery {
+            guard interrupted() else { return }
+            await serialize {
+                // `finishInterruptedWipe` checks the epoch again: a wipe that ran meanwhile needs no second one.
+                _ = await wiper.guarded { await local.finishInterruptedWipe() }
+            }
+        }
+    }
+
+    /// The `WipeEpoch` beside the database says a wipe is in progress (no process runs one at launch).
+    static func hasInterruptedWipe(_ database: AppDatabase) -> Bool {
+        guard let url = WipeEpoch.url(besideDatabaseAt: URL(filePath: database.writer.path)) else { return false }
+        return WipeEpoch.isWiping(WipeEpoch.read(at: url))
+    }
+
     /// Runs once a sign-in has stored the session and the account markers. Signing in again while the app stays
     /// active gets no scene activation, so the work a 401 paused (PDF uploads, import polling) resumes here too.
     static func afterSignIn(
@@ -319,7 +355,8 @@ public final class LiveGraph: Sendable {
             scheduleRefresh: { background.scheduleRefresh() },
             needsBackgroundDownload: { [self] in await needsBackgroundDownload() },
             scheduleDownload: { background.scheduleDownload() },
-            expireBackground: { [suspension] in suspension.expire() })
+            expireBackground: { [suspension] in suspension.expire() },
+            ready: { [launchRecovery] in await launchRecovery.ready() })
     }
 
     /// The work of the background tasks.
@@ -327,6 +364,8 @@ public final class LiveGraph: Sendable {
         let background = configuration.backgroundScheduler
         return BackgroundJobs(
             refresh: { [self] in
+                // A launch into the background finishes an interrupted wipe before touching data.
+                await launchRecovery.ready()
                 sessionStore.reload()
                 preferences.reload()
                 // Signed out: nothing to sync, and no next refresh until the user signs in again.
@@ -338,6 +377,7 @@ public final class LiveGraph: Sendable {
                 }
             },
             download: { [self] in
+                await launchRecovery.ready()
                 preferences.reload()
                 sessionStore.reload()
                 guard isSignedIn else { return true }

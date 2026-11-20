@@ -28,6 +28,8 @@ public struct LifecycleActions: Sendable {
     /// True when the policy allows automatic downloads and eligible items wait.
     public var needsBackgroundDownload: @Sendable () async -> Bool
     public var scheduleDownload: @Sendable () -> Void
+    /// UIKit background time ran out: suspend the database whatever still holds it.
+    public var expireBackground: @Sendable () -> Void
 
     public init(
         enterForeground: @escaping @Sendable () -> Void,
@@ -46,7 +48,8 @@ public struct LifecycleActions: Sendable {
         setDownloadsForeground: @escaping @Sendable (Bool) -> Void,
         scheduleRefresh: @escaping @Sendable () -> Void,
         needsBackgroundDownload: @escaping @Sendable () async -> Bool,
-        scheduleDownload: @escaping @Sendable () -> Void
+        scheduleDownload: @escaping @Sendable () -> Void,
+        expireBackground: @escaping @Sendable () -> Void = {}
     ) {
         self.enterForeground = enterForeground
         self.enterBackground = enterBackground
@@ -65,6 +68,7 @@ public struct LifecycleActions: Sendable {
         self.scheduleRefresh = scheduleRefresh
         self.needsBackgroundDownload = needsBackgroundDownload
         self.scheduleDownload = scheduleDownload
+        self.expireBackground = expireBackground
     }
 }
 
@@ -103,13 +107,37 @@ public final class AppLifecycle {
     /// schedule the background refresh and download tasks, then let the database suspend. Call inside a UIKit
     /// background task so the push can finish.
     public func enterBackground() async {
-        let actions = actions
+        await flush(beginBackground())
+    }
+
+    /// One backgrounding: its transition id and the database hold its flush releases.
+    public struct BackgroundFlush: Sendable {
+        public let transition: Int
+        fileprivate let release: @Sendable () -> Void
+    }
+
+    /// The synchronous part of backgrounding, at the call: hold the database, stop foreground downloads, mark the
+    /// database background. Pass the result to `flush(_:)`, and to `backgroundExpired(_:)` if the time runs out.
+    public func beginBackground() -> BackgroundFlush {
         transition += 1
         let release = actions.holdDatabase()
-        defer { release() }
         actions.setDownloadsForeground(false)
         actions.cancelAutomaticDownloads()
         actions.enterBackground()
+        return BackgroundFlush(transition: transition, release: release)
+    }
+
+    /// The background time of `background` ran out: suspend the database now, unless a newer transition (the app came
+    /// back, or backgrounded again with its own background time) has taken over since.
+    public func backgroundExpired(_ background: BackgroundFlush) {
+        guard transition == background.transition else { return }
+        actions.expireBackground()
+    }
+
+    /// The rest of backgrounding: push queued ops, schedule the background tasks, then release the hold.
+    public func flush(_ background: BackgroundFlush) async {
+        let actions = actions
+        defer { background.release() }
         guard actions.isSignedIn() else { return }
         if await actions.pendingOpCount() > 0 {
             await actions.syncNow()

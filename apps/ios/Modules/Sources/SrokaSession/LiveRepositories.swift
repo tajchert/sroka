@@ -84,9 +84,11 @@ public final class LiveAccountRepository: AccountRepository {
     }
 
     public func deleteAccount() async -> DeleteAccountResult {
+        // The request carries the current account's token; its answer may only clear that account's data.
+        let mark = auth.transitionMark()
         switch await apiCall({ try await api.deleteAccount() }) {
         case .success:
-            await auth.clearLocal()
+            await auth.clearLocal(ifUnchangedSince: mark)
             return .deleted
         case .failure(let error):
             if error.isUnauthorized { auth.markSessionExpired() }

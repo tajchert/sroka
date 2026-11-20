@@ -6,22 +6,17 @@ import SrokaDesign
 import SrokaTesting
 import SwiftUI
 
-/// The app's root. Picks one of four screens, in this order:
-/// 1. the blocking "update needed" screen (`versionGate`),
-/// 2. the shell for a signed-in (or expired) session,
-/// 3. the sign-in flow for a signed-out session,
-/// 4. a plain paper-coloured screen until the session is known.
+/// The library root under `AppRoot` (which already handles the update gate and the signed-out screen). Follows
+/// `authRepository.session` into the router, so the shell stays up for an expired session (with its sign-in-again
+/// cover) and resets for another account. Shows, in this order:
+/// 1. the shell for a signed-in (or expired) session,
+/// 2. the sign-in flow for a signed-out session (only for the moment before `AppRoot` switches screens),
+/// 3. a plain paper-coloured screen until the session is known.
 ///
-/// **Seams for the live graph (stream L1).** All three have working defaults, so the app runs on the fakes today:
-/// - `session`: the session root. `nil` follows `authRepository.session` itself; pass a value to drive it from the
-///   live graph instead (changes are applied; signing out resets all navigation state).
-/// - `versionGate`: `.open` by default; `.updateRequired(storeURL:)` replaces the whole app.
-/// - `pendingDeepLinkItemId` with `onDeepLinkHandled`: an item id from `sroka://item/{id}` or a notification. The
-///   shell opens it as soon as it is on screen (immediately when it already is) and then calls `onDeepLinkHandled`
-///   so the owner can clear it.
+/// `pendingDeepLinkItemId` with `onDeepLinkHandled`: an item id from `sroka://item/{id}` or a notification. The
+/// shell opens it as soon as it is on screen (immediately when it already is) and then calls `onDeepLinkHandled` so
+/// the owner can clear it.
 struct RootView: View {
-    var session: SessionState?
-    var versionGate: VersionGate
     var pendingDeepLinkItemId: String?
     var onDeepLinkHandled: () -> Void
 
@@ -29,24 +24,17 @@ struct RootView: View {
     @State private var models: ShellModels
     @Dependency(\.authRepository) private var auth
 
-    init(
-        session: SessionState? = nil,
-        versionGate: VersionGate = .open,
-        pendingDeepLinkItemId: String? = nil,
-        onDeepLinkHandled: @escaping () -> Void = {}
-    ) {
-        self.session = session
-        self.versionGate = versionGate
+    init(pendingDeepLinkItemId: String? = nil, onDeepLinkHandled: @escaping () -> Void = {}) {
         self.pendingDeepLinkItemId = pendingDeepLinkItemId
         self.onDeepLinkHandled = onDeepLinkHandled
-        let router = AppRouter(session: session)
+        let router = AppRouter()
         _router = State(initialValue: router)
         _models = State(initialValue: ShellModels(router: router))
     }
 
     var body: some View {
-        RootContent(router: router, models: models, versionGate: versionGate)
-            .task(id: session) { await followSession() }
+        RootContent(router: router, models: models)
+            .task { await followSession() }
             .onChange(of: pendingDeepLinkItemId, initial: true) { _, itemId in
                 guard let itemId else { return }
                 router.open(itemId: itemId)
@@ -56,10 +44,6 @@ struct RootView: View {
     }
 
     private func followSession() async {
-        if let session {
-            router.sessionChanged(session)
-            return
-        }
         for await state in auth.session {
             router.sessionChanged(state)
         }
@@ -69,20 +53,14 @@ struct RootView: View {
 private struct RootContent: View {
     let router: AppRouter
     let models: ShellModels
-    let versionGate: VersionGate
 
     var body: some View {
-        switch versionGate {
-        case .updateRequired(let storeURL):
-            UpdateRequiredView(storeURL: storeURL)
-        case .open:
-            if router.showsShell {
-                ShellView(router: router, models: models)
-            } else if router.showsAuth {
-                AuthRoot(intents: models.intents)
-            } else {
-                SrokaColor.background.ignoresSafeArea()
-            }
+        if router.showsShell {
+            ShellView(router: router, models: models)
+        } else if router.showsAuth {
+            AuthRoot(intents: models.intents)
+        } else {
+            SrokaColor.background.ignoresSafeArea()
         }
     }
 }

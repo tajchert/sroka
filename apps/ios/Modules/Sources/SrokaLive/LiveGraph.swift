@@ -167,7 +167,10 @@ public final class LiveGraph: Sendable {
         let auth = LiveAuthRepository(
             api: api, sessionStore: sessionStore, preferences: preferences, provider: provider, wiper: wiper,
             hasLocalData: { await LiveAuthRepository.hasAccountData(in: database) },
-            requestSync: { scheduler.requestSync() },
+            requestSync: Self.afterSignIn(
+                requestSync: { scheduler.requestSync() },
+                resumePendingUploads: { uploader.resumePendingUploads() },
+                resumeImport: { importTracker.resumeIfNeeded() }),
             clock: ContinuousClock())
 
         // Telemetry: consent gated; the decorators log enum-only events.
@@ -265,6 +268,20 @@ public final class LiveGraph: Sendable {
         }
     }
 
+    /// Runs once a sign-in has stored the session and the account markers. Signing in again while the app stays
+    /// active gets no scene activation, so the work a 401 paused (PDF uploads, import polling) resumes here too.
+    static func afterSignIn(
+        requestSync: @escaping @Sendable () -> Void,
+        resumePendingUploads: @escaping @Sendable () -> Void,
+        resumeImport: @escaping @Sendable () -> Void
+    ) -> @Sendable () -> Void {
+        {
+            resumePendingUploads()
+            resumeImport()
+            requestSync()
+        }
+    }
+
     // MARK: Lifecycle
 
     public func lifecycleActions() -> LifecycleActions {
@@ -301,7 +318,8 @@ public final class LiveGraph: Sendable {
             setDownloadsForeground: { [hooks] in hooks.setForeground($0) },
             scheduleRefresh: { background.scheduleRefresh() },
             needsBackgroundDownload: { [self] in await needsBackgroundDownload() },
-            scheduleDownload: { background.scheduleDownload() })
+            scheduleDownload: { background.scheduleDownload() },
+            expireBackground: { [suspension] in suspension.expire() })
     }
 
     /// The work of the background tasks.

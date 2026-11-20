@@ -94,10 +94,16 @@ public final class AppRouter {
     public var showsAuth: Bool { session == .signedOut }
 
     /// Follows the session. Signing out resets every piece of navigation state; the next account must not
-    /// find the previous one's tabs, readers or sheets.
+    /// find the previous one's tabs, readers or sheets. The session stream keeps only its newest value, so an
+    /// account switch can arrive without the signed-out state in between: a different account resets too, while
+    /// the same account signing in again keeps its place.
     public func sessionChanged(_ state: SessionState) {
         let wasShowingShell = showsShell
+        let previousAccount = Self.account(of: session)
         session = state
+        if let previousAccount, let account = Self.account(of: state), previousAccount != account {
+            reset()
+        }
         switch state {
         case .signedOut:
             reset()
@@ -106,6 +112,14 @@ public final class AppRouter {
             openPendingIfPossible()
         case .expired:
             if !wasShowingShell { openPendingIfPossible() }
+        }
+    }
+
+    /// The account a session belongs to (emails compare case-insensitively); nil when signed out or unknown.
+    private static func account(of state: SessionState?) -> String? {
+        switch state {
+        case .signedIn(let email), .expired(let email): email.lowercased()
+        case .signedOut, nil: nil
         }
     }
 

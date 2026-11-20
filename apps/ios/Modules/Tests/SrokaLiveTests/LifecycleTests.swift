@@ -59,7 +59,8 @@ private func actions(
         setDownloadsForeground: { log.add($0 ? "downloadsForeground" : "downloadsBackground") },
         scheduleRefresh: { log.add("scheduleRefresh") },
         needsBackgroundDownload: { needsDownload },
-        scheduleDownload: { log.add("scheduleDownload") })
+        scheduleDownload: { log.add("scheduleDownload") },
+        expireBackground: { log.add("expire") })
 }
 
 @MainActor
@@ -110,6 +111,35 @@ struct AppLifecycleTests {
         #expect(!log.all.contains("syncNow"))
         #expect(!log.all.contains("scheduleDownload"))
         #expect(log.all.contains("scheduleRefresh"))
+    }
+
+    @Test func `Background time running out suspends only while that backgrounding is current`() async {
+        let log = StepLog()
+        let lifecycle = AppLifecycle(actions: actions(log: log, signedIn: false))
+        let first = lifecycle.beginBackground()
+        await lifecycle.flush(first)
+        await lifecycle.activate()
+        lifecycle.backgroundExpired(first)
+        #expect(!log.all.contains("expire"))
+
+        let second = lifecycle.beginBackground()
+        let third = lifecycle.beginBackground()
+        lifecycle.backgroundExpired(second)
+        #expect(!log.all.contains("expire"))
+        lifecycle.backgroundExpired(third)
+        #expect(log.all.filter { $0 == "expire" }.count == 1)
+        await lifecycle.flush(second)
+        await lifecycle.flush(third)
+    }
+
+    @Test func `Signing in resumes paused uploads and import polling, then syncs`() {
+        let log = StepLog()
+        let afterSignIn = LiveGraph.afterSignIn(
+            requestSync: { log.add("requestSync") },
+            resumePendingUploads: { log.add("uploads") },
+            resumeImport: { log.add("import") })
+        afterSignIn()
+        #expect(log.all == ["uploads", "import", "requestSync"])
     }
 
     @Test func `Backgrounding while signed out schedules nothing`() async {

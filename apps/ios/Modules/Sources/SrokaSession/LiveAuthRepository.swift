@@ -124,6 +124,21 @@ public final class LiveAuthRepository: AuthRepository {
         await gate.run { _ = await wipeLocked() }
     }
 
+    /// Marks the current account state; pass it to `clearLocal(ifUnchangedSince:)`.
+    public func transitionMark() -> Int { generation.withLock { $0 } }
+
+    /// Wipes like `clearLocal()`, but only if no sign-out, wipe, server switch or sign-in as another account (which
+    /// wipes) happened since `mark`: a late answer for one account never clears the next one's data.
+    public func clearLocal(ifUnchangedSince mark: Int) async {
+        await gate.run {
+            guard generation.withLock({ $0 }) == mark else {
+                sessionLog.notice("Local clear skipped: the account changed meanwhile")
+                return
+            }
+            _ = await wipeLocked()
+        }
+    }
+
     /// Switches the server with `apply`, signing out (revoke against the old server, then wipe) first when a session
     /// exists. Runs under the transition gate so no sign-in completes between the two.
     public func switchServer(_ apply: @escaping @Sendable () -> Void) async {

@@ -12,18 +12,11 @@ final class AppRuntime {
     /// Background task work; nil under `-UITests`, where the tasks do nothing.
     nonisolated let backgroundJobs: BackgroundJobs?
     private let lifecycle: AppLifecycle?
-    /// UIKit background time ran out: suspend the database whatever still holds it.
-    private let backgroundExpired: @Sendable () -> Void
-    private var flush: Task<Void, Never>?
 
-    private init(
-        model: AppModel, lifecycle: AppLifecycle?, backgroundJobs: BackgroundJobs?,
-        backgroundExpired: @escaping @Sendable () -> Void = {}
-    ) {
+    private init(model: AppModel, lifecycle: AppLifecycle?, backgroundJobs: BackgroundJobs?) {
         self.model = model
         self.lifecycle = lifecycle
         self.backgroundJobs = backgroundJobs
-        self.backgroundExpired = backgroundExpired
     }
 
     static func live(_ graph: LiveGraph) -> AppRuntime {
@@ -34,10 +27,9 @@ final class AppRuntime {
                 build: graph.configuration.build, server: { graph.currentServer() },
                 fetchMinimum: { await graph.fetchMinimumBuild() }),
             deepLinks: DeepLinkInbox(scheme: graph.configuration.environment.urlScheme))
-        let suspension = graph.suspension
         return AppRuntime(
             model: model, lifecycle: AppLifecycle(actions: graph.lifecycleActions()),
-            backgroundJobs: graph.backgroundJobs(), backgroundExpired: { suspension.expire() })
+            backgroundJobs: graph.backgroundJobs())
     }
 
     static func fakes(_ fakes: Fakes, scheme: String) -> AppRuntime {
@@ -60,29 +52,30 @@ final class AppRuntime {
     }
 
     /// The app moved to the background: runs the flush inside a UIKit background task so it can finish. If the time
-    /// runs out first, the flush is cancelled and the database suspended before the task ends.
+    /// runs out first, that flush is cancelled and, unless the app came back or backgrounded again since, the
+    /// database is suspended before the task ends.
     func appEnteredBackground() {
         guard let lifecycle else { return }
-        let expired = backgroundExpired
-        let assertion = BackgroundAssertion { [weak self] in
-            self?.flush?.cancel()
-            expired()
-        }
-        flush = Task {
-            await lifecycle.enterBackground()
+        let background = lifecycle.beginBackground()
+        let assertion = BackgroundAssertion { lifecycle.backgroundExpired(background) }
+        assertion.flush = Task {
+            await lifecycle.flush(background)
             assertion.end()
         }
     }
 }
 
-/// A UIKit background task around the backgrounding flush. Ends once, on completion or expiry; `onExpiry` runs first.
+/// A UIKit background task around one backgrounding flush. Ends once, on completion or expiry; on expiry it cancels
+/// its own flush (never a newer one) and runs `onExpiry` first.
 @MainActor
 private final class BackgroundAssertion {
     private var identifier = UIBackgroundTaskIdentifier.invalid
+    var flush: Task<Void, Never>?
 
     init(onExpiry: @escaping @MainActor () -> Void) {
         identifier = UIApplication.shared.beginBackgroundTask(withName: "sroka.flush") { [weak self] in
             MainActor.assumeIsolated {
+                self?.flush?.cancel()
                 onExpiry()
                 self?.end()
             }

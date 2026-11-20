@@ -426,6 +426,28 @@ struct SignOutTests {
         #expect(h.sessionStore.current == nil)
     }
 
+    @Test func `A deletion answered after another account signed in leaves that account alone`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co")
+        let account = LiveAccountRepository(api: h.api, auth: h.auth)
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        h.api.configure {
+            $0.deleteAccount = {
+                enteredContinuation.yield()
+                for await _ in release { break }
+            }
+        }
+        let deletion = Task { await account.deleteAccount() }
+        for await _ in entered { break }
+        #expect(await h.signIn("c@d.co") == .success)
+        try await h.insertItem()
+        releaseContinuation.yield()
+        _ = await deletion.value
+        #expect(h.sessionStore.current?.email == "c@d.co")
+        #expect(try await h.itemCount() == 1)
+    }
+
     @Test func `Failed account deletion keeps data and a 401 expires the session`() async throws {
         let h = try Harness()
         _ = await h.signIn("a@b.co")

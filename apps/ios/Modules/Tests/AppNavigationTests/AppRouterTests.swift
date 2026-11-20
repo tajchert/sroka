@@ -374,6 +374,42 @@ struct AppRouterTests {
         #expect(router.presentedReaderItemId == nil)
     }
 
+    @Test func `Another account arriving without a sign-out in between starts on a fresh shell`() {
+        let router = signedInRouter()
+        router.select(.archive)
+        router.open(itemId: "a")
+        router.presentTagEditor(itemId: "a")
+        router.readerArchived(itemId: "a")
+        router.sessionChanged(.signedIn(email: "other@example.com"))
+        #expect(router.selectedTab == .myList)
+        #expect(router.paths.isEmpty)
+        #expect(router.sheet == nil)
+        #expect(router.toast == nil)
+    }
+
+    @Test func `The same account signing in again keeps its place`() {
+        let router = signedInRouter()
+        router.select(.archive)
+        router.open(itemId: "a")
+        router.sessionChanged(.expired(email: "reader@example.com"))
+        router.presentSignInAgain()
+        router.sessionChanged(.signedIn(email: "Reader@example.com"))
+        #expect(router.selectedTab == .archive)
+        #expect(router.presentedReaderItemId == "a")
+        #expect(!router.isSignInAgainPresented)
+    }
+
+    @Test func `A deep link to an item that is not there closes back to the screen below`() {
+        let router = signedInRouter()
+        router.openTagItems("work")
+        router.open(itemId: "gone")
+        // The reader reports a missing item with its close intent (ReaderView, `.missing`).
+        router.closeReader(in: .tags)
+        #expect(router.presentedReaderItemId == nil)
+        #expect(router[path: .tags] == [.tagItems(tag: "work")])
+        #expect(router.pendingItemId == nil)
+    }
+
     @Test func `No root is shown until the session is known`() {
         let router = AppRouter()
         #expect(!router.showsShell)

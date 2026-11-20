@@ -1,0 +1,780 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA0000000000000000000200 /* SrokaCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000100 /* SrokaCore */; };
+		AA0000000000000000000201 /* SrokaDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000101 /* SrokaDesign */; };
+		AA0000000000000000000202 /* SrokaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000102 /* SrokaTesting */; };
+		AA0000000000000000000203 /* SrokaNetwork in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000103 /* SrokaNetwork */; };
+		AA0000000000000000000204 /* SrokaDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000104 /* SrokaDatabase */; };
+		AA0000000000000000000205 /* SrokaSync in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000105 /* SrokaSync */; };
+		AA0000000000000000000206 /* SrokaContent in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000106 /* SrokaContent */; };
+		AA0000000000000000000207 /* SrokaSession in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000107 /* SrokaSession */; };
+		AA0000000000000000000208 /* AuthFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000108 /* AuthFeature */; };
+		AA0000000000000000000209 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000109 /* LibraryFeature */; };
+		AA000000000000000000020A /* TagsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010A /* TagsFeature */; };
+		AA000000000000000000020B /* SearchFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010B /* SearchFeature */; };
+		AA000000000000000000020C /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010C /* ReaderFeature */; };
+		AA000000000000000000020D /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010D /* SettingsFeature */; };
+		AA000000000000000000020E /* ShareFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010E /* ShareFeature */; };
+		AA0000000000000000000032 /* SrokaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AB000000000000000000000D /* SrokaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AB0000000000000000000200 /* SrokaCore in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000100 /* SrokaCore */; };
+		AB0000000000000000000201 /* SrokaDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000101 /* SrokaDesign */; };
+		AB0000000000000000000202 /* SrokaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000102 /* SrokaTesting */; };
+		AB0000000000000000000203 /* SrokaNetwork in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000103 /* SrokaNetwork */; };
+		AB0000000000000000000204 /* SrokaDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000104 /* SrokaDatabase */; };
+		AB0000000000000000000205 /* SrokaSync in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000105 /* SrokaSync */; };
+		AB0000000000000000000206 /* SrokaContent in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000106 /* SrokaContent */; };
+		AB0000000000000000000207 /* SrokaSession in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000107 /* SrokaSession */; };
+		AB0000000000000000000208 /* ShareFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000108 /* ShareFeature */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA0000000000000000000031 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AF0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AB0000000000000000000001;
+			remoteInfo = SrokaShare;
+		};
+		AD0000000000000000000031 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AF0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000001;
+			remoteInfo = Sroka;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA000000000000000000000A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA0000000000000000000032 /* SrokaShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		AA000000000000000000000D /* Sroka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sroka.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000000000000000000000D /* SrokaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SrokaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AD000000000000000000000D /* SrokaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SrokaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC0000000000000000000002 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		AC0000000000000000000003 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		AC0000000000000000000004 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		AC0000000000000000000005 /* Dev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Dev.xcconfig; sourceTree = "<group>"; };
+		AC0000000000000000000006 /* Prod.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Prod.xcconfig; sourceTree = "<group>"; };
+		AC0000000000000000000007 /* Debug-Dev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Debug-Dev.xcconfig"; sourceTree = "<group>"; };
+		AC0000000000000000000008 /* Debug-Prod.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Debug-Prod.xcconfig"; sourceTree = "<group>"; };
+		AC0000000000000000000009 /* Release-Dev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Release-Dev.xcconfig"; sourceTree = "<group>"; };
+		AC000000000000000000000A /* Release-Prod.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Release-Prod.xcconfig"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA000000000000000000000C /* Exceptions for "App" folder in "Sroka" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000001 /* Sroka */;
+		};
+		AB000000000000000000000C /* Exceptions for "Share" folder in "SrokaShare" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AB0000000000000000000001 /* SrokaShare */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA000000000000000000000B /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000000000000000000000C /* Exceptions for "App" folder in "Sroka" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AB000000000000000000000B /* Share */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AB000000000000000000000C /* Exceptions for "Share" folder in "SrokaShare" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = Share;
+			sourceTree = "<group>";
+		};
+		AD000000000000000000000B /* UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000200 /* SrokaCore in Frameworks */,
+				AA0000000000000000000201 /* SrokaDesign in Frameworks */,
+				AA0000000000000000000202 /* SrokaTesting in Frameworks */,
+				AA0000000000000000000203 /* SrokaNetwork in Frameworks */,
+				AA0000000000000000000204 /* SrokaDatabase in Frameworks */,
+				AA0000000000000000000205 /* SrokaSync in Frameworks */,
+				AA0000000000000000000206 /* SrokaContent in Frameworks */,
+				AA0000000000000000000207 /* SrokaSession in Frameworks */,
+				AA0000000000000000000208 /* AuthFeature in Frameworks */,
+				AA0000000000000000000209 /* LibraryFeature in Frameworks */,
+				AA000000000000000000020A /* TagsFeature in Frameworks */,
+				AA000000000000000000020B /* SearchFeature in Frameworks */,
+				AA000000000000000000020C /* ReaderFeature in Frameworks */,
+				AA000000000000000000020D /* SettingsFeature in Frameworks */,
+				AA000000000000000000020E /* ShareFeature in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB0000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB0000000000000000000200 /* SrokaCore in Frameworks */,
+				AB0000000000000000000201 /* SrokaDesign in Frameworks */,
+				AB0000000000000000000202 /* SrokaTesting in Frameworks */,
+				AB0000000000000000000203 /* SrokaNetwork in Frameworks */,
+				AB0000000000000000000204 /* SrokaDatabase in Frameworks */,
+				AB0000000000000000000205 /* SrokaSync in Frameworks */,
+				AB0000000000000000000206 /* SrokaContent in Frameworks */,
+				AB0000000000000000000207 /* SrokaSession in Frameworks */,
+				AB0000000000000000000208 /* ShareFeature in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AD0000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AF0000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000000B /* App */,
+				AB000000000000000000000B /* Share */,
+				AD000000000000000000000B /* UITests */,
+				AC0000000000000000000001 /* Config */,
+				AF0000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AC0000000000000000000001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AC0000000000000000000002 /* Shared.xcconfig */,
+				AC0000000000000000000003 /* Debug.xcconfig */,
+				AC0000000000000000000004 /* Release.xcconfig */,
+				AC0000000000000000000005 /* Dev.xcconfig */,
+				AC0000000000000000000006 /* Prod.xcconfig */,
+				AC0000000000000000000007 /* Debug-Dev.xcconfig */,
+				AC0000000000000000000008 /* Debug-Prod.xcconfig */,
+				AC0000000000000000000009 /* Release-Dev.xcconfig */,
+				AC000000000000000000000A /* Release-Prod.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		AF0000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000000D /* Sroka.app */,
+				AB000000000000000000000D /* SrokaShare.appex */,
+				AD000000000000000000000D /* SrokaUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA0000000000000000000001 /* Sroka */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000002 /* Build configuration list for PBXNativeTarget "Sroka" */;
+			buildPhases = (
+				AA0000000000000000000007 /* Sources */,
+				AA0000000000000000000008 /* Frameworks */,
+				AA0000000000000000000009 /* Resources */,
+				AA000000000000000000000A /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000000000000000000030 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA000000000000000000000B /* App */,
+			);
+			name = Sroka;
+			packageProductDependencies = (
+				AA0000000000000000000100 /* SrokaCore */,
+				AA0000000000000000000101 /* SrokaDesign */,
+				AA0000000000000000000102 /* SrokaTesting */,
+				AA0000000000000000000103 /* SrokaNetwork */,
+				AA0000000000000000000104 /* SrokaDatabase */,
+				AA0000000000000000000105 /* SrokaSync */,
+				AA0000000000000000000106 /* SrokaContent */,
+				AA0000000000000000000107 /* SrokaSession */,
+				AA0000000000000000000108 /* AuthFeature */,
+				AA0000000000000000000109 /* LibraryFeature */,
+				AA000000000000000000010A /* TagsFeature */,
+				AA000000000000000000010B /* SearchFeature */,
+				AA000000000000000000010C /* ReaderFeature */,
+				AA000000000000000000010D /* SettingsFeature */,
+				AA000000000000000000010E /* ShareFeature */,
+			);
+			productName = Sroka;
+			productReference = AA000000000000000000000D /* Sroka.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AB0000000000000000000001 /* SrokaShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AB0000000000000000000002 /* Build configuration list for PBXNativeTarget "SrokaShare" */;
+			buildPhases = (
+				AB0000000000000000000007 /* Sources */,
+				AB0000000000000000000008 /* Frameworks */,
+				AB0000000000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AB000000000000000000000B /* Share */,
+			);
+			name = SrokaShare;
+			packageProductDependencies = (
+				AB0000000000000000000100 /* SrokaCore */,
+				AB0000000000000000000101 /* SrokaDesign */,
+				AB0000000000000000000102 /* SrokaTesting */,
+				AB0000000000000000000103 /* SrokaNetwork */,
+				AB0000000000000000000104 /* SrokaDatabase */,
+				AB0000000000000000000105 /* SrokaSync */,
+				AB0000000000000000000106 /* SrokaContent */,
+				AB0000000000000000000107 /* SrokaSession */,
+				AB0000000000000000000108 /* ShareFeature */,
+			);
+			productName = SrokaShare;
+			productReference = AB000000000000000000000D /* SrokaShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		AD0000000000000000000001 /* SrokaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AD0000000000000000000002 /* Build configuration list for PBXNativeTarget "SrokaUITests" */;
+			buildPhases = (
+				AD0000000000000000000007 /* Sources */,
+				AD0000000000000000000008 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AD0000000000000000000030 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AD000000000000000000000B /* UITests */,
+			);
+			name = SrokaUITests;
+			packageProductDependencies = (
+			);
+			productName = SrokaUITests;
+			productReference = AD000000000000000000000D /* SrokaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AF0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					AD0000000000000000000001 = {
+						TestTargetID = AA0000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = AF0000000000000000000003 /* Build configuration list for PBXProject "Sroka" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AF0000000000000000000002;
+			packageReferences = (
+				AE0000000000000000000001 /* XCLocalSwiftPackageReference "Modules" */,
+			);
+			productRefGroup = AF0000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA0000000000000000000001 /* Sroka */,
+				AB0000000000000000000001 /* SrokaShare */,
+				AD0000000000000000000001 /* SrokaUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA0000000000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB0000000000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AD0000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA0000000000000000000030 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AB0000000000000000000001 /* SrokaShare */;
+			targetProxy = AA0000000000000000000031 /* PBXContainerItemProxy */;
+		};
+		AD0000000000000000000030 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000000000001 /* Sroka */;
+			targetProxy = AD0000000000000000000031 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AF0000000000000000000004 /* Debug-Dev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AC0000000000000000000007 /* Debug-Dev.xcconfig */;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = "Debug-Dev";
+		};
+		AF0000000000000000000005 /* Debug-Prod */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AC0000000000000000000008 /* Debug-Prod.xcconfig */;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = "Debug-Prod";
+		};
+		AF0000000000000000000006 /* Release-Dev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AC0000000000000000000009 /* Release-Dev.xcconfig */;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = "Release-Dev";
+		};
+		AF0000000000000000000007 /* Release-Prod */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AC000000000000000000000A /* Release-Prod.xcconfig */;
+			buildSettings = {
+				SDKROOT = iphoneos;
+			};
+			name = "Release-Prod";
+		};
+		AA0000000000000000000003 /* Debug-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-Dev";
+		};
+		AA0000000000000000000004 /* Debug-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-Prod";
+		};
+		AA0000000000000000000005 /* Release-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-Dev";
+		};
+		AA0000000000000000000006 /* Release-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Release-Prod";
+		};
+		AB0000000000000000000003 /* Debug-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Share/SrokaShare.entitlements;
+				INFOPLIST_FILE = Share/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sroka;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = "Debug-Dev";
+		};
+		AB0000000000000000000004 /* Debug-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Share/SrokaShare.entitlements;
+				INFOPLIST_FILE = Share/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sroka;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = "Debug-Prod";
+		};
+		AB0000000000000000000005 /* Release-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Share/SrokaShare.entitlements;
+				INFOPLIST_FILE = Share/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sroka;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = "Release-Dev";
+		};
+		AB0000000000000000000006 /* Release-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Share/SrokaShare.entitlements;
+				INFOPLIST_FILE = Share/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sroka;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = "Release-Prod";
+		};
+		AD0000000000000000000003 /* Debug-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.sroka.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Sroka;
+			};
+			name = "Debug-Dev";
+		};
+		AD0000000000000000000004 /* Debug-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.sroka.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Sroka;
+			};
+			name = "Debug-Prod";
+		};
+		AD0000000000000000000005 /* Release-Dev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.sroka.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Sroka;
+			};
+			name = "Release-Dev";
+		};
+		AD0000000000000000000006 /* Release-Prod */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.sroka.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_TARGET_NAME = Sroka;
+			};
+			name = "Release-Prod";
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AF0000000000000000000003 /* Build configuration list for PBXProject "Sroka" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF0000000000000000000004 /* Debug-Dev */,
+				AF0000000000000000000005 /* Debug-Prod */,
+				AF0000000000000000000006 /* Release-Dev */,
+				AF0000000000000000000007 /* Release-Prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-Prod";
+		};
+		AA0000000000000000000002 /* Build configuration list for PBXNativeTarget "Sroka" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000003 /* Debug-Dev */,
+				AA0000000000000000000004 /* Debug-Prod */,
+				AA0000000000000000000005 /* Release-Dev */,
+				AA0000000000000000000006 /* Release-Prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-Prod";
+		};
+		AB0000000000000000000002 /* Build configuration list for PBXNativeTarget "SrokaShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000003 /* Debug-Dev */,
+				AB0000000000000000000004 /* Debug-Prod */,
+				AB0000000000000000000005 /* Release-Dev */,
+				AB0000000000000000000006 /* Release-Prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-Prod";
+		};
+		AD0000000000000000000002 /* Build configuration list for PBXNativeTarget "SrokaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AD0000000000000000000003 /* Debug-Dev */,
+				AD0000000000000000000004 /* Debug-Prod */,
+				AD0000000000000000000005 /* Release-Dev */,
+				AD0000000000000000000006 /* Release-Prod */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = "Release-Prod";
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AE0000000000000000000001 /* XCLocalSwiftPackageReference "Modules" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Modules;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA0000000000000000000100 /* SrokaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaCore;
+		};
+		AA0000000000000000000101 /* SrokaDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaDesign;
+		};
+		AA0000000000000000000102 /* SrokaTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaTesting;
+		};
+		AA0000000000000000000103 /* SrokaNetwork */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaNetwork;
+		};
+		AA0000000000000000000104 /* SrokaDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaDatabase;
+		};
+		AA0000000000000000000105 /* SrokaSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaSync;
+		};
+		AA0000000000000000000106 /* SrokaContent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaContent;
+		};
+		AA0000000000000000000107 /* SrokaSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaSession;
+		};
+		AA0000000000000000000108 /* AuthFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AuthFeature;
+		};
+		AA0000000000000000000109 /* LibraryFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LibraryFeature;
+		};
+		AA000000000000000000010A /* TagsFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TagsFeature;
+		};
+		AA000000000000000000010B /* SearchFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SearchFeature;
+		};
+		AA000000000000000000010C /* ReaderFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ReaderFeature;
+		};
+		AA000000000000000000010D /* SettingsFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SettingsFeature;
+		};
+		AA000000000000000000010E /* ShareFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShareFeature;
+		};
+		AB0000000000000000000100 /* SrokaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaCore;
+		};
+		AB0000000000000000000101 /* SrokaDesign */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaDesign;
+		};
+		AB0000000000000000000102 /* SrokaTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaTesting;
+		};
+		AB0000000000000000000103 /* SrokaNetwork */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaNetwork;
+		};
+		AB0000000000000000000104 /* SrokaDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaDatabase;
+		};
+		AB0000000000000000000105 /* SrokaSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaSync;
+		};
+		AB0000000000000000000106 /* SrokaContent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaContent;
+		};
+		AB0000000000000000000107 /* SrokaSession */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaSession;
+		};
+		AB0000000000000000000108 /* ShareFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShareFeature;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AF0000000000000000000001 /* Project object */;
+}

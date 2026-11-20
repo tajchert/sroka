@@ -7,3 +7,5 @@ workers/api/.dev.vars
 workers/parser/.dev.vars
 .dev.vars
 wrangler.dev.jsonc
+apps/ios/Config/GoogleService-Info.plist
+apps/ios/Config/Local.xcconfig

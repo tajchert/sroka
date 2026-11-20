@@ -1,0 +1,7 @@
+// Environment axis: Prod. The $() below is the standard xcconfig trick to
+// write "//" without starting a comment.
+APP_ENVIRONMENT_NAME = Prod
+APP_DISPLAY_NAME = Sroka
+BUNDLE_ID_SUFFIX =
+URL_SCHEME = sroka
+API_BASE_URL = https:/$()/api.sroka.app

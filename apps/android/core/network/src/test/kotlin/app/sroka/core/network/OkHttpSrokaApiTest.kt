@@ -235,6 +235,34 @@ class OkHttpSrokaApiTest {
     }
 
     @Test
+    fun putPushTokenSendsFcmRegistration() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(204).build())
+        assertTrue(api.putPushToken("fcm-token:abc") is ApiResult.Success)
+        val req = server.takeRequest()
+        assertEquals("PUT", req.method)
+        assertEquals("/v1/push-token", req.url.encodedPath)
+        assertEquals("and_dev1", req.headers["X-Sroka-Device"])
+        assertEquals("""{"platform":"fcm","token":"fcm-token:abc"}""", req.body!!.utf8())
+    }
+
+    @Test
+    fun deletePushTokenIsBodylessDelete() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(204).build())
+        assertTrue(api.deletePushToken() is ApiResult.Success)
+        val req = server.takeRequest()
+        assertEquals("DELETE", req.method)
+        assertEquals("/v1/push-token", req.url.encodedPath)
+        assertEquals("and_dev1", req.headers["X-Sroka-Device"])
+    }
+
+    @Test
+    fun putPushTokenValidationErrorIsHttpError() = runBlocking {
+        json("""{"error":"validation","message":"device header required"}""", code = 400)
+        val r = api.putPushToken("t")
+        assertTrue(r is ApiResult.HttpError && r.status == 400)
+    }
+
+    @Test
     fun connectionFailureIsNetworkError() = runBlocking {
         server.enqueue(MockResponse.Builder().onRequestStart(SocketEffect.CloseSocket()).build())
         assertTrue(api.me() is ApiResult.NetworkError)

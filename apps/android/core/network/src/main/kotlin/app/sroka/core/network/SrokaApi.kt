@@ -54,6 +54,15 @@ interface SrokaApi {
     suspend fun deleteAccount(): ApiResult<Unit>
 
     /**
+     * `PUT /v1/push-token` (api.md "Push tokens"): registers or refreshes this device's FCM [token]
+     * (the device is the `X-Sroka-Device` header). 204 on success.
+     */
+    suspend fun putPushToken(token: String): ApiResult<Unit>
+
+    /** `DELETE /v1/push-token`: forgets this device's token; 204 even when none was stored. */
+    suspend fun deletePushToken(): ApiResult<Unit>
+
+    /**
      * Streams the unauthenticated (signed) [url] into [dest] via a `.part` file that is renamed on
      * success, so [dest] is never half-written. [onProgress] gets (bytesRead, totalBytes or -1).
      */

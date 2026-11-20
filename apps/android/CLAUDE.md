@@ -17,6 +17,10 @@ Built from the ai-android-template (adopted as `app.sroka`); template guides und
 ## Telemetry (D15)
 - `Telemetry` + `TelemetryEvent` (enum-backed params only) in `core:domain`; `FakeTelemetry` in `core:testing`. `app/src/play` binds the Firebase impl (no-op when FirebaseApp is not initialised or in debug builds), `app/src/foss` binds `Telemetry.None`. Consent (`analytics: Boolean?`, `crashReports` default true) lives in `core:datastore` `ConsentStore`; `ConsentApplier` (core:data) applies it at start and on change. Events are logged by the decorated repositories in `core/data/.../telemetry/` plus a few view models. Never pass URLs, titles, search text, tag names or ids.
 
+## Silent sync push (repo-root D17)
+- `play` only: FCM data message `type=sync` → `SrokaMessagingService` (`app/src/play/.../push`) → `PushMessageHandler` (core:data) → `WorkScheduler.enqueueSync()` (which chains the policy-respecting download). `foss` binds `PushRegistrar.None` (hourly periodic sync only). No notification permission, no UI.
+- Registration: `PushRegistrar` (core:domain) → `FirebasePushRegistrar` → `PushTokenSyncer` (core:data; `PUT/DELETE /v1/push-token`, skips an unchanged token for 7 days, state in `PushTokenStore`). Triggers: after sign-in, each foreground start (`SyncInitializer`), `onNewToken`. Sign-out unregisters (≤ 3 s) before `api.signOut()`; the wipe clears the throttle state.
+
 ## Layout
 `app` (activities, nav, workers wiring) · `feature/{auth,library,reader,settings}/{api,impl}` · `core/{model,common,designsystem,ui,database,datastore,network,data,testing}` — see DECISIONS A2.
 

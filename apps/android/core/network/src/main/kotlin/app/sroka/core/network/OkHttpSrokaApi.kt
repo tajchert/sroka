@@ -100,6 +100,14 @@ internal class OkHttpSrokaApi(
         return execute(request("/v1/account") { delete(body) }) { }
     }
 
+    override suspend fun putPushToken(token: String): ApiResult<Unit> {
+        val body = json.encodeToString(PushTokenRequest("fcm", token)).toRequestBody(JSON_TYPE)
+        return execute(request("/v1/push-token") { put(body) }) { }
+    }
+
+    override suspend fun deletePushToken(): ApiResult<Unit> =
+        execute(request("/v1/push-token") { delete() }) { }
+
     override suspend fun download(url: String, dest: File, onProgress: (Long, Long) -> Unit): ApiResult<Unit> {
         val httpUrl = url.toHttpUrlOrNull() ?: return ApiResult.NetworkError(IOException("bad url"))
         val part = File(dest.parentFile, dest.name + ".part")

@@ -141,5 +141,9 @@ internal data class PushRequest(val deviceId: String, val ops: List<JsonObject>)
 @Serializable
 internal data class DeleteAccountRequest(val confirm: String)
 
+/** `PUT /v1/push-token` (api.md "Push tokens"): this app only registers FCM tokens. */
+@Serializable
+internal data class PushTokenRequest(val platform: String, val token: String)
+
 @Serializable
 internal data class ErrorBody(val error: String? = null, val code: String? = null)

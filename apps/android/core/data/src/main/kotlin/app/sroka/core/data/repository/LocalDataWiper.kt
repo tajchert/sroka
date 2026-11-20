@@ -11,6 +11,7 @@ import app.sroka.core.data.sync.WorkScheduler
 import app.sroka.core.database.SrokaDatabase
 import app.sroka.core.database.dao.MaintenanceDao
 import app.sroka.core.database.vacuum
+import app.sroka.core.datastore.PushTokenStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -31,12 +32,14 @@ internal class LocalDataWiper @Inject constructor(
     private val db: SrokaDatabase,
     private val importJobs: app.sroka.core.data.transfer.ImportJobStore,
     private val paths: ContentPaths,
+    private val pushTokenStore: PushTokenStore,
     @ApplicationContext private val context: Context,
     @Dispatcher(SrokaDispatchers.IO) private val io: CoroutineDispatcher,
 ) {
     suspend fun wipe() {
         scheduler.cancelAll()
         importJobs.clear()
+        pushTokenStore.clear()
         syncController.resetPeriodic()
         engine.exclusive {
             maintenanceDao.wipeAll()

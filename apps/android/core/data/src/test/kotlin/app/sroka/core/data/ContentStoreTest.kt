@@ -167,6 +167,8 @@ internal class ContentStoreTest : DataTestBase() {
         override suspend fun me() = error("unused")
         override suspend fun config() = error("unused")
         override suspend fun deleteAccount() = error("unused")
+        override suspend fun putPushToken(token: String) = error("unused")
+        override suspend fun deletePushToken() = error("unused")
     }
 
     private fun storeWith(api: SrokaApi) =

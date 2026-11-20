@@ -1,20 +1,25 @@
 package app.sroka.core.data.repository
 
+import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.database.dao.ItemDao
 import app.sroka.core.database.dao.PendingOpDao
 import app.sroka.core.datastore.SessionStore
 import app.sroka.core.domain.AuthError
 import app.sroka.core.domain.AuthRepository
 import app.sroka.core.domain.AuthResult
+import app.sroka.core.domain.PushRegistrar
 import app.sroka.core.domain.SyncController
 import app.sroka.core.model.SessionState
 import app.sroka.core.network.ApiResult
 import app.sroka.core.network.SessionProvider
 import app.sroka.core.network.SrokaApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +35,8 @@ internal class AuthRepositoryImpl @Inject constructor(
     private val pendingOpDao: PendingOpDao,
     private val syncController: SyncController,
     private val sessionProvider: SessionProvider,
+    private val pushRegistrar: PushRegistrar,
+    @ApplicationScope private val scope: CoroutineScope,
 ) : AuthRepository {
 
     override val session: Flow<SessionState> = sessionStore.session
@@ -76,13 +83,16 @@ internal class AuthRepositoryImpl @Inject constructor(
                 accountMarker.email = signedInAs
                 accountMarker.serverUrl = server
                 syncController.requestSync()
+                // Never delays sign-in: a failed or throttled registration is retried at the next app start.
+                scope.launch { runPushCall { pushRegistrar.register() } }
                 AuthResult.Success
             }
         }
     }
 
     override suspend fun signOut() {
-        // Best effort: never block sign-out on the network.
+        // Best effort: never block sign-out on the network. The push token goes first (it needs the session).
+        withTimeoutOrNull(PUSH_UNREGISTER_TIMEOUT_MS) { runPushCall { pushRegistrar.unregister() } }
         withTimeoutOrNull(SIGN_OUT_TIMEOUT_MS) { api.signOut() }
         clearLocal()
     }
@@ -102,7 +112,18 @@ internal class AuthRepositoryImpl @Inject constructor(
 
     private companion object {
         const val SIGN_OUT_TIMEOUT_MS = 5_000L
+        const val PUSH_UNREGISTER_TIMEOUT_MS = 3_000L
         val EMAIL = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+
+        /** Push registration is best effort: nothing it throws may fail sign-in or sign-out. */
+        suspend fun runPushCall(block: suspend () -> Unit) {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
 
         fun isValidEmail(email: String) = email.length <= 254 && EMAIL.matches(email)
 

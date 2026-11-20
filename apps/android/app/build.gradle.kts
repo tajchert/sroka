@@ -260,6 +260,7 @@ dependencies {
     "playImplementation"(platform(libs.firebase.bom))
     "playImplementation"(libs.firebase.analytics)
     "playImplementation"(libs.firebase.crashlytics)
+    "playImplementation"(libs.firebase.messaging)
 
     // Testing
     screenshotTestImplementation(libs.screenshot.validation.api)

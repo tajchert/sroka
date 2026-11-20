@@ -7,8 +7,10 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import app.sroka.core.common.di.ApplicationScope
 import app.sroka.core.data.content.ContentStoreImpl
 import app.sroka.core.datastore.SessionStore
+import app.sroka.core.domain.PushRegistrar
 import app.sroka.core.domain.SyncController
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,6 +28,7 @@ class SyncInitializer @Inject internal constructor(
     private val syncController: SyncController,
     private val sessionStore: SessionStore,
     private val contentStore: ContentStoreImpl,
+    private val pushRegistrar: PushRegistrar,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val started = AtomicBoolean(false)
@@ -40,7 +43,16 @@ class SyncInitializer @Inject internal constructor(
                 override fun onStart(owner: LifecycleOwner) {
                     scope.launch {
                         val session = sessionStore.current()
-                        if (session != null && !session.expired) syncController.requestSync()
+                        if (session != null && !session.expired) {
+                            syncController.requestSync()
+                            // Throttled to one PUT per 7 days unless the token changed; failures are non-fatal.
+                            try {
+                                pushRegistrar.register()
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                            }
+                        }
                     }
                 }
             },

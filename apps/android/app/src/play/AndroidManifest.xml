@@ -22,6 +22,15 @@
         <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
         <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
         <meta-data android:name="google_analytics_ssaid_collection_enabled" android:value="false" />
+
+        <!-- Silent "sync" push (repo-root D17): data-only FCM messages, no notification permission needed. -->
+        <service
+            android:name="app.sroka.push.SrokaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

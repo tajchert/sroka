@@ -33,7 +33,8 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 - Final review: untested race fixes in H (4) and G (2).
 - Gate on ad8eb4d (after D, J): format and `build Dev` pass; full `unit` had one failure, `LibraryViewModelTests` "Filters combine with AND", which passed 3 of 3 alone. Flaky under the parallel run; fix in polish.
 
-- L1 must feed `RootView` seams: `session`, `versionGate`, `pendingDeepLinkItemId` + `onDeepLinkHandled`.
+- L1 open risks: a late 401 can sign out a new account; no local notification when an import ends; background tasks and Keychain access group untested on a device.
+- K2 must know: Keychain service `app.sroka.session`, session JSON has `server`, op clock key `sroka.opClock.last` in App Group defaults, extension `OpWriter` has no write gate.
 - After L2: zoom transition not done; app-target strings are literals; archive-and-next, delete in reader, sign-out not exercised on a simulator.
 
 ## Open items for the owner

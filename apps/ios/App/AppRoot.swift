@@ -18,9 +18,13 @@ struct AppRoot: View {
     @ViewBuilder private var content: some View {
         switch runtime.model.root {
         case .launching: Color.clear
-        case .updateRequired: UpdateRequiredView()
+        case .updateRequired: UpdateRequiredView(storeURL: nil)
         case .signedOut: SignedOutRoot()
-        case .library: RootView()
+        case .library:
+            RootView(
+                pendingDeepLinkItemId: runtime.model.deepLinks.pendingItemId,
+                onDeepLinkHandled: { _ = runtime.model.deepLinks.consumePendingItem() }
+            )
         }
     }
 }
@@ -32,19 +36,4 @@ private struct SignedOutRoot: View {
     var body: some View {
         AuthView(model: model)
     }
-}
-
-/// Blocking screen while this build is below the server's minimum (`/v1/config` `minVersions.ios`).
-struct UpdateRequiredView: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label("Update Sroka", systemImage: "arrow.down.app")
-        } description: {
-            Text("This version of Sroka is no longer supported. Update it from the App Store to keep reading.")
-        }
-    }
-}
-
-#Preview("Update required") {
-    UpdateRequiredView()
 }

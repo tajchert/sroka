@@ -30,7 +30,9 @@ struct SessionStoreTests {
         _ = await h.signIn("a@b.co")
         h.auth.markSessionExpired()
         #expect(await h.signIn("a@b.co", token: "fresh") == .success)
-        #expect(h.sessionStore.current == StoredSession(token: "fresh", email: "a@b.co", expired: false))
+        #expect(
+            h.sessionStore.current
+                == StoredSession(token: "fresh", email: "a@b.co", expired: false, server: Harness.defaultServer))
     }
 
     @Test func `Marking expired while signed out does nothing`() async throws {

@@ -9,6 +9,22 @@ import Testing
 
 @testable import SrokaLive
 
+/// A gate that suspends callers of `wait()` until `open()`.
+final class Latch: Sendable {
+    private let waiters = Mutex<[CheckedContinuation<Void, Never>]>([])
+    func wait() async {
+        await withCheckedContinuation { continuation in waiters.withLock { $0.append(continuation) } }
+    }
+    var waiting: Int { waiters.withLock { $0.count } }
+    func open() {
+        let all = waiters.withLock { waiters in
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in all { waiter.resume() }
+    }
+}
+
 /// Records the order of named steps from any thread.
 final class StepLog: Sendable {
     private let steps = Mutex<[String]>([])
@@ -17,7 +33,8 @@ final class StepLog: Sendable {
 }
 
 private func actions(
-    log: StepLog, signedIn: Bool, pendingOps: Int = 0, needsDownload: Bool = false
+    log: StepLog, signedIn: Bool, pendingOps: Int = 0, needsDownload: Bool = false,
+    notify: @escaping @Sendable () async -> Void = {}
 ) -> LifecycleActions {
     LifecycleActions(
         enterForeground: { log.add("foreground") },
@@ -27,7 +44,10 @@ private func actions(
             return { log.add("release") }
         },
         reloadStores: { log.add("reload") },
-        notifyExternalChanges: { log.add("notify") },
+        notifyExternalChanges: {
+            log.add("notify")
+            await notify()
+        },
         isSignedIn: { signedIn },
         recoverInterrupted: { log.add("recover") },
         resumePendingUploads: { log.add("uploads") },
@@ -58,6 +78,19 @@ struct AppLifecycleTests {
         let log = StepLog()
         await AppLifecycle(actions: actions(log: log, signedIn: false)).activate()
         #expect(log.all == ["foreground", "downloadsForeground", "reload", "notify"])
+    }
+
+    @Test func `Backgrounding during activation stops the activation's account work`() async throws {
+        let log = StepLog()
+        let latch = Latch()
+        let lifecycle = AppLifecycle(actions: actions(log: log, signedIn: true, notify: { await latch.wait() }))
+        let activation = Task { await lifecycle.activate() }
+        try await waitFor { latch.waiting == 1 }
+        await lifecycle.enterBackground()
+        latch.open()
+        await activation.value
+        #expect(!log.all.contains("recover"))
+        #expect(!log.all.contains("requestSync"))
     }
 
     @Test func `Backgrounding pushes queued ops and schedules tasks while the database is held`() async {
@@ -107,7 +140,52 @@ struct SuspensionGateTests {
     }
 }
 
+extension SuspensionGateTests {
+    @Test func `Expiry suspends despite holds until they are released`() {
+        let log = StepLog()
+        let gate = SuspensionGate(suspend: { log.add("suspend") }, resume: { log.add("resume") })
+        gate.enterForeground()
+        let flush = gate.hold()
+        gate.enterBackground()
+        gate.expire()
+        #expect(log.all == ["suspend"])
+        flush.release()
+        #expect(log.all == ["suspend"])
+        let task = gate.hold()
+        #expect(log.all == ["suspend", "resume"])
+        task.release()
+        #expect(log.all == ["suspend", "resume", "suspend"])
+    }
+}
+
 struct WipeGuardTests {
+    @Test func `A wipe waits for running local writes and refuses new ones`() async throws {
+        let wipeGuard = WipeGuard()
+        let log = StepLog()
+        let latch = Latch()
+        let write = Task {
+            try await wipeGuard.admit {
+                await latch.wait()
+                log.add("write")
+            }
+        }
+        try await waitFor { latch.waiting == 1 }
+        let wipe = Task {
+            await wipeGuard.during {
+                await wipeGuard.drainWrites()
+                log.add("clear")
+            }
+        }
+        try await waitFor { wipeGuard.isWiping }
+        await #expect(throws: WipeGuard.LocalWritesClosed.self) {
+            try await wipeGuard.admit { log.add("late") }
+        }
+        latch.open()
+        try await write.value
+        await wipe.value
+        #expect(log.all == ["write", "clear"])
+    }
+
     @Test func `The sync session reads signed out for the whole wipe`() async throws {
         let database = try AppDatabase.inMemory()
         let secure = InMemorySecureStore()
@@ -238,6 +316,37 @@ struct LiveContentHooksTests {
         content.releaseRuns()
         try await waitFor { content.log.all.count == 2 }
         #expect(content.log.all == ["auto:anyNetwork", "auto:anyNetwork"])
+    }
+
+    @Test func `The wipe's cancel returns only once the run has stopped`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        try await waitFor { content.waitingRuns == 1 }
+        let log = StepLog()
+        let cancel = Task {
+            await hooks.cancelAutomaticAndWait()
+            log.add("joined")
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(log.all.isEmpty)
+        content.releaseRuns()
+        await cancel.value
+        #expect(log.all == ["joined"])
+    }
+
+    @Test func `The background task joins a run already in progress`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        try await waitFor { content.waitingRuns == 1 }
+        let background = Task { await hooks.runAutomaticNow() }
+        try await Task.sleep(for: .milliseconds(20))
+        content.releaseRuns()
+        await background.value
+        #expect(content.log.all == ["auto:anyNetwork"])
     }
 
     @Test func `No automatic run starts during a wipe`() async {

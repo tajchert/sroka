@@ -95,6 +95,7 @@ public final class LiveGraph: Sendable {
     public let syncStatus: any SyncStatusRepository
     public let telemetry: any Telemetry
     private let consentApplier: ConsentApplier
+    private let provider: LiveApiSessionProvider
 
     public init(configuration: LiveConfiguration) {
         self.configuration = configuration
@@ -129,6 +130,7 @@ public final class LiveGraph: Sendable {
 
         // Session as sync sees it; a 401 anywhere marks it expired (ignored during a wipe).
         let wipeGuard = WipeGuard()
+        let suspension = SuspensionGate(suspend: { AppDatabase.suspend() }, resume: { AppDatabase.resume() })
         let syncSession = LiveSyncSession(store: sessionStore, guard: wipeGuard)
         let onUnauthorized: @Sendable () async -> Void = { await syncSession.markExpired() }
 
@@ -145,7 +147,8 @@ public final class LiveGraph: Sendable {
         let scheduler = SyncScheduler(engine: engine, session: syncSession, hooks: hooks, network: network)
         let writer = OpWriter(
             database: database,
-            opClock: OpClock(now: systemNowMillis, store: DefaultsOpClockStore(defaults: opClockDefaults)))
+            opClock: OpClock(now: systemNowMillis, store: DefaultsOpClockStore(defaults: opClockDefaults)),
+            admission: wipeGuard)
         let uploader = LivePdfUploader(
             api: api, paths: paths, syncController: scheduler, onUnauthorized: onUnauthorized)
 
@@ -163,12 +166,15 @@ public final class LiveGraph: Sendable {
             LocalDataWiper(
                 database: database,
                 cancelAllWork: {
-                    hooks.cancelAutomatic()
+                    // Joined, not just cancelled: no automatic download may write files after the content is removed.
+                    await hooks.cancelAutomaticAndWait()
                     uploader.cancelAll()
                     importTracker.stop()
                     background.cancelAll()
                 },
                 clearTables: {
+                    // The guard is up, so no local write starts; let the ones already running commit first.
+                    await wipeGuard.drainWrites()
                     try await scheduler.wipe { try await database.write { try MaintenanceDao.wipeAll($0) } }
                 },
                 deleteFiles: { await content.removeAllContent() },
@@ -176,7 +182,7 @@ public final class LiveGraph: Sendable {
                 sessionStore: sessionStore,
                 preferences: preferences,
                 importJobs: importJobs),
-            guard: wipeGuard)
+            guard: wipeGuard, suspension: suspension)
         let auth = LiveAuthRepository(
             api: api, sessionStore: sessionStore, preferences: preferences, provider: provider, wiper: wiper,
             hasLocalData: { await LiveAuthRepository.hasAccountData(in: database) },
@@ -196,7 +202,8 @@ public final class LiveGraph: Sendable {
         self.hooks = hooks
         self.scheduler = scheduler
         self.wipeGuard = wipeGuard
-        self.suspension = SuspensionGate(suspend: { AppDatabase.suspend() }, resume: { AppDatabase.resume() })
+        self.suspension = suspension
+        self.provider = provider
         self.importTracker = importTracker
         self.syncSession = syncSession
         self.auth = auth
@@ -245,6 +252,9 @@ public final class LiveGraph: Sendable {
         guard !wipeGuard.isWiping, let session = sessionStore.current else { return false }
         return !session.expired
     }
+
+    /// The server requests go to now (custom server or the build default); version answers are keyed by it.
+    public func currentServer() -> String { provider.currentServer() }
 
     /// `/v1/config` `minVersions.ios`; nil when the read failed.
     public func fetchMinimumBuild() async -> Int?? {

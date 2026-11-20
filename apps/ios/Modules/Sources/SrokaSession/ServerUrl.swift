@@ -64,12 +64,14 @@ public final class LiveApiSessionProvider: ApiSessionProvider {
             let fallback = URL(string: defaultServerUrl) ?? URL(string: "https://api.sroka.app")!
             return ApiEndpoint(baseUrl: fallback, token: nil)
         }
-        // Sign-in always records the server; a token without that record (e.g. a Keychain delete that failed during a
-        // wipe), or recorded for another server, is never sent anywhere.
-        guard let token = sessionStore.token, preferences.accountServer == server else {
+        // Token and issuing server come from one read of the Keychain item, so they always belong together. A token
+        // issued by another server, or without the record, is never sent. The account marker is a second guard: the
+        // wipe clears it even when deleting the Keychain item fails.
+        guard let session = sessionStore.current, session.server == server, preferences.accountServer == server
+        else {
             return ApiEndpoint(baseUrl: url, token: nil)
         }
-        return ApiEndpoint(baseUrl: url, token: token)
+        return ApiEndpoint(baseUrl: url, token: session.token)
     }
 
     public func deviceId() async -> String { sessionStore.deviceId() }

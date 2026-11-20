@@ -11,6 +11,8 @@ public final class SuspensionGate: Sendable {
         var foreground = false
         var holds = 0
         var suspended = false
+        /// Background time ran out: suspended even with holds outstanding, until the next foreground.
+        var expired = false
     }
 
     private let state = Mutex(State())
@@ -23,11 +25,23 @@ public final class SuspensionGate: Sendable {
     }
 
     public func enterForeground() {
-        update { $0.foreground = true }
+        update {
+            $0.foreground = true
+            $0.expired = false
+        }
     }
 
     public func enterBackground() {
         update { $0.foreground = false }
+    }
+
+    /// The system is about to suspend the app (UIKit background time expired): suspend the database now, whatever
+    /// still holds it. It stays suspended until the next foreground or until every hold from before has been released.
+    public func expire() {
+        update {
+            $0.foreground = false
+            $0.expired = true
+        }
     }
 
     /// Keeps the database running until the returned hold is released.
@@ -44,7 +58,11 @@ public final class SuspensionGate: Sendable {
     }
 
     fileprivate func release() {
-        update { $0.holds = max(0, $0.holds - 1) }
+        update {
+            $0.holds = max(0, $0.holds - 1)
+            // The holds from before the expiry are gone: a later background task may hold and resume again.
+            if $0.holds == 0 { $0.expired = false }
+        }
     }
 
     /// Applies `change`, then suspends or resumes when the wanted state differs. The callback runs under the lock so
@@ -52,7 +70,7 @@ public final class SuspensionGate: Sendable {
     private func update(_ change: (inout State) -> Void) {
         state.withLock { state in
             change(&state)
-            let wantSuspended = !state.foreground && state.holds == 0
+            let wantSuspended = !state.foreground && (state.holds == 0 || state.expired)
             guard wantSuspended != state.suspended else { return }
             state.suspended = wantSuspended
             if wantSuspended { suspend() } else { resume() }

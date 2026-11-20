@@ -7,19 +7,11 @@ import SwiftUI
 /// `AppModel` is in the environment for the root navigation (pending deep link: `appModel.deepLinks`).
 struct AppRoot: View {
     let runtime: AppRuntime
-    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         content
             .environment(runtime.model)
             .onOpenURL { runtime.model.deepLinks.handle($0) }
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                switch phase {
-                case .active: runtime.sceneBecameActive()
-                case .background: runtime.sceneEnteredBackground()
-                default: break
-                }
-            }
             .task { runtime.start() }
     }
 

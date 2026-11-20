@@ -48,6 +48,31 @@ struct VersionGateTests {
         #expect(gate.updateRequired)
     }
 
+    @Test func `A server switch drops the previous server's answer`() async {
+        let server = Mutex("https://a.example")
+        let minimum = Mutex<Int??>(.some(10))
+        let gate = VersionGate(
+            build: 5, server: { server.withLock { $0 } }, fetchMinimum: { minimum.withLock { $0 } })
+        await gate.check()
+        #expect(gate.updateRequired)
+        server.withLock { $0 = "https://b.example" }
+        minimum.withLock { $0 = nil }
+        await gate.check()
+        #expect(!gate.updateRequired)
+    }
+
+    @Test func `A reply that arrives after a server switch is ignored`() async {
+        let server = Mutex("https://a.example")
+        let gate = VersionGate(
+            build: 5, server: { server.withLock { $0 } },
+            fetchMinimum: {
+                server.withLock { $0 = "https://b.example" }
+                return .some(10)
+            })
+        await gate.check()
+        #expect(!gate.updateRequired)
+    }
+
     @Test func `A server without a minimum never blocks`() async {
         let gate = VersionGate(build: 5, fetchMinimum: { .some(nil) })
         await gate.check()

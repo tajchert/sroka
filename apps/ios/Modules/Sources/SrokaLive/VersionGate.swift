@@ -22,8 +22,10 @@ extension Character {
 
 /// Reads `minVersions.ios` from `/v1/config` and says whether this build must be updated before it can be used.
 ///
-/// Checked at launch and when the app becomes active. A failed check (offline, server error) keeps the last answer,
-/// so a device that once learned it is too old stays blocked until a later check says otherwise.
+/// Checked at launch, when the app becomes active and when the session changes. A failed check (offline, server error)
+/// keeps the last answer for the same server, so a device that once learned it is too old stays blocked until a later
+/// check says otherwise. Answers belong to the server they came from: a switch drops the old answer, and a reply that
+/// arrives after a switch is ignored.
 @Observable @MainActor
 public final class VersionGate {
     /// The outcome of one config read: the minimum (nil when the server sets none), or nil when the read failed.
@@ -35,11 +37,17 @@ public final class VersionGate {
     public private(set) var minimumBuild: Int?
 
     @ObservationIgnored private let build: Int?
+    @ObservationIgnored private let server: @Sendable () -> String
     @ObservationIgnored private let fetchMinimum: FetchMinimum
-    @ObservationIgnored private var inFlight: Task<Void, Never>?
+    @ObservationIgnored private var inFlight: (server: String, task: Task<Void, Never>)?
+    @ObservationIgnored private var answeredServer: String?
 
-    public init(build: Int?, fetchMinimum: @escaping FetchMinimum) {
+    /// - Parameter server: the effective server requests go to now (the key answers are stored under).
+    public init(
+        build: Int?, server: @escaping @Sendable () -> String = { "" }, fetchMinimum: @escaping FetchMinimum
+    ) {
         self.build = build
+        self.server = server
         self.fetchMinimum = fetchMinimum
     }
 
@@ -48,23 +56,32 @@ public final class VersionGate {
         VersionGate(build: nil, fetchMinimum: { nil })
     }
 
-    /// One config read; concurrent calls share it.
+    /// One config read; concurrent calls for the same server share it.
     public func check() async {
-        if let inFlight {
-            await inFlight.value
+        let key = server()
+        if let answeredServer, answeredServer != key { forget() }
+        if let inFlight, inFlight.server == key {
+            await inFlight.task.value
             return
         }
         let fetch = fetchMinimum
         let task = Task { @MainActor [weak self] in
             let result = await fetch()
-            guard let self else { return }
+            guard let self, self.server() == key else { return }
             // A failed read keeps the previous answer.
             guard case .some(let minimum) = result else { return }
+            self.answeredServer = key
             self.minimumBuild = minimum
             self.updateRequired = isUpdateRequired(build: self.build, minimum: minimum)
         }
-        inFlight = task
+        inFlight = (key, task)
         await task.value
-        inFlight = nil
+        if inFlight?.server == key { inFlight = nil }
+    }
+
+    private func forget() {
+        answeredServer = nil
+        minimumBuild = nil
+        updateRequired = false
     }
 }

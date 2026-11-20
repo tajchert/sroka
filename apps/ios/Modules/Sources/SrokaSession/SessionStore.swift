@@ -7,11 +7,15 @@ public struct StoredSession: Sendable, Hashable {
     public var token: String
     public var email: String
     public var expired: Bool
+    /// The server that issued the token (no trailing slash); nil for an item written before it was recorded. Stored in
+    /// the same Keychain item, so a token is never paired with another server's URL.
+    public var server: String?
 
-    public init(token: String, email: String, expired: Bool) {
+    public init(token: String, email: String, expired: Bool, server: String? = nil) {
         self.token = token
         self.email = email
         self.expired = expired
+        self.server = server
     }
 
     var state: SessionState { expired ? .expired(email: email) : .signedIn(email: email) }
@@ -32,6 +36,7 @@ public final class SessionStore: Sendable {
         var token: String
         var email: String
         var expired: Bool
+        var server: String?
     }
 
     private let store: any SecureStore
@@ -72,10 +77,11 @@ public final class SessionStore: Sendable {
         lock.withLock { _ in value.send(Self.load(store)) }
     }
 
-    /// Stores a fresh session (also clears the expired flag). Throws when the Keychain refuses the write.
-    public func save(token: String, email: String) throws {
+    /// Stores a fresh session issued by `server` (also clears the expired flag). Throws when the Keychain refuses the
+    /// write.
+    public func save(token: String, email: String, server: String? = nil) throws {
         try lock.withLock { _ in
-            let session = StoredSession(token: token, email: email, expired: false)
+            let session = StoredSession(token: token, email: email, expired: false, server: server)
             try write(session)
             value.send(session)
         }
@@ -109,6 +115,14 @@ public final class SessionStore: Sendable {
                 try store.delete(Self.sessionKey)
             } catch {
                 sessionLog.error("Could not delete the session item: \(error.localizedDescription, privacy: .public)")
+                // A retained item would sign the user back in on the next reload: overwrite it with one that reads as
+                // signed out.
+                do {
+                    try store.write(Self.sessionKey, value: "")
+                } catch {
+                    sessionLog.error(
+                        "Could not blank the session item: \(error.localizedDescription, privacy: .public)")
+                }
             }
             value.send(nil)
         }
@@ -136,7 +150,7 @@ public final class SessionStore: Sendable {
 
     private func write(_ session: StoredSession) throws {
         let data = try JSONEncoder().encode(
-            Stored(token: session.token, email: session.email, expired: session.expired))
+            Stored(token: session.token, email: session.email, expired: session.expired, server: session.server))
         try store.write(Self.sessionKey, value: String(decoding: data, as: UTF8.self))
     }
 
@@ -151,6 +165,6 @@ public final class SessionStore: Sendable {
         guard let raw, let stored = try? JSONDecoder().decode(Stored.self, from: Data(raw.utf8)),
             !stored.token.isEmpty, !stored.email.isEmpty
         else { return nil }
-        return StoredSession(token: stored.token, email: stored.email, expired: stored.expired)
+        return StoredSession(token: stored.token, email: stored.email, expired: stored.expired, server: stored.server)
     }
 }

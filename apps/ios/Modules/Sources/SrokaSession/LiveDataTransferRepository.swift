@@ -52,6 +52,8 @@ public final class LiveDataTransferRepository: DataTransferRepository {
     /// Runs detached from the caller: leaving the screen stops the wait, not the upload or storing the job.
     public func startImport(fileURL: URL, format: ImportFormat) async -> ImportStartResult {
         // The copy must happen while the caller still holds the security scope, so it runs before detaching.
+        // The account the import is for: the copy can take a while, and the file must never be posted for another.
+        let token = sessionStore.token
         let max = Limits.maxImportBytes
         let info = fileInfo(fileURL)
         if (info?.sizeBytes ?? 0) > max { return .failed(.tooLarge) }
@@ -82,6 +84,7 @@ public final class LiveDataTransferRepository: DataTransferRepository {
         let generation = jobs.generation
         return await Task {
             defer { try? FileManager.default.removeItem(at: temp) }
+            guard sessionStore.token == token else { return .failed(.signedOut) }
             return await upload(temp: temp, name: name, mime: mime, format: format, generation: generation)
         }.value
     }

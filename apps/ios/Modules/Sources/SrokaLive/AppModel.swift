@@ -51,7 +51,11 @@ public final class AppModel {
         observation = Task { [weak self] in
             for await state in stream {
                 guard let self else { return }
-                if self.session != state { self.session = state }
+                guard self.session != state else { continue }
+                let changed = self.session != nil
+                self.session = state
+                // Sign-in, sign-out and server switches change the session: the server may be another one now.
+                if changed { Task { await self.versionGate.check() } }
             }
         }
     }

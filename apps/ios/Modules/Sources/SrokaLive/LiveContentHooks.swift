@@ -21,9 +21,10 @@ extension LiveContentStore: ContentEngine {}
 
 /// The sync engine's content port backed by `LiveContentStore`.
 ///
-/// Automatic downloads after a sync run in one cancellable task at a time (a request while one runs reruns it once
-/// it ends). They start only in the foreground and never during a wipe; in the background they are handed to the
-/// `BGProcessingTask` through `onDeferred`, which runs them with `runAutomaticNow()`.
+/// Automatic downloads run in one tracked, cancellable task at a time, whichever entry point starts them (a request
+/// while one runs reruns it once it ends). Sync requests start them only in the foreground and never during a wipe; in
+/// the background they are handed to the `BGProcessingTask` through `onDeferred`, which joins the same task with
+/// `runAutomaticNow()`.
 public final class LiveContentHooks: SyncContentHooks {
     private struct State {
         var task: Task<Void, Never>?
@@ -101,24 +102,33 @@ public final class LiveContentHooks: SyncContentHooks {
 
     // MARK: App lifecycle
 
-    /// Runs the automatic downloads now and returns when they end (background processing task). Cancelling the
-    /// calling task cancels the run.
+    /// Runs the automatic downloads now and returns when they end (background processing task). Joins a run already
+    /// in progress instead of starting a second one. Cancelling the calling task cancels the run.
     public func runAutomaticNow() async {
-        let policy = policy()
-        if policy == .manual || wipeGuard.isWiping { return }
-        _ = await runOnce(policy: policy)
+        if policy() == .manual || wipeGuard.isWiping { return }
+        let task = state.withLock { state -> Task<Void, Never> in
+            if let task = state.task { return task }
+            return startLocked(&state)
+        }
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
-    /// Cancels the running automatic run (backgrounding, policy change, wipe).
+    /// Cancels the running automatic run (backgrounding, policy change). Returns without waiting for it to stop.
     public func cancelAutomatic() {
-        let task = state.withLock { state -> Task<Void, Never>? in
-            let task = state.task
-            state.task = nil
-            state.rerun = false
-            state.taskId += 1
-            return task
-        }
+        takeTask()?.cancel()
+        progress.send(nil)
+    }
+
+    /// Cancels the running automatic run and returns once it has stopped (wipe: no download may write files after the
+    /// content is removed).
+    public func cancelAutomaticAndWait() async {
+        let task = takeTask()
         task?.cancel()
+        await task?.value
         progress.send(nil)
     }
 
@@ -131,28 +141,41 @@ public final class LiveContentHooks: SyncContentHooks {
 
     // MARK: Private
 
-    private func startLocked(_ state: inout State) {
+    private func takeTask() -> Task<Void, Never>? {
+        state.withLock { state -> Task<Void, Never>? in
+            let task = state.task
+            state.task = nil
+            state.rerun = false
+            state.taskId += 1
+            return task
+        }
+    }
+
+    @discardableResult
+    private func startLocked(_ state: inout State) -> Task<Void, Never> {
         state.taskId += 1
         let id = state.taskId
-        state.task = Task { [self] in
+        let task = Task { [self] in
             while true {
                 let policy = policy()
-                if policy == .manual || wipeGuard.isWiping || Task.isCancelled { break }
-                _ = await runOnce(policy: policy)
+                let proceed = !(policy == .manual || wipeGuard.isWiping || Task.isCancelled)
+                if proceed { _ = await runOnce(policy: policy) }
+                // One step decides between rerunning and retiring, so a request arriving now is never lost.
                 let again = self.state.withLock { state -> Bool in
-                    guard state.taskId == id, state.rerun, !Task.isCancelled else { return false }
+                    guard state.taskId == id else { return false }
+                    if proceed, state.rerun, !Task.isCancelled {
+                        state.rerun = false
+                        return true
+                    }
+                    state.task = nil
                     state.rerun = false
-                    return true
+                    return false
                 }
                 if !again { break }
             }
-            self.state.withLock { state in
-                if state.taskId == id {
-                    state.task = nil
-                    state.rerun = false
-                }
-            }
         }
+        state.task = task
+        return task
     }
 
     private func runOnce(policy: DownloadPolicy) async -> DownloadRunResult {

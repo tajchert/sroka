@@ -4,6 +4,9 @@ import SwiftUI
 @main
 struct SrokaApp: App {
     private let runtime: AppRuntime
+    /// The app-wide phase across all windows: one iPad window going to the background must not suspend the database
+    /// while another is still active.
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         runtime = AppComposition.prepare()
@@ -13,6 +16,13 @@ struct SrokaApp: App {
         let jobs = runtime.backgroundJobs
         WindowGroup {
             AppRoot(runtime: runtime)
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            switch phase {
+            case .active: runtime.appBecameActive()
+            case .background: runtime.appEnteredBackground()
+            default: break
+            }
         }
         // SwiftUI registers both identifiers (Info.plist BGTaskSchedulerPermittedIdentifiers), completes each task
         // when its closure returns and cancels the closure when the system expires the task.

@@ -74,6 +74,8 @@ public struct LifecycleActions: Sendable {
 @MainActor
 public final class AppLifecycle {
     private let actions: LifecycleActions
+    /// Bumped by every transition; activation work stops after an await once a newer transition superseded it.
+    private var transition = 0
 
     public init(actions: LifecycleActions) {
         self.actions = actions
@@ -83,12 +85,15 @@ public final class AppLifecycle {
     /// only) recover interrupted downloads, resume uploads and import polling, and sync.
     public func activate() async {
         let actions = actions
+        transition += 1
+        let current = transition
         actions.enterForeground()
         actions.setDownloadsForeground(true)
         actions.reloadStores()
         await actions.notifyExternalChanges()
-        guard actions.isSignedIn() else { return }
+        guard transition == current, actions.isSignedIn() else { return }
         await actions.recoverInterrupted()
+        guard transition == current, actions.isSignedIn() else { return }
         actions.resumePendingUploads()
         actions.resumeImport()
         actions.requestSync()
@@ -99,6 +104,7 @@ public final class AppLifecycle {
     /// background task so the push can finish.
     public func enterBackground() async {
         let actions = actions
+        transition += 1
         let release = actions.holdDatabase()
         defer { release() }
         actions.setDownloadsForeground(false)

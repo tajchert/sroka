@@ -102,7 +102,7 @@ public final class LiveAuthRepository: AuthRepository {
             guard await wipeLocked() else { return .failure(.server) }
         }
         do {
-            try sessionStore.save(token: result.token, email: signedInAs)
+            try sessionStore.save(token: result.token, email: signedInAs, server: server)
         } catch {
             sessionLog.error("Could not store the session: \(String(describing: error), privacy: .public)")
             return .failure(.server)

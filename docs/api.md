@@ -473,6 +473,8 @@ Upsert keyed by device id (LibraryDO `push_devices`, schema v7; APNs tokens are 
 
 `DELETE /v1/push-token` → removes the row of `X-Sroka-Device`; `204` even if there was none.
 
+Sign-out also removes this device's token: a successful `POST /api/auth/sign-out` carrying a valid `X-Sroka-Device` (not `rest`) deletes that user's row for the device after the session is revoked (best-effort backstop; apps still call `DELETE` first). Other devices' rows are kept; failures never change the sign-out response.
+
 **Sending** (LibraryDO alarm): content becoming ready sets a pending push due at `max(now + 10 s, lastSent + 60 s)` unless one is already pending, so bursts (imports) coalesce to at most one push per minute; each due time sends once to every registered device (a send interrupted by an instance reset is repeated; a duplicate push is harmless). Every provider/OAuth request has a 10 s deadline. Dead tokens are deleted: FCM `404` / `UNREGISTERED` / `400 INVALID_ARGUMENT` naming the token; APNs `410`, `400 BadDeviceToken` (after one retry on the other APNs environment — on success the stored `apnsEnvironment` is switched), `400 DeviceTokenNotForTopic`. `429`/`5xx`/network errors are logged and not retried (the apps' periodic sync is the fallback). A platform whose credentials are not configured is skipped.
 
 Payloads (clients act on any message with `type == "sync"` and ignore other types):

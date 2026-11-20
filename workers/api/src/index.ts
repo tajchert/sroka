@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "./env.ts";
 import { createAuth } from "./auth.ts";
+import { signOutHandler } from "./sign-out.ts";
 import { serveAsset } from "./assets.ts";
 import { corsMiddleware, requireAuth } from "./middleware/auth.ts";
 import { handleContent } from "./routes/content.ts";
@@ -34,6 +35,8 @@ app.use("/api/*", corsMiddleware);
 app.use("/v1/*", corsMiddleware);
 
 // Better Auth (cookie + bearer).
+// Sign-out also drops this device's push token (api.md §17); registered before the catch-all.
+app.post("/api/auth/sign-out", signOutHandler);
 app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env, c.executionCtx).handler(c.req.raw));
 
 // Public /v1 endpoints (registered before the auth middleware).

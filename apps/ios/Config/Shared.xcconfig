@@ -26,9 +26,10 @@ KEYCHAIN_GROUP = app.sroka$(BUNDLE_ID_SUFFIX).shared
 
 // Enhanced Security. Pairs with the com.apple.security.hardened-process
 // entitlements in App/Sroka.entitlements; the build setting alone is inert.
-// Pointer authentication adds an arm64e slice; the simulator SDK drops it.
+// Pointer authentication is off: it adds an arm64e slice to the app and extension, but the Swift package
+// modules (and binary dependencies) are built for arm64 only, so a device archive cannot resolve them.
 ENABLE_ENHANCED_SECURITY = YES
-ENABLE_POINTER_AUTHENTICATION = YES
+ENABLE_POINTER_AUTHENTICATION = NO
 
 // DEVELOPMENT_TEAM (and any other per-machine value) lives in the optional,
 // gitignored Config/Local.xcconfig. Simulator builds need none.

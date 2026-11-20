@@ -112,8 +112,11 @@ check_signing() {
     if [ -z "$decoded" ]; then
       bad "cannot decode embedded.mobileprovision"
     else
-      grep -q '<key>ProvisionedDevices</key>' <<<"$decoded" && bad "provisioning profile lists devices (development or ad hoc, not App Store)"
-      grep -q '<key>ProvisionsAllDevices</key>' <<<"$decoded" && bad "enterprise provisioning profile"
+      # `if`, not `&&`: a non-matching grep as the function's last command would end the script under `set -e`.
+      if grep -q '<key>ProvisionedDevices</key>' <<<"$decoded"; then
+        bad "provisioning profile lists devices (development or ad hoc, not App Store)"
+      fi
+      if grep -q '<key>ProvisionsAllDevices</key>' <<<"$decoded"; then bad "enterprise provisioning profile"; fi
     fi
   elif [ "$kind" = "ipa" ]; then
     bad "no embedded.mobileprovision in the .ipa app"

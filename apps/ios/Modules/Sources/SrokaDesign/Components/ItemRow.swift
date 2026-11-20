@@ -70,14 +70,23 @@ public struct ItemRow: View {
 }
 
 /// 48 pt thumbnail. Falls back to the site's first letter, a PDF tile or a spinner while preparing.
-struct ItemThumbnail: View {
+public struct ItemThumbnail: View {
     let item: ItemSummary
     let presentation: ItemRowPresentation
 
     private static let size: CGFloat = 48
     private static let radius: CGFloat = 9
 
-    var body: some View {
+    public init(item: ItemSummary, presentation: ItemRowPresentation) {
+        self.item = item
+        self.presentation = presentation
+    }
+
+    public init(_ item: ItemSummary) {
+        self.init(item: item, presentation: ItemRowPresentation(item))
+    }
+
+    public var body: some View {
         ZStack(alignment: .bottom) {
             RoundedRectangle(cornerRadius: Self.radius, style: .continuous).fill(SrokaColor.surfaceHigh)
             content

@@ -97,8 +97,8 @@ struct RootDestination: View {
             switch tab {
             case .myList: LibraryTab(scope: .myList)
             case .archive: LibraryTab(scope: .archive)
-            case .tags: TagsPlaceholderView().navigationTitle(Text(tab.title))
-            case .search: SearchPlaceholderView().navigationTitle(Text(tab.title))
+            case .tags: TagsTab()
+            case .search: SearchTab()
             }
         }
     }
@@ -115,6 +115,25 @@ private struct LibraryTab: View {
 
     var body: some View {
         LibraryView(model: model)
+    }
+}
+
+/// Owns the tags view model. `TagsIntent`s (open item, edit tags, Settings, open URL) are handled
+/// here by stream L together with the tag editor sheet (`TagEditorSheet`).
+private struct TagsTab: View {
+    @State private var model = TagsViewModel()
+
+    var body: some View {
+        TagsView(model: model)
+    }
+}
+
+/// Owns the search view model. `SearchIntent.openItem` is handled here once the reader lands.
+private struct SearchTab: View {
+    @State private var model = SearchViewModel()
+
+    var body: some View {
+        SearchView(model: model)
     }
 }
 

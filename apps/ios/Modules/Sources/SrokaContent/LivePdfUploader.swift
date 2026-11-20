@@ -48,6 +48,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private let renderThumbnail: @Sendable (URL) -> Data?
     private let onUnauthorized: @Sendable () async -> Void
     private let owner: @Sendable () -> String?
+    private let boundAPI: @Sendable (_ owner: String?) async -> (any SrokaAPI)?
+    private let claimToken: String
     /// Uploads run one at a time.
     private let lane = KeyedLock()
     var laneForTests: KeyedLock { lane }
@@ -69,8 +71,12 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         now: @escaping @Sendable () -> Date = { Date() },
         renderThumbnail: @escaping @Sendable (URL) -> Data? = { PdfThumbnailRenderer.render($0) },
         onUnauthorized: @escaping @Sendable () async -> Void = {},
-        owner: @escaping @Sendable () -> String? = { nil }
+        owner: @escaping @Sendable () -> String? = { nil },
+        boundAPI: (@Sendable (_ owner: String?) async -> (any SrokaAPI)?)? = nil,
+        claimToken: String = LivePdfUploader.processToken
     ) {
+        self.claimToken = claimToken
+        self.boundAPI = boundAPI ?? { _ in api }
         self.api = api
         self.paths = paths
         self.syncController = syncController
@@ -95,7 +101,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             if upload.state == .queued {
                 if !start(upload, generation: generation) {
                     // Signed out while copying: the wipe already ran, drop the late copy.
-                    deleteFiles(upload.id)
+                    if claim(upload.id) { deleteFiles(upload.id) }
                     upload.state = .failed(.unknown)
                 }
             } else {
@@ -110,7 +116,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         guard list.value.contains(where: { $0.id == id && $0.isActive }) else { return }
         let task = running.withLock { $0.tasks.removeValue(forKey: id) }
         task?.cancel()
-        deleteFiles(id)
+        if claim(id) { deleteFiles(id) }
         list.update { $0.removeAll { $0.id == id } }
     }
 
@@ -128,7 +134,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         for name in names.sorted() where name.hasSuffix(".json") {
             let id = String(name.dropLast(5))
             guard let meta = readMetadata(id), ownedByCurrentAccount(meta) else {
-                deleteFiles(id)
+                // Not while the other process (the share extension) holds it.
+                if claim(id) { deleteFiles(id) }
                 continue
             }
             if running.withLock({ $0.tasks[id] != nil }) { continue }
@@ -136,12 +143,18 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         }
     }
 
-    /// Removes PDFs whose sidecar never got written (the process died between publishing and writing it), once they
-    /// are old enough that no admission can still be finishing them.
+    /// Removes PDFs whose sidecar never got written (the process died between publishing and writing it), and claims
+    /// left without an upload, once they are old enough that no admission can still be finishing them.
     private func sweepOrphans(_ names: [String]) {
         let present = Set(names)
         let cutoff = now().addingTimeInterval(-Self.orphanAge)
-        for name in names where name.hasSuffix(".pdf") && !present.contains(name.dropLast(4) + ".json") {
+        func orphan(_ name: String) -> Bool {
+            for suffix in [".pdf", ".claim"] where name.hasSuffix(suffix) {
+                return !present.contains(name.dropLast(suffix.count) + ".json")
+            }
+            return false
+        }
+        for name in names where orphan(name) {
             let url = paths.pdfUploads.appending(path: name)
             let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
             if let modified, modified < cutoff { paths.removeIfPresent(url) }
@@ -269,7 +282,14 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     }
 
     private func process(_ id: String) async {
+        // Whatever path ends this attempt, the other process may take the upload over.
+        defer { release(id) }
         while !Task.isCancelled {
+            // The app and the share extension share the queue: only the claim holder sends or deletes it.
+            guard claim(id) else {
+                setState(id, .queued)
+                return
+            }
             guard var meta = readMetadata(id), let file = paths.pdfUpload(id) else {
                 finish(id, .failed(.unknown))
                 return
@@ -288,16 +308,27 @@ public final class LivePdfUploader: PdfUploader, Sendable {
                 finish(id, .failed(.tooLarge))
                 return
             }
+            // One credential snapshot of the owning account for the upload and its thumbnail.
+            guard let api = await boundAPI(meta.owner) else {
+                setState(id, .queued)
+                return
+            }
             setState(id, .uploading(progress: 0))
             let classification: Classification
+            let renewed = ClaimRenewal(now())
             do {
                 let response = try await api.uploadPdf(
                     file: file, fileName: meta.fileName, tags: meta.tags, source: .share
                 ) { [weak self] sent, total in
+                    guard let self else { return }
+                    self.renewClaim(id, last: renewed)
                     guard total > 0 else { return }
-                    self?.setState(id, .uploading(progress: min(1, Double(sent) / Double(total))))
+                    self.setState(id, .uploading(progress: min(1, Double(sent) / Double(total))))
                 }
-                if response.item.leadImageKey == nil { await uploadPreview(itemId: response.item.id, file: file) }
+                // Signed out (`cancelAll`) while the upload ran: nothing more goes out.
+                if response.item.leadImageKey == nil, !Task.isCancelled {
+                    await uploadPreview(api: api, itemId: response.item.id, file: file)
+                }
                 finish(id, .done(itemId: response.item.id, duplicate: !response.created))
                 syncController.requestSync()
                 return
@@ -356,7 +387,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     }
 
     /// Best effort: an upload is done even when its preview is not.
-    private func uploadPreview(itemId: String, file: URL) async {
+    private func uploadPreview(api: any SrokaAPI, itemId: String, file: URL) async {
         guard let data = renderThumbnail(file), !data.isEmpty, data.count <= Limits.maxThumbnailBytes else { return }
         do {
             _ = try await api.uploadThumbnail(itemId: itemId, data: data, contentType: PdfThumbnailRenderer.contentType)
@@ -379,9 +410,62 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         }
     }
 
+    /// Callers hold the claim; it goes last.
     private func deleteFiles(_ id: String) {
         if let file = paths.pdfUpload(id) { paths.removeIfPresent(file) }
         if let meta = paths.pdfUploadMetadata(id) { paths.removeIfPresent(meta) }
+        if let claim = claimURL(id) { paths.removeIfPresent(claim) }
+    }
+
+    // MARK: Cross-process claim
+
+    /// Identifies this process's claims (`{id}.claim` holds it).
+    public static let processToken = UUID().uuidString
+    /// A claim not renewed for this long belongs to a process that died (the extension killed mid-upload).
+    public static let claimLease: TimeInterval = 600
+    static let claimRenewal: TimeInterval = 30
+
+    private func claimURL(_ id: String) -> URL? {
+        guard isValidItemId(id) else { return nil }
+        return paths.pdfUploads.appending(path: "\(id).claim", directoryHint: .notDirectory)
+    }
+
+    /// Takes the upload for this process: free, already ours, or left by a holder that stopped renewing it. False
+    /// while the other process is sending or deleting it. A plain file, not a lock held open: a lock in the App Group
+    /// held while suspended gets the process killed.
+    func claim(_ id: String) -> Bool {
+        guard let url = claimURL(id) else { return false }
+        let token = Data(claimToken.utf8)
+        if (try? token.write(to: url, options: .withoutOverwriting)) != nil { return true }
+        guard let holder = try? Data(contentsOf: url) else {
+            return (try? token.write(to: url, options: .withoutOverwriting)) != nil
+        }
+        if holder == token { return true }
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        guard (modified ?? .distantPast) < now().addingTimeInterval(-Self.claimLease) else { return false }
+        // Expired: only one process wins the rename of the expired claim, then creates its own.
+        let expired = paths.pdfUploads.appending(path: "\(id).claim-expired-\(claimToken)")
+        guard (try? FileManager.default.moveItem(at: url, to: expired)) != nil else { return false }
+        paths.removeIfPresent(expired)
+        return (try? token.write(to: url, options: .withoutOverwriting)) != nil
+    }
+
+    /// Gives the upload back, if this process holds it.
+    private func release(_ id: String) {
+        guard let url = claimURL(id), (try? Data(contentsOf: url)) == Data(claimToken.utf8) else { return }
+        paths.removeIfPresent(url)
+    }
+
+    /// Keeps a long upload's claim from expiring (progress callbacks, at most every `claimRenewal`).
+    private func renewClaim(_ id: String, last: ClaimRenewal) {
+        let current = now()
+        let due = last.at.withLock { last -> Bool in
+            guard current.timeIntervalSince(last) >= Self.claimRenewal else { return false }
+            last = current
+            return true
+        }
+        guard due, let url = claimURL(id) else { return }
+        try? FileManager.default.setAttributes([.modificationDate: current], ofItemAtPath: url.path)
     }
 
     /// A sidecar without an owner predates the field and stays uploadable.
@@ -399,4 +483,10 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         guard let url = paths.pdfUploadMetadata(meta.id), let data = try? JSONEncoder().encode(meta) else { return }
         try? data.write(to: url, options: .atomic)
     }
+}
+
+/// When a running upload last renewed its claim.
+final class ClaimRenewal: Sendable {
+    let at: Mutex<Date>
+    init(_ date: Date) { at = Mutex(date) }
 }

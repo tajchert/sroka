@@ -30,10 +30,11 @@ struct ShareAccount: Sendable {
     var launchEpoch: String? = nil
     var epoch: @Sendable () -> String? = { nil }
 
-    /// No wipe started since launch, the Keychain still holds the token the sheet was opened with (expired or not),
+    /// No wipe was running at launch or started since, the Keychain still holds the token the sheet was opened with (expired or not),
     /// and the account marker is set (for the launch session's server, when it recorded one).
     var isCurrent: Bool {
-        guard let launch, epoch() == launchEpoch, let now = stored(), now.token == launch.token,
+        guard let launch, !WipeEpoch.isWiping(launchEpoch), epoch() == launchEpoch, let now = stored(),
+            now.token == launch.token,
             now.server == launch.server, let marker = accountServer()
         else { return false }
         return launch.server == nil || launch.server == marker

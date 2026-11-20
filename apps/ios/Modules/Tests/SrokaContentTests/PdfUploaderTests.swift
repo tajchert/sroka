@@ -2,6 +2,7 @@ import Foundation
 import SrokaCore
 import SrokaNetwork
 import SrokaTesting
+import Synchronization
 import Testing
 
 @testable import SrokaContent
@@ -71,6 +72,77 @@ struct PdfUploaderTests {
 
     private func pendingFiles() -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)) ?? []).sorted()
+    }
+
+    @Test func `The upload and its preview both use the API bound for the upload's owner`() async throws {
+        defer { dir.cleanUp() }
+        let bound = FakeAPI()
+        bound.setUploads(.success(uploadResponse(itemId: "item1")))
+        api.setUploads(.success(uploadResponse(itemId: "wrong")))
+        let owners = Mutex<[String?]>([])
+        let uploader = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in },
+            renderThumbnail: { _ in Data(repeating: 9, count: 100) }, owner: { "owner-a" },
+            boundAPI: { owner in
+                owners.withLock { $0.append(owner) }
+                return bound
+            })
+
+        _ = await uploader.enqueue([try source("a.pdf")])
+        _ = await settled(uploader)
+
+        #expect(owners.withLock { $0 } == ["owner-a"])
+        #expect(bound.uploadCalls == 1)
+        #expect(bound.thumbnailUploads.count == 1)
+        #expect(api.uploadCalls == 0)
+        #expect(api.thumbnailUploads.isEmpty)
+    }
+
+    @Test func `Without a credential snapshot for its owner the upload waits, queued`() async throws {
+        defer { dir.cleanUp() }
+        let uploader = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: { "owner-a" }, boundAPI: { _ in nil })
+
+        let queued = await uploader.enqueue([try source("a.pdf")])
+        for await list in uploader.uploads where list.first?.state == .queued { break }
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(api.uploadCalls == 0)
+        #expect(pendingFiles() == ["\(queued[0].id).json", "\(queued[0].id).pdf"])
+    }
+
+    @Test func `An upload the other process holds is neither sent nor deleted until its claim expires`() async throws {
+        defer { dir.cleanUp() }
+        api.setUploads(.success(uploadResponse(itemId: "item1", leadImageKey: "img/x.webp")))
+        // The share extension queued it and is sending it now: queue files plus its claim.
+        let id = "0190a1b2-share"
+        try paths.prepare(paths.pdfUploads)
+        try pdfData.write(to: paths.pdfUploads.appending(path: "\(id).pdf"))
+        let meta = LivePdfUploader.Metadata(
+            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: nil)
+        try JSONEncoder().encode(meta).write(to: paths.pdfUploads.appending(path: "\(id).json"))
+        let extensionSide = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            claimToken: "extension")
+        #expect(extensionSide.claim(id))
+
+        let app = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            claimToken: "app")
+        app.resumePendingUploads()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(api.uploadCalls == 0)
+        #expect(pendingFiles() == ["\(id).claim", "\(id).json", "\(id).pdf"])
+
+        // The extension was killed: its claim stops being renewed and expires.
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-2 * LivePdfUploader.claimLease)],
+            ofItemAtPath: paths.pdfUploads.appending(path: "\(id).claim").path)
+        app.resumePendingUploads()
+        _ = await settled(app)
+        #expect(api.uploadCalls == 1)
+        #expect(pendingFiles().isEmpty)
     }
 
     @Test func `A successful upload sends a preview, cleans up and requests a sync`() async throws {

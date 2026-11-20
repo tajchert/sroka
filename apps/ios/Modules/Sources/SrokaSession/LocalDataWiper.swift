@@ -70,14 +70,25 @@ public final class LocalDataWiper: LocalDataWiping {
         await Task { await runSteps() }.value
     }
 
+    /// A wipe that died (the app was killed mid-wipe) left `WipeEpoch` in progress, which keeps the share extension
+    /// from writing or sending: run it again. Call once at launch, before the account is used.
+    @discardableResult public func finishInterruptedWipe() async -> Bool {
+        guard let epochURL, WipeEpoch.isWiping(WipeEpoch.read(at: epochURL)) else { return true }
+        return await wipe()
+    }
+
+    private var epochURL: URL? { WipeEpoch.url(besideDatabaseAt: URL(filePath: database.writer.path)) }
+
     private func runSteps() async -> Bool {
         var tablesCleared = true
-        // First: a share extension commit from here on sees a new epoch and is refused (see `WipeEpoch`).
-        if let epochURL = WipeEpoch.url(besideDatabaseAt: URL(filePath: database.writer.path)) {
+        let epochURL = epochURL
+        // First: from here on the share extension refuses commits and requests, until the epoch is finished below
+        // (and an extension opened meanwhile never writes, see `WipeEpoch`).
+        if let epochURL {
             do {
-                try WipeEpoch.bump(at: epochURL)
+                try WipeEpoch.begin(at: epochURL)
             } catch {
-                sessionLog.error("Wipe: epoch bump failed: \(String(describing: error), privacy: .public)")
+                sessionLog.error("Wipe: epoch begin failed: \(String(describing: error), privacy: .public)")
             }
         }
         await cancelAllWork()
@@ -121,6 +132,13 @@ public final class LocalDataWiper: LocalDataWiping {
             }
         } catch {
             sessionLog.error("Wipe: checkpoint/vacuum failed: \(String(describing: error), privacy: .public)")
+        }
+        if let epochURL {
+            do {
+                try WipeEpoch.finish(at: epochURL)
+            } catch {
+                sessionLog.error("Wipe: epoch finish failed: \(String(describing: error), privacy: .public)")
+            }
         }
         return tablesCleared
     }

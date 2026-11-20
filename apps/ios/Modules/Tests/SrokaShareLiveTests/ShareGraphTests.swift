@@ -201,7 +201,14 @@ struct ShareGraphTests {
         let uploads = await graph.uploader.enqueue([source])
         let id = try #require(uploads.first?.id)
         let queued = try FileManager.default.contentsOfDirectory(atPath: group.paths.pdfUploads.path)
-        #expect(Set(queued) == ["\(id).pdf", "\(id).json"])
+        #expect(Set(queued).isSuperset(of: ["\(id).pdf", "\(id).json"]))
+        // The killed extension's claim (if its upload had started) is no longer renewed and expires.
+        let claim = group.paths.pdfUploads.appending(path: "\(id).claim")
+        if FileManager.default.fileExists(atPath: claim.path) {
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date().addingTimeInterval(-2 * LivePdfUploader.claimLease)],
+                ofItemAtPath: claim.path)
+        }
 
         // The app (another process: its own uploader over the same App Group) resumes it.
         let appAPI = ShareFakeAPI()
@@ -213,7 +220,7 @@ struct ShareGraphTests {
         let owner = try #require(SessionStore(store: group.secureStore).current?.ownerKey)
         let appUploader = LivePdfUploader(
             api: appAPI, paths: group.paths, syncController: ShareSyncController(), renderThumbnail: { _ in nil },
-            owner: { owner })
+            owner: { owner }, claimToken: "app")
         appUploader.resumePendingUploads()
         await appStarted.wait()
         #expect(appAPI.events == ["upload:Report.pdf"])
@@ -383,13 +390,64 @@ struct ShareGraphTests {
         try group.appOpened()
         let graph = try group.graph(api: api)
         // Another process: its cached marker and the Keychain item survive; only the epoch file changed.
-        try WipeEpoch.bump(at: try #require(WipeEpoch.url(besideDatabaseAt: group.databaseURL)))
+        try WipeEpoch.begin(at: try #require(WipeEpoch.url(besideDatabaseAt: group.databaseURL)))
 
         let saved = await graph.library.save(url: "https://example.com/late", title: nil, tags: [], source: .share)
 
         if case .saved = saved { Issue.record("saved after a wipe started") }
         #expect(try await group.queuedOps().isEmpty)
         #expect(try await group.itemCount() == 0)
+    }
+
+    @Test func `A sheet opened while a wipe is running neither writes nor sends`() async throws {
+        try group.appOpened()
+        // The wipe has begun; the token and the account marker are still there.
+        try WipeEpoch.begin(at: try #require(WipeEpoch.url(besideDatabaseAt: group.databaseURL)))
+        let graph = try group.graph(api: api)
+        api.onPush { pushAnswer($0) }
+
+        let saved = await graph.library.save(url: "https://example.com/mid", title: nil, tags: [], source: .share)
+        await graph.pushOnce()
+
+        if case .saved = saved { Issue.record("saved during a wipe") }
+        #expect(try await group.queuedOps().isEmpty)
+        #expect(api.events.isEmpty)
+    }
+
+    @Test func `An upload gets an API only when the endpoint's token is its owner's session`() async throws {
+        try group.appOpened()
+        let store = SessionStore(store: group.secureStore)
+        let owner = try #require(store.current?.ownerKey)
+        struct Fixed: ApiSessionProvider {
+            let token: String
+            func baseUrl() async -> URL { URL(string: AppGroupFixture.server)! }
+            func token() async -> String? { token }
+            func deviceId() async -> String { "device" }
+        }
+        let http = HTTPSrokaAPI(provider: Fixed(token: "token"), identity: ClientIdentity(appVersion: "1"))
+        let same = OwnerBoundAPI.make(api: http, provider: Fixed(token: "token"), current: { store.current })
+        // The provider already resolves the next account's token (a switch between the owner check and the request).
+        let switched = OwnerBoundAPI.make(api: http, provider: Fixed(token: "other"), current: { store.current })
+
+        #expect(await same(owner) != nil)
+        #expect(await same("another-account") == nil)
+        #expect(await switched(owner) == nil)
+    }
+
+    @Test func `A wipe that died is finished at the next launch`() async throws {
+        try group.appOpened()
+        let epochURL = try #require(WipeEpoch.url(besideDatabaseAt: group.databaseURL))
+        try WipeEpoch.begin(at: epochURL)
+        let defaults = try #require(UserDefaults(suiteName: "share-wipe-\(UUID().uuidString)"))
+        let preferences = PreferencesStore(defaults: defaults)
+        let wiper = LocalDataWiper.databaseOnly(
+            try AppDatabase.openShared(at: group.databaseURL), sessionStore: SessionStore(store: group.secureStore),
+            preferences: preferences, importJobs: ImportJobStore(preferences: preferences))
+
+        #expect(await wiper.finishInterruptedWipe())
+
+        #expect(WipeEpoch.isWiping(WipeEpoch.read(at: epochURL)) == false)
+        #expect(SessionStore(store: group.secureStore).current == nil)
     }
 
     @Test func `The app's wipe replaces the epoch before it clears anything`() async throws {

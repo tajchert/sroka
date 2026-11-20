@@ -33,6 +33,23 @@ extension ApiSessionProvider {
     }
 }
 
+/// One endpoint snapshot for every request made through it (`HTTPSrokaAPI.pinned(to:)`): a session change after
+/// the snapshot was checked cannot swap in another account's token. The device id still comes from `base`.
+public struct PinnedSessionProvider: ApiSessionProvider {
+    public let base: any ApiSessionProvider
+    public let pinned: ApiEndpoint
+
+    public init(base: any ApiSessionProvider, pinned: ApiEndpoint) {
+        self.base = base
+        self.pinned = pinned
+    }
+
+    public func baseUrl() async -> URL { pinned.baseUrl }
+    public func token() async -> String? { pinned.token }
+    public func deviceId() async -> String { await base.deviceId() }
+    public func endpoint() async -> ApiEndpoint { pinned }
+}
+
 /// Static client identity sent as `User-Agent: Sroka-iOS/<version>`.
 public struct ClientIdentity: Sendable, Hashable {
     public var userAgent: String

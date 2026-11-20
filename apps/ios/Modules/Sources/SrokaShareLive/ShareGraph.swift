@@ -103,7 +103,10 @@ public struct ShareGraph: Sendable {
         return .ready(
             ShareGraph(
                 environment: environment, database: database, api: api,
-                endpointUsable: { await provider.endpoint().token != nil }, sessionStore: sessionStore,
+                endpointUsable: { await provider.endpoint().token != nil },
+                boundAPI: OwnerBoundAPI.make(
+                    api: api, provider: provider, current: { SessionStore(store: keychain).current }),
+                sessionStore: sessionStore,
                 account: account, clockStore: DefaultsOpClockStore.appGroup(group), paths: paths))
     }
 
@@ -137,6 +140,7 @@ public struct ShareGraph: Sendable {
         database: AppDatabase,
         api: any SrokaAPI,
         endpointUsable: @escaping @Sendable () async -> Bool = { true },
+        boundAPI: (@Sendable (_ owner: String?) async -> (any SrokaAPI)?)? = nil,
         sessionStore: SessionStore,
         account: ShareAccount,
         clockStore: any OpClockStore,
@@ -161,10 +165,19 @@ public struct ShareGraph: Sendable {
         // Copies each PDF into the App Group queue first, then uploads while the sheet is up; the app's
         // `resumePendingUploads()` finishes whatever the extension could not.
         // No thumbnail here: PDFKit may decode a first-page scan at full size, past the extension's memory limit.
+        // Each upload pinned to one credential snapshot of its account, still behind the share's checks.
+        var shareBound: (@Sendable (_ owner: String?) async -> (any SrokaAPI)?)?
+        if let boundAPI {
+            shareBound = { owner -> (any SrokaAPI)? in
+                guard let bound = await boundAPI(owner) else { return nil }
+                return ShareAPI(base: bound, account: account, endpointUsable: endpointUsable)
+            }
+        }
         uploader = SharePdfUploader(
             base: LivePdfUploader(
                 api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil },
-                owner: { [launch = account.launch] in launch?.ownerKey }),
+                owner: { [launch = account.launch] in launch?.ownerKey },
+                boundAPI: shareBound),
             account: account)
         self.account = account
         self.gate = gate

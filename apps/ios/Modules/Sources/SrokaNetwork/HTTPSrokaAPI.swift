@@ -32,6 +32,13 @@ public final class HTTPSrokaAPI: SrokaAPI {
         self.now = now
     }
 
+    /// The same client, but every request uses `endpoint` (see `PinnedSessionProvider`).
+    public func pinned(to endpoint: ApiEndpoint) -> HTTPSrokaAPI {
+        HTTPSrokaAPI(
+            provider: PinnedSessionProvider(base: provider, pinned: endpoint), identity: identity, session: session,
+            now: now)
+    }
+
     /// Ephemeral session without cookies or caches.
     public static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral

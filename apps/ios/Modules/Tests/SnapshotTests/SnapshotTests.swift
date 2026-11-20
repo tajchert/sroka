@@ -17,7 +17,7 @@ import Testing
 @MainActor
 struct SnapshotTargetTests {
     @Test func `Feature modules link`() {
-        _ = LibraryPlaceholderView()
+        _ = LibraryView.self
         _ = TagsPlaceholderView()
         _ = SearchPlaceholderView()
         _ = ReaderPlaceholderView()

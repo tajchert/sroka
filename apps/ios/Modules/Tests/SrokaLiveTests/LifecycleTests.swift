@@ -415,12 +415,21 @@ struct LiveContentHooksTests {
 
     @Test func `The background task joins a run already in progress`() async throws {
         let content = StubContent(blockRuns: true)
-        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        // Every entry point reads the policy first, so a read count says when the background call has begun.
+        let policyReads = Mutex(0)
+        let hooks = LiveContentHooks(
+            content: content,
+            policy: {
+                policyReads.withLock { $0 += 1 }
+                return .anyNetwork
+            }, guard: WipeGuard())
         hooks.setForeground(true)
         await hooks.queueAutomaticDownloads()
         try await waitFor { content.waitingRuns == 1 }
+        let readsBefore = policyReads.withLock { $0 }
         let background = Task { await hooks.runAutomaticNow() }
-        try await Task.sleep(for: .milliseconds(20))
+        // The call joins the running task under its lock straight after that read, before it can suspend.
+        try await waitFor { policyReads.withLock { $0 } > readsBefore }
         content.releaseRuns()
         await background.value
         #expect(content.log.all == ["auto:anyNetwork"])

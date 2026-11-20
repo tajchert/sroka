@@ -144,7 +144,15 @@ struct AppModelTests {
     @Test func `The root follows the session and the version gate`() async throws {
         let (stream, continuation) = AsyncStream<SessionState>.makeStream()
         let minimum = Mutex<Int??>(.some(1))
-        let gate = VersionGate(build: 5, fetchMinimum: { minimum.withLock { $0 } })
+        // Session changes start version checks in the background. Holding every read until the test releases it
+        // means no read can answer with the old minimum after the test changed it, whichever check started when.
+        let release = OpenGate()
+        let gate = VersionGate(
+            build: 5,
+            fetchMinimum: {
+                await release.wait()
+                return minimum.withLock { $0 }
+            })
         let model = AppModel(
             sessionStates: { stream }, versionGate: gate, deepLinks: DeepLinkInbox(scheme: "sroka-dev"))
         #expect(model.root == .launching)
@@ -158,10 +166,40 @@ struct AppModelTests {
         try await waitUntil { model.session == .expired(email: "a@b.c") }
         #expect(model.root == .library)
 
+        // The version gate has not answered yet, so it blocks nothing; once it answers 9 the root blocks.
         minimum.withLock { $0 = .some(9) }
-        await gate.check()
-        #expect(model.root == .updateRequired)
+        release.open()
+        try await waitUntil { model.root == .updateRequired }
         continuation.finish()
+    }
+}
+
+/// Suspends `wait()` until `open()`; once open, `wait()` returns at once.
+final class OpenGate: Sendable {
+    private struct State {
+        var isOpen = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+    private let state = Mutex(State())
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow = state.withLock { state -> Bool in
+                if state.isOpen { return true }
+                state.waiters.append(continuation)
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let all = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+            state.isOpen = true
+            defer { state.waiters = [] }
+            return state.waiters
+        }
+        for waiter in all { waiter.resume() }
     }
 }
 

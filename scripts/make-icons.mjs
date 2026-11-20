@@ -14,10 +14,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const COLORS = { tile: "#ffffff", ink: "#15171c", band: "#1e6f8f", beak: "#f2c84b" };
 // Shapes in a 100×100 tile. The band sits fully inside the body, so no clip is needed.
+// The beak is drawn under the body: its visible part starts on the flat right edge of the head (x=70, below the
+// corner curve that ends at y=28), and its hidden base tucks into the body so no seam shows.
 const BODY = "M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z";
 const BAND = "30,56 70,46 70,58 30,68";
-const BEAK = "69,27 83,33 69,39";
-const bird = `<path d="${BODY}" fill="${COLORS.ink}"/><polygon points="${BAND}" fill="${COLORS.band}"/><polygon points="${BEAK}" fill="${COLORS.beak}"/><circle cx="58" cy="32" r="4" fill="${COLORS.tile}"/>`;
+const BEAK = "66,28 70,28 83,33.5 70,39 66,39";
+const bird = `<polygon points="${BEAK}" fill="${COLORS.beak}"/><path d="${BODY}" fill="${COLORS.ink}"/><polygon points="${BAND}" fill="${COLORS.band}"/><circle cx="58" cy="32" r="4" fill="${COLORS.tile}"/>`;
 
 /** shape: "square" (full bleed; for OS-masked icons), "rounded" (baked corners), "circle". */
 const svg = (shape = "square") => {
@@ -28,7 +30,7 @@ const svg = (shape = "square") => {
 };
 // Single-colour glyph (body with band + eye cut out), for monochrome contexts.
 const glyphPath = `${BODY} M30 56 L70 46 L70 58 L30 68 Z M54 32 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z`;
-const glyphSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 16 60 70"><path fill-rule="evenodd" d="${glyphPath}" fill="${COLORS.ink}"/><polygon points="${BEAK}" fill="${COLORS.beak}"/></svg>\n`;
+const glyphSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="26 16 60 70"><polygon points="${BEAK}" fill="${COLORS.beak}"/><path fill-rule="evenodd" d="${glyphPath}" fill="${COLORS.ink}"/></svg>\n`;
 
 const write = (rel, data) => {
   const p = join(root, rel);
@@ -80,9 +82,9 @@ write(
   `${res}/drawable/ic_launcher_foreground.xml`,
   vector(
     [
+      [pts(BEAK), COLORS.beak],
       [BODY, COLORS.ink],
       [pts(BAND), COLORS.band],
-      [pts(BEAK), COLORS.beak],
       [circle, COLORS.tile],
     ]
       .map(([d, c]) => `        <path android:fillColor="${c.toUpperCase()}" android:pathData="${d}" />\n`)

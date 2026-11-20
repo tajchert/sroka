@@ -16,6 +16,6 @@
         <!-- Beak -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M69,27 L83,33 L69,39 Z" />
+            android:pathData="M66,28 L70,28 L83,33.5 L70,39 L66,39 Z" />
     </group>
 </vector>

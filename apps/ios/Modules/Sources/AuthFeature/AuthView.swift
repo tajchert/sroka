@@ -363,6 +363,10 @@ struct BrandMark: View {
                 path.closeSubpath()
                 return path
             }
+            context.fill(
+                polygon([(66, 28), (70, 28), (83, 33.5), (70, 39), (66, 39)]),
+                with: .color(Color(red: 0xF2 / 255, green: 0xC8 / 255, blue: 0x4B / 255))
+            )
             var body = Path()
             body.move(to: point(30, 20))
             body.addLine(to: point(62, 20))
@@ -375,10 +379,6 @@ struct BrandMark: View {
             context.fill(
                 polygon([(30, 56), (70, 46), (70, 58), (30, 68)]),
                 with: .color(Color(red: 0x1E / 255, green: 0x6F / 255, blue: 0x8F / 255))
-            )
-            context.fill(
-                polygon([(69, 27), (83, 33), (69, 39)]),
-                with: .color(Color(red: 0xF2 / 255, green: 0xC8 / 255, blue: 0x4B / 255))
             )
             context.fill(
                 Path(ellipseIn: CGRect(x: 54 * k, y: 28 * k, width: 8 * k, height: 8 * k)),

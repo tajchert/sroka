@@ -46,6 +46,14 @@ final class SrokaJourneyTests: XCTestCase {
         let body = web.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", Journey.articleWord))
         expect(body.firstMatch, "article text with '\(Journey.articleWord)'", timeout: 40, app: app)
         shot("b3-reader-top")
+        // The header (title, meta line) rests below the floating back and Aa buttons, sharp, at the top of the page.
+        XCTAssertGreaterThan(
+            screens.titleTop(in: web), screens.topControlsBottom(),
+            "the article header starts below the floating top controls")
+        // The same page in the dark theme (chosen in the reader's own appearance sheet, restored below).
+        screens.chooseReaderTheme("Dark")
+        shot("b3-reader-top-dark")
+        screens.chooseReaderTheme("Auto")
 
         for _ in 0..<4 { web.swipeUp() }
         let progress = screens.readingProgress()
@@ -59,13 +67,18 @@ final class SrokaJourneyTests: XCTestCase {
         let screens2 = Screens(app: app2, test: self)
         screens2.ensureSignedIn()
         screens2.waitForArticleRow().tap()
-        expect(
+        let web2 = expect(app2.webViews.firstMatch, "reader web view after reopening", timeout: 40, app: app2)
+        shot("b5a-reader-reopening")  // as early as the reader is there: the page may still be loading
+        // b5 is taken once the notice is on screen and article text is hittable, never before.
+        let toast = expect(
             app2.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "Resumed at")).firstMatch,
-            "'Resumed at N%' toast after reopening", timeout: 40, app: app2)
-        // The notice must not outrun the page: the text is on screen the moment "Resumed at N%" shows.
+            "'Resumed at N%' toast after reopening", timeout: 20, app: app2)
+        XCTAssertTrue(toast.isHittable, "the resume notice is on screen")
+        usleep(300_000)  // the toast has finished sliding in
         shot("b5-reader-resumed")
+        // The text query is slow (the toast stays about 6 s), so it follows the shot; nothing scrolls in between.
         XCTAssertGreaterThan(
-            screens2.visibleBodyTexts(in: app2.webViews.firstMatch), 0,
+            screens2.visibleBodyTexts(in: web2), 0,
             "article text is on screen when the resume notice shows, not only in the DOM")
         XCTAssertGreaterThan(screens2.readingProgress(), 0, "the progress line starts where the reader left")
     }

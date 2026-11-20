@@ -64,6 +64,8 @@ struct ArticleWebView: UIViewRepresentable {
     let restore: RestorePoint
     let appearance: WebAppearance
     let header: ReaderHeader?
+    /// Space under the floating top controls: the page rests below it and scrolls under it (soft edge effect).
+    let topInset: CGFloat
     let endPaddingPx: Int
     let scrollToTopRequest: Int
     let onProgress: (ProgressReport) -> Void
@@ -192,6 +194,7 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     func update(from view: ArticleWebView, webView: WKWebView) {
         parent = view
         applyBackground(view.appearance.theme, to: webView)
+        applyTopInset(view.topInset, to: webView)
         if loadedDocument != view.document {
             load(view, into: webView)
             return
@@ -225,6 +228,18 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
         webView.backgroundColor = color
         webView.scrollView.backgroundColor = color
         webView.overrideUserInterfaceStyle = theme.isDark ? .dark : .light
+    }
+
+    /// The web view fills the screen, so without an inset the header would start under the status bar and toolbar.
+    /// A page resting at its top stays at its top when the inset changes; a scrolled page keeps its place.
+    private func applyTopInset(_ inset: CGFloat, to webView: WKWebView) {
+        let scrollView = webView.scrollView
+        guard scrollView.contentInset.top != inset else { return }
+        let atRest = scrollView.contentOffset.y <= -scrollView.contentInset.top + 1
+        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.contentInset.top = inset
+        scrollView.verticalScrollIndicatorInsets.top = inset
+        if atRest { scrollView.contentOffset.y = -inset }
     }
 
     private func load(_ view: ArticleWebView, into webView: WKWebView) {

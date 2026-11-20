@@ -253,6 +253,40 @@ struct Screens {
         back.tap()
     }
 
+    /// Top edge (screen points) of the article title in the page header.
+    func titleTop(in web: XCUIElement) -> CGFloat {
+        let title = web.staticTexts.matching(NSPredicate(format: "label == %@", Journey.articleTitle)).firstMatch
+        test.expect(title, "article title in the page header", app: app)
+        return title.frame.minY
+    }
+
+    /// Bottom edge (screen points) of the floating back / Aa / more buttons.
+    func topControlsBottom() -> CGFloat {
+        let buttons = app.navigationBars.buttons
+        var bottom: CGFloat = 0
+        for index in 0..<buttons.count { bottom = max(bottom, buttons.element(boundBy: index).frame.maxY) }
+        return bottom
+    }
+
+    /// The reader's own appearance sheet (Aa): pick a theme swatch by its label, then close the sheet.
+    func chooseReaderTheme(_ name: String) {
+        let aa = app.buttons["Appearance"].firstMatch
+        if !aa.isHittable { app.webViews.firstMatch.tap() }  // the chrome is hidden: a tap on the page shows it
+        test.expect(aa, "Aa (appearance) button", app: app)
+        aa.tap()
+        let swatch = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", name)).firstMatch
+        test.expect(swatch, "theme swatch \(name)", app: app)
+        swatch.tap()
+        // Drag the fitted sheet down by its title (the sheet starts about half way down the screen).
+        let title = app.staticTexts["Appearance"].firstMatch
+        let from =
+            title.exists
+            ? title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.52))
+        from.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
+        XCTAssertTrue(test.waitForDisappearance(of: swatch), "the appearance sheet closes")
+    }
+
     func openSettings() {
         let avatar = app.buttons["Settings"].firstMatch
         test.expect(avatar, "Settings (avatar) button", app: app)

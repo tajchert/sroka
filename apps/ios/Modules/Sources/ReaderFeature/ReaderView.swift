@@ -42,6 +42,9 @@ struct ReaderScreen: View {
     @Binding var safari: SafariDestination?
     @Binding var sheetHeight: CGFloat
     @Environment(\.colorScheme) private var colorScheme
+    /// Space the floating top controls (status bar and toolbar) take while they are shown. The page rests below it
+    /// and scrolls under it. Kept while the toolbar is hidden, so hiding it does not move the text.
+    @State private var topInset: CGFloat = 0
 
     private var theme: EffectiveTheme {
         EffectiveTheme.resolve(model.appearance.preferences.readerTheme, systemDark: colorScheme == .dark)
@@ -54,9 +57,14 @@ struct ReaderScreen: View {
             theme.palette.background.ignoresSafeArea()
             if model.appearance.isLoaded {
                 ReaderContent(
-                    model: model, theme: theme, originalURL: originalURL, isChromeVisible: $isChromeVisible,
-                    onOpenLink: { safari = SafariDestination(url: $0) })
+                    model: model, theme: theme, originalURL: originalURL, topInset: topInset,
+                    isChromeVisible: $isChromeVisible, onOpenLink: { safari = SafariDestination(url: $0) })
             }
+        }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.safeAreaInsets.top
+        } action: { inset in
+            if isChromeVisible || inset > topInset { topInset = inset }
         }
         .overlay(alignment: .top) {
             if model.isReaderShown {
@@ -108,10 +116,36 @@ private struct ReaderContent: View {
     let model: ReaderViewModel
     let theme: EffectiveTheme
     let originalURL: URL?
+    let topInset: CGFloat
     @Binding var isChromeVisible: Bool
     let onOpenLink: (URL) -> Void
+    /// The article page has painted (the opening header gives way to it).
+    @State private var pageDisplayed = false
 
     var body: some View {
+        ZStack(alignment: .top) {
+            stateContent
+            // The page takes about a second to load and paint, so the title is up from the first frame.
+            if showsOpeningHeader, let header {
+                ReaderOpeningHeader(header: header, theme: theme, topInset: topInset)
+                    .ignoresSafeArea()  // same frame as the full-screen web view; topInset already counts the safe area
+                    // Up at once, fades out when the page takes over.
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: showsOpeningHeader)
+    }
+
+    private var showsOpeningHeader: Bool {
+        guard !model.isPdf else { return false }
+        switch model.state {
+        case .loading: return true
+        case .ready: return !pageDisplayed
+        default: return false
+        }
+    }
+
+    @ViewBuilder private var stateContent: some View {
         switch model.state {
         case .loading, .missing:
             Color.clear
@@ -121,6 +155,7 @@ private struct ReaderContent: View {
                 restore: model.restorePoint(),
                 appearance: webAppearance,
                 header: header,
+                topInset: topInset,
                 endPaddingPx: model.endsWithCard ? ReaderHtml.endCardPaddingPx : ReaderHtml.defaultEndPaddingPx,
                 scrollToTopRequest: model.scrollToTopRequest,
                 onProgress: { model.readingPositionReported($0) },
@@ -131,7 +166,10 @@ private struct ReaderContent: View {
                 },
                 onOpenLink: onOpenLink,
                 onProcessTerminated: { model.webProcessTerminated() },
-                onLoaded: { model.articleDisplayed() }
+                onLoaded: {
+                    pageDisplayed = true
+                    model.articleDisplayed()
+                }
             )
             .ignoresSafeArea()
         case .pdfReady(let file):

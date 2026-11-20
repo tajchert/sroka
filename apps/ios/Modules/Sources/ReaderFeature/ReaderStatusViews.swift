@@ -149,3 +149,27 @@ struct OpenOriginalButton: View {
         }
     }
 }
+
+/// The article header (site, title, meta line) in native text while the page loads: same place, size and colours as
+/// the page's own header, so the page takes over without a jump. Hidden from accessibility (the page has the text).
+struct ReaderOpeningHeader: View {
+    let header: ReaderHeader
+    let theme: EffectiveTheme
+    let topInset: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(header.site).font(.system(size: 14, weight: .medium)).foregroundStyle(theme.palette.link)
+            Text(header.title).font(.system(size: 28, weight: .semibold)).lineSpacing(0)
+            Text(header.metaPrefix.trimmingCharacters(in: CharacterSet(charactersIn: " ·")))
+                .font(.system(size: 14)).opacity(0.65)
+        }
+        .foregroundStyle(theme.palette.text)
+        .padding(.horizontal, 17.6)
+        .padding(.top, topInset + 20)
+        .frame(maxWidth: 720, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+}

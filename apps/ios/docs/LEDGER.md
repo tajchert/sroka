@@ -29,7 +29,7 @@ Integration branch: `t3/ios-app-native`. Brief: `apps/ios/docs/BRIEF.md`.
 ## Open items
 
 - Stream L: `HTTPSrokaAPI` takes base URL and token from one snapshot.
-- Polish: feature String Catalogs are empty; remove unused `ContentStoreURL`; check reader glass and insets on a simulator.
+- Polish: feature String Catalogs are empty; check reader glass and insets on a simulator.
 - Final review: untested race fixes in H (4) and G (2).
 - Gate on ad8eb4d (after D, J): format and `build Dev` pass; full `unit` had one failure, `LibraryViewModelTests` "Filters combine with AND", which passed 3 of 3 alone. Flaky under the parallel run; fix in polish.
 

@@ -82,6 +82,7 @@ let package = Package(
             dependencies: [
                 "SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies,
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
         .target(name: "SrokaSession", dependencies: ["SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies]),
@@ -103,7 +104,13 @@ let package = Package(
             dependencies: testDependencies("SrokaDatabase") + [.product(name: "GRDB", package: "GRDB.swift")]
         ),
         .testTarget(name: "SrokaSyncTests", dependencies: testDependencies("SrokaSync")),
-        .testTarget(name: "SrokaContentTests", dependencies: testDependencies("SrokaContent")),
+        .testTarget(
+            name: "SrokaContentTests",
+            dependencies: testDependencies("SrokaContent") + [
+                "SrokaDatabase", "SrokaNetwork", .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         .testTarget(name: "SrokaSessionTests", dependencies: testDependencies("SrokaSession")),
         .testTarget(name: "AuthFeatureTests", dependencies: testDependencies("AuthFeature")),
         .testTarget(name: "LibraryFeatureTests", dependencies: testDependencies("LibraryFeature")),

@@ -273,6 +273,14 @@ public final class LibraryViewModel {
         }
     }
 
+    /// What the user typed or pasted: the first URL inside text, else the trimmed text itself when
+    /// it is a web address. Nil means "not a valid web address".
+    static func link(from raw: String) -> String? {
+        if let found = UrlNormalizer.extractFirstUrl(raw) { return found }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return UrlNormalizer.isHttpUrl(trimmed) ? trimmed : nil
+    }
+
     static func avatarLetter(for session: SessionState) -> String {
         guard let email = session.email, let first = email.first(where: { $0.isLetter || $0.isNumber }) else {
             return "?"
@@ -453,12 +461,12 @@ public final class LibraryViewModel {
     /// Fills the field from the clipboard (system paste button: no permission prompt).
     public func pasted(_ strings: [String]) {
         guard let text = strings.first else { return }
-        addLinkText = LinkExtraction.link(from: text) ?? text
+        addLinkText = Self.link(from: text) ?? text
     }
 
     /// Onboarding chip "Save link from clipboard": saves the pasted link without the sheet.
     public func saveClipboardLinkTapped(_ strings: [String]) async {
-        guard let link = strings.lazy.compactMap({ LinkExtraction.link(from: $0) }).first else {
+        guard let link = strings.lazy.compactMap({ Self.link(from: $0) }).first else {
             showToast(LibraryStrings.noLinkFound)
             return
         }
@@ -466,7 +474,7 @@ public final class LibraryViewModel {
     }
 
     public func saveLinkTapped() async {
-        guard let link = LinkExtraction.link(from: addLinkText) else {
+        guard let link = Self.link(from: addLinkText) else {
             isAddLinkInvalid = true
             return
         }
@@ -515,13 +523,13 @@ public final class LibraryViewModel {
 
     /// Text dropped onto the list: every link found in it.
     public func textDropped(_ strings: [String]) async {
-        let urls = strings.compactMap { LinkExtraction.firstURL(in: $0) }.compactMap { URL(string: $0) }
+        let urls = strings.compactMap { UrlNormalizer.extractFirstUrl($0) }.compactMap { URL(string: $0) }
         await linksDropped(urls)
     }
 
     public func linksDropped(_ urls: [URL]) async {
         var seen = Set<String>()
-        let links = urls.map(\.absoluteString).filter { LinkExtraction.isHTTPURL($0) && seen.insert($0).inserted }
+        let links = urls.map(\.absoluteString).filter { UrlNormalizer.isHttpUrl($0) && seen.insert($0).inserted }
         guard !links.isEmpty else {
             showToast(LibraryStrings.noLinkFound)
             return

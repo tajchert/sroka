@@ -451,6 +451,13 @@ struct LibraryViewModelTests {
         #expect(model.addLinkText == "https://example.com/p")
     }
 
+    @Test func `A typed address is trimmed and other text is not a link`() {
+        #expect(LibraryViewModel.link(from: "  https://example.com/x \n") == "https://example.com/x")
+        #expect(LibraryViewModel.link(from: "see (https://example.com/page).") == "https://example.com/page")
+        #expect(LibraryViewModel.link(from: "ftp://example.com/file") == nil)
+        #expect(LibraryViewModel.link(from: "example.com") == nil)
+    }
+
     @Test func `Saving from the clipboard chip saves without the sheet`() async {
         let model = await makeModel()
         await model.saveClipboardLinkTapped(["nothing here"])

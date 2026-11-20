@@ -24,8 +24,18 @@ struct ReaderProgressLine: View {
     }
 }
 
+extension View {
+    /// Glass for the reader's floating chrome (bottom bar, toast, end-of-article card): regular Liquid Glass tinted
+    /// with the page colour, so article text scrolling behind it stays out of the labels. The system swaps it for a
+    /// solid fill under Reduce Transparency. Neighbours go in one `GlassEffectContainer` (`ReaderBottomOverlay`).
+    func readerGlass<S: Shape>(_ theme: EffectiveTheme, in shape: S) -> some View {
+        glassEffect(.regular.tint(theme.palette.background.opacity(0.85)), in: shape)
+    }
+}
+
 /// Floating glass bar: favorite, archive, tags, share.
 struct ReaderBottomBar<ShareContent: View>: View {
+    let theme: EffectiveTheme
     let isFavorite: Bool
     let isArchived: Bool
     let onFavorite: () -> Void
@@ -52,7 +62,8 @@ struct ReaderBottomBar<ShareContent: View>: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .floatingGlass()
+        .foregroundStyle(theme.palette.text)
+        .readerGlass(theme, in: .capsule)
     }
 
     private func barButton(_ symbol: String, label: Text, tint: Color? = nil, action: @escaping () -> Void) -> some View
@@ -60,7 +71,7 @@ struct ReaderBottomBar<ShareContent: View>: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.title3)
-                .foregroundStyle(tint ?? Color.primary)
+                .foregroundStyle(tint ?? theme.palette.text)
                 .frame(width: 52, height: 44)
         }
         .buttonStyle(.plain)
@@ -70,6 +81,19 @@ struct ReaderBottomBar<ShareContent: View>: View {
 
 /// Transient notice above the bottom bar ("Article refreshed", "Resumed at 42%" + Start over).
 struct ReaderToastView: View {
+    let theme: EffectiveTheme
+    let toast: ReaderToast
+    let onStartOver: () -> Void
+
+    var body: some View {
+        ReaderToastContent(theme: theme, toast: toast, onStartOver: onStartOver)
+            .readerGlass(theme, in: .capsule)
+    }
+}
+
+/// The toast's text and button without the glass, which renders blank off-screen (snapshot tests).
+struct ReaderToastContent: View {
+    let theme: EffectiveTheme
     let toast: ReaderToast
     let onStartOver: () -> Void
 
@@ -87,7 +111,7 @@ struct ReaderToastView: View {
         .font(.subheadline)
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
-        .floatingGlass()
+        .foregroundStyle(theme.palette.text)
         .accessibilityElement(children: .combine)
     }
 

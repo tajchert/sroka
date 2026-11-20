@@ -159,6 +159,10 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
         webView.allowsLinkPreview = false
         webView.allowsBackForwardNavigationGestures = false
         webView.isOpaque = false
+        // The page runs under the status bar, the toolbar and the floating bar: a soft scroll-edge effect
+        // fades the text out under them (the web view fills the screen; see `ReaderContent`).
+        webView.scrollView.topEdgeEffect.style = .soft
+        webView.scrollView.bottomEdgeEffect.style = .soft
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
         tap.cancelsTouchesInView = false

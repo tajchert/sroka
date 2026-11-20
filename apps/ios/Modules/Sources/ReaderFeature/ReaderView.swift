@@ -185,9 +185,17 @@ private struct ReaderBottomOverlay: View {
     let isChromeVisible: Bool
 
     var body: some View {
+        GlassEffectContainer(spacing: 10) {
+            chrome
+        }
+        .environment(\.colorScheme, theme.isDark ? .dark : .light)
+        .padding(.bottom, 8)
+    }
+
+    private var chrome: some View {
         VStack(spacing: 10) {
             if let toast = model.toast {
-                ReaderToastView(toast: toast, onStartOver: { model.startOverTapped() })
+                ReaderToastView(theme: theme, toast: toast, onStartOver: { model.startOverTapped() })
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if model.isEndCardShown {
@@ -204,6 +212,7 @@ private struct ReaderBottomOverlay: View {
             }
             if isChromeVisible, model.isReaderShown, let item = model.item {
                 ReaderBottomBar(
+                    theme: theme,
                     isFavorite: item.isFavorite,
                     isArchived: item.status == .archived,
                     onFavorite: { Task { await model.favoriteTapped() } },
@@ -215,7 +224,6 @@ private struct ReaderBottomOverlay: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.bottom, 8)
     }
 }
 

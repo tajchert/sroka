@@ -126,8 +126,8 @@ struct ReaderSnapshotTests {
 
     @Test func toastsAndProgressLine() {
         let view = VStack(spacing: 16) {
-            ReaderToastView(toast: .resumed(percent: 42), onStartOver: {})
-            ReaderToastView(toast: .refreshedPartial, onStartOver: {})
+            ReaderToastContent(theme: .light, toast: .resumed(percent: 42), onStartOver: {})
+            ReaderToastContent(theme: .light, toast: .refreshedPartial, onStartOver: {})
             ReaderProgressLine(progress: 0.42, theme: .light)
         }
         .padding()

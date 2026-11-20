@@ -26,7 +26,8 @@ struct EndOfArticleCard: View {
         }
         .padding(18)
         .frame(maxWidth: 560, alignment: .leading)
-        .floatingGlass(cornerRadius: 22)
+        .foregroundStyle(theme.palette.text)
+        .readerGlass(theme, in: .rect(cornerRadius: 22))
         .padding(.horizontal, 16)
     }
 }

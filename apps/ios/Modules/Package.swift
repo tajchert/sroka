@@ -76,7 +76,13 @@ let package = Package(
             dependencies: ["SrokaCore", dependencies, .product(name: "GRDB", package: "GRDB.swift")]
         ),
         // MARK: Engine (G sync, H content, I session)
-        .target(name: "SrokaSync", dependencies: ["SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies, clocks]),
+        .target(
+            name: "SrokaSync",
+            dependencies: [
+                "SrokaCore", "SrokaNetwork", "SrokaDatabase", dependencies, clocks,
+                .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         .target(
             name: "SrokaContent",
             dependencies: [
@@ -109,7 +115,12 @@ let package = Package(
             name: "SrokaDatabaseTests",
             dependencies: testDependencies("SrokaDatabase") + [.product(name: "GRDB", package: "GRDB.swift")]
         ),
-        .testTarget(name: "SrokaSyncTests", dependencies: testDependencies("SrokaSync")),
+        .testTarget(
+            name: "SrokaSyncTests",
+            dependencies: testDependencies("SrokaSync") + [
+                "SrokaDatabase", "SrokaNetwork", .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         .testTarget(
             name: "SrokaContentTests",
             dependencies: testDependencies("SrokaContent") + [

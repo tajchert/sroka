@@ -62,6 +62,14 @@ for (const [d, n] of [["mdpi", 48], ["hdpi", 72], ["xhdpi", 96], ["xxhdpi", 144]
 }
 await png(svg("square"), 512, "apps/android/app/src/main/ic_launcher-playstore.png");
 
+// iOS: one 1024 px opaque square (the system applies the mask); App Store icons must have no alpha.
+await sharp(Buffer.from(svg("square")), { density: 72 * 11 * 4 })
+  .resize(1024, 1024)
+  .flatten({ background: COLORS.tile })
+  .removeAlpha()
+  .png()
+  .toFile(join(root, "apps/ios/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png"));
+
 // Adaptive foreground: the 100-unit tile maps onto the 72dp visible area of the 108dp layer.
 const group = (body) => `    <group android:scaleX="0.72" android:scaleY="0.72" android:translateX="18" android:translateY="18">\n${body}    </group>\n`;
 const vector = (body) =>

@@ -24,11 +24,16 @@ struct ShareAccount: Sendable {
     let stored: @Sendable () -> StoredSession?
     /// The stored device id, never created here.
     let deviceId: @Sendable () -> String?
+    /// The App Group account marker; the wipe clears it even when deleting the Keychain item fails.
+    let accountServer: @Sendable () -> String?
 
-    /// The Keychain still holds the token the sheet was opened with (expired or not).
+    /// The Keychain still holds the token the sheet was opened with (expired or not), and the account marker is set
+    /// (for the launch session's server, when it recorded one).
     var isCurrent: Bool {
-        guard let launch, let now = stored() else { return false }
-        return now.token == launch.token && now.server == launch.server
+        guard let launch, let now = stored(), now.token == launch.token, now.server == launch.server,
+            let marker = accountServer()
+        else { return false }
+        return launch.server == nil || launch.server == marker
     }
 
     /// Requests may go out: the account is current and the app has created the device id.
@@ -153,32 +158,37 @@ struct ShareApiSessionProvider: ApiSessionProvider {
     func deviceId() async -> String { account.deviceId() ?? "" }
 }
 
-/// The calls the extension makes (push, PDF and thumbnail upload), each only while the launch account is current
-/// and the device id exists. Otherwise they throw a 401, which leaves ops and PDFs queued for the app; the other
-/// calls are never used here and throw `invalidRequest`.
+/// The calls the extension makes (push, PDF and thumbnail upload), each only while the launch account is current,
+/// the device id exists and the endpoint carries a token. Otherwise they throw a 401, which leaves ops and PDFs
+/// queued for the app (an `invalidRequest` from the refused endpoint would fail a PDF permanently); the other calls
+/// are never used here and throw `invalidRequest`.
 struct ShareAPI: SrokaAPI {
     let base: any SrokaAPI
     let account: ShareAccount
+    /// The provider would attach a token (server and account marker match).
+    let endpointUsable: @Sendable () async -> Bool
 
-    private func authorize() throws {
-        guard account.canSend else { throw ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil) }
+    private func authorize() async throws {
+        guard account.canSend, await endpointUsable() else {
+            throw ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)
+        }
     }
 
     func push(payloads: [String]) async throws -> PushResponseDto {
-        try authorize()
+        try await authorize()
         return try await base.push(payloads: payloads)
     }
 
     func uploadPdf(
         file: URL, fileName: String, tags: [String], source: ItemSource, onProgress: ByteProgress?
     ) async throws -> PdfUploadResponseDto {
-        try authorize()
+        try await authorize()
         return try await base.uploadPdf(
             file: file, fileName: fileName, tags: tags, source: source, onProgress: onProgress)
     }
 
     func uploadThumbnail(itemId: String, data: Data, contentType: String) async throws -> ItemDto {
-        try authorize()
+        try await authorize()
         return try await base.uploadThumbnail(itemId: itemId, data: data, contentType: contentType)
     }
 
@@ -210,6 +220,14 @@ struct SharePdfUploader: PdfUploader {
     var uploads: AsyncStream<[PdfUpload]> { base.uploads }
 
     func enqueue(_ fileURLs: [URL]) async -> [PdfUpload] {
+        guard account.isCurrent else {
+            return fileURLs.map { url in
+                PdfUpload(
+                    id: UUID().uuidString, fileName: url.lastPathComponent, sizeBytes: 0, state: .failed(.unknown))
+            }
+        }
+        // Each sidecar carries the launch account's owner key: if this races a sign-out, the app never uploads the
+        // file under the next account (it deletes it on resume).
         let uploads = await base.enqueue(fileURLs)
         guard account.isCurrent else {
             for upload in uploads { await base.cancel(id: upload.id) }

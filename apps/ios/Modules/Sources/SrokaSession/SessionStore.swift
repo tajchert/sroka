@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SrokaCore
 import Synchronization
@@ -178,5 +179,14 @@ public final class SessionStore: Sendable {
             !stored.token.isEmpty, !stored.email.isEmpty
         else { return nil }
         return StoredSession(token: stored.token, email: stored.email, expired: stored.expired, server: stored.server)
+    }
+}
+
+extension StoredSession {
+    /// Identifies the account (issuing server and email) without spelling out the email: hex SHA-256. Stamped on
+    /// queued PDF uploads so one queued for an account is never uploaded under another.
+    public var ownerKey: String {
+        SHA256.hash(data: Data("\(server ?? "")\n\(email.lowercased())".utf8))
+            .map { String(format: "%02x", $0) }.joined()
     }
 }

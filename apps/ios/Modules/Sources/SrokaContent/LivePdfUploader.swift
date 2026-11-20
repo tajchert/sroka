@@ -36,6 +36,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         var sizeBytes: Int64
         var attempts: Int
         var tags: [String]
+        /// `owner()` when the file was queued; nil in sidecars written before it was recorded.
+        var owner: String?
     }
 
     private let api: any SrokaAPI
@@ -45,6 +47,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private let now: @Sendable () -> Date
     private let renderThumbnail: @Sendable (URL) -> Data?
     private let onUnauthorized: @Sendable () async -> Void
+    private let owner: @Sendable () -> String?
     /// Uploads run one at a time.
     private let lane = KeyedLock()
     var laneForTests: KeyedLock { lane }
@@ -65,7 +68,8 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         now: @escaping @Sendable () -> Date = { Date() },
         renderThumbnail: @escaping @Sendable (URL) -> Data? = { PdfThumbnailRenderer.render($0) },
-        onUnauthorized: @escaping @Sendable () async -> Void = {}
+        onUnauthorized: @escaping @Sendable () async -> Void = {},
+        owner: @escaping @Sendable () -> String? = { nil }
     ) {
         self.api = api
         self.paths = paths
@@ -74,6 +78,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         self.now = now
         self.renderThumbnail = renderThumbnail
         self.onUnauthorized = onUnauthorized
+        self.owner = owner
         try? paths.prepare(paths.pdfUploads)
     }
 
@@ -121,7 +126,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)) ?? []
         for name in names.sorted() where name.hasSuffix(".json") {
             let id = String(name.dropLast(5))
-            guard let meta = readMetadata(id) else {
+            guard let meta = readMetadata(id), ownedByCurrentAccount(meta) else {
                 deleteFiles(id)
                 continue
             }
@@ -163,7 +168,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             paths.removeIfPresent(dest)
             return failed(error)
         }
-        let meta = Metadata(id: id, fileName: fileName, sizeBytes: copied, attempts: 0, tags: [])
+        let meta = Metadata(id: id, fileName: fileName, sizeBytes: copied, attempts: 0, tags: [], owner: owner())
         do {
             try JSONEncoder().encode(meta).write(to: metaURL, options: .atomic)
         } catch {
@@ -242,6 +247,11 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private func process(_ id: String) async {
         while !Task.isCancelled {
             guard var meta = readMetadata(id), let file = paths.pdfUpload(id) else {
+                finish(id, .failed(.unknown))
+                return
+            }
+            // Queued for another account (the share extension raced a sign-out): never upload it under this one.
+            guard ownedByCurrentAccount(meta) else {
                 finish(id, .failed(.unknown))
                 return
             }
@@ -348,6 +358,12 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private func deleteFiles(_ id: String) {
         if let file = paths.pdfUpload(id) { paths.removeIfPresent(file) }
         if let meta = paths.pdfUploadMetadata(id) { paths.removeIfPresent(meta) }
+    }
+
+    /// A sidecar without an owner predates the field and stays uploadable.
+    private func ownedByCurrentAccount(_ meta: Metadata) -> Bool {
+        guard let queuedBy = meta.owner else { return true }
+        return queuedBy == owner()
     }
 
     private func readMetadata(_ id: String) -> Metadata? {

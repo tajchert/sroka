@@ -345,6 +345,25 @@ struct SignOutTests {
         #expect(h.sessionStore.current == nil)
     }
 
+    @Test func `A failed second table clear reports the wipe as failed`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co")
+        struct Boom: Error {}
+        let passes = Mutex(0)
+        let wiper = LocalDataWiper(
+            database: h.database, cancelAllWork: {},
+            clearTables: {
+                let pass = passes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 2 { throw Boom() }
+            },
+            deleteFiles: {}, transferDirectories: [], sessionStore: h.sessionStore, preferences: h.preferences,
+            importJobs: h.jobs)
+        #expect(await wiper.wipe() == false)
+    }
+
     @Test func `A share committed before the token is cleared is removed by the wipe's second clear`() async throws {
         let h = try Harness()
         _ = await h.signIn("a@b.co")

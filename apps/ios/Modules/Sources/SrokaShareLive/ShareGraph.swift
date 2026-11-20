@@ -89,17 +89,18 @@ public struct ShareGraph: Sendable {
         let account = ShareAccount(
             launch: sessionStore.current,
             stored: { SessionStore(store: keychain).current },
-            deviceId: { sessionStore.existingDeviceId() })
-        let api = HTTPSrokaAPI(
-            provider: ShareApiSessionProvider(
-                base: LiveApiSessionProvider(
-                    sessionStore: sessionStore, preferences: preferences,
-                    defaultServerUrl: environment.apiBaseURL.absoluteString),
-                account: account),
-            identity: ClientIdentity(appVersion: configuration.appVersion))
+            deviceId: { sessionStore.existingDeviceId() },
+            accountServer: { preferences.accountServer })
+        let provider = ShareApiSessionProvider(
+            base: LiveApiSessionProvider(
+                sessionStore: sessionStore, preferences: preferences,
+                defaultServerUrl: environment.apiBaseURL.absoluteString),
+            account: account)
+        let api = HTTPSrokaAPI(provider: provider, identity: ClientIdentity(appVersion: configuration.appVersion))
         return .ready(
             ShareGraph(
-                environment: environment, database: database, api: api, sessionStore: sessionStore,
+                environment: environment, database: database, api: api,
+                endpointUsable: { await provider.endpoint().token != nil }, sessionStore: sessionStore,
                 account: account, clockStore: DefaultsOpClockStore.appGroup(group), paths: paths))
     }
 
@@ -132,6 +133,7 @@ public struct ShareGraph: Sendable {
         environment: AppEnvironment,
         database: AppDatabase,
         api: any SrokaAPI,
+        endpointUsable: @escaping @Sendable () async -> Bool = { true },
         sessionStore: SessionStore,
         account: ShareAccount,
         clockStore: any OpClockStore,
@@ -140,7 +142,7 @@ public struct ShareGraph: Sendable {
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         let controller = ShareSyncController()
-        let api = ShareAPI(base: api, account: account)
+        let api = ShareAPI(base: api, account: account, endpointUsable: endpointUsable)
         let gate = ShareWriteGate(account: account)
         // Every commit on this connection re-checks the account inside its transaction.
         database.writer.add(transactionObserver: ShareCommitCheck(account: account), extent: .databaseLifetime)
@@ -157,7 +159,9 @@ public struct ShareGraph: Sendable {
         // `resumePendingUploads()` finishes whatever the extension could not.
         // No thumbnail here: PDFKit may decode a first-page scan at full size, past the extension's memory limit.
         uploader = SharePdfUploader(
-            base: LivePdfUploader(api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil }),
+            base: LivePdfUploader(
+                api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil },
+                owner: { [launch = account.launch] in launch?.ownerKey }),
             account: account)
         self.account = account
         self.gate = gate
@@ -181,15 +185,18 @@ public struct ShareGraph: Sendable {
         // account's): leave the push to the app.
         guard account.canSend else { return }
         let engine = engine
+        let gate = gate
         await withTimeout(Self.pushTimeout, clock: clock) {
-            let outcome = await engine.pushOnce()
-            if case .success = outcome { return }
+            // Through the write gate: a push the timeout cancelled may still be writing its bookkeeping, and
+            // `closeWrites` must wait for it before the database is suspended.
+            let outcome = try? await gate.admit { await engine.pushOnce() }
+            if case .success? = outcome { return }
             shareLog.info("share push deferred to the app")
         }
     }
 
-    /// The sheet is closing: refuses new local writes and waits for the running ones (a tag save the editor left
-    /// behind, a favorite), so the database is never suspended under a commit.
+    /// The sheet is closing: refuses new local writes and pushes and waits for the running ones (a tag save the editor
+    /// left behind, a favorite, a cancelled push still unwinding), so the database is never suspended under a commit.
     public func closeWrites() async {
         await gate.closeAndDrain()
     }

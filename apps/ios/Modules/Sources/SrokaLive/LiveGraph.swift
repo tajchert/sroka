@@ -130,7 +130,8 @@ public final class LiveGraph: Sendable {
             opClock: OpClock(now: systemNowMillis, store: DefaultsOpClockStore.appGroup(group)),
             admission: wipeGuard)
         let uploader = LivePdfUploader(
-            api: api, paths: paths, syncController: scheduler, onUnauthorized: onUnauthorized)
+            api: api, paths: paths, syncController: scheduler, onUnauthorized: onUnauthorized,
+            owner: { sessionStore.current?.ownerKey })
 
         // Session engine.
         let importJobs = ImportJobStore(preferences: preferences)

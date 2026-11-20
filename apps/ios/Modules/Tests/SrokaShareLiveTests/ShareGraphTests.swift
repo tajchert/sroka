@@ -210,8 +210,10 @@ struct ShareGraphTests {
             appStarted.open()
             throw ApiError.http(status: 400, code: nil, message: nil, retryAfter: nil)
         }
+        let owner = try #require(SessionStore(store: group.secureStore).current?.ownerKey)
         let appUploader = LivePdfUploader(
-            api: appAPI, paths: group.paths, syncController: ShareSyncController(), renderThumbnail: { _ in nil })
+            api: appAPI, paths: group.paths, syncController: ShareSyncController(), renderThumbnail: { _ in nil },
+            owner: { owner })
         appUploader.resumePendingUploads()
         await appStarted.wait()
         #expect(appAPI.events == ["upload:Report.pdf"])
@@ -276,7 +278,7 @@ struct ShareGraphTests {
             _ = try await HTTPSrokaAPI(provider: provider, identity: ClientIdentity(appVersion: "1")).push(payloads: [])
         }
         await #expect(throws: ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)) {
-            _ = try await ShareAPI(base: api, account: account).push(payloads: ["{}"])
+            _ = try await ShareAPI(base: api, account: account, endpointUsable: { true }).push(payloads: ["{}"])
         }
         await graph.pushOnce()
         #expect(api.events.isEmpty)
@@ -296,6 +298,82 @@ struct ShareGraphTests {
         let left = (try? FileManager.default.contentsOfDirectory(atPath: group.paths.pdfUploads.path)) ?? []
         #expect(left.isEmpty)
         #expect(api.events.isEmpty)
+    }
+
+    @Test func `A PDF a stale sheet queued is deleted, not uploaded, by the next account's app`() async throws {
+        try group.appOpened()
+        let gate = Gate()
+        let graph = try group.graph(api: api)
+        api.onUpload { _, _ in
+            await gate.wait()
+            throw CancellationError()
+        }
+        let source = group.root.appending(path: "Stale.pdf")
+        try Data("%PDF-1.7\n1 0 obj\n".utf8).write(to: source)
+        // The sheet published the file just before the app's wipe, then was suspended.
+        _ = await graph.uploader.enqueue([source])
+        try group.appSwitched(signedInAs: "other-token")
+
+        let appAPI = ShareFakeAPI()
+        let newOwner = try #require(SessionStore(store: group.secureStore).current?.ownerKey)
+        let appUploader = LivePdfUploader(
+            api: appAPI, paths: group.paths, syncController: ShareSyncController(), renderThumbnail: { _ in nil },
+            owner: { newOwner })
+        appUploader.resumePendingUploads()
+
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: group.paths.pdfUploads.path)) ?? []
+        #expect(left.isEmpty)
+        #expect(appAPI.events.isEmpty)
+        gate.open()
+    }
+
+    @Test func `With the account marker cleared nothing is written, even if the Keychain item survived`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        // The wipe could not delete the Keychain item but cleared the marker.
+        group.marker.withLock { $0 = nil }
+
+        let saved = await graph.library.save(url: "https://example.com/kept", title: nil, tags: [], source: .share)
+
+        if case .saved = saved { Issue.record("saved without an account marker") }
+        #expect(try await group.queuedOps().isEmpty)
+    }
+
+    @Test func `A refused endpoint pauses requests with a 401 instead of failing the PDF`() async throws {
+        try group.appOpened()
+        let account = group.account()
+        let refused = ShareAPI(base: api, account: account, endpointUsable: { false })
+        await #expect(throws: ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)) {
+            _ = try await refused.uploadPdf(
+                file: group.root, fileName: "a.pdf", tags: [], source: .share, onProgress: nil)
+        }
+        #expect(api.events.isEmpty)
+    }
+
+    @Test func `Closing waits for a push the timeout cancelled`() async throws {
+        try group.appOpened()
+        let release = Gate()
+        let pushing = Gate()
+        let graph = try group.graph(api: api, clock: ImmediateClock())
+        api.onPush { payloads in
+            pushing.open()
+            await release.wait()
+            return pushAnswer(payloads)
+        }
+        _ = await graph.library.save(url: "https://example.com/slow", title: nil, tags: [], source: .share)
+        let push = Task { await graph.pushOnce() }
+        await pushing.wait()
+        await push.value
+        let closed = Mutex(false)
+        let closing = Task {
+            await graph.closeWrites()
+            closed.withLock { $0 = true }
+        }
+        for _ in 0..<50 { await Task.yield() }
+        #expect(closed.withLock { $0 } == false)
+        release.open()
+        await closing.value
+        #expect(closed.withLock { $0 })
     }
 
     @Test func `Closing waits for a running write and refuses new ones`() async throws {

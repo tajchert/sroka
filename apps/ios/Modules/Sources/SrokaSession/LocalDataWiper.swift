@@ -9,8 +9,8 @@ public protocol LocalDataWiping: Sendable {
     @discardableResult func wipe() async -> Bool
 }
 
-/// The wipe in the plan's order: cancel all work, clear every table inside the sync actor, delete files, checkpoint
-/// and vacuum, clear the token. The device id and preferences stay.
+/// The wipe in the plan's order: cancel all work, clear every table inside the sync actor, delete files, clear the
+/// token, clear tables and files again, checkpoint and vacuum. The device id and preferences stay.
 ///
 /// The sync and content engines own the table clear and most files, so the composition root passes them in:
 /// - `cancelAllWork`: background tasks, URLSession tasks, sync debounce, import polling.
@@ -84,17 +84,6 @@ public final class LocalDataWiper: LocalDataWiping {
         }
         await deleteFiles()
         removeTransferDirectories()
-        do {
-            // DELETE never shrinks the file: reclaim the article text the FTS index held.
-            try await database.writer.writeWithoutTransaction { db in
-                if db.configuration.readonly == false, try String.fetchOne(db, sql: "PRAGMA journal_mode") == "wal" {
-                    try db.checkpoint(.truncate)
-                }
-                try db.execute(sql: "VACUUM")
-            }
-        } catch {
-            sessionLog.error("Wipe: checkpoint/vacuum failed: \(String(describing: error), privacy: .public)")
-        }
         sessionStore.clear()
         preferences.accountEmail = nil
         preferences.accountServer = nil
@@ -102,14 +91,29 @@ public final class LocalDataWiper: LocalDataWiping {
         importJobs.clear()
         removeTransferDirectories()
         // The share extension writes from its own process and checks, at each commit, that the Keychain still holds
-        // its launch token. A share that committed after the first clear but before the token went is removed here;
-        // one after this point is refused there. Same for a PDF it queued into the shared upload directory.
+        // its launch token and the account marker. A share that committed after the first clear but before they went
+        // is removed here; one after this point is refused there. Same for a PDF it queued into the upload directory.
         do {
             try await clearTables()
         } catch {
             sessionLog.error("Wipe: second table clear failed: \(String(describing: error), privacy: .public)")
+            tablesCleared = false
         }
         await deleteFiles()
+        do {
+            // After the last clear, so no deleted row (a late share included) stays in the WAL or in free pages.
+            // DELETE never shrinks the file: VACUUM reclaims the article text the FTS index held, and the
+            // truncating checkpoint after it empties the WAL that VACUUM wrote through.
+            try await database.writer.writeWithoutTransaction { db in
+                let mode = try String.fetchOne(db, sql: "PRAGMA journal_mode")
+                let wal = db.configuration.readonly == false && mode == "wal"
+                if wal { try db.checkpoint(.truncate) }
+                try db.execute(sql: "VACUUM")
+                if wal { try db.checkpoint(.truncate) }
+            }
+        } catch {
+            sessionLog.error("Wipe: checkpoint/vacuum failed: \(String(describing: error), privacy: .public)")
+        }
         return tablesCleared
     }
 

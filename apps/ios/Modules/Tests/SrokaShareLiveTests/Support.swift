@@ -100,6 +100,8 @@ final class AppGroupFixture: Sendable {
     var databaseURL: URL { root.appending(path: "Database").appending(path: AppDatabase.fileName) }
     var paths: ContentPaths { ContentPaths(root: root.appending(path: "Content")) }
     let secureStore = InMemorySecureStore()
+    /// The App Group account marker (`PreferencesStore.accountServer`).
+    let marker = Mutex<String?>(nil)
     let environment = AppEnvironment(
         name: "Test", apiBaseURL: URL(string: "https://api.example.test")!, appGroupIdentifier: "group.test",
         keychainAccessGroup: "test.session", urlScheme: "sroka-test")
@@ -114,6 +116,7 @@ final class AppGroupFixture: Sendable {
         guard signedIn else { return }
         let session = SessionStore(store: secureStore)
         try session.save(token: "token", email: "reader@example.test", server: Self.server)
+        marker.withLock { $0 = Self.server }
         if deviceId { _ = session.deviceId() }
     }
 
@@ -121,7 +124,11 @@ final class AppGroupFixture: Sendable {
     func appSwitched(signedInAs token: String? = nil) throws {
         let session = SessionStore(store: secureStore)
         session.clear()
-        if let token { try session.save(token: token, email: "other@example.test", server: Self.server) }
+        marker.withLock { $0 = nil }
+        if let token {
+            try session.save(token: token, email: "other@example.test", server: Self.server)
+            marker.withLock { $0 = Self.server }
+        }
     }
 
     /// The share's account as the graph builds it, over the fixture's Keychain.
@@ -130,13 +137,18 @@ final class AppGroupFixture: Sendable {
         return ShareAccount(
             launch: store.current,
             stored: { [secureStore] in SessionStore(store: secureStore).current },
-            deviceId: { store.existingDeviceId() })
+            deviceId: { store.existingDeviceId() },
+            accountServer: { [self] in marker.withLock { $0 } })
     }
 
-    func graph(api: any SrokaAPI, clock: any Clock<Duration> = ContinuousClock()) throws -> ShareGraph {
+    func graph(
+        api: any SrokaAPI, clock: any Clock<Duration> = ContinuousClock(),
+        endpointUsable: @escaping @Sendable () async -> Bool = { true }
+    ) throws -> ShareGraph {
         ShareGraph(
             environment: environment, database: try AppDatabase.openForExtension(at: databaseURL),
-            api: api, sessionStore: SessionStore(store: secureStore), account: account(),
+            api: api, endpointUsable: endpointUsable, sessionStore: SessionStore(store: secureStore),
+            account: account(),
             clockStore: FileOpClockStore(besideDatabaseAt: databaseURL), paths: paths, clock: clock)
     }
 

@@ -49,7 +49,13 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     private let lane = KeyedLock()
     var laneForTests: KeyedLock { lane }
     private let list = Broadcast<[PdfUpload]>([])
-    private let tasks = Mutex<[String: Task<Void, Never>]>([:])
+    private struct Running {
+        /// Bumped by `cancelAll`; an `enqueue` that was copying meanwhile must not start its upload.
+        var generation = 0
+        var tasks: [String: Task<Void, Never>] = [:]
+    }
+
+    private let running = Mutex(Running())
     private let log = Logger(subsystem: "app.sroka", category: "pdf-upload")
 
     public init(
@@ -77,18 +83,27 @@ public final class LivePdfUploader: PdfUploader, Sendable {
 
     public func enqueue(_ fileURLs: [URL]) async -> [PdfUpload] {
         var result: [PdfUpload] = []
+        // Once per call: a sign-out during the first copy must also stop the later files.
+        let generation = running.withLock { $0.generation }
         for url in fileURLs {
-            let upload = admit(url)
-            list.update { $0.append(upload) }
+            var upload = admit(url)
+            if upload.state == .queued {
+                if !start(upload, generation: generation) {
+                    // Signed out while copying: the wipe already ran, drop the late copy.
+                    deleteFiles(upload.id)
+                    upload.state = .failed(.unknown)
+                }
+            } else {
+                list.update { $0.append(upload) }
+            }
             result.append(upload)
-            if upload.state == .queued { start(upload.id) }
         }
         return result
     }
 
     public func cancel(id: String) async {
         guard list.value.contains(where: { $0.id == id && $0.isActive }) else { return }
-        let task = tasks.withLock { $0.removeValue(forKey: id) }
+        let task = running.withLock { $0.tasks.removeValue(forKey: id) }
         task?.cancel()
         deleteFiles(id)
         list.update { $0.removeAll { $0.id == id } }
@@ -110,27 +125,21 @@ public final class LivePdfUploader: PdfUploader, Sendable {
                 deleteFiles(id)
                 continue
             }
-            if tasks.withLock({ $0[id] != nil }) { continue }
-            let known = list.value.contains { $0.id == id }
-            if !known {
-                list.update {
-                    $0.append(PdfUpload(id: id, fileName: meta.fileName, sizeBytes: meta.sizeBytes, state: .queued))
-                }
-            } else {
-                setState(id, .queued)
-            }
-            start(id)
+            if running.withLock({ $0.tasks[id] != nil }) { continue }
+            _ = start(PdfUpload(id: id, fileName: meta.fileName, sizeBytes: meta.sizeBytes, state: .queued))
         }
     }
 
     /// Sign-out: stops every upload and forgets them (the content store's wipe deletes the files).
     public func cancelAll() {
-        let running = tasks.withLock { tasks in
-            defer { tasks.removeAll() }
-            return Array(tasks.values)
+        let tasks = running.withLock { running in
+            running.generation += 1
+            defer { running.tasks.removeAll() }
+            // Cleared under the same lock, so no upload can be published in between.
+            list.update { $0.removeAll() }
+            return Array(running.tasks.values)
         }
-        for task in running { task.cancel() }
-        list.update { $0.removeAll() }
+        for task in tasks { task.cancel() }
     }
 
     // MARK: Admission
@@ -207,14 +216,26 @@ public final class LivePdfUploader: PdfUploader, Sendable {
 
     // MARK: Processing
 
-    private func start(_ id: String) {
-        tasks.withLock { tasks in
-            guard tasks[id] == nil else { return }
-            tasks[id] = Task { [weak self] in
+    /// Publishes `upload` (or marks a known entry queued) and starts its task, unless `cancelAll` ran since
+    /// `generation` was read. Lock order: `running`, then the list.
+    private func start(_ upload: PdfUpload, generation: Int? = nil) -> Bool {
+        let id = upload.id
+        return running.withLock { running in
+            if let generation, generation != running.generation { return false }
+            guard running.tasks[id] == nil else { return true }
+            list.update { uploads in
+                if let index = uploads.firstIndex(where: { $0.id == id }) {
+                    uploads[index].state = .queued
+                } else {
+                    uploads.append(upload)
+                }
+            }
+            running.tasks[id] = Task { [weak self] in
                 guard let self else { return }
                 await self.lane.withLock("upload") { await self.process(id) }
-                self.tasks.withLock { _ = $0.removeValue(forKey: id) }
+                self.running.withLock { _ = $0.tasks.removeValue(forKey: id) }
             }
+            return true
         }
     }
 

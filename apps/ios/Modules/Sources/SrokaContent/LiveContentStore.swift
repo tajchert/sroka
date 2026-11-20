@@ -213,14 +213,42 @@ public final class LiveContentStore: ContentStore, Sendable {
         let before = nowMs - Self.evictAfterMs
         while true {
             let ids =
-                (try? await database.write { db -> [String] in
-                    let ids = try ContentFileDao.evictionCandidates(db, archivedBefore: before, limit: Self.evictBatch)
-                    try ContentFileDao.delete(db, itemIds: ids)
-                    return ids
+                (try? await database.read { db in
+                    try ContentFileDao.evictionCandidates(db, archivedBefore: before, limit: Self.evictBatch)
                 }) ?? []
-            if ids.isEmpty { return }
-            for id in ids { paths.deleteItemFiles(id) }
+            var evicted = 0
+            for id in ids {
+                // Under the item lock, so a reader fetch cannot install a package between row and file removal.
+                let removed = await locks.withLock(id) {
+                    let removed =
+                        (try? await self.database.write { db -> Bool in
+                            // The full predicate again, in the delete's transaction: the item may have been
+                            // downloaded, read, favorited or unarchived since the query.
+                            guard try Self.isEvictable(db, itemId: id, before: before) else { return false }
+                            try ContentFileDao.delete(db, itemId: id)
+                            return true
+                        }) ?? false
+                    if removed { self.paths.deleteItemFiles(id) }
+                    return removed
+                }
+                if removed { evicted += 1 }
+            }
+            if evicted == 0 { return }
         }
+    }
+
+    /// `ContentFileDao.evictionCandidates`' predicate for one item.
+    private static func isEvictable(_ db: Database, itemId: String, before: Int64) throws -> Bool {
+        try Bool.fetchOne(
+            db,
+            sql: """
+                SELECT EXISTS (SELECT 1 FROM content_files cf JOIN items i ON i.id = cf.item_id
+                WHERE cf.item_id = ? AND cf.state = 'DOWNLOADED' AND i.status = 'ARCHIVED' AND i.is_favorite = 0
+                  AND i.archived_at IS NOT NULL AND i.archived_at < ?
+                  AND (cf.downloaded_at IS NULL OR cf.downloaded_at < ?)
+                  AND (i.last_read_at IS NULL OR i.last_read_at < ?))
+                """,
+            arguments: [itemId, before, before, before]) ?? false
     }
 
     /// Deletes the files of items that were removed (sync tombstones, local delete, full-resync sweep).
@@ -262,12 +290,13 @@ public final class LiveContentStore: ContentStore, Sendable {
         var missing: [String] = []
         var staleThumbs: [ContentFileRecord] = []
         for row in rows {
+            // The swap runs while the row is DOWNLOADING (now QUEUED): roll back for every row, before the sweep.
+            rollBackInterruptedSwap(row.itemId)
             if row.state == .downloaded {
                 if !isValidItemId(row.itemId) {
                     missing.append(row.itemId)
                     continue
                 }
-                rollBackInterruptedSwap(row.itemId)
                 if !hasLocalContent(row.itemId) {
                     missing.append(row.itemId)
                     continue
@@ -379,7 +408,7 @@ public final class LiveContentStore: ContentStore, Sendable {
         if run.values.withLock({ $0.stopped }) || Task.isCancelled { return }
         // "Remove downloaded articles" ran meanwhile: do not re-fetch what the user cleared.
         if self.generation != generation { return }
-        let outcome = await download(itemId: itemId, api: api)
+        let outcome = await download(itemId: itemId, api: api, generation: generation)
         let title = try? await database.read { db -> String? in
             guard let item = try ItemDao.item(db, id: itemId) else { return nil }
             if let title = item.title, !title.isEmpty { return title }
@@ -402,16 +431,18 @@ public final class LiveContentStore: ContentStore, Sendable {
 
     // MARK: One item
 
-    func download(itemId: String, api: any SrokaAPI) async -> DownloadOutcome {
+    /// `generation`: the one a bulk run started under (a clear since then must stop it); nil = now.
+    func download(itemId: String, api: any SrokaAPI, generation: Int? = nil) async -> DownloadOutcome {
         guard isValidItemId(itemId) else { return .failed(.server) }
         await recoverInterrupted()
-        let generation = generation
+        let generation = generation ?? self.generation
         return await locks.withLock(itemId) {
             await self.downloadLocked(itemId: itemId, generation: generation, api: api)
         }
     }
 
     private func downloadLocked(itemId: String, generation: Int, api: any SrokaAPI) async -> DownloadOutcome {
+        if self.generation != generation { return .notReady }
         guard
             let snapshot = try? await database.read({ db -> (ItemRecord?, ContentFileRecord?) in
                 (try ItemDao.item(db, id: itemId), try ContentFileDao.get(db, itemId: itemId))
@@ -505,27 +536,21 @@ public final class LiveContentStore: ContentStore, Sendable {
         let html = paths.articleHtml(itemId).flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
         let body = HtmlText.extract(html)
         let downloadedAt = nowMs
-        let committed =
-            (try? await database.write { db -> Bool in
-                guard self.generation == generation else { return false }
-                // Re-checks that the item still exists with this content id and the row is still ours.
-                guard
-                    try ContentFileDao.commitDownloaded(
-                        db, itemId: itemId, contentId: contentId, bytes: bytes, downloadedAt: downloadedAt)
-                else { return false }
-                if var row = try ContentFileDao.get(db, itemId: itemId), row.attempts != 0 {
-                    row.attempts = 0
-                    try ContentFileDao.upsert(db, row)
-                }
-                try ItemDao.setFtsBody(db, itemId: itemId, body: body)
-                return true
-            }) ?? false
-        if !committed {
-            // Cleared or deleted meanwhile: do not leave files without a row.
-            paths.deleteItemFiles(itemId)
-            return .notReady
+        let committed = try? await database.write { db -> Bool in
+            guard self.generation == generation else { return false }
+            // Re-checks that the item still exists with this content id and the row is still ours.
+            guard
+                try ContentFileDao.commitDownloaded(
+                    db, itemId: itemId, contentId: contentId, bytes: bytes, downloadedAt: downloadedAt)
+            else { return false }
+            if var row = try ContentFileDao.get(db, itemId: itemId), row.attempts != 0 {
+                row.attempts = 0
+                try ContentFileDao.upsert(db, row)
+            }
+            try ItemDao.setFtsBody(db, itemId: itemId, body: body)
+            return true
         }
-        return .downloaded
+        return await settleCommit(committed, itemId: itemId)
     }
 
     // MARK: PDF items
@@ -615,35 +640,45 @@ public final class LiveContentStore: ContentStore, Sendable {
             let bytes = ContentPaths.fileSize(temp)
             let downloadedAt = nowMs
             guard let dir = paths.articleDir(itemId), let dest = paths.pdfFile(itemId) else { return .failed(.server) }
-            let committed =
-                (try? await database.write { db -> Bool in
-                    guard self.generation == generation, let current = try ItemDao.item(db, id: itemId),
-                        current.contentId == contentId,
-                        let row = try ContentFileDao.get(db, itemId: itemId), row.state == .downloading,
-                        row.contentId == contentId
-                    else { return false }
-                    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                    try? FileManager.default.removeItem(at: dest)
-                    try FileManager.default.moveItem(at: temp, to: dest)
-                    var done = row
-                    done.state = .downloaded
-                    done.bytes = bytes
-                    done.attempts = 0
-                    done.error = nil
-                    done.downloadedAt = downloadedAt
-                    try ContentFileDao.upsert(db, done)
-                    return true
-                }) ?? false
-            if !committed {
-                paths.deleteItemFiles(itemId)
-                return .notReady
+            let committed = try? await database.write { db -> Bool in
+                guard self.generation == generation, let current = try ItemDao.item(db, id: itemId),
+                    current.contentId == contentId,
+                    let row = try ContentFileDao.get(db, itemId: itemId), row.state == .downloading,
+                    row.contentId == contentId
+                else { return false }
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? FileManager.default.removeItem(at: dest)
+                try FileManager.default.moveItem(at: temp, to: dest)
+                var done = row
+                done.state = .downloaded
+                done.bytes = bytes
+                done.attempts = 0
+                done.error = nil
+                done.downloadedAt = downloadedAt
+                try ContentFileDao.upsert(db, done)
+                return true
             }
+            let settled = await settleCommit(committed, itemId: itemId)
+            if settled != .downloaded { return settled }
             if let key = item.leadImageKey {
                 await downloadThumbnail(
                     itemId: itemId, baseUrl: urls.baseUrl, key: key, generation: generation, api: api)
             }
             return .downloaded
         }
+    }
+
+    /// After the commit transaction: false = cleared or deleted meanwhile, nil = the write itself failed (disk
+    /// full, rename error). Either way no files stay without a row; a failed write also drops the DOWNLOADING
+    /// row so the item is eligible again, without counting an attempt.
+    private func settleCommit(_ committed: Bool?, itemId: String) async -> DownloadOutcome {
+        if committed == true { return .downloaded }
+        paths.deleteItemFiles(itemId)
+        if committed == nil {
+            _ = try? await database.write { db in try ContentFileDao.delete(db, itemId: itemId) }
+            return .storageFull
+        }
+        return .notReady
     }
 
     /// `%PDF-` within the first KiB.

@@ -372,7 +372,8 @@ struct MaintenanceTests {
         try h.database.insert(item("busy"), item("lost"), item("swap"), item("thumb", leadImageKey: "img/x.webp"))
         try h.database.insert(ContentFileRecord(itemId: "busy", contentId: "c1", state: .downloading))
         try h.database.insert(ContentFileRecord(itemId: "lost", contentId: "c1", state: .downloaded))
-        try h.database.insert(ContentFileRecord(itemId: "swap", contentId: "c1", state: .downloaded))
+        // The installer swaps while the row is DOWNLOADING.
+        try h.database.insert(ContentFileRecord(itemId: "swap", contentId: "c1", state: .downloading))
         try h.database.insert(
             ContentFileRecord(
                 itemId: "thumb", contentId: "c1", state: .downloaded, thumbPath: "thumbs/thumb.webp", thumbAttempts: 2))
@@ -394,7 +395,7 @@ struct MaintenanceTests {
 
         #expect(try h.database.row("busy")?.state == .queued)
         #expect(try h.database.row("lost") == nil)
-        #expect(try h.database.row("swap")?.state == .downloaded)
+        #expect(try h.database.row("swap")?.state == .queued)
         #expect(await h.store.articleHtml(itemId: "swap") == "<p>kept</p>")
         #expect(try h.database.row("thumb")?.thumbPath == nil)
         #expect(try h.database.row("thumb")?.thumbAttempts == 0)

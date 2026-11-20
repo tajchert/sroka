@@ -155,8 +155,12 @@ public struct PackageInstaller: Sendable {
         guard manifest.files.contains(where: { $0.path == ContentPaths.articleFile }) else {
             throw InvalidPackage("no_article")
         }
+        // Each file is hashed once: a manifest repeating a path must not multiply the work.
+        if manifest.files.count > maxEntries { throw InvalidPackage("bad_manifest") }
+        var listed = Set<String>()
         for file in manifest.files {
             guard let path = Self.safeRelativePath(file.path) else { throw InvalidPackage("unsafe_path") }
+            guard listed.insert(path.lowercased()).inserted else { throw InvalidPackage("bad_manifest") }
             let url = dir.appending(path: path, directoryHint: .notDirectory)
             guard ContentPaths.isFile(url) else { throw InvalidPackage("missing_file") }
             guard try Self.sha256Hex(url).caseInsensitiveCompare(file.sha256) == .orderedSame else {

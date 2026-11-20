@@ -120,6 +120,16 @@ struct PackageInstallerTests {
         #expect(try install(entries) == .invalid(reason: "bad_manifest"))
     }
 
+    @Test func `A manifest repeating a path is rejected before hashing`() throws {
+        defer { dir.cleanUp() }
+        let article = Data("<p>x</p>".utf8)
+        let entries: [ZipEntry] = [
+            .file("manifest.json", manifest([("article.html", article), ("Article.html", article)])),
+            .file("article.html", article),
+        ]
+        #expect(try install(entries) == .invalid(reason: "bad_manifest"))
+    }
+
     @Test func `A file listed but missing is rejected`() throws {
         defer { dir.cleanUp() }
         let article = Data("<p>x</p>".utf8)

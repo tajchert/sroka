@@ -106,6 +106,8 @@ public final class LocalDataWiper: LocalDataWiping {
         sessionStore.clear()
         preferences.accountEmail = nil
         preferences.accountServer = nil
+        // The server forgets this device on sign-out (or with the account); the next sign-in registers again.
+        preferences.pushRegistration = nil
         // An import or export that started while the token was still stored may have written since: clear again.
         importJobs.clear()
         removeTransferDirectories()

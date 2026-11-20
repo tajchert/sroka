@@ -73,3 +73,20 @@ public struct BackgroundJobs: Sendable {
         self.download = download
     }
 }
+
+/// The silent push entry points, called from the app delegate.
+public struct PushJobs: Sendable {
+    /// `didRegisterForRemoteNotificationsWithDeviceToken`: the raw APNs device token. Stores it before returning and
+    /// registers it in the background.
+    public var deviceTokenReceived: @Sendable (Data) -> Void
+    /// A `type == "sync"` push arrived; `foreground` is true while the app is active.
+    public var syncRequested: @Sendable (_ foreground: Bool) async -> PushFetchResult
+
+    public init(
+        deviceTokenReceived: @escaping @Sendable (Data) -> Void,
+        syncRequested: @escaping @Sendable (_ foreground: Bool) async -> PushFetchResult
+    ) {
+        self.deviceTokenReceived = deviceTokenReceived
+        self.syncRequested = syncRequested
+    }
+}

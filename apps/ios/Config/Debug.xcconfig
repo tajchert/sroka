@@ -6,3 +6,9 @@ SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG $(inherited)
 ENABLE_TESTABILITY = YES
 ONLY_ACTIVE_ARCH = YES
 DEBUG_INFORMATION_FORMAT = dwarf
+
+// Silent sync push (D17): debug builds are signed with a development profile, so APNs hands them sandbox tokens.
+// APS_ENVIRONMENT feeds the aps-environment entitlement; APNS_SERVER_ENVIRONMENT is what the app reports to the
+// server (Info.plist SrokaApnsEnvironment) so it sends to the matching APNs host.
+APS_ENVIRONMENT = development
+APNS_SERVER_ENVIRONMENT = sandbox

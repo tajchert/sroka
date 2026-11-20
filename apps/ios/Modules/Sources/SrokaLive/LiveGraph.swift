@@ -19,6 +19,8 @@ public struct LiveConfiguration: Sendable {
     /// The crash/analytics SDK (stream M). Wrapped in consent gating here.
     public var telemetry: any Telemetry
     public var backgroundScheduler: any BackgroundScheduling
+    /// APNs environment and topic for the silent sync push; nil disables push registration.
+    public var pushEnvironment: PushEnvironment?
 
     public init(
         environment: AppEnvironment,
@@ -26,7 +28,8 @@ public struct LiveConfiguration: Sendable {
         build: Int?,
         appIdentifierPrefix: String?,
         telemetry: any Telemetry = NoTelemetry(),
-        backgroundScheduler: any BackgroundScheduling = SystemBackgroundScheduler()
+        backgroundScheduler: any BackgroundScheduling = SystemBackgroundScheduler(),
+        pushEnvironment: PushEnvironment? = nil
     ) {
         self.environment = environment
         self.appVersion = appVersion
@@ -34,6 +37,7 @@ public struct LiveConfiguration: Sendable {
         self.appIdentifierPrefix = appIdentifierPrefix
         self.telemetry = telemetry
         self.backgroundScheduler = backgroundScheduler
+        self.pushEnvironment = pushEnvironment
     }
 
     /// Keychain service for the session item. The share extension must use the same value.
@@ -81,6 +85,7 @@ public final class LiveGraph: Sendable {
     public let pdfUploader: any PdfUploader
     public let syncStatus: any SyncStatusRepository
     public let telemetry: any Telemetry
+    public let pushRegistrar: any PushRegistrar
     private let consentApplier: ConsentApplier
     private let provider: LiveApiSessionProvider
 
@@ -102,6 +107,9 @@ public final class LiveGraph: Sendable {
         let sessionStore = SessionStore(
             store: KeychainSecureStore(
                 service: LiveConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup))
+        let installCheck = InstallCheck {
+            Self.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+        }
         let database = Self.openDatabase(group: group)
         let paths = ContentPaths.appGroup(group) ?? Self.fallbackContentPaths()
 
@@ -170,6 +178,18 @@ public final class LiveGraph: Sendable {
             preferences: preferences,
             importJobs: importJobs)
         let wiper = GuardedWiper(localWiper, guard: wipeGuard, suspension: suspension)
+        let livePushRegistrar: LivePushRegistrar? =
+            configuration.pushEnvironment.map { pushEnvironment in
+                LivePushRegistrar(
+                    api: api, preferences: preferences, environment: pushEnvironment,
+                    session: {
+                        guard installCheck.isResolved, !wipeGuard.isWiping, let session = sessionStore.current,
+                            !session.expired
+                        else { return nil }
+                        return LivePushRegistrar.Session(owner: session.ownerKey, token: session.token)
+                    })
+            }
+        let pushRegistrar: any PushRegistrar = livePushRegistrar ?? NoPushRegistrar()
         let auth = LiveAuthRepository(
             api: api, sessionStore: sessionStore, preferences: preferences, provider: provider, wiper: wiper,
             hasLocalData: { await LiveAuthRepository.hasAccountData(in: database) },
@@ -177,7 +197,8 @@ public final class LiveGraph: Sendable {
                 requestSync: { scheduler.requestSync() },
                 resumePendingUploads: { uploader.resumePendingUploads() },
                 resumeImport: { importTracker.resumeIfNeeded() }),
-            clock: ContinuousClock())
+            clock: ContinuousClock(),
+            pushRegistrar: livePushRegistrar)
 
         // Telemetry: consent gated; the decorators log enum-only events.
         let telemetry = ConsentGatedTelemetry(configuration.telemetry, consent: { preferences.consent })
@@ -196,9 +217,6 @@ public final class LiveGraph: Sendable {
         self.provider = provider
         self.importTracker = importTracker
         self.syncSession = syncSession
-        let installCheck = InstallCheck {
-            Self.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
-        }
         self.installCheck = installCheck
         self.launchRecovery = Self.launchRecovery(
             firstRun: { installCheck.resolve() },
@@ -238,6 +256,7 @@ public final class LiveGraph: Sendable {
         self.syncStatus = LiveSyncStatusRepository(
             database: database, scheduler: scheduler, session: syncSession, hooks: hooks, network: network)
         self.telemetry = telemetry
+        self.pushRegistrar = pushRegistrar
         // The SDK starts with collection off (Info.plist); the applier turns on what the stored consent allows.
         self.consentApplier = ConsentApplier(consent: consent, telemetry: telemetry)
     }
@@ -258,6 +277,7 @@ public final class LiveGraph: Sendable {
         dependencies.syncStatusRepository = syncStatus
         dependencies.syncController = scheduler
         dependencies.telemetry = telemetry
+        dependencies.pushRegistrar = pushRegistrar
     }
 
     // MARK: Session
@@ -455,6 +475,54 @@ public final class LiveGraph: Sendable {
                 if await needsBackgroundDownload() { background.scheduleDownload() }
                 return true
             })
+    }
+
+    /// The silent push entry points (`AppDelegate`).
+    public func pushJobs() -> PushJobs {
+        let background = configuration.backgroundScheduler
+        let handler = SyncPushHandler(
+            steps: SyncPushHandler.Steps(
+                ready: { [launchRecovery] in await launchRecovery.ready() },
+                reloadStores: { [preferences, sessionStore, installCheck] in
+                    preferences.reload()
+                    Self.reloadSession(sessionStore, installCheck: installCheck)
+                },
+                isSignedIn: { [self] in isSignedIn },
+                requestSync: { [scheduler] in scheduler.requestSync() },
+                holding: { [suspension, database] body in
+                    await suspension.holding {
+                        try? await database.notifyExternalChanges()
+                        await body()
+                    }
+                },
+                sync: { [scheduler] in Self.pushOutcome(await scheduler.syncNow()) },
+                download: { [content, hooks] in
+                    await content.recoverInterrupted()
+                    await hooks.runAutomaticNow()
+                },
+                needsBackgroundDownload: { [self] in await needsBackgroundDownload() },
+                scheduleDownload: { background.scheduleDownload() }))
+        let registrar = pushRegistrar
+        return PushJobs(
+            deviceTokenReceived: { [launchRecovery] token in
+                // Stored before anything is awaited: callbacks arrive in order on the main thread, the latest wins.
+                registrar.deviceTokenReceived(LivePushRegistrar.hex(token))
+                Task {
+                    // A launch into the background finishes an interrupted wipe before reading the session.
+                    await launchRecovery.ready()
+                    await registrar.register()
+                }
+            },
+            syncRequested: { foreground in await handler.handle(foreground: foreground) })
+    }
+
+    static func pushOutcome(_ outcome: SyncOutcome) -> PushSyncOutcome {
+        switch outcome {
+        case .success(let pulled): .synced(pulled: pulled)
+        case .skipped: .skipped
+        case .failure: .failed
+        case .cancelled: .cancelled
+        }
     }
 
     private func needsBackgroundDownload() async -> Bool {

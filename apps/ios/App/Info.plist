@@ -30,6 +30,8 @@
 	<string>$(KEYCHAIN_GROUP)</string>
 	<key>URLScheme</key>
 	<string>$(URL_SCHEME)</string>
+	<key>SrokaApnsEnvironment</key>
+	<string>$(APNS_SERVER_ENVIRONMENT)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -79,6 +81,7 @@
 	<array>
 		<string>fetch</string>
 		<string>processing</string>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct SrokaApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let runtime: AppRuntime
     /// The app-wide phase across all windows: one iPad window going to the background must not suspend the database
     /// while another is still active.
@@ -10,6 +11,7 @@ struct SrokaApp: App {
 
     init() {
         runtime = AppComposition.prepare()
+        AppDelegate.push = runtime.pushJobs
     }
 
     var body: some Scene {

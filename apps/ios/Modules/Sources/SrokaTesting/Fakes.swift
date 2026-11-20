@@ -23,6 +23,7 @@ public struct Fakes: Sendable {
     public var syncStatus: FakeSyncStatusRepository
     public var syncController: FakeSyncController
     public var telemetry: RecordingTelemetry
+    public var pushRegistrar: FakePushRegistrar
 
     public init(
         items: [Item] = Fixtures.items,
@@ -42,6 +43,7 @@ public struct Fakes: Sendable {
         self.syncStatus = FakeSyncStatusRepository(status: syncStatus)
         syncController = FakeSyncController(status: self.syncStatus)
         telemetry = RecordingTelemetry()
+        pushRegistrar = FakePushRegistrar()
     }
 
     /// An empty, signed-in library (empty states, onboarding).
@@ -64,5 +66,6 @@ extension DependencyValues {
         syncStatusRepository = fakes.syncStatus
         syncController = fakes.syncController
         telemetry = fakes.telemetry
+        pushRegistrar = fakes.pushRegistrar
     }
 }

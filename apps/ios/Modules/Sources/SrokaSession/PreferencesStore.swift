@@ -25,6 +25,8 @@ public final class PreferencesStore: Sendable {
         static let accountServer = "account_server"
         static let activeImport = "active_import"
         static let installed = "installed"
+        static let apnsDeviceToken = "apns_device_token"
+        static let pushRegistration = "push_registration"
     }
 
     public init(defaults: UserDefaults) {
@@ -147,6 +149,24 @@ public final class PreferencesStore: Sendable {
         set { store(newValue ? true : nil, InternalKey.installed) }
     }
 
+    // MARK: Push (not a preference)
+
+    /// The last APNs device token (hex). Belongs to the install, not the account: a sign-out keeps it.
+    public var apnsDeviceToken: String? {
+        get { defaults.object(forKey: InternalKey.apnsDeviceToken) as? String }
+        set { store(newValue, InternalKey.apnsDeviceToken) }
+    }
+
+    /// The token last registered with the server for the signed-in account, and when; nil = not registered. Cleared by
+    /// the sign-out wipe, so the next sign-in registers again.
+    public var pushRegistration: PushRegistrationRecord? {
+        get {
+            (defaults.object(forKey: InternalKey.pushRegistration) as? Data)
+                .flatMap { try? JSONDecoder().decode(PushRegistrationRecord.self, from: $0) }
+        }
+        set { store(newValue.flatMap { try? JSONEncoder().encode($0) }, InternalKey.pushRegistration) }
+    }
+
     // MARK: Active import (not a preference)
 
     var activeImportData: Data? {
@@ -156,5 +176,19 @@ public final class PreferencesStore: Sendable {
 
     private func store(_ value: Any?, _ key: String) {
         if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+    }
+}
+
+/// A successful `PUT /v1/push-token`: the token sent, the account it was sent for (`StoredSession.ownerKey`) and
+/// when (Unix milliseconds).
+public struct PushRegistrationRecord: Codable, Sendable, Hashable {
+    public var token: String
+    public var owner: String
+    public var registeredAtMs: Int64
+
+    public init(token: String, owner: String, registeredAtMs: Int64) {
+        self.token = token
+        self.owner = owner
+        self.registeredAtMs = registeredAtMs
     }
 }

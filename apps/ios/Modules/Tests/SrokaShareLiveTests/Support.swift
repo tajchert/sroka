@@ -58,6 +58,8 @@ final class ShareFakeAPI: SrokaAPI {
     }
     func me() async throws -> MeDto { throw ApiError.invalidRequest }
     func deleteAccount() async throws { throw ApiError.invalidRequest }
+    func putPushToken(_ body: PushTokenRequestDto) async throws { throw ApiError.invalidRequest }
+    func deletePushToken() async throws { throw ApiError.invalidRequest }
     func createImport(source: URL, fileName: String, mimeType: String, format: ImportFormat) async throws -> JobDto {
         throw ApiError.invalidRequest
     }

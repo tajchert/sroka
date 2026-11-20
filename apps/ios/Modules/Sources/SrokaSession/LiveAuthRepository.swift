@@ -10,6 +10,8 @@ import Synchronization
 /// A 401 anywhere else only marks the session expired (`markSessionExpired()`); library data is kept.
 public final class LiveAuthRepository: AuthRepository {
     public static let signOutTimeout: Duration = .seconds(5)
+    /// How long sign-out waits for the push token removal before it goes on without it.
+    public static let pushUnregisterTimeout: Duration = .seconds(3)
 
     private let api: any SrokaAPI
     private let sessionStore: SessionStore
@@ -19,6 +21,7 @@ public final class LiveAuthRepository: AuthRepository {
     private let hasLocalData: @Sendable () async -> Bool
     private let requestSync: @Sendable () -> Void
     private let clock: any Clock<Duration>
+    private let pushRegistrar: (any PushRegistrar)?
     /// Sign-in completion, sign-out, wipes and server switches never interleave.
     private let gate = SerialGate()
     /// Bumped by every sign-out or wipe, so a sign-in that was in flight across one does not restore a session.
@@ -27,6 +30,7 @@ public final class LiveAuthRepository: AuthRepository {
     /// - Parameters:
     ///   - hasLocalData: true when the database holds items or pending ops (`LiveAuthRepository.hasAccountData(in:)`).
     ///   - requestSync: starts a sync after sign-in.
+    ///   - pushRegistrar: registered after sign-in, unregistered before sign-out (D17); nil without APNs.
     public init(
         api: any SrokaAPI,
         sessionStore: SessionStore,
@@ -35,7 +39,8 @@ public final class LiveAuthRepository: AuthRepository {
         wiper: any LocalDataWiping,
         hasLocalData: @escaping @Sendable () async -> Bool,
         requestSync: @escaping @Sendable () -> Void,
-        clock: any Clock<Duration>
+        clock: any Clock<Duration>,
+        pushRegistrar: (any PushRegistrar)? = nil
     ) {
         self.api = api
         self.sessionStore = sessionStore
@@ -45,6 +50,7 @@ public final class LiveAuthRepository: AuthRepository {
         self.hasLocalData = hasLocalData
         self.requestSync = requestSync
         self.clock = clock
+        self.pushRegistrar = pushRegistrar
     }
 
     public var session: AsyncStream<SessionState> { sessionStore.state }
@@ -112,6 +118,8 @@ public final class LiveAuthRepository: AuthRepository {
         preferences.accountEmail = signedInAs
         preferences.accountServer = server
         requestSync()
+        // Not awaited: the sign-in never waits on the network for it. The registrar serializes it with a sign-out.
+        if let pushRegistrar { Task { await pushRegistrar.register() } }
         return .success
     }
 
@@ -167,6 +175,10 @@ public final class LiveAuthRepository: AuthRepository {
     private func signOutLocked() async {
         // Best effort: never block sign-out on the network. The token is still stored, so the call carries it.
         let api = api
+        // The device token first: once the session is revoked the server no longer knows whose it is.
+        if let pushRegistrar {
+            await runWithTimeout(Self.pushUnregisterTimeout, clock: clock) { await pushRegistrar.unregister() }
+        }
         await runWithTimeout(Self.signOutTimeout, clock: clock) { _ = try? await api.signOut() }
         _ = await wipeLocked()
     }

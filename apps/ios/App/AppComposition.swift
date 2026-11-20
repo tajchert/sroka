@@ -30,7 +30,10 @@ enum AppComposition {
                 appVersion: info["CFBundleShortVersionString"] as? String ?? "0",
                 build: buildNumber(fromBundleVersion: info["CFBundleVersion"] as? String),
                 appIdentifierPrefix: info["AppIdentifierPrefix"] as? String,
-                telemetry: makeTelemetry()))
+                telemetry: makeTelemetry(),
+                pushEnvironment: PushEnvironment(
+                    infoValue: info["SrokaApnsEnvironment"] as? String,
+                    bundleIdentifier: Bundle.main.bundleIdentifier)))
         prepareDependencies { graph.install(into: &$0) }
         return AppRuntime.live(graph)
     }

@@ -145,6 +145,18 @@ public final class HTTPSrokaAPI: SrokaAPI {
         _ = try await perform(request)
     }
 
+    // MARK: Push
+
+    public func putPushToken(_ body: PushTokenRequestDto) async throws {
+        let request = try await apiRequest("PUT", "/v1/push-token", json: body)
+        _ = try await perform(request)
+    }
+
+    public func deletePushToken() async throws {
+        let request = try await apiRequest("DELETE", "/v1/push-token")
+        _ = try await perform(request)
+    }
+
     public func config() async throws -> ConfigDto {
         let request = try await apiRequest("GET", "/v1/config")
         return try decode(try await perform(request).data)

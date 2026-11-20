@@ -11,12 +11,17 @@ final class AppRuntime {
     let model: AppModel
     /// Background task work; nil under `-UITests`, where the tasks do nothing.
     nonisolated let backgroundJobs: BackgroundJobs?
+    /// Silent push work (`AppDelegate`); nil under `-UITests`, where the app registers for no pushes.
+    let pushJobs: PushJobs?
     private let lifecycle: AppLifecycle?
 
-    private init(model: AppModel, lifecycle: AppLifecycle?, backgroundJobs: BackgroundJobs?) {
+    private init(
+        model: AppModel, lifecycle: AppLifecycle?, backgroundJobs: BackgroundJobs?, pushJobs: PushJobs? = nil
+    ) {
         self.model = model
         self.lifecycle = lifecycle
         self.backgroundJobs = backgroundJobs
+        self.pushJobs = pushJobs
     }
 
     static func live(_ graph: LiveGraph) -> AppRuntime {
@@ -30,7 +35,7 @@ final class AppRuntime {
             ready: { await graph.launchRecovery.ready() })
         return AppRuntime(
             model: model, lifecycle: AppLifecycle(actions: graph.lifecycleActions()),
-            backgroundJobs: graph.backgroundJobs())
+            backgroundJobs: graph.backgroundJobs(), pushJobs: graph.pushJobs())
     }
 
     static func fakes(_ fakes: Fakes, scheme: String) -> AppRuntime {

@@ -4,3 +4,7 @@ SWIFT_OPTIMIZATION_LEVEL = -O
 SWIFT_COMPILATION_MODE = wholemodule
 DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 VALIDATE_PRODUCT = YES
+
+// Silent sync push (D17): see Debug.xcconfig. TestFlight and App Store builds get production tokens.
+APS_ENVIRONMENT = production
+APNS_SERVER_ENVIRONMENT = production

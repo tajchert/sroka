@@ -17,6 +17,8 @@ final class FakeAPI: SrokaAPI {
         var signOut: (@Sendable () async throws -> Void)?
         var me: (@Sendable () async throws -> MeDto)?
         var deleteAccount: (@Sendable () async throws -> Void)?
+        var putPushToken: (@Sendable (PushTokenRequestDto) async throws -> Void)?
+        var deletePushToken: (@Sendable () async throws -> Void)?
         var createImport: (@Sendable (URL, String, String, ImportFormat) async throws -> JobDto)?
         var importJob: (@Sendable (String) async throws -> JobDto)?
         var export: (@Sendable (ExportFormat, URL) async throws -> ExportFile)?
@@ -68,6 +70,18 @@ final class FakeAPI: SrokaAPI {
     func deleteAccount() async throws {
         record("deleteAccount")
         guard let handler = handlers.withLock({ $0.deleteAccount }) else { throw ApiError.invalidRequest }
+        try await handler()
+    }
+
+    func putPushToken(_ body: PushTokenRequestDto) async throws {
+        record("putPushToken")
+        guard let handler = handlers.withLock({ $0.putPushToken }) else { throw ApiError.invalidRequest }
+        try await handler(body)
+    }
+
+    func deletePushToken() async throws {
+        record("deletePushToken")
+        guard let handler = handlers.withLock({ $0.deletePushToken }) else { throw ApiError.invalidRequest }
         try await handler()
     }
 

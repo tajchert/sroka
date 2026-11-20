@@ -35,6 +35,12 @@ public protocol SrokaAPI: Sendable {
     /// `DELETE /v1/account` with `{"confirm":"DELETE"}`.
     func deleteAccount() async throws
 
+    // Push
+    /// `PUT /v1/push-token`: registers or refreshes this device's push token (204).
+    func putPushToken(_ body: PushTokenRequestDto) async throws
+    /// `DELETE /v1/push-token`: removes this device's push token (204, also when none was stored).
+    func deletePushToken() async throws
+
     // Import / export
     /// `POST /v1/imports` (multipart `file` + `format`, file at most `Limits.maxImportBytes`).
     func createImport(source: URL, fileName: String, mimeType: String, format: ImportFormat) async throws -> JobDto

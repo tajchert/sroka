@@ -12,6 +12,9 @@
 	<array>
 		<string>$(AppIdentifierPrefix)$(KEYCHAIN_GROUP)</string>
 	</array>
+	<!-- Silent sync push (D17). APS_ENVIRONMENT is development in Debug, production in Release (Config/). -->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
 	<!-- Enhanced Security runtime protections. ENABLE_ENHANCED_SECURITY in
 	     Config/Shared.xcconfig turns on the compile-time half; these keys turn
 	     on the runtime half, and without them the build setting is inert. Only

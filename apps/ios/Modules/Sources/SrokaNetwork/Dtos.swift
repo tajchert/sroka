@@ -425,3 +425,28 @@ public struct JobDto: Decodable, Sendable, Equatable {
 struct JobEnvelope: Decodable {
     var job: JobDto
 }
+
+/// `PUT /v1/push-token` body (api.md "Push tokens"). The device is the `X-Sroka-Device` header.
+public struct PushTokenRequestDto: Encodable, Sendable, Equatable {
+    /// `"apns"` (iOS) or `"fcm"` (Android).
+    public var platform: String
+    /// APNs: the device token as lowercase hex.
+    public var token: String
+    /// `"sandbox"` or `"production"`; APNs only.
+    public var apnsEnvironment: String?
+    /// The bundle identifier (`app.sroka`, `app.sroka.dev`); APNs only.
+    public var apnsTopic: String?
+
+    public init(platform: String, token: String, apnsEnvironment: String?, apnsTopic: String?) {
+        self.platform = platform
+        self.token = token
+        self.apnsEnvironment = apnsEnvironment
+        self.apnsTopic = apnsTopic
+    }
+
+    /// An APNs registration.
+    public static func apns(token: String, environment: PushEnvironment) -> PushTokenRequestDto {
+        PushTokenRequestDto(
+            platform: "apns", token: token, apnsEnvironment: environment.apns.rawValue, apnsTopic: environment.topic)
+    }
+}

@@ -6,9 +6,14 @@ import SrokaTesting
 /// Screenshot and UI-test aid: `-UITests -UITestsRoute <name>` lands the app on one screen without tapping.
 /// Only honoured together with `-UITests` (the app's fakes), never in a normal launch.
 ///
-/// Names: `myList`, `archive`, `tags`, `search`, `settings`, `reader`, `tagEditor`, `signInAgain`.
+/// Names: `myList`, `archive`, `tags`, `search`, `settings`, `reader`, `tagItems`, `tagItemsReader`,
+/// `tagEditor`, `signInAgain`.
 @MainActor
 enum DebugRoute {
+    /// A fixture tag and one of its articles (`Fixtures.items`), for the `tagItems` routes.
+    static let taggedTag = "birds"
+    static let taggedItemId = "a2-short-news"
+
     static func applyIfRequested(
         to router: AppRouter, consent: ConsentPromptViewModel,
         arguments: [String] = ProcessInfo.processInfo.arguments
@@ -27,6 +32,11 @@ enum DebugRoute {
         case "search": router.select(.search)
         case "settings": router.presentSettings()
         case "reader": router.open(itemId: itemId)
+        case "tagItems": router.openTagItems(Self.taggedTag)
+        case "tagItemsReader":
+            // Tags → the tag's items → a reader on top, the stack a person builds by tapping.
+            router.openTagItems(Self.taggedTag)
+            router.open(itemId: Self.taggedItemId)
         case "tagEditor": router.presentTagEditor(itemId: itemId)
         case "signInAgain": router.presentSignInAgain()
         default: break

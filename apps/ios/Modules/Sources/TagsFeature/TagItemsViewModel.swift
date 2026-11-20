@@ -24,13 +24,15 @@ public struct TagShareRequest: Identifiable, Sendable, Hashable {
 
 /// One tag's items (My List and Archive together) as a filtered list with the same row actions as
 /// the library: swipe on both edges as configured, context menu, Undo toast, delete confirmation.
-/// Created by `TagsViewModel.tagTapped`; attach with `.task { model.start() }`.
+/// Created by `TagsViewModel.itemsModel(for:)` for the screen the app root pushes on `.openTag`; attach with
+/// `.task { model.start() }`.
 @MainActor
 @Observable
 public final class TagItemsViewModel {
     @ObservationIgnored @Dependency(\.libraryRepository) private var library
     @ObservationIgnored @Dependency(\.settingsRepository) private var settings
     @ObservationIgnored @Dependency(\.syncStatusRepository) private var syncStatusRepository
+    @ObservationIgnored @Dependency(\.tagRepository) private var tagRepository
     @ObservationIgnored @Dependency(\.continuousClock) private var clock
 
     static let toastDuration: Duration = .seconds(4)
@@ -57,6 +59,7 @@ public final class TagItemsViewModel {
     private var isOffline = false
     private var lastLimit = 0
     private var lastSort: LibrarySortOrder?
+    private var hasReportedTagGone = false
 
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var itemsTask: Task<Void, Never>?
@@ -80,7 +83,14 @@ public final class TagItemsViewModel {
         guard tasks.isEmpty else { return }
         let preferences = settings.preferences
         let status = syncStatusRepository.status
+        let allTags = tagRepository.observeTags()
         tasks = [
+            Task { [weak self] in
+                for await tags in allTags {
+                    guard let self else { return }
+                    tagsChanged(tags)
+                }
+            },
             Task { [weak self] in
                 for await preferences in preferences {
                     guard let self else { return }
@@ -103,6 +113,14 @@ public final class TagItemsViewModel {
         itemsTask?.cancel()
         itemsTask = nil
         lastSort = nil
+    }
+
+    /// A tag that disappears from the tag list (renamed or deleted, here or by a sync) leaves nothing to list:
+    /// ask the root to drop the screen, once.
+    private func tagsChanged(_ tags: [TagCount]) {
+        guard !hasReportedTagGone, !tags.contains(where: { $0.name == tag }) else { return }
+        hasReportedTagGone = true
+        onIntent(.closeTag(name: tag))
     }
 
     private func apply(_ preferences: UserPreferences) {
@@ -255,10 +273,4 @@ public final class TagItemsViewModel {
 public enum TagSwipeEdge: Sendable, Hashable {
     case leading
     case trailing
-}
-
-/// `navigationDestination(item:)` needs a hashable value; a model is identified by identity.
-extension TagItemsViewModel: Hashable {
-    public nonisolated static func == (lhs: TagItemsViewModel, rhs: TagItemsViewModel) -> Bool { lhs === rhs }
-    public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(ObjectIdentifier(self)) }
 }

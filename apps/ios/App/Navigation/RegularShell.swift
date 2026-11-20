@@ -13,8 +13,12 @@ struct RegularShell: View {
         NavigationSplitView {
             SidebarList(router: router, models: models)
         } content: {
-            NavigationStack {
+            NavigationStack(path: $router[listPath: router.selectedTab]) {
                 TabRoot(tab: router.selectedTab, models: models)
+                    .navigationDestination(for: AppRoute.self) { route in
+                        // The reader is the detail column here; only lists are pushed in this column.
+                        if case .tagItems(let tag) = route { TagItemsDestination(tag: tag, models: models) }
+                    }
             }
             .id(router.selectedTab)
         } detail: {

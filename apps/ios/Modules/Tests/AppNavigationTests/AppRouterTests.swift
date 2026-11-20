@@ -36,28 +36,109 @@ struct AppRouterTests {
 
     // MARK: Opening items
 
-    /// The Tags tab pushes a tag's item list itself (`navigationDestination(item:)`, not part of `paths`); the
-    /// reader opened from that list goes on the same tab's typed path, and leaving it returns to the list.
-    @Test func `A reader opened from a tag's items lives on the Tags path and closes back to it`() {
+    /// The router owns the Tags stack: a tag's item list is a route, and the reader opened from it goes on top.
+    @Test func `Tags root to tag items to reader and back goes through the tag's items`() {
         let router = signedInRouter()
         router.select(.tags)
+        router.openTagItems("birds")
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+        #expect(router.presentedReaderItemId == nil)
+
         router.open(itemId: "tagged-1")
-        #expect(router[path: .tags] == [ReaderRoute(itemId: "tagged-1")])
+        #expect(router[path: .tags] == [.tagItems(tag: "birds"), .reader(itemId: "tagged-1")])
         #expect(router.readerItemId(in: .tags) == "tagged-1")
         #expect(router[path: .myList].isEmpty)
 
         router.closeReader()
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+        // Back from the list (the stack's own pop) lands on the Tags root.
+        router[path: .tags].removeLast()
         #expect(router[path: .tags].isEmpty)
         #expect(router.selectedTab == .tags)
     }
 
-    @Test func `Archive and next from a tag's reader stays on the Tags path`() {
+    @Test func `Closing a screen that is not a reader leaves the stack alone`() {
         let router = signedInRouter()
-        router.select(.tags)
+        router.openTagItems("birds")
+        router.closeReader()
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+    }
+
+    @Test func `Opening a tag selects the Tags tab and a second tap does not stack lists`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        #expect(router.selectedTab == .tags)
+        router.openTagItems("science")
+        #expect(router[path: .tags] == [.tagItems(tag: "science")])
+        router.openTagItems("")
+        #expect(router[path: .tags] == [.tagItems(tag: "science")])
+    }
+
+    @Test func `Up next from a tag's reader replaces the reader and keeps the list below`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.open(itemId: "a")
+        router.openNext(itemId: "b", in: .tags)
+        #expect(router[path: .tags] == [.tagItems(tag: "birds"), .reader(itemId: "b")])
+    }
+
+    @Test func `Archive and next from a tag's reader stays on top of the tag's items`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
         router.open(itemId: "tagged-1")
         router.readerArchivedAndOpenNext(archivedId: "tagged-1", nextId: "tagged-2")
-        #expect(router[path: .tags] == [ReaderRoute(itemId: "tagged-2")])
+        #expect(router[path: .tags] == [.tagItems(tag: "birds"), .reader(itemId: "tagged-2")])
         router.closeReader()
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+    }
+
+    @Test func `Archiving in a tag's reader returns to the tag's items and offers undo`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.open(itemId: "a")
+        router.readerArchived(itemId: "a")
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+        #expect(router.toast?.kind == .archived(itemId: "a"))
+    }
+
+    @Test func `Deleting in a tag's reader returns to the tag's items`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.open(itemId: "a")
+        router.itemDeleted("a")
+        #expect(router[path: .tags] == [.tagItems(tag: "birds")])
+    }
+
+    @Test func `A tag that is renamed or deleted drops its list and leaves no dead screen`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.tagGone("birds")
+        #expect(router[path: .tags].isEmpty)
+
+        router.tagGone("birds")
+        #expect(router[path: .tags].isEmpty)
+    }
+
+    @Test func `A tag that goes away under an open reader keeps the reader and drops only the list`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.open(itemId: "a")
+        router.tagGone("birds")
+        #expect(router[path: .tags] == [.reader(itemId: "a")])
+        router.tagGone("other")
+        #expect(router[path: .tags] == [.reader(itemId: "a")])
+    }
+
+    @Test func `The content column's path hides the reader and popping it also closes the reader`() {
+        let router = signedInRouter()
+        router.openTagItems("birds")
+        router.open(itemId: "a")
+        #expect(router[listPath: .tags] == [.tagItems(tag: "birds")])
+        // Setting the same list keeps the reader (the column re-renders without a pop).
+        router[listPath: .tags] = [.tagItems(tag: "birds")]
+        #expect(router.readerItemId(in: .tags) == "a")
+        // Back in the column pops the list and the reader detail with it.
+        router[listPath: .tags] = []
         #expect(router[path: .tags].isEmpty)
     }
 
@@ -77,7 +158,7 @@ struct AppRouterTests {
         let router = signedInRouter()
         router.open(itemId: "a")
         router.open(itemId: "b")
-        #expect(router.paths[.myList] == [ReaderRoute(itemId: "b")])
+        #expect(router.paths[.myList] == [.reader(itemId: "b")])
     }
 
     @Test func `Up next replaces the reader on the same tab`() {
@@ -85,7 +166,7 @@ struct AppRouterTests {
         router.select(.tags)
         router.open(itemId: "a")
         router.openNext(itemId: "b", in: .tags)
-        #expect(router.paths[.tags] == [ReaderRoute(itemId: "b")])
+        #expect(router.paths[.tags] == [.reader(itemId: "b")])
     }
 
     @Test(arguments: ["", "../etc", "has space", String(repeating: "x", count: 65), "a/b"])
@@ -175,7 +256,7 @@ struct AppRouterTests {
         router.select(.archive)
         router.open(itemId: "a")
         router.readerArchivedAndOpenNext(archivedId: "a", nextId: "b")
-        #expect(router.paths[.archive] == [ReaderRoute(itemId: "b")])
+        #expect(router.paths[.archive] == [.reader(itemId: "b")])
         #expect(router.toast?.kind == .archived(itemId: "a"))
     }
 

@@ -3,8 +3,9 @@ import Foundation
 import Observation
 import SrokaCore
 
-/// Model of the Tags tab: the tag list with counts, rename, delete with confirmation, and the push
-/// to one tag's items (`openedTag`). Other features' screens are requested through `onIntent`.
+/// Model of the Tags tab: the tag list with counts, rename and delete with confirmation. Screens (a
+/// tag's items, the reader, the tag editor, Settings) are requested through `onIntent`; the app root
+/// owns the navigation stack.
 /// Attach with `.task { model.start() }`.
 @MainActor
 @Observable
@@ -16,9 +17,6 @@ public final class TagsViewModel {
     public private(set) var tags: [TagCount]?
     /// First letter of the signed-in email for the avatar button.
     public private(set) var avatarLetter = "?"
-
-    /// The tag whose items are pushed (set by `tagTapped`; the navigation stack clears it on back).
-    public var openedTag: TagItemsViewModel?
 
     // Rename
     public var isRenaming = false
@@ -82,11 +80,15 @@ public final class TagsViewModel {
 
     public func avatarTapped() { onIntent(.openSettings) }
 
-    /// Opens the tag's items as a filtered list.
-    public func tagTapped(_ tag: TagCount) {
+    /// Asks the root to push the tag's items as a filtered list.
+    public func tagTapped(_ tag: TagCount) { onIntent(.openTag(name: tag.name)) }
+
+    /// The model of one tag's item list, for the screen the root pushes on `.openTag`. Its intents go to the
+    /// same `onIntent`.
+    public func itemsModel(for tag: String) -> TagItemsViewModel {
         let forward = onIntent
-        openedTag = withDependencies(from: self) {
-            TagItemsViewModel(tag: tag.name) { forward($0) }
+        return withDependencies(from: self) {
+            TagItemsViewModel(tag: tag) { forward($0) }
         }
     }
 

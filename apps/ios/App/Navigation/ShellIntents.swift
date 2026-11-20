@@ -33,6 +33,8 @@ final class ShellIntents {
 
     func handle(_ intent: TagsIntent) {
         switch intent {
+        case .openTag(let name): router.openTagItems(name)
+        case .closeTag(let name): router.tagGone(name)
         case .openItem(let id): router.open(itemId: id)
         case .editTags(let id): router.presentTagEditor(itemId: id)
         case .openSettings: router.presentSettings()

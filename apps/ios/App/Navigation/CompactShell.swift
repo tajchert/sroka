@@ -1,6 +1,7 @@
 import AppNavigation
 import ReaderFeature
 import SwiftUI
+import TagsFeature
 
 /// Compact width (iPhone, narrow windows): a tab bar with My List, Archive, Tags and the search tab, each tab with
 /// its own `NavigationStack`. The reader is pushed on the tab it was opened from and hides the tab bar.
@@ -25,7 +26,8 @@ struct CompactShell: View {
     }
 }
 
-/// One tab's stack. Its path is the router's path for the tab, so a deep link can push the reader onto it.
+/// One tab's stack. Its path is the router's path for the tab, so a deep link can push the reader onto it and a
+/// reader opened from a tag's items sits on top of that list.
 private struct CompactTabStack: View {
     @Bindable var router: AppRouter
     let models: ShellModels
@@ -34,10 +36,31 @@ private struct CompactTabStack: View {
     var body: some View {
         NavigationStack(path: $router[path: tab]) {
             TabRoot(tab: tab, models: models)
-                .navigationDestination(for: ReaderRoute.self) { route in
-                    ReaderDestination(itemId: route.itemId, tab: tab, intents: models.intents)
+                .navigationDestination(for: AppRoute.self) { route in
+                    switch route {
+                    case .reader(let itemId):
+                        ReaderDestination(itemId: itemId, tab: tab, intents: models.intents)
+                    case .tagItems(let tag):
+                        TagItemsDestination(tag: tag, models: models)
+                    }
                 }
         }
+    }
+}
+
+/// A tag's item list as a pushed screen. The model lives in the view's state, so it survives the reader being
+/// pushed on top and goes away when the list is popped.
+struct TagItemsDestination: View {
+    let tag: String
+    @State private var model: TagItemsViewModel
+
+    init(tag: String, models: ShellModels) {
+        self.tag = tag
+        _model = State(initialValue: models.tags.itemsModel(for: tag))
+    }
+
+    var body: some View {
+        TagItemsView(model: model)
     }
 }
 

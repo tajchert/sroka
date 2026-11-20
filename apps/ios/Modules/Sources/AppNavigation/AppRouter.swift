@@ -13,13 +13,22 @@ public enum AppTab: String, Hashable, CaseIterable, Sendable, Identifiable {
     public var id: Self { self }
 }
 
-/// One pushed screen on a tab's stack. Only the reader is pushed by the app root; the Tags tab pushes a tag's
-/// item list itself (`TagsView`).
-public struct ReaderRoute: Hashable, Sendable {
-    public let itemId: String
+/// One pushed screen on a tab's stack. The router is the only owner of the stacks: the Tags tab asks for a tag's
+/// item list (`tagItems`) through an intent, and a reader opened from that list goes on top of it, so back leads
+/// to the list.
+public enum AppRoute: Hashable, Sendable {
+    /// One tag's articles, pushed from the Tags list.
+    case tagItems(tag: String)
+    case reader(itemId: String)
 
-    public init(itemId: String) {
-        self.itemId = itemId
+    /// The item of a reader route; `nil` for every other screen.
+    public var readerItemId: String? {
+        if case .reader(let itemId) = self { itemId } else { nil }
+    }
+
+    /// The tag of a tag item list route; `nil` for every other screen.
+    public var tagItemsTag: String? {
+        if case .tagItems(let tag) = self { tag } else { nil }
     }
 }
 
@@ -54,8 +63,8 @@ public struct RouterToast: Identifiable, Hashable, Sendable {
 public final class AppRouter {
     public var selectedTab: AppTab = .myList
     /// The stack path of each tab. Compact width binds these to the tab's `NavigationStack`; regular width
-    /// shows the selected tab's last reader as the detail column.
-    public var paths: [AppTab: [ReaderRoute]] = [:]
+    /// shows the selected tab's tag item lists in the content column and its last reader as the detail column.
+    public var paths: [AppTab: [AppRoute]] = [:]
     /// The sheet over the shell (Settings or the tag editor).
     public var sheet: AppSheet?
     /// Sign-in-again cover over the shell (the session expired; local data is kept).
@@ -113,16 +122,32 @@ public final class AppRouter {
     // MARK: Opening items
 
     /// The path of one tab, for `NavigationStack(path: $router[path: tab])`.
-    public subscript(path tab: AppTab) -> [ReaderRoute] {
+    public subscript(path tab: AppTab) -> [AppRoute] {
         get { paths[tab] ?? [] }
         set { paths[tab] = newValue }
     }
 
+    /// The path of one tab without its reader, for the regular-width content column (the reader is the detail
+    /// column there). Popping a screen in the column also closes the reader that sat on top of it.
+    public subscript(listPath tab: AppTab) -> [AppRoute] {
+        get { (paths[tab] ?? []).filter { $0.readerItemId == nil } }
+        set {
+            let current = paths[tab] ?? []
+            var next = newValue
+            if let reader = current.last, reader.readerItemId != nil,
+                newValue.count == current.count - 1
+            {
+                next.append(reader)
+            }
+            paths[tab] = next
+        }
+    }
+
     /// The reader on top of the selected tab, if any. Regular width shows it in the detail column.
-    public var presentedReaderItemId: String? { paths[selectedTab]?.last?.itemId }
+    public var presentedReaderItemId: String? { paths[selectedTab]?.last?.readerItemId }
 
     /// The reader on top of `tab`.
-    public func readerItemId(in tab: AppTab) -> String? { paths[tab]?.last?.itemId }
+    public func readerItemId(in tab: AppTab) -> String? { paths[tab]?.last?.readerItemId }
 
     /// Opens an item in the reader on the selected tab. Replaces a reader that is already on top (one reader at
     /// a time, as "Up next" does) and closes sheets. Invalid ids are ignored. Without a shell the request is
@@ -144,14 +169,33 @@ public final class AppRouter {
         push(itemId, in: tab ?? selectedTab)
     }
 
+    /// Puts the reader on top of the tab's stack, replacing a reader that is already there.
     private func push(_ itemId: String, in tab: AppTab) {
         var path = paths[tab] ?? []
-        if path.last != nil {
-            path[path.count - 1] = ReaderRoute(itemId: itemId)
-        } else {
-            path.append(ReaderRoute(itemId: itemId))
-        }
+        if path.last?.readerItemId != nil { path.removeLast() }
+        path.append(.reader(itemId: itemId))
         paths[tab] = path
+    }
+
+    /// Pushes one tag's item list on the Tags tab (a re-tap while one is on top replaces it). The reader opened
+    /// from that list is pushed on top by `open(itemId:)`.
+    public func openTagItems(_ tag: String) {
+        guard !tag.isEmpty else { return }
+        select(.tags)
+        var path = paths[.tags] ?? []
+        if path.last?.tagItemsTag != nil { path.removeLast() }
+        path.append(.tagItems(tag: tag))
+        paths[.tags] = path
+    }
+
+    /// The tag no longer exists (renamed or deleted, here or by a sync): its item list would only be empty, so
+    /// it leaves every stack. A reader that sits on top of it stays; back then leads to the screen below.
+    public func tagGone(_ tag: String) {
+        for tab in AppTab.allCases {
+            guard var path = paths[tab], path.contains(.tagItems(tag: tag)) else { continue }
+            path.removeAll { $0 == .tagItems(tag: tag) }
+            paths[tab] = path
+        }
     }
 
     private func openPendingIfPossible() {
@@ -159,10 +203,11 @@ public final class AppRouter {
         open(itemId: id)
     }
 
-    /// Leaves the reader of `tab` (the back button, the reader's own close).
+    /// Leaves the reader of `tab` (the back button, the reader's own close). Does nothing when the tab shows
+    /// another screen on top.
     public func closeReader(in tab: AppTab? = nil) {
         let tab = tab ?? selectedTab
-        guard var path = paths[tab], !path.isEmpty else { return }
+        guard var path = paths[tab], path.last?.readerItemId != nil else { return }
         path.removeLast()
         paths[tab] = path
     }
@@ -196,15 +241,15 @@ public final class AppRouter {
     }
 
     private func tabShowingReader(_ itemId: String) -> AppTab? {
-        if paths[selectedTab]?.last?.itemId == itemId { return selectedTab }
-        return AppTab.allCases.first { paths[$0]?.last?.itemId == itemId }
+        if paths[selectedTab]?.last?.readerItemId == itemId { return selectedTab }
+        return AppTab.allCases.first { paths[$0]?.last?.readerItemId == itemId }
     }
 
     /// Pops every reader showing `itemId`. A tab in `except` keeps its (about to be replaced) top entry.
     private func removeReaders(showing itemId: String, except: AppTab? = nil) {
         for tab in AppTab.allCases where tab != except {
-            guard var path = paths[tab], path.contains(where: { $0.itemId == itemId }) else { continue }
-            path.removeAll { $0.itemId == itemId }
+            guard var path = paths[tab], path.contains(.reader(itemId: itemId)) else { continue }
+            path.removeAll { $0 == .reader(itemId: itemId) }
             paths[tab] = path
         }
     }

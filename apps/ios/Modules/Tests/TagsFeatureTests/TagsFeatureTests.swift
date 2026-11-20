@@ -62,14 +62,21 @@ struct TagsViewModelTests {
         #expect(bed.intents == [.openSettings])
     }
 
-    @Test func `Opening a tag lists its articles from My List and Archive`() async throws {
+    @Test func `Tapping a tag asks the root to push its articles`() async {
         let model = await makeModel()
         model.tagTapped(TagCount(name: "birds", count: 2))
-        let opened = try #require(model.openedTag)
+        #expect(bed.intents == [.openTag(name: "birds")])
+    }
+
+    @Test func `A tag's item list shows its articles from My List and Archive and forwards intents`() async {
+        let model = await makeModel()
+        let opened = model.itemsModel(for: "birds")
         opened.start()
         await bed.until { opened.isLoaded }
         #expect(opened.tag == "birds")
         #expect(Set(opened.items.map(\.id)) == ["a2-short-news", "a7-archived-fav"])
+        opened.itemTapped(opened.items[0])
+        #expect(bed.intents == [.openItem(id: opened.items[0].id)])
     }
 
     @Test func `Renaming a tag changes it on every article`() async {
@@ -202,6 +209,26 @@ struct TagItemsViewModelTests {
         #expect(bed.fakes.library.item(id: item.id) == nil)
         #expect(model.warningFeedbackCount == 1)
         #expect(text(model.toast?.message) == "Article deleted")
+    }
+
+    @Test func `Renaming the tag while its list is open asks the root to drop the list once`() async {
+        let model = await makeModel()
+        #expect(bed.intents.isEmpty)
+        _ = await bed.fakes.tags.rename(from: "birds", to: "corvids")
+        await bed.until { bed.intents.contains(.closeTag(name: "birds")) }
+        #expect(bed.intents == [.closeTag(name: "birds")])
+        _ = await bed.fakes.tags.rename(from: "corvids", to: "crows")
+        for _ in 0..<50 { await Task.yield() }
+        #expect(bed.intents == [.closeTag(name: "birds")])
+        _ = model
+    }
+
+    @Test func `Deleting the tag while its list is open asks the root to drop the list`() async {
+        let model = await makeModel()
+        await bed.fakes.tags.delete(name: "birds")
+        await bed.until { bed.intents.contains(.closeTag(name: "birds")) }
+        #expect(bed.intents == [.closeTag(name: "birds")])
+        _ = model
     }
 
     @Test func `A tag without articles shows an empty list once loaded`() async {

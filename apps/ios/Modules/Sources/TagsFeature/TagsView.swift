@@ -10,11 +10,10 @@ struct TagsActions {
     var avatarTapped: () -> Void = {}
 }
 
-/// The Tags tab: the stateless list plus rename sheet, delete confirmation and the push to one
-/// tag's items.
+/// The Tags tab: the stateless list plus rename sheet and delete confirmation.
 ///
-/// Put it inside the tab's `NavigationStack`; `model.onIntent` asks the app root to open the
-/// reader, the tag editor and Settings.
+/// Put it inside the tab's `NavigationStack`; `model.onIntent` asks the app root to push a tag's
+/// items (`TagItemsView`), the reader, the tag editor and Settings.
 public struct TagsView: View {
     @Bindable private var model: TagsViewModel
 
@@ -25,9 +24,6 @@ public struct TagsView: View {
     public var body: some View {
         TagsScreenContent(tags: model.tags, avatarLetter: model.avatarLetter, actions: actions)
             .task { model.start() }
-            .navigationDestination(item: $model.openedTag) { opened in
-                TagItemsView(model: opened)
-            }
             .sheet(isPresented: $model.isRenaming) {
                 TagRenameSheet(
                     text: $model.renameText,

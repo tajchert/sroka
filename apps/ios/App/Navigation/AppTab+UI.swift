@@ -25,14 +25,6 @@ extension AppTab {
     }
 }
 
-extension AppRouter {
-    /// The sidebar `List` selects an optional value; clearing it (which a list can do) keeps the current tab.
-    var sidebarSelection: AppTab? {
-        get { selectedTab }
-        set { if let newValue { selectedTab = newValue } }
-    }
-}
-
 /// The root screen of a tab: the feature's own view, which expects a `NavigationStack` around it.
 struct TabRoot: View {
     let tab: AppTab

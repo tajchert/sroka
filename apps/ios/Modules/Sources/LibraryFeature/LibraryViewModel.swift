@@ -72,6 +72,12 @@ public final class LibraryViewModel {
     private var filters = ListFilters() {
         didSet { filtersChanged() }
     }
+    /// The filters in effect. The app root sets them from outside (iPad sidebar: Favorites, a tag); the chip row
+    /// goes through the `...Tapped` methods and ends up in the same place.
+    public var activeFilters: ListFilters {
+        get { filters }
+        set { if newValue != filters { filters = newValue } }
+    }
     private var allContinueReading: [ItemSummary] = []
     private var tagCounts: [TagCount] = []
     private var session: SessionState = .signedOut
@@ -151,7 +157,9 @@ public final class LibraryViewModel {
     ) -> Task<Void, Never> {
         Task { [weak self] in
             for await element in stream {
-                guard let self else { return }
+                // A stream that was replaced (new filters, sort or limit) may still hand over the value it had
+                // buffered before it was cancelled; applying it would show the old query's page over the new one.
+                guard let self, !Task.isCancelled else { return }
                 apply(self, element)
             }
         }

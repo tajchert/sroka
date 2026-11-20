@@ -11,7 +11,7 @@ struct RegularShell: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarList(router: router)
+            SidebarList(router: router, models: models)
         } content: {
             NavigationStack {
                 TabRoot(tab: router.selectedTab, models: models)
@@ -23,17 +23,6 @@ struct RegularShell: View {
             }
         }
         .background { ShellShortcuts(router: router, models: models) }
-    }
-}
-
-private struct SidebarList: View {
-    @Bindable var router: AppRouter
-
-    var body: some View {
-        List(AppTab.allCases, selection: $router.sidebarSelection) { tab in
-            Label(String(localized: tab.title), systemImage: tab.systemImage)
-        }
-        .navigationTitle("Sroka")
     }
 }
 

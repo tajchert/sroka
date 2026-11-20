@@ -44,6 +44,9 @@ public final class ShareViewModel {
     @ObservationIgnored private var observers: [Task<Void, Never>] = []
     @ObservationIgnored private var pushTask: Task<Void, Never>?
     @ObservationIgnored private var changedSincePush = false
+    /// Edits still writing; `finish` waits for them, so the host never completes (and suspends the database)
+    /// under a pending write.
+    @ObservationIgnored private var pendingEdits: [Task<Void, Never>] = []
     @ObservationIgnored private var finished = false
 
     /// - Parameters:
@@ -223,8 +226,12 @@ public final class ShareViewModel {
     public func favoriteButtonTapped() async {
         sheetTouched()
         guard case .saved(let itemId, _) = state.phase, let item = state.item else { return }
-        await library.setFavorite(id: itemId, favorite: !item.isFavorite)
+        guard !finished else { return }
         changedSincePush = true
+        let library = library
+        let edit = Task { await library.setFavorite(id: itemId, favorite: !item.isFavorite) }
+        pendingEdits.append(edit)
+        await edit.value
     }
 
     /// "Open" and "Continue reading": the app opens at the item's reader.
@@ -260,6 +267,7 @@ public final class ShareViewModel {
         guard !finished else { return }
         finished = true
         timerTask?.cancel()
+        for edit in pendingEdits { await edit.value }
         await pushTask?.value
         if changedSincePush {
             changedSincePush = false

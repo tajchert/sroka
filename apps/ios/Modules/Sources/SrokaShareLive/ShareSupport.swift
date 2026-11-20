@@ -22,18 +22,23 @@ struct ShareSyncSession: SyncSession {
 /// `LiveApiSessionProvider` without its one Keychain write: the device id must already exist (the app creates it
 /// at sign-in). Without it no token is sent, and `ShareGraph` skips the network altogether.
 ///
-/// Token and server stay one snapshot: the token comes from the session cached at launch (never re-read, since
-/// nothing here calls `reload` or `markExpired`), and `LiveApiSessionProvider` withholds it unless the live account
-/// marker matches the server the extension sends to.
+/// The token is the session cached at launch, sent only while the Keychain still holds that same token: if the
+/// user signed out or switched account in the app meanwhile (the local queue then belongs to the new account),
+/// nothing goes out with the old one. `LiveApiSessionProvider` also withholds it unless the live account marker
+/// matches the server the extension sends to.
 struct ShareApiSessionProvider: ApiSessionProvider {
     let base: LiveApiSessionProvider
     let store: SessionStore
+    /// Reads the Keychain item fresh, without writing it.
+    let storedToken: @Sendable () -> String?
 
     func baseUrl() async -> URL { await base.baseUrl() }
 
     func token() async -> String? {
-        guard store.existingDeviceId() != nil else { return nil }
-        return await base.token()
+        guard store.existingDeviceId() != nil, let token = await base.token(), storedToken() == token else {
+            return nil
+        }
+        return token
     }
 
     func deviceId() async -> String { store.existingDeviceId() ?? "" }

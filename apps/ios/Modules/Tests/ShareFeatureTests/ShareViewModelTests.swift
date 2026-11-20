@@ -244,6 +244,18 @@ struct ShareViewModelTests {
         #expect(log.intents == [.dismiss])
     }
 
+    @Test func `Swiping away during a favorite write waits for it and pushes it`() async {
+        let model = await savedModel()
+        let id = savedId ?? ""
+        let tap = Task { await model.favoriteButtonTapped() }
+        await Task.yield()
+        await model.sheetDismissed()
+        await tap.value
+        #expect(fakes.library.item(id: id)?.isFavorite == true)
+        #expect(log.pushes == 2)
+        #expect(log.intents == [.dismiss])
+    }
+
     @Test func `An editor that saved tags itself closes and the sheet pushes once more`() async {
         let model = await savedModel()
         model.tagsButtonTapped()

@@ -117,7 +117,8 @@ final class AppGroupFixture: Sendable {
     func graph(api: any SrokaAPI, clock: any Clock<Duration> = ContinuousClock()) throws -> ShareGraph {
         ShareGraph(
             environment: environment, database: try AppDatabase.openForExtension(at: databaseURL),
-            databaseURL: databaseURL, api: api, sessionStore: SessionStore(store: secureStore), paths: paths,
+            databaseURL: databaseURL, api: api, sessionStore: SessionStore(store: secureStore),
+            storedToken: { [secureStore] in SessionStore(store: secureStore).token }, paths: paths,
             clock: clock)
     }
 

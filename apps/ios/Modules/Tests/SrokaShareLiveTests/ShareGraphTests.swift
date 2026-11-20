@@ -155,6 +155,24 @@ struct ShareGraphTests {
         #expect(try await group.queuedOps().count == 1)
     }
 
+    @Test func `After an account switch in the app nothing is pushed with the old token`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        api.onPush { pushAnswer($0) }
+        let saved = await graph.library.save(url: "https://example.com/a", title: nil, tags: [], source: .share)
+        guard case .saved = saved else {
+            Issue.record("not saved")
+            return
+        }
+        // The app signs out and another account signs in while the sheet stays open.
+        try SessionStore(store: group.secureStore).save(token: "other-token", email: "other@example.test")
+
+        await graph.pushOnce()
+
+        #expect(api.events.isEmpty)
+        #expect(try await group.queuedOps().count == 1)
+    }
+
     @Test func `Signed out: nothing is saved and nothing is sent`() async throws {
         try group.appOpened(signedIn: false)
         let graph = try group.graph(api: api)

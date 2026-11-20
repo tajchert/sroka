@@ -57,6 +57,7 @@ public struct ShareGraph: Sendable {
     let uploader: LivePdfUploader
     let engine: SyncEngine
     let sessionStore: SessionStore
+    let storedToken: @Sendable () -> String?
     let clock: any Clock<Duration>
 
     /// The graph, or why the sheet cannot save.
@@ -81,20 +82,21 @@ public struct ShareGraph: Sendable {
             shareLog.error("share storage unavailable")
             return .failed(.unavailable)
         }
-        let sessionStore = SessionStore(
-            store: KeychainSecureStore(
-                service: ShareConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup))
+        let keychain = KeychainSecureStore(
+            service: ShareConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup)
+        let sessionStore = SessionStore(store: keychain)
         let api = HTTPSrokaAPI(
             provider: ShareApiSessionProvider(
                 base: LiveApiSessionProvider(
                     sessionStore: sessionStore, preferences: preferences,
                     defaultServerUrl: environment.apiBaseURL.absoluteString),
-                store: sessionStore),
+                store: sessionStore,
+                storedToken: { SessionStore(store: keychain).token }),
             identity: ClientIdentity(appVersion: configuration.appVersion))
         return .ready(
             ShareGraph(
                 environment: environment, database: database, databaseURL: databaseURL, api: api,
-                sessionStore: sessionStore, paths: paths))
+                sessionStore: sessionStore, storedToken: { SessionStore(store: keychain).token }, paths: paths))
     }
 
     /// The startup decision: the database must exist and be fully migrated by the app.
@@ -128,6 +130,7 @@ public struct ShareGraph: Sendable {
         databaseURL: URL,
         api: any SrokaAPI,
         sessionStore: SessionStore,
+        storedToken: @escaping @Sendable () -> String?,
         paths: ContentPaths,
         now: @escaping @Sendable () -> Int64 = systemNowMillis,
         clock: any Clock<Duration> = ContinuousClock()
@@ -149,6 +152,7 @@ public struct ShareGraph: Sendable {
         uploader = LivePdfUploader(
             api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil })
         self.sessionStore = sessionStore
+        self.storedToken = storedToken
         engine = SyncEngine(database: database, api: api, session: ShareSyncSession(store: sessionStore), now: now)
     }
 
@@ -166,6 +170,8 @@ public struct ShareGraph: Sendable {
     public func pushOnce() async {
         // The app creates the device id at sign-in; without it, leave the push to the app.
         guard sessionStore.existingDeviceId() != nil else { return }
+        // Signed out or another account since launch: the queue may now be the new account's.
+        guard let token = sessionStore.token, storedToken() == token else { return }
         let engine = engine
         await withTimeout(Self.pushTimeout, clock: clock) {
             let outcome = await engine.pushOnce()

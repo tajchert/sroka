@@ -110,6 +110,8 @@ public final class AppRouter {
         }
         switch state {
         case .signedOut:
+            // Leaving an account: whoever signs in next (even the same email) starts on fresh screen models.
+            if previousAccount != nil { accountGeneration += 1 }
             reset()
         case .signedIn:
             isSignInAgainPresented = false

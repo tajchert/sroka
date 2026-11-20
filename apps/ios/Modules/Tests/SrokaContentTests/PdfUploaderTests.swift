@@ -251,6 +251,33 @@ struct PdfUploaderTests {
         #expect(api.uploadCalls == 0)
     }
 
+    @Test func `An unreadable queue directory keeps queued rows`() async throws {
+        defer { dir.cleanUp() }
+        let id = "0190a1b2-share"
+        try paths.prepare(paths.pdfUploads)
+        try pdfData.write(to: paths.pdfUploads.appending(path: "\(id).pdf"))
+        let meta = LivePdfUploader.Metadata(
+            id: id, fileName: "a.pdf", sizeBytes: Int64(pdfData.count), attempts: 0, tags: [], owner: "owner-a")
+        try JSONEncoder().encode(meta).write(to: paths.pdfUploads.appending(path: "\(id).json"))
+        let extensionSide = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: { "owner-a" }, claimToken: "extension")
+        #expect(extensionSide.claim(id))
+        let app = LivePdfUploader(
+            api: api, paths: paths, syncController: sync, sleep: { _ in }, renderThumbnail: { _ in nil },
+            owner: { "owner-a" }, claimToken: "app")
+        app.resumePendingUploads()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await current(app).map(\.state) == [.queued])
+
+        // The sidecars are still there, but listing the directory fails.
+        let queue = paths.pdfUploads.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: queue)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: queue) }
+        app.resumePendingUploads()
+        #expect(await current(app).map(\.state) == [.queued])
+    }
+
     @Test func `A successful upload sends a preview, cleans up and requests a sync`() async throws {
         defer { dir.cleanUp() }
         api.setUploads(.success(uploadResponse(itemId: "item1")))

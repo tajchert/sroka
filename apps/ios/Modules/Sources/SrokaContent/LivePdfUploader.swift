@@ -133,7 +133,16 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     /// Picks up uploads left in `pdf-uploads/` by an earlier process or paused by an expired session. Call at
     /// launch, after sign-in and when the app returns to the foreground.
     public func resumePendingUploads() {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)) ?? []
+        let names: [String]
+        do {
+            names = try FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            names = []  // No directory yet: nothing was ever queued.
+        } catch {
+            // Unreadable is not empty: reconciling now could drop rows whose sidecars still exist.
+            log.error("PDF upload queue unreadable: \(String(describing: error), privacy: .public)")
+            return
+        }
         sweepOrphans(names)
         // Rows this process left queued (it lost the claim) whose upload the other process finished or dropped.
         let present = Set(names)

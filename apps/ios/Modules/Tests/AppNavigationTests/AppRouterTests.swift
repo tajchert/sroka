@@ -387,14 +387,19 @@ struct AppRouterTests {
         #expect(router.toast == nil)
     }
 
-    @Test func `Only a different account changes the account generation the shell models are keyed by`() {
+    @Test func `Leaving an account changes the generation the shell models are keyed by, expiry does not`() {
         let router = signedInRouter()
         let first = router.accountGeneration
         router.sessionChanged(.expired(email: "reader@example.com"))
         router.sessionChanged(.signedIn(email: "Reader@example.com"))
         #expect(router.accountGeneration == first)
         router.sessionChanged(.signedIn(email: "other@example.com"))
-        #expect(router.accountGeneration != first)
+        let second = router.accountGeneration
+        #expect(second != first)
+        // A sign-out delivered between two accounts: the next account still gets fresh models.
+        router.sessionChanged(.signedOut)
+        router.sessionChanged(.signedIn(email: "third@example.com"))
+        #expect(router.accountGeneration != second)
     }
 
     @Test func `The same account signing in again keeps its place`() {

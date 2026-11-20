@@ -129,6 +129,18 @@ public final class SessionStore: Sendable {
         }
     }
 
+    /// False while the Keychain cannot be read (a launch before first unlock). The items are readable after first
+    /// unlock, the same window as the App Group suite's default file protection, so this also says whether an absent
+    /// App Group value can be trusted.
+    public var isStorageReadable: Bool {
+        do {
+            _ = try store.read(Self.sessionKey)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// A fresh install found an earlier install's Keychain items: removes the session and the device id (both belong
     /// to the earlier install), so the app starts signed out with a new device id. False when the Keychain refused (a
     /// launch before first unlock); the caller tries again at the next launch.

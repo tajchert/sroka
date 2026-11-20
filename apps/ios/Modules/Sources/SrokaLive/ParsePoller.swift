@@ -16,7 +16,9 @@ public final class ParsePoller: Sendable {
     private struct State {
         var active = false
         var loop: Task<Void, Never>?
-        var generation = 0
+        /// The running round was cancelled and is unwinding; it stays in `loop` until it exits, so no second round
+        /// starts beside it.
+        var cancelled = false
     }
 
     private let state = Mutex(State())
@@ -41,50 +43,61 @@ public final class ParsePoller: Sendable {
         self.pull = pull
     }
 
-    /// The scene became active (true) or left the foreground (false, stops a running round at once).
+    /// The scene became active (true) or left the foreground (false, cancels a running round at once).
     public func setActive(_ active: Bool) {
         let cancelled = state.withLock { state -> Task<Void, Never>? in
             state.active = active
-            guard !active else { return nil }
-            state.generation += 1
-            defer { state.loop = nil }
-            return state.loop
+            guard !active, let loop = state.loop, !state.cancelled else { return nil }
+            state.cancelled = true
+            return loop
         }
         cancelled?.cancel()
         if active { kick() }
     }
 
-    /// Starts a round unless one runs or the scene is not active.
+    /// Starts a round unless one runs or the scene is not active. A cancelled round still unwinding is replaced when
+    /// it exits, if the scene is active again by then.
     public func kick() {
-        state.withLock { state in
-            guard state.active, state.loop == nil else { return }
-            state.generation += 1
-            let generation = state.generation
-            state.loop = Task { [self] in
-                await run()
-                self.state.withLock { state in
-                    if state.generation == generation { state.loop = nil }
-                }
+        state.withLock { start(&$0) }
+    }
+
+    private func start(_ state: inout State) {
+        guard state.active, state.loop == nil else { return }
+        state.loop = Task { [self] in
+            await run()
+            self.state.withLock { state in
+                let restart = state.cancelled
+                state.loop = nil
+                state.cancelled = false
+                if restart { start(&state) }
             }
         }
     }
 
-    var isPolling: Bool { state.withLock { $0.loop != nil } }
+    /// A round runs and has not been cancelled.
+    var isPolling: Bool { state.withLock { $0.loop != nil && !$0.cancelled } }
 
     private func run() async {
         var delay = Self.firstDelay
         var waited: Duration = .zero
-        while canPoll(), await hasPendingParse(), !Task.isCancelled {
+        while await shouldPoll() {
             do {
                 try await clock.sleep(for: delay)
             } catch {
                 return
             }
-            guard !Task.isCancelled, canPoll(), await hasPendingParse() else { return }
+            guard await shouldPoll() else { return }
             await pull()
             waited += delay
             guard waited < Self.giveUpAfter else { return }
             delay = min(delay * 2, Self.maxDelay)
         }
+    }
+
+    /// Checked again after the query: the scene may have left the foreground, or the account changed, meanwhile.
+    private func shouldPoll() async -> Bool {
+        guard !Task.isCancelled, canPoll() else { return false }
+        let pending = await hasPendingParse()
+        return pending && !Task.isCancelled && canPoll()
     }
 }

@@ -66,6 +66,8 @@ public final class LiveGraph: Sendable {
     public let syncSession: LiveSyncSession
     /// Awaited before the account is used: finishes a wipe a dead process left in progress.
     public let launchRecovery: LaunchRecovery
+    /// The fresh-install Keychain clear; until it resolves no session is read or used.
+    let installCheck: InstallCheck
     /// Pulls while the app is active and an item waits for its parse result.
     public let parsePoller: ParsePoller
 
@@ -194,15 +196,21 @@ public final class LiveGraph: Sendable {
         self.provider = provider
         self.importTracker = importTracker
         self.syncSession = syncSession
+        let installCheck = InstallCheck {
+            Self.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore)
+        }
+        self.installCheck = installCheck
         self.launchRecovery = Self.launchRecovery(
-            firstRun: { Self.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore) },
+            firstRun: { installCheck.resolve() },
             interrupted: { Self.hasInterruptedWipe(database) },
             serialize: { await auth.finishInterruptedWipe($0) }, wiper: wiper, local: localWiper)
         self.auth = auth
         let recovery = self.launchRecovery
         let parsePoller = ParsePoller(
             clock: ContinuousClock(),
-            canPoll: { !wipeGuard.isWiping && sessionStore.current.map { !$0.expired } == true },
+            canPoll: {
+                installCheck.isResolved && !wipeGuard.isWiping && sessionStore.current.map { !$0.expired } == true
+            },
             hasPendingParse: {
                 await recovery.ready()
                 return await Self.hasPendingParse(database)
@@ -256,7 +264,7 @@ public final class LiveGraph: Sendable {
 
     /// Signed in and not in the middle of a wipe: the state in which sync, uploads and imports may run.
     public var isSignedIn: Bool {
-        guard !wipeGuard.isWiping, let session = sessionStore.current else { return false }
+        guard installCheck.isResolved, !wipeGuard.isWiping, let session = sessionStore.current else { return false }
         return !session.expired
     }
 
@@ -326,12 +334,25 @@ public final class LiveGraph: Sendable {
     /// this; the share extension needs the database the app creates, so it never runs before the app's first launch.
     ///
     /// An install that predates the marker (an update) still has its account marker, so it keeps its session.
-    static func clearEarlierInstall(preferences: PreferencesStore, sessionStore: SessionStore) {
-        guard !preferences.installMarker else { return }
+    ///
+    /// False while unresolved: storage is not readable yet (before first unlock an absent marker proves nothing, so
+    /// nothing is decided) or the Keychain refused the delete. `InstallCheck` tries again before the session is read.
+    @discardableResult
+    static func clearEarlierInstall(preferences: PreferencesStore, sessionStore: SessionStore) -> Bool {
+        guard sessionStore.isStorageReadable else { return false }
+        guard !preferences.installMarker else { return true }
         if preferences.accountEmail == nil {
-            guard sessionStore.clearForFreshInstall() else { return }
+            guard sessionStore.clearForFreshInstall() else { return false }
         }
         preferences.installMarker = true
+        return true
+    }
+
+    /// Re-reads the stored session, unless the fresh-install check is still unresolved (then an earlier install's
+    /// session may still be in the Keychain, and it stays unread).
+    static func reloadSession(_ sessionStore: SessionStore, installCheck: InstallCheck) {
+        guard installCheck.resolve() else { return }
+        sessionStore.reload()
     }
 
     /// The `WipeEpoch` beside the database says a wipe is in progress (no process runs one at launch).
@@ -365,9 +386,9 @@ public final class LiveGraph: Sendable {
                 let hold = suspension.hold()
                 return { hold.release() }
             },
-            reloadStores: { [sessionStore, preferences] in
-                sessionStore.reload()
+            reloadStores: { [sessionStore, preferences, installCheck] in
                 preferences.reload()
+                Self.reloadSession(sessionStore, installCheck: installCheck)
             },
             notifyExternalChanges: { [database] in
                 do {
@@ -410,8 +431,8 @@ public final class LiveGraph: Sendable {
             refresh: { [self] in
                 // A launch into the background finishes an interrupted wipe before touching data.
                 await launchRecovery.ready()
-                sessionStore.reload()
                 preferences.reload()
+                Self.reloadSession(sessionStore, installCheck: installCheck)
                 // Signed out: nothing to sync, and no next refresh until the user signs in again.
                 guard isSignedIn else { return true }
                 background.scheduleRefresh()
@@ -423,7 +444,7 @@ public final class LiveGraph: Sendable {
             download: { [self] in
                 await launchRecovery.ready()
                 preferences.reload()
-                sessionStore.reload()
+                Self.reloadSession(sessionStore, installCheck: installCheck)
                 guard isSignedIn else { return true }
                 await suspension.holding {
                     await self.content.recoverInterrupted()

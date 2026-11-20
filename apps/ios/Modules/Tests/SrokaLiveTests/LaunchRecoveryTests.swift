@@ -235,3 +235,63 @@ struct FirstRunTests {
         #expect(log.all == ["firstRun", "interrupted"])
     }
 }
+
+/// A Keychain whose reads and deletes fail independently.
+private final class ScriptedSecureStore: SecureStore {
+    let base = InMemorySecureStore()
+    let failRead = Mutex(false)
+    let failDelete = Mutex(false)
+
+    func read(_ key: String) throws -> String? {
+        if failRead.withLock({ $0 }) { throw SecureStoreError(status: -25308) }
+        return try base.read(key)
+    }
+
+    func write(_ key: String, value: String) throws { try base.write(key, value: value) }
+
+    func delete(_ key: String) throws {
+        if failDelete.withLock({ $0 }) { throw SecureStoreError(status: -25308) }
+        try base.delete(key)
+    }
+}
+
+struct InstallCheckTests {
+    private let keychain = ScriptedSecureStore()
+    private let preferences = PreferencesStore(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+
+    private func earlierInstallSession() throws {
+        try SessionStore(store: keychain).save(token: "t", email: "a@b.co", server: "https://api.example")
+    }
+
+    @Test func `An unresolved install clear keeps the earlier session unread until it resolves`() throws {
+        try earlierInstallSession()
+        let sessionStore = SessionStore(store: keychain)
+        let check = InstallCheck {
+            LiveGraph.clearEarlierInstall(preferences: self.preferences, sessionStore: sessionStore)
+        }
+        keychain.failDelete.withLock { $0 = true }
+        #expect(!check.resolve())
+
+        // The next activation: the Keychain reads, the delete still fails; the earlier session stays unread.
+        LiveGraph.reloadSession(sessionStore, installCheck: check)
+        #expect(sessionStore.current == nil)
+        #expect(!check.isResolved)
+
+        // Once the delete goes through, the check resolves and nothing is left to read.
+        keychain.failDelete.withLock { $0 = false }
+        LiveGraph.reloadSession(sessionStore, installCheck: check)
+        #expect(check.isResolved)
+        #expect(sessionStore.current == nil)
+        #expect(preferences.installMarker)
+    }
+
+    @Test func `Unreadable storage decides nothing and deletes nothing`() throws {
+        try earlierInstallSession()
+        let sessionStore = SessionStore(store: keychain)
+        // Before first unlock: an absent marker (unreadable App Group suite) must not lead to a delete.
+        keychain.failRead.withLock { $0 = true }
+        #expect(!LiveGraph.clearEarlierInstall(preferences: preferences, sessionStore: sessionStore))
+        #expect(keychain.base.snapshot["session"] != nil)
+        #expect(!preferences.installMarker)
+    }
+}

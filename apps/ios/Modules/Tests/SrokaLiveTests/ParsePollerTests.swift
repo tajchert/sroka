@@ -10,6 +10,10 @@ private final class PollFlags: Sendable {
     let signedIn = Mutex(true)
     let pulls = Mutex(0)
     let onPull = Mutex<(@Sendable (PollFlags) -> Void)?>(nil)
+    let queries = Mutex(0)
+    /// The query with this number waits for `gate`.
+    let blockQuery = Mutex<Int?>(nil)
+    let gate = QueryGate()
 
     func setPending(_ value: Bool) { pending.withLock { $0 = value } }
     func setSignedIn(_ value: Bool) { signedIn.withLock { $0 = value } }
@@ -26,7 +30,14 @@ private final class PollHarness: Sendable {
         poller = ParsePoller(
             clock: clock,
             canPoll: { flags.signedIn.withLock { $0 } },
-            hasPendingParse: { flags.pending.withLock { $0 } },
+            hasPendingParse: {
+                let query = flags.queries.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if flags.blockQuery.withLock({ $0 }) == query { await flags.gate.wait() }
+                return flags.pending.withLock { $0 }
+            },
             pull: {
                 flags.pulls.withLock { $0 += 1 }
                 flags.onPull.withLock { $0 }?(flags)
@@ -42,7 +53,57 @@ private final class PollHarness: Sendable {
     }
 }
 
+/// Holds one pending-row query until opened.
+private final class QueryGate: Sendable {
+    private let state = Mutex<(open: Bool, waiter: CheckedContinuation<Void, Never>?)>((false, nil))
+
+    var isWaiting: Bool { state.withLock { $0.waiter != nil } }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resume = state.withLock { state -> Bool in
+                if state.open { return true }
+                state.waiter = continuation
+                return false
+            }
+            if resume { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let waiter = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            state.open = true
+            defer { state.waiter = nil }
+            return state.waiter
+        }
+        waiter?.resume()
+    }
+}
+
 @Suite struct ParsePollerTests {
+    @Test func `A round backgrounded during its query neither pulls nor overlaps the next round`() async {
+        let harness = PollHarness()
+        // Query 1 starts the round; query 2 is the check after the first sleep, held while the app backgrounds.
+        harness.flags.blockQuery.withLock { $0 = 2 }
+        harness.poller.setActive(true)
+        await harness.elapseNextSleep()
+        await pollEventually { harness.flags.gate.isWaiting }
+        harness.poller.setActive(false)
+        harness.poller.setActive(true)
+        // The old round is still unwinding: no second round starts beside it.
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(harness.clock.sleeperCount == 0)
+
+        harness.flags.gate.open()
+        // The old round exits without pulling; one new round replaces it because the app is active again.
+        await harness.clock.waitForSleepers()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(harness.pullCount == 0)
+        #expect(harness.clock.sleeperCount == 1)
+        #expect(harness.poller.isPolling)
+        harness.poller.setActive(false)
+    }
+
     @Test func `Polling starts when an item waits for its parse and backs off`() async {
         let harness = PollHarness()
         harness.poller.setActive(true)

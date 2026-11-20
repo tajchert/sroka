@@ -3,7 +3,7 @@ import Foundation
 
 /// Reader-facing part of offline article storage (DECISIONS A9/A10). Packages live in the App Group
 /// container at `articles/{itemId}/` (`article.html`, `img/…`, or `document.pdf` for PDF items) and are
-/// served to `WKWebView` by a `WKURLSchemeHandler` for `ContentStoreURL.scheme`. Android: ContentStore.kt.
+/// served to `WKWebView` by the reader's own `sroka-article://` scheme handler. Android: ContentStore.kt.
 public protocol ContentStore: Sendable {
     /// Offline state of one item's article package.
     func observeOffline(itemId: String) -> AsyncStream<OfflineState>
@@ -28,12 +28,6 @@ public protocol ContentStore: Sendable {
 }
 
 extension ContentStore {
-    /// Base URL the reader loads `article.html` with, so relative `img/…` resolve through the
-    /// scheme handler: `sroka-content://articles/{itemId}/`.
-    public func articleBaseURL(itemId: String) -> URL {
-        ContentStoreURL.articleBase(itemId: itemId)
-    }
-
     /// Local file for a PDF item, downloading it first when needed.
     public func ensurePdfFile(itemId: String) async -> PdfFileResult {
         if let file = await pdfFile(itemId: itemId) { return .ready(file) }
@@ -46,15 +40,6 @@ extension ContentStore {
         case .failed(let reason):
             return .failed(reason)
         }
-    }
-}
-
-/// The custom URL scheme the reader's `WKURLSchemeHandler` serves article packages from.
-public enum ContentStoreURL {
-    public static let scheme = "sroka-content"
-
-    public static func articleBase(itemId: String) -> URL {
-        URL(string: "\(scheme)://articles/\(itemId)/")!
     }
 }
 

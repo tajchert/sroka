@@ -126,7 +126,7 @@ Progress: `apps/ios/docs/LEDGER.md` (orchestrator only).
 ## Wave 2 notes: D (reader) and J (tags, search) merged
 
 - Reader entry point: `ReaderView(itemId:onIntent:)`. `ReaderIntent`: `close`, `editTags(itemId:)`, `openItem(String)`, `archived(itemId:)`, `archivedAndOpenNext(archivedId:nextId:)`, `deleted(itemId:)`.
-- The reader serves packages itself from `sroka-article://{itemId}/` (`ArticleScheme.name`), reading `ContentStore.articlesDirectory()/{itemId}/`. This is the scheme that stays: each article gets its own origin. `ContentStoreURL` (`sroka-content`) in `SrokaCore` is unused; remove it in polish.
+- The reader serves packages itself from `sroka-article://{itemId}/` (`ArticleScheme.name`), reading `ContentStore.articlesDirectory()/{itemId}/`. This is the scheme that stays: each article gets its own origin. (The unused `ContentStoreURL` / `sroka-content` in `SrokaCore` is removed.)
 - From the content store the reader calls `articleHtml`, `downloadNow`, `observeOffline`, `pdfFile`, `ensurePdfFile`.
 - Tags and search entry points: `TagsView`, `TagItemsView`, `TagEditorSheet`, `SearchView`, with `TagsIntent` and the search intent type in their modules.
 - Glass surfaces (reader bottom bar, end card) render blank in snapshots; check them on a simulator. `window.innerHeight` with iOS insets in the reader script is unverified.

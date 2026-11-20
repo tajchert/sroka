@@ -39,22 +39,26 @@ public final class LiveContentHooks: SyncContentHooks {
     private let policy: @Sendable () -> DownloadPolicy
     private let wipeGuard: WipeGuard
     private let onDeferred: @Sendable () -> Void
+    private let joinTimeout: Duration
     private let state = Mutex(State())
     private let progress = ValueSubject<SyncDownloadProgress?>(nil)
 
     /// - Parameters:
     ///   - policy: the current download policy (read on every request).
     ///   - onDeferred: called when an automatic run was requested but cannot start now (app in background).
+    ///   - joinTimeout: how long the wipe waits for cancelled runs (one can sit behind a slow reader download).
     public init(
         content: any ContentEngine,
         policy: @escaping @Sendable () -> DownloadPolicy,
         guard wipeGuard: WipeGuard,
-        onDeferred: @escaping @Sendable () -> Void = {}
+        onDeferred: @escaping @Sendable () -> Void = {},
+        joinTimeout: Duration = .seconds(5)
     ) {
         self.content = content
         self.policy = policy
         self.wipeGuard = wipeGuard
         self.onDeferred = onDeferred
+        self.joinTimeout = joinTimeout
     }
 
     /// Foreground state from the scene; automatic runs start only while true.
@@ -121,7 +125,19 @@ public final class LiveContentHooks: SyncContentHooks {
         await withTaskCancellationHandler {
             await task.value
         } onCancel: {
-            if !state.withLock({ $0.foreground }) { task.cancel() }
+            // Retired under the lock, so a foreground request arriving before the run exits starts a new one instead
+            // of setting a rerun the cancelled run would drop.
+            let cancel = state.withLock { state -> Bool in
+                guard !state.foreground else { return false }
+                if state.task == task {
+                    state.retiring[state.taskId] = task
+                    state.task = nil
+                    state.rerun = false
+                    state.taskId += 1
+                }
+                return true
+            }
+            if cancel { task.cancel() }
         }
     }
 
@@ -132,13 +148,17 @@ public final class LiveContentHooks: SyncContentHooks {
         progress.send(nil)
     }
 
-    /// Cancels the running automatic run and returns once it and every earlier cancelled run have stopped (wipe: no
-    /// automatic download may write files after the content is removed).
+    /// Cancels the running automatic run and returns once it and every earlier cancelled run have stopped, or after
+    /// `joinTimeout` (wipe). A run still queued behind a reader download then finds the content generation changed
+    /// and writes nothing; the wait only keeps the common case tidy and must not hold sign-out hostage.
     public func cancelAutomaticAndWait() async {
         let (current, retiring) = takeTasks()
         current?.cancel()
-        await current?.value
-        for task in retiring { await task.value }
+        let all = (current.map { [$0] } ?? []) + retiring
+        if !all.isEmpty {
+            let joined = await Self.join(all, timeout: joinTimeout)
+            if !joined { liveLog.notice("Wipe: automatic downloads still stopping; continuing") }
+        }
         progress.send(nil)
     }
 
@@ -150,6 +170,29 @@ public final class LiveContentHooks: SyncContentHooks {
     }
 
     // MARK: Private
+
+    /// True when every task ended within `timeout`. The tasks keep running either way.
+    private static func join(_ tasks: [Task<Void, Never>], timeout: Duration) async -> Bool {
+        let outcome = Mutex<Bool?>(nil)
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let finish: @Sendable (Bool) -> Void = { joined in
+                let first = outcome.withLock { value -> Bool in
+                    guard value == nil else { return false }
+                    value = joined
+                    return true
+                }
+                if first { continuation.resume(returning: joined) }
+            }
+            Task {
+                for task in tasks { await task.value }
+                finish(true)
+            }
+            Task {
+                try? await Task.sleep(for: timeout)
+                finish(false)
+            }
+        }
+    }
 
     /// Detaches the current run (kept in `retiring` until it exits) and returns it with the earlier retiring runs.
     private func takeTasks() -> (current: Task<Void, Never>?, retiring: [Task<Void, Never>]) {

@@ -67,3 +67,14 @@ struct EndpointSnapshotTests {
         #expect(request.header("Authorization") == nil)
     }
 }
+
+struct SameOriginTests {
+    @Test func `Origins match on scheme, host and port`() {
+        let url = { (string: String) in URL(string: string) }
+        #expect(HTTPSrokaAPI.sameOrigin(url("https://a.example/v1"), url("https://A.example:443/x")))
+        #expect(!HTTPSrokaAPI.sameOrigin(url("https://a.example"), url("https://b.example")))
+        #expect(!HTTPSrokaAPI.sameOrigin(url("https://a.example"), url("http://a.example")))
+        #expect(!HTTPSrokaAPI.sameOrigin(url("https://a.example"), url("https://a.example:8443")))
+        #expect(!HTTPSrokaAPI.sameOrigin(nil, url("https://a.example")))
+    }
+}

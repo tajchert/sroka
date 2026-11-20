@@ -183,7 +183,8 @@ public final class HTTPSrokaAPI: SrokaAPI {
         request.httpMethod = "GET"
         request.httpShouldHandleCookies = false
         request.setValue(identity.userAgent, forHTTPHeaderField: "User-Agent")
-        _ = try await downloadFile(request, to: destination, progress: onProgress)
+        // Signed URLs may redirect to a storage host: no credentials go with them.
+        _ = try await downloadFile(request, to: destination, progress: onProgress, sameOriginOnly: false)
     }
 
     // MARK: Plumbing
@@ -246,13 +247,17 @@ public final class HTTPSrokaAPI: SrokaAPI {
         do {
             let data: Data
             let response: URLResponse
+            // API requests carry a token or an OTP: never follow a redirect to another origin, and never accept an answer
+            // (such as a sign-in token) from a server other than the one the request was made to.
+            let delegate = ProgressDelegate(progress, sameOriginOnly: true)
             if let uploadFile {
-                (data, response) = try await session.upload(
-                    for: request, fromFile: uploadFile, delegate: ProgressDelegate(progress))
+                (data, response) = try await session.upload(for: request, fromFile: uploadFile, delegate: delegate)
             } else {
-                (data, response) = try await session.data(for: request)
+                (data, response) = try await session.data(for: request, delegate: delegate)
             }
-            guard let http = response as? HTTPURLResponse else { throw ApiError.malformedResponse }
+            guard let http = response as? HTTPURLResponse, Self.sameOrigin(http.url, request.url) else {
+                throw ApiError.malformedResponse
+            }
             guard (200..<300).contains(http.statusCode) else { throw ErrorParsing.error(from: http, body: data) }
             return (data, http)
         } catch {
@@ -262,12 +267,13 @@ public final class HTTPSrokaAPI: SrokaAPI {
 
     /// Downloads to a temporary file, then moves it onto `destination` (replacing it). Returns bytes written.
     private func downloadFile(
-        _ request: URLRequest, to destination: URL, progress: ByteProgress?
+        _ request: URLRequest, to destination: URL, progress: ByteProgress?, sameOriginOnly: Bool = true
     ) async throws -> (bytes: Int64, response: HTTPURLResponse) {
         let temporary: URL
         let response: URLResponse
         do {
-            (temporary, response) = try await session.download(for: request, delegate: ProgressDelegate(progress))
+            (temporary, response) = try await session.download(
+                for: request, delegate: ProgressDelegate(progress, sameOriginOnly: sameOriginOnly))
         } catch {
             throw Self.map(error)
         }
@@ -296,6 +302,17 @@ public final class HTTPSrokaAPI: SrokaAPI {
         } catch {
             throw ApiError.transport(.cannotWriteToFile)
         }
+    }
+
+    /// Same scheme, host and port (default ports filled in).
+    static func sameOrigin(_ lhs: URL?, _ rhs: URL?) -> Bool {
+        guard let lhs, let rhs, let leftScheme = lhs.scheme?.lowercased(), let rightScheme = rhs.scheme?.lowercased(),
+            let leftHost = lhs.host?.lowercased(), let rightHost = rhs.host?.lowercased()
+        else { return false }
+        func port(_ url: URL, _ scheme: String) -> Int? {
+            url.port ?? (scheme == "https" ? 443 : scheme == "http" ? 80 : nil)
+        }
+        return leftScheme == rightScheme && leftHost == rightHost && port(lhs, leftScheme) == port(rhs, rightScheme)
     }
 
     private static func map(_ error: any Error) -> any Error {
@@ -342,8 +359,21 @@ private struct DeleteAccountBody: Encodable {
 /// Forwards byte progress; also satisfies the download-delegate callbacks the async download API reports through.
 private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let handler: ByteProgress?
+    private let sameOriginOnly: Bool
 
-    init(_ handler: ByteProgress?) { self.handler = handler }
+    init(_ handler: ByteProgress?, sameOriginOnly: Bool) {
+        self.handler = handler
+        self.sameOriginOnly = sameOriginOnly
+    }
+
+    /// A refused redirect hands the 3xx answer to the caller, which treats it as an error.
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        guard sameOriginOnly else { return request }
+        return HTTPSrokaAPI.sameOrigin(task.originalRequest?.url, request.url) ? request : nil
+    }
 
     func urlSession(
         _ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64,

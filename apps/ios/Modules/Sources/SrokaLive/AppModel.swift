@@ -59,7 +59,8 @@ public final class AppModel {
                 let changed = last != nil && last != server
                 last = server
                 // Switching servers while signed out changes no session: check the new server's minimum here.
-                if changed { await self?.versionGate.check() }
+                // Not awaited: the next switch must start its own (newer) check at once.
+                if changed { Task { await self?.versionGate.check() } }
             }
         }
         let stream = sessionStates()

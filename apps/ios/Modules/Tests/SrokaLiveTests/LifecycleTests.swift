@@ -387,6 +387,32 @@ struct LiveContentHooksTests {
         await background.value
     }
 
+    @Test func `The wipe stops waiting for a stuck run after the join timeout`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(
+            content: content, policy: { .anyNetwork }, guard: WipeGuard(), joinTimeout: .milliseconds(50))
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        try await waitFor { content.waitingRuns == 1 }
+        await hooks.cancelAutomaticAndWait()
+        content.releaseRuns()
+    }
+
+    @Test func `A foreground request after a background expiry starts a new run`() async throws {
+        let content = StubContent(blockRuns: true)
+        let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())
+        let background = Task { await hooks.runAutomaticNow() }
+        try await waitFor { content.waitingRuns == 1 }
+        background.cancel()
+        hooks.setForeground(true)
+        await hooks.queueAutomaticDownloads()
+        content.releaseRuns()
+        try await waitFor { content.waitingRuns == 1 }
+        content.releaseRuns()
+        try await waitFor { content.log.all.count == 2 }
+        await background.value
+    }
+
     @Test func `The background task joins a run already in progress`() async throws {
         let content = StubContent(blockRuns: true)
         let hooks = LiveContentHooks(content: content, policy: { .anyNetwork }, guard: WipeGuard())

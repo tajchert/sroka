@@ -130,11 +130,14 @@ public final class FakeDataTransferRepository: DataTransferRepository {
     /// nil = start a queued job; otherwise fail with this error.
     public let importFailure: FakeSubject<ImportError?>
     public let exportResult: FakeSubject<ExportResult>
+    /// Size `fileInfo` reports for any picked file (nil = unknown).
+    public let pickedFileSizeBytes: FakeSubject<Int64?>
     public let calls = CallRecorder<String>()
 
     public init(
         activeImport: ImportJob? = nil,
         importFailure: ImportError? = nil,
+        pickedFileSizeBytes: Int64? = 4096,
         exportResult: ExportResult = .ready(
             fileURL: URL(filePath: NSTemporaryDirectory()).appending(path: "sroka-export.csv"),
             fileName: "sroka-export.csv",
@@ -144,6 +147,7 @@ public final class FakeDataTransferRepository: DataTransferRepository {
         active = FakeSubject(activeImport)
         self.importFailure = FakeSubject(importFailure)
         self.exportResult = FakeSubject(exportResult)
+        self.pickedFileSizeBytes = FakeSubject(pickedFileSizeBytes)
     }
 
     public func startImport(fileURL: URL, format: ImportFormat) async -> ImportStartResult {
@@ -170,6 +174,6 @@ public final class FakeDataTransferRepository: DataTransferRepository {
     }
 
     public func fileInfo(_ fileURL: URL) -> PickedFile? {
-        PickedFile(name: fileURL.lastPathComponent, sizeBytes: 4096)
+        PickedFile(name: fileURL.lastPathComponent, sizeBytes: pickedFileSizeBytes.value)
     }
 }

@@ -22,6 +22,9 @@
 		AA000000000000000000020C /* ReaderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010C /* ReaderFeature */; };
 		AA000000000000000000020D /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010D /* SettingsFeature */; };
 		AA000000000000000000020E /* ShareFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010E /* ShareFeature */; };
+		AA0000000000000000000210 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000110 /* FirebaseCore */; };
+		AA0000000000000000000211 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000111 /* FirebaseAnalyticsCore */; };
+		AA0000000000000000000212 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000112 /* FirebaseCrashlytics */; };
 		AA0000000000000000000032 /* SrokaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AB000000000000000000000D /* SrokaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AB0000000000000000000200 /* SrokaCore in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000100 /* SrokaCore */; };
 		AB0000000000000000000201 /* SrokaDesign in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000101 /* SrokaDesign */; };
@@ -153,6 +156,9 @@
 				AA000000000000000000020C /* ReaderFeature in Frameworks */,
 				AA000000000000000000020D /* SettingsFeature in Frameworks */,
 				AA000000000000000000020E /* ShareFeature in Frameworks */,
+				AA0000000000000000000210 /* FirebaseCore in Frameworks */,
+				AA0000000000000000000211 /* FirebaseAnalyticsCore in Frameworks */,
+				AA0000000000000000000212 /* FirebaseCrashlytics in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -230,6 +236,8 @@
 				AA0000000000000000000008 /* Frameworks */,
 				AA0000000000000000000009 /* Resources */,
 				AA000000000000000000000A /* Embed Foundation Extensions */,
+				AA0000000000000000000020 /* Bundle Firebase config (if present) */,
+				AA0000000000000000000021 /* Upload Crashlytics dSYMs (Release, if configured) */,
 			);
 			buildRules = (
 			);
@@ -256,6 +264,9 @@
 				AA000000000000000000010C /* ReaderFeature */,
 				AA000000000000000000010D /* SettingsFeature */,
 				AA000000000000000000010E /* ShareFeature */,
+				AA0000000000000000000110 /* FirebaseCore */,
+				AA0000000000000000000111 /* FirebaseAnalyticsCore */,
+				AA0000000000000000000112 /* FirebaseCrashlytics */,
 			);
 			productName = Sroka;
 			productReference = AA000000000000000000000D /* Sroka.app */;
@@ -338,6 +349,7 @@
 			mainGroup = AF0000000000000000000002;
 			packageReferences = (
 				AE0000000000000000000001 /* XCLocalSwiftPackageReference "Modules" */,
+				AE0000000000000000000002 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			productRefGroup = AF0000000000000000000008 /* Products */;
 			projectDirPath = "";
@@ -366,6 +378,50 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AA0000000000000000000020 /* Bundle Firebase config (if present) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Config/GoogleService-Info.plist",
+			);
+			name = "Bundle Firebase config (if present)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Copies the gitignored Config/GoogleService-Info.plist into the app bundle when it exists.\n# Without it the build still succeeds and the app falls back to no-op telemetry.\nset -eu\nSRC=\"${SRCROOT}/Config/GoogleService-Info.plist\"\nDST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ -f \"$SRC\" ]; then\n  cp -f \"$SRC\" \"$DST\"\nelse\n  rm -f \"$DST\"\nfi\n";
+		};
+		AA0000000000000000000021 /* Upload Crashlytics dSYMs (Release, if configured) */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
+				"$(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)",
+			);
+			name = "Upload Crashlytics dSYMs (Release, if configured)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Release builds only, and only with a real (non-placeholder) GoogleService-Info.plist.\n# Needs network, so ENABLE_USER_SCRIPT_SANDBOXING is NO for the Release configurations of this target.\nset -eu\ncase \"${CONFIGURATION}\" in Release*) ;; *) exit 0 ;; esac\nPLIST=\"${SRCROOT}/Config/GoogleService-Info.plist\"\nif [ ! -f \"$PLIST\" ]; then\n  echo \"note: no Config/GoogleService-Info.plist, skipping Crashlytics dSYM upload\"\n  exit 0\nfi\nif grep -q 'sroka-example' \"$PLIST\"; then\n  echo \"note: placeholder GoogleService-Info.plist, skipping Crashlytics dSYM upload\"\n  exit 0\nfi\nRUN=\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\nif [ ! -x \"$RUN\" ]; then\n  echo \"error: Crashlytics run script not found at $RUN\" >&2\n  exit 1\nfi\n\"$RUN\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AA0000000000000000000007 /* Sources */ = {
@@ -484,6 +540,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -504,6 +561,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/Sroka.entitlements;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -677,6 +735,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		AE0000000000000000000002 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		AA0000000000000000000100 /* SrokaCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -737,6 +806,21 @@
 		AA000000000000000000010E /* ShareFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShareFeature;
+		};
+		AA0000000000000000000110 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE0000000000000000000002 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		AA0000000000000000000111 /* FirebaseAnalyticsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE0000000000000000000002 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsCore;
+		};
+		AA0000000000000000000112 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE0000000000000000000002 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
 		};
 		AB0000000000000000000100 /* SrokaCore */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -18,6 +18,7 @@ enum AppComposition {
                 // TODO(streams G/H/I): live repositories in this environment's App Group
                 // (dependencies.appEnvironment.appGroupIdentifier).
                 dependencies.useFakes(Fakes())
+                dependencies.telemetry = makeTelemetry()
             }
         }
     }

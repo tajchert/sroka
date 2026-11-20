@@ -131,6 +131,8 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     private var allowInitialNavigation = false
     /// True once the current document has finished loading, i.e. the reader script is installed.
     private var scriptReady = false
+    /// The navigation of the current document: a late `didFinish` of an outgoing one must not mark it ready.
+    private var currentNavigation: WKNavigation?
     private var scrollObservation: NSKeyValueObservation?
     private var tracker = ScrollDirectionTracker()
     private var loadTask: Task<Void, Never>?
@@ -222,6 +224,7 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     private func load(_ view: ArticleWebView, into webView: WKWebView) {
         loadedDocument = view.document
         scriptReady = false
+        currentNavigation = nil
         appliedAppearance = view.appearance
         appliedHeader = view.header
         appliedScrollToTop = view.scrollToTopRequest
@@ -251,7 +254,7 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
                     source: script, injectionTime: .atDocumentEnd, forMainFrameOnly: true,
                     in: ReaderWorld.world))
             self.allowInitialNavigation = true
-            webView.loadHTMLString(html, baseURL: baseURL)
+            self.currentNavigation = webView.loadHTMLString(html, baseURL: baseURL)
         }
     }
 
@@ -323,6 +326,7 @@ final class ArticleWebViewCoordinator: NSObject, WKNavigationDelegate, UIGesture
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard navigation === currentNavigation else { return }
         scriptReady = true
         if let parent { update(from: parent, webView: webView) }
     }

@@ -43,7 +43,7 @@ extension ReaderViewModel {
         }
     }
 
-    private func saveReported(at now: Date) {
+    func saveReported(at now: Date) {
         guard let report = reported, isReady, unsaved else { return }
         lastSavedAt = now
         unsaved = false

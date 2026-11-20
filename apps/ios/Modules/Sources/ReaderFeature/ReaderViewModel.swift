@@ -300,6 +300,8 @@ public final class ReaderViewModel {
             // A scroll still waiting for its save survives a document replacement (refresh, reload).
             if !unsaved { reported = nil }
             progress = reported?.progress ?? latestItem?.progress ?? 0
+            // The held-back save may have fired while the reader was not ready (and exited): write it now.
+            if unsaved { saveReported(at: date.now) }
             atEnd = false
             touchActivity()
             if case .ready = new { announceResumeIfNeeded() }

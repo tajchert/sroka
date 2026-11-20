@@ -15,6 +15,7 @@
 		AA0000000000000000000205 /* SrokaSync in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000105 /* SrokaSync */; };
 		AA0000000000000000000206 /* SrokaContent in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000106 /* SrokaContent */; };
 		AA0000000000000000000207 /* SrokaSession in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000107 /* SrokaSession */; };
+		AA000000000000000000020F /* SrokaLive in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010F /* SrokaLive */; };
 		AA0000000000000000000208 /* AuthFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000108 /* AuthFeature */; };
 		AA0000000000000000000209 /* LibraryFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000109 /* LibraryFeature */; };
 		AA000000000000000000020A /* TagsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000010A /* TagsFeature */; };
@@ -150,6 +151,7 @@
 				AA0000000000000000000205 /* SrokaSync in Frameworks */,
 				AA0000000000000000000206 /* SrokaContent in Frameworks */,
 				AA0000000000000000000207 /* SrokaSession in Frameworks */,
+				AA000000000000000000020F /* SrokaLive in Frameworks */,
 				AA0000000000000000000208 /* AuthFeature in Frameworks */,
 				AA0000000000000000000209 /* LibraryFeature in Frameworks */,
 				AA000000000000000000020A /* TagsFeature in Frameworks */,
@@ -259,6 +261,7 @@
 				AA0000000000000000000105 /* SrokaSync */,
 				AA0000000000000000000106 /* SrokaContent */,
 				AA0000000000000000000107 /* SrokaSession */,
+				AA000000000000000000010F /* SrokaLive */,
 				AA0000000000000000000108 /* AuthFeature */,
 				AA0000000000000000000109 /* LibraryFeature */,
 				AA000000000000000000010A /* TagsFeature */,
@@ -781,6 +784,10 @@
 		AA0000000000000000000107 /* SrokaSession */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SrokaSession;
+		};
+		AA000000000000000000010F /* SrokaLive */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SrokaLive;
 		};
 		AA0000000000000000000108 /* AuthFeature */ = {
 			isa = XCSwiftPackageProductDependency;

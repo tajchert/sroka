@@ -1,0 +1,12 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "This version of Sroka is no longer supported. Update it from the App Store to keep reading." : {
+      "comment" : "Blocking screen shown when the server requires a newer app build."
+    },
+    "Update Sroka" : {
+      "comment" : "Title of the blocking screen shown when the server requires a newer app build."
+    }
+  },
+  "version" : "1.0"
+}

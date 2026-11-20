@@ -4,6 +4,7 @@ import PackageDescription
 // Module graph (see apps/ios/AGENTS.md "Modules and ownership"). Dependency direction is top to bottom:
 //
 //   features (Auth, Library, Tags, Search, Reader, Settings, Share)  -> SrokaCore, SrokaDesign, SrokaTesting
+//   live     (SrokaLive: app composition glue, app target only)      -> engine + data modules
 //   engine   (Sync, Content, Session)                                -> SrokaNetwork, SrokaDatabase, SrokaCore
 //   data     (Network, Database)                                     -> SrokaCore
 //   shared   (Design -> Core; Testing -> Core)
@@ -41,6 +42,7 @@ let package = Package(
         .library(name: "SrokaSync", targets: ["SrokaSync"]),
         .library(name: "SrokaContent", targets: ["SrokaContent"]),
         .library(name: "SrokaSession", targets: ["SrokaSession"]),
+        .library(name: "SrokaLive", targets: ["SrokaLive"]),
         .library(name: "AuthFeature", targets: ["AuthFeature"]),
         .library(name: "LibraryFeature", targets: ["LibraryFeature"]),
         .library(name: "TagsFeature", targets: ["TagsFeature"]),
@@ -99,6 +101,14 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
+        // MARK: Live composition (L): the app's dependency graph and the glue between engines. Only the app imports it.
+        .target(
+            name: "SrokaLive",
+            dependencies: [
+                "SrokaCore", "SrokaNetwork", "SrokaDatabase", "SrokaSync", "SrokaContent", "SrokaSession",
+                dependencies, .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
         // MARK: Features — features never depend on other features or on data/engine modules.
         .target(name: "AuthFeature", dependencies: featureDependencies, resources: featureResources),
         .target(name: "LibraryFeature", dependencies: featureDependencies, resources: featureResources),
@@ -135,6 +145,13 @@ let package = Package(
             name: "SrokaSessionTests",
             dependencies: testDependencies("SrokaSession") + [
                 "SrokaNetwork", "SrokaDatabase", .product(name: "GRDB", package: "GRDB.swift"),
+            ]
+        ),
+        .testTarget(
+            name: "SrokaLiveTests",
+            dependencies: testDependencies("SrokaLive") + [
+                "SrokaDatabase", "SrokaNetwork", "SrokaSync", "SrokaContent", "SrokaSession",
+                .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
         .testTarget(name: "AuthFeatureTests", dependencies: testDependencies("AuthFeature")),

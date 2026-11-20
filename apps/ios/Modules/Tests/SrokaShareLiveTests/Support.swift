@@ -134,11 +134,14 @@ final class AppGroupFixture: Sendable {
     /// The share's account as the graph builds it, over the fixture's Keychain.
     func account() -> ShareAccount {
         let store = SessionStore(store: secureStore)
+        let epochURL = WipeEpoch.url(besideDatabaseAt: databaseURL)
         return ShareAccount(
             launch: store.current,
             stored: { [secureStore] in SessionStore(store: secureStore).current },
             deviceId: { store.existingDeviceId() },
-            accountServer: { [self] in marker.withLock { $0 } })
+            accountServer: { [self] in marker.withLock { $0 } },
+            launchEpoch: epochURL.flatMap(WipeEpoch.read(at:)),
+            epoch: { epochURL.flatMap(WipeEpoch.read(at:)) })
     }
 
     func graph(

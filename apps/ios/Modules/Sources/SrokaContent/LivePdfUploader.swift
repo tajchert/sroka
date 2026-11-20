@@ -124,6 +124,7 @@ public final class LivePdfUploader: PdfUploader, Sendable {
     /// launch, after sign-in and when the app returns to the foreground.
     public func resumePendingUploads() {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.pdfUploads.path)) ?? []
+        sweepOrphans(names)
         for name in names.sorted() where name.hasSuffix(".json") {
             let id = String(name.dropLast(5))
             guard let meta = readMetadata(id), ownedByCurrentAccount(meta) else {
@@ -134,6 +135,20 @@ public final class LivePdfUploader: PdfUploader, Sendable {
             _ = start(PdfUpload(id: id, fileName: meta.fileName, sizeBytes: meta.sizeBytes, state: .queued))
         }
     }
+
+    /// Removes PDFs whose sidecar never got written (the process died between publishing and writing it), once they
+    /// are old enough that no admission can still be finishing them.
+    private func sweepOrphans(_ names: [String]) {
+        let present = Set(names)
+        let cutoff = now().addingTimeInterval(-Self.orphanAge)
+        for name in names where name.hasSuffix(".pdf") && !present.contains(name.dropLast(4) + ".json") {
+            let url = paths.pdfUploads.appending(path: name)
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified < cutoff { paths.removeIfPresent(url) }
+        }
+    }
+
+    public static let orphanAge: TimeInterval = 3600
 
     /// Sign-out: stops every upload and forgets them (the content store's wipe deletes the files).
     public func cancelAll() {
@@ -161,12 +176,21 @@ public final class LivePdfUploader: PdfUploader, Sendable {
         if declared > Limits.maxPdfBytes { return failed(.tooLarge) }
         guard let dest = paths.pdfUpload(id), let metaURL = paths.pdfUploadMetadata(id) else { return failed(.unknown) }
         try? paths.prepare(paths.pdfUploads)
+        // Copied privately first: a process killed mid-copy (the share extension) leaves nothing in the shared queue.
+        // Only the rename publishes it, just before its sidecar; `resumePendingUploads` sweeps a PDF left without one.
+        let staged = FileManager.default.temporaryDirectory.appending(path: "pdf-upload-\(id).pdf")
         let copied: Int64
-        switch Self.copyPdf(from: source, to: dest, cap: Limits.maxPdfBytes) {
+        switch Self.copyPdf(from: source, to: staged, cap: Limits.maxPdfBytes) {
         case .copied(let size): copied = size
         case .failed(let error):
-            paths.removeIfPresent(dest)
+            paths.removeIfPresent(staged)
             return failed(error)
+        }
+        do {
+            try FileManager.default.moveItem(at: staged, to: dest)
+        } catch {
+            paths.removeIfPresent(staged)
+            return failed(.storageFull, size: copied)
         }
         let meta = Metadata(id: id, fileName: fileName, sizeBytes: copied, attempts: 0, tags: [], owner: owner())
         do {

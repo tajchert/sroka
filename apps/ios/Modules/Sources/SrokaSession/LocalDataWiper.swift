@@ -72,6 +72,14 @@ public final class LocalDataWiper: LocalDataWiping {
 
     private func runSteps() async -> Bool {
         var tablesCleared = true
+        // First: a share extension commit from here on sees a new epoch and is refused (see `WipeEpoch`).
+        if let epochURL = WipeEpoch.url(besideDatabaseAt: URL(filePath: database.writer.path)) {
+            do {
+                try WipeEpoch.bump(at: epochURL)
+            } catch {
+                sessionLog.error("Wipe: epoch bump failed: \(String(describing: error), privacy: .public)")
+            }
+        }
         await cancelAllWork()
         // Stops import polling too: the tracker stops once its job is no longer the stored one.
         importJobs.clear()

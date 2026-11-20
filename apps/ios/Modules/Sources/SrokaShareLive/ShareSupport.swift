@@ -26,12 +26,15 @@ struct ShareAccount: Sendable {
     let deviceId: @Sendable () -> String?
     /// The App Group account marker; the wipe clears it even when deleting the Keychain item fails.
     let accountServer: @Sendable () -> String?
+    /// The wipe epoch read at launch, and a fresh read from disk (`WipeEpoch`).
+    var launchEpoch: String? = nil
+    var epoch: @Sendable () -> String? = { nil }
 
-    /// The Keychain still holds the token the sheet was opened with (expired or not), and the account marker is set
-    /// (for the launch session's server, when it recorded one).
+    /// No wipe started since launch, the Keychain still holds the token the sheet was opened with (expired or not),
+    /// and the account marker is set (for the launch session's server, when it recorded one).
     var isCurrent: Bool {
-        guard let launch, let now = stored(), now.token == launch.token, now.server == launch.server,
-            let marker = accountServer()
+        guard let launch, epoch() == launchEpoch, let now = stored(), now.token == launch.token,
+            now.server == launch.server, let marker = accountServer()
         else { return false }
         return launch.server == nil || launch.server == marker
     }
@@ -174,22 +177,31 @@ struct ShareAPI: SrokaAPI {
         }
     }
 
-    func push(payloads: [String]) async throws -> PushResponseDto {
+    /// The endpoint can still be refused when the request is built (the token rotated after `authorize`): that
+    /// `invalidRequest` is a pause too, so the app retries instead of the PDF failing for good.
+    private func send<T>(_ call: () async throws -> T) async throws -> T {
         try await authorize()
-        return try await base.push(payloads: payloads)
+        do {
+            return try await call()
+        } catch ApiError.invalidRequest {
+            throw ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)
+        }
+    }
+
+    func push(payloads: [String]) async throws -> PushResponseDto {
+        try await send { try await base.push(payloads: payloads) }
     }
 
     func uploadPdf(
         file: URL, fileName: String, tags: [String], source: ItemSource, onProgress: ByteProgress?
     ) async throws -> PdfUploadResponseDto {
-        try await authorize()
-        return try await base.uploadPdf(
-            file: file, fileName: fileName, tags: tags, source: source, onProgress: onProgress)
+        try await send {
+            try await base.uploadPdf(file: file, fileName: fileName, tags: tags, source: source, onProgress: onProgress)
+        }
     }
 
     func uploadThumbnail(itemId: String, data: Data, contentType: String) async throws -> ItemDto {
-        try await authorize()
-        return try await base.uploadThumbnail(itemId: itemId, data: data, contentType: contentType)
+        try await send { try await base.uploadThumbnail(itemId: itemId, data: data, contentType: contentType) }
     }
 
     func sendOtp(email: String) async throws { throw ApiError.invalidRequest }

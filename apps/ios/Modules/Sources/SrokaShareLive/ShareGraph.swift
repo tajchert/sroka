@@ -86,11 +86,14 @@ public struct ShareGraph: Sendable {
         let keychain = KeychainSecureStore(
             service: ShareConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup)
         let sessionStore = SessionStore(store: keychain)
+        let epochURL = WipeEpoch.url(besideDatabaseAt: databaseURL ?? URL(filePath: database.writer.path))
         let account = ShareAccount(
             launch: sessionStore.current,
             stored: { SessionStore(store: keychain).current },
             deviceId: { sessionStore.existingDeviceId() },
-            accountServer: { preferences.accountServer })
+            accountServer: { preferences.accountServer },
+            launchEpoch: epochURL.flatMap(WipeEpoch.read(at:)),
+            epoch: { epochURL.flatMap(WipeEpoch.read(at:)) })
         let provider = ShareApiSessionProvider(
             base: LiveApiSessionProvider(
                 sessionStore: sessionStore, preferences: preferences,

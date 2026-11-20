@@ -354,7 +354,8 @@ struct ShareGraphTests {
         try group.appOpened()
         let release = Gate()
         let pushing = Gate()
-        let graph = try group.graph(api: api, clock: ImmediateClock())
+        let clock = TestClock()
+        let graph = try group.graph(api: api, clock: clock)
         api.onPush { payloads in
             pushing.open()
             await release.wait()
@@ -363,6 +364,8 @@ struct ShareGraphTests {
         _ = await graph.library.save(url: "https://example.com/slow", title: nil, tags: [], source: .share)
         let push = Task { await graph.pushOnce() }
         await pushing.wait()
+        // The timeout fires only once the push is inside the API.
+        await clock.advance(by: ShareGraph.pushTimeout)
         await push.value
         let closed = Mutex(false)
         let closing = Task {
@@ -374,6 +377,62 @@ struct ShareGraphTests {
         release.open()
         await closing.value
         #expect(closed.withLock { $0 })
+    }
+
+    @Test func `A wipe that could not clear the marker or the Keychain still refuses the share`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        // Another process: its cached marker and the Keychain item survive; only the epoch file changed.
+        try WipeEpoch.bump(at: try #require(WipeEpoch.url(besideDatabaseAt: group.databaseURL)))
+
+        let saved = await graph.library.save(url: "https://example.com/late", title: nil, tags: [], source: .share)
+
+        if case .saved = saved { Issue.record("saved after a wipe started") }
+        #expect(try await group.queuedOps().isEmpty)
+        #expect(try await group.itemCount() == 0)
+    }
+
+    @Test func `The app's wipe replaces the epoch before it clears anything`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        let defaults = try #require(UserDefaults(suiteName: "share-wipe-\(UUID().uuidString)"))
+        let preferences = PreferencesStore(defaults: defaults)
+        let wiper = LocalDataWiper.databaseOnly(
+            try AppDatabase.openShared(at: group.databaseURL), sessionStore: SessionStore(store: InMemorySecureStore()),
+            preferences: preferences, importJobs: ImportJobStore(preferences: preferences))
+        #expect(await wiper.wipe())
+
+        #expect(graph.account.isCurrent == false)
+    }
+
+    @Test func `A PDF published without its sidecar is swept once it is old`() async throws {
+        try group.appOpened()
+        let uploads = group.paths.pdfUploads
+        try FileManager.default.createDirectory(at: uploads, withIntermediateDirectories: true)
+        let old = uploads.appending(path: "orphan-old.pdf")
+        let fresh = uploads.appending(path: "orphan-new.pdf")
+        try Data("%PDF-1.7".utf8).write(to: old)
+        try Data("%PDF-1.7".utf8).write(to: fresh)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-2 * LivePdfUploader.orphanAge)], ofItemAtPath: old.path)
+
+        let appUploader = LivePdfUploader(
+            api: ShareFakeAPI(), paths: group.paths, syncController: ShareSyncController(),
+            renderThumbnail: { _ in nil })
+        appUploader.resumePendingUploads()
+
+        #expect(FileManager.default.fileExists(atPath: old.path) == false)
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+    }
+
+    @Test func `A request refused while it is built pauses with a 401`() async throws {
+        try group.appOpened()
+        // The fake throws invalidRequest, as HTTPSrokaAPI does when the endpoint is refused after the preflight.
+        let shareAPI = ShareAPI(base: api, account: group.account(), endpointUsable: { true })
+        await #expect(throws: ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)) {
+            _ = try await shareAPI.uploadPdf(
+                file: group.root, fileName: "a.pdf", tags: [], source: .share, onProgress: nil)
+        }
     }
 
     @Test func `Closing waits for a running write and refuses new ones`() async throws {

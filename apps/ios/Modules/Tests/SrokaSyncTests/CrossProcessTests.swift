@@ -167,3 +167,20 @@ private func field(_ name: String, of payload: String) -> Any? {
 private func opId(_ payload: String) -> String? { field("opId", of: payload) as? String }
 
 private func at(of payload: String) -> Int64? { (field("at", of: payload) as? NSNumber)?.int64Value }
+
+struct CombinedOpClockStoreTests {
+    @Test func `Loads the largest stored value and saves to every store`() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "clock-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let defaults = DefaultsOpClockStore(defaults: try #require(UserDefaults(suiteName: UUID().uuidString)))
+        let file = FileOpClockStore(url: directory.appending(path: "op-clock"))
+        defaults.save(10)
+        file.save(42)
+        let combined = CombinedOpClockStore([defaults, file])
+        #expect(combined.load() == 42)
+        combined.save(50)
+        #expect(defaults.load() == 50)
+        #expect(file.load() == 50)
+    }
+}

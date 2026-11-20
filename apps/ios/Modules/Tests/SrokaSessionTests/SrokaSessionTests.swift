@@ -1,7 +1,9 @@
 import Clocks
 import Foundation
 import SrokaCore
+import SrokaDatabase
 import SrokaNetwork
+import Synchronization
 import Testing
 
 @testable import SrokaSession
@@ -330,15 +332,52 @@ struct SignOutTests {
             database: h.database,
             cancelAllWork: { log.append("cancel") },
             clearTables: {
-                #expect(sessionStore.current != nil)
+                // First pass with the token still stored, the second (share extension) after it is cleared.
+                let first = !log.entries.contains("tables")
+                #expect((sessionStore.current != nil) == first)
                 log.append("tables")
             },
             deleteFiles: { log.append("files") },
             transferDirectories: [],
             sessionStore: h.sessionStore, preferences: h.preferences, importJobs: h.jobs)
         await wiper.wipe()
-        #expect(log.entries == ["cancel", "tables", "files"])
+        #expect(log.entries == ["cancel", "tables", "files", "tables", "files"])
         #expect(h.sessionStore.current == nil)
+    }
+
+    @Test func `A share committed before the token is cleared is removed by the wipe's second clear`() async throws {
+        let h = try Harness()
+        _ = await h.signIn("a@b.co")
+        let sessionStore = h.sessionStore
+        let database = h.database
+        let tokenAtSecondClear = LockedLog()
+        let clears = Mutex(0)
+        let wiper = LocalDataWiper(
+            database: database,
+            cancelAllWork: {},
+            clearTables: {
+                let pass = clears.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 2 { tokenAtSecondClear.append(sessionStore.current == nil ? "none" : "still") }
+                try await database.write { try MaintenanceDao.wipeAll($0) }
+            },
+            // The extension commits its row while the files go, after the first clear, token still stored.
+            deleteFiles: {
+                guard clears.withLock({ $0 }) == 1 else { return }
+                try? await database.write { db in
+                    try db.execute(
+                        sql: """
+                            INSERT INTO pending_ops (op_id, type, payload, created_at)
+                            VALUES ('share-op', 'item.add', '{}', 0)
+                            """)
+                }
+            },
+            transferDirectories: [], sessionStore: h.sessionStore, preferences: h.preferences, importJobs: h.jobs)
+        await wiper.wipe()
+        #expect(tokenAtSecondClear.entries == ["none"])
+        #expect(try await h.pendingOpCount() == 0)
     }
 
     @Test func `A failed table clear still clears the token, and the next sign in wipes`() async throws {

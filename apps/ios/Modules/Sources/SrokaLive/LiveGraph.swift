@@ -7,25 +7,6 @@ import SrokaNetwork
 import SrokaSession
 import SrokaSync
 
-/// Persists the op clock in the App Group suite, which the share extension shares.
-public struct DefaultsOpClockStore: OpClockStore {
-    public static let key = "sroka.opClock.last"
-    /// `UserDefaults` is thread-safe; it is not marked `Sendable` in every SDK (same as `PreferencesStore`).
-    private nonisolated(unsafe) let defaults: UserDefaults
-
-    public init(defaults: UserDefaults) {
-        self.defaults = defaults
-    }
-
-    public func load() -> Int64 {
-        (defaults.object(forKey: Self.key) as? NSNumber)?.int64Value ?? 0
-    }
-
-    public func save(_ value: Int64) {
-        defaults.set(NSNumber(value: value), forKey: Self.key)
-    }
-}
-
 /// Inputs of the live graph that come from the app bundle.
 public struct LiveConfiguration: Sendable {
     public var environment: AppEnvironment
@@ -112,7 +93,6 @@ public final class LiveGraph: Sendable {
             liveLog.error("App Group unavailable: preferences fall back to the app's own defaults")
             preferences = PreferencesStore(defaults: .standard)
         }
-        let opClockDefaults = UserDefaults(suiteName: group) ?? .standard
         let sessionStore = SessionStore(
             store: KeychainSecureStore(
                 service: LiveConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup))
@@ -147,7 +127,7 @@ public final class LiveGraph: Sendable {
         let scheduler = SyncScheduler(engine: engine, session: syncSession, hooks: hooks, network: network)
         let writer = OpWriter(
             database: database,
-            opClock: OpClock(now: systemNowMillis, store: DefaultsOpClockStore(defaults: opClockDefaults)),
+            opClock: OpClock(now: systemNowMillis, store: DefaultsOpClockStore.appGroup(group)),
             admission: wipeGuard)
         let uploader = LivePdfUploader(
             api: api, paths: paths, syncController: scheduler, onUnauthorized: onUnauthorized)

@@ -125,7 +125,7 @@ let package = Package(
             name: "SrokaShareLive",
             dependencies: [
                 "SrokaCore", "SrokaNetwork", "SrokaDatabase", "SrokaSync", "SrokaContent", "SrokaSession",
-                "ShareFeature", dependencies,
+                "ShareFeature", dependencies, .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
         // MARK: Tests
@@ -175,7 +175,7 @@ let package = Package(
             name: "SrokaShareLiveTests",
             dependencies: testDependencies("SrokaShareLive") + [
                 "ShareFeature", "SrokaDatabase", "SrokaNetwork", "SrokaSync", "SrokaContent", "SrokaSession",
-                .product(name: "GRDB", package: "GRDB.swift"),
+                "SrokaLive", .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
         .testTarget(

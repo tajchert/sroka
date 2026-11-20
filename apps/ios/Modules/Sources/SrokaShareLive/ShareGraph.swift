@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import GRDB
 import ShareFeature
 import SrokaContent
 import SrokaCore
@@ -54,10 +55,10 @@ public struct ShareGraph: Sendable {
     let library: LiveLibraryRepository
     let tags: LiveTagRepository
     let auth: ShareAuthRepository
-    let uploader: LivePdfUploader
+    let uploader: SharePdfUploader
     let engine: SyncEngine
-    let sessionStore: SessionStore
-    let storedToken: @Sendable () -> String?
+    let account: ShareAccount
+    let gate: ShareWriteGate
     let clock: any Clock<Duration>
 
     /// The graph, or why the sheet cannot save.
@@ -76,7 +77,7 @@ public struct ShareGraph: Sendable {
         case .opened(let opened): database = opened
         case .failed(let startup): return .failed(startup)
         }
-        guard let databaseURL, let paths = ContentPaths.appGroup(group),
+        guard let paths = ContentPaths.appGroup(group),
             let preferences = PreferencesStore(appGroup: group)
         else {
             shareLog.error("share storage unavailable")
@@ -85,18 +86,21 @@ public struct ShareGraph: Sendable {
         let keychain = KeychainSecureStore(
             service: ShareConfiguration.keychainService, accessGroup: configuration.keychainAccessGroup)
         let sessionStore = SessionStore(store: keychain)
+        let account = ShareAccount(
+            launch: sessionStore.current,
+            stored: { SessionStore(store: keychain).current },
+            deviceId: { sessionStore.existingDeviceId() })
         let api = HTTPSrokaAPI(
             provider: ShareApiSessionProvider(
                 base: LiveApiSessionProvider(
                     sessionStore: sessionStore, preferences: preferences,
                     defaultServerUrl: environment.apiBaseURL.absoluteString),
-                store: sessionStore,
-                storedToken: { SessionStore(store: keychain).token }),
+                account: account),
             identity: ClientIdentity(appVersion: configuration.appVersion))
         return .ready(
             ShareGraph(
-                environment: environment, database: database, databaseURL: databaseURL, api: api,
-                sessionStore: sessionStore, storedToken: { SessionStore(store: keychain).token }, paths: paths))
+                environment: environment, database: database, api: api, sessionStore: sessionStore,
+                account: account, clockStore: DefaultsOpClockStore.appGroup(group), paths: paths))
     }
 
     /// The startup decision: the database must exist and be fully migrated by the app.
@@ -127,18 +131,21 @@ public struct ShareGraph: Sendable {
     init(
         environment: AppEnvironment,
         database: AppDatabase,
-        databaseURL: URL,
         api: any SrokaAPI,
         sessionStore: SessionStore,
-        storedToken: @escaping @Sendable () -> String?,
+        account: ShareAccount,
+        clockStore: any OpClockStore,
         paths: ContentPaths,
         now: @escaping @Sendable () -> Int64 = systemNowMillis,
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         let controller = ShareSyncController()
+        let api = ShareAPI(base: api, account: account)
+        let gate = ShareWriteGate(account: account)
+        // Every commit on this connection re-checks the account inside its transaction.
+        database.writer.add(transactionObserver: ShareCommitCheck(account: account), extent: .databaseLifetime)
         let writer = OpWriter(
-            database: database, opClock: OpClock(now: now, store: FileOpClockStore(besideDatabaseAt: databaseURL)),
-            now: now)
+            database: database, opClock: OpClock(now: now, store: clockStore), now: now, admission: gate)
         self.environment = environment
         self.database = database
         self.clock = clock
@@ -149,11 +156,13 @@ public struct ShareGraph: Sendable {
         // Copies each PDF into the App Group queue first, then uploads while the sheet is up; the app's
         // `resumePendingUploads()` finishes whatever the extension could not.
         // No thumbnail here: PDFKit may decode a first-page scan at full size, past the extension's memory limit.
-        uploader = LivePdfUploader(
-            api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil })
-        self.sessionStore = sessionStore
-        self.storedToken = storedToken
-        engine = SyncEngine(database: database, api: api, session: ShareSyncSession(store: sessionStore), now: now)
+        uploader = SharePdfUploader(
+            base: LivePdfUploader(api: api, paths: paths, syncController: controller, renderThumbnail: { _ in nil }),
+            account: account)
+        self.account = account
+        self.gate = gate
+        engine = SyncEngine(
+            database: database, api: api, session: ShareSyncSession(store: sessionStore, account: account), now: now)
     }
 
     /// Sets the services the save sheet and the tag editor use.
@@ -168,15 +177,20 @@ public struct ShareGraph: Sendable {
 
     /// One push batch, at most `pushTimeout`. Never throws: a failed or slow push leaves the ops queued for the app.
     public func pushOnce() async {
-        // The app creates the device id at sign-in; without it, leave the push to the app.
-        guard sessionStore.existingDeviceId() != nil else { return }
-        // Signed out or another account since launch: the queue may now be the new account's.
-        guard let token = sessionStore.token, storedToken() == token else { return }
+        // Without the app's device id, or signed out / another account since launch (the queue may now be the new
+        // account's): leave the push to the app.
+        guard account.canSend else { return }
         let engine = engine
         await withTimeout(Self.pushTimeout, clock: clock) {
             let outcome = await engine.pushOnce()
             if case .success = outcome { return }
             shareLog.info("share push deferred to the app")
         }
+    }
+
+    /// The sheet is closing: refuses new local writes and waits for the running ones (a tag save the editor left
+    /// behind, a favorite), so the database is never suspended under a commit.
+    public func closeWrites() async {
+        await gate.closeAndDrain()
     }
 }

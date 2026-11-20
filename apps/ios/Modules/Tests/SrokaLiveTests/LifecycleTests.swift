@@ -218,7 +218,7 @@ struct WipeGuardTests {
 
         #expect(await syncSession.currentState() == .signedIn(email: "a@b.c"))
         await wiper.wipe()
-        #expect(log.all == ["cancel:out", "tables:out", "files:out"])
+        #expect(log.all == ["cancel:out", "tables:out", "files:out", "tables:out", "files:out"])
         #expect(sessionStore.current == nil)
         #expect(!wipeGuard.isWiping)
         #expect(await syncSession.currentState() == .signedOut)

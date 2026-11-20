@@ -5,6 +5,7 @@ import SrokaCore
 import SrokaDatabase
 import SrokaNetwork
 import SrokaSession
+import SrokaSync
 import Synchronization
 
 @testable import SrokaShareLive
@@ -105,21 +106,43 @@ final class AppGroupFixture: Sendable {
 
     deinit { try? FileManager.default.removeItem(at: root) }
 
+    static let server = "https://api.example.test"
+
     /// The app opened once (created and migrated the file) and the user signed in.
     func appOpened(signedIn: Bool = true, deviceId: Bool = true) throws {
         _ = try AppDatabase.openShared(at: databaseURL)
         guard signedIn else { return }
         let session = SessionStore(store: secureStore)
-        try session.save(token: "token", email: "reader@example.test")
+        try session.save(token: "token", email: "reader@example.test", server: Self.server)
         if deviceId { _ = session.deviceId() }
+    }
+
+    /// The app signed out (`signedInAs: nil`) or another account signed in.
+    func appSwitched(signedInAs token: String? = nil) throws {
+        let session = SessionStore(store: secureStore)
+        session.clear()
+        if let token { try session.save(token: token, email: "other@example.test", server: Self.server) }
+    }
+
+    /// The share's account as the graph builds it, over the fixture's Keychain.
+    func account() -> ShareAccount {
+        let store = SessionStore(store: secureStore)
+        return ShareAccount(
+            launch: store.current,
+            stored: { [secureStore] in SessionStore(store: secureStore).current },
+            deviceId: { store.existingDeviceId() })
     }
 
     func graph(api: any SrokaAPI, clock: any Clock<Duration> = ContinuousClock()) throws -> ShareGraph {
         ShareGraph(
             environment: environment, database: try AppDatabase.openForExtension(at: databaseURL),
-            databaseURL: databaseURL, api: api, sessionStore: SessionStore(store: secureStore),
-            storedToken: { [secureStore] in SessionStore(store: secureStore).token }, paths: paths,
-            clock: clock)
+            api: api, sessionStore: SessionStore(store: secureStore), account: account(),
+            clockStore: FileOpClockStore(besideDatabaseAt: databaseURL), paths: paths, clock: clock)
+    }
+
+    func itemCount() async throws -> Int {
+        let database = try AppDatabase.openShared(at: databaseURL)
+        return try await database.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM items") ?? 0 }
     }
 
     func queuedOps() async throws -> [PendingOpRecord] {

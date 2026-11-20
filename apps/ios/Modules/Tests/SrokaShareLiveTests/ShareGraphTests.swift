@@ -6,6 +6,7 @@ import ShareFeature
 import SrokaContent
 import SrokaCore
 import SrokaDatabase
+import SrokaLive
 import SrokaNetwork
 import SrokaSession
 import SrokaSync
@@ -165,7 +166,7 @@ struct ShareGraphTests {
             return
         }
         // The app signs out and another account signs in while the sheet stays open.
-        try SessionStore(store: group.secureStore).save(token: "other-token", email: "other@example.test")
+        try group.appSwitched(signedInAs: "other-token")
 
         await graph.pushOnce()
 
@@ -225,7 +226,98 @@ struct ShareGraphTests {
         #expect(values.appEnvironment == group.environment)
         #expect(values.libraryRepository is LiveLibraryRepository)
         #expect(values.tagRepository is LiveTagRepository)
-        #expect(values.pdfUploader is LivePdfUploader)
+        #expect(values.pdfUploader is SharePdfUploader)
+    }
+
+    @Test func `A share after the app signed out is refused and leaves no row`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        try group.appSwitched()
+
+        let saved = await graph.library.save(url: "https://example.com/late", title: nil, tags: [], source: .share)
+
+        if case .saved = saved { Issue.record("saved for a signed-out account") }
+        #expect(try await group.queuedOps().isEmpty)
+        #expect(try await group.itemCount() == 0)
+    }
+
+    @Test func `A commit is rolled back when the account goes inside its transaction`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        let group = group
+        await #expect(throws: ShareAccountGone.self) {
+            try await graph.database.write { db in
+                try db.execute(
+                    sql: "INSERT INTO pending_ops (op_id, type, payload, created_at) VALUES ('x', 'item.add', '{}', 0)")
+                // The app's sign-out lands after the gate admitted the write, before it commits.
+                try group.appSwitched(signedInAs: "other-token")
+            }
+        }
+        #expect(try await group.queuedOps().isEmpty)
+    }
+
+    @Test func `After an account switch the API sends nothing, not even without a token`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        let account = group.account()
+        let preferences = PreferencesStore(defaults: try #require(UserDefaults(suiteName: UUID().uuidString)))
+        preferences.accountServer = AppGroupFixture.server
+        let provider = ShareApiSessionProvider(
+            base: LiveApiSessionProvider(
+                sessionStore: SessionStore(store: group.secureStore), preferences: preferences,
+                defaultServerUrl: AppGroupFixture.server),
+            account: account)
+        #expect(await provider.endpoint() == ApiEndpoint(baseUrl: URL(string: AppGroupFixture.server)!, token: "token"))
+
+        try group.appSwitched(signedInAs: "other-token")
+
+        #expect(await provider.endpoint() == ApiEndpoint(baseUrl: ShareApiSessionProvider.refused, token: nil))
+        await #expect(throws: ApiError.invalidRequest) {
+            _ = try await HTTPSrokaAPI(provider: provider, identity: ClientIdentity(appVersion: "1")).push(payloads: [])
+        }
+        await #expect(throws: ApiError.http(status: 401, code: nil, message: nil, retryAfter: nil)) {
+            _ = try await ShareAPI(base: api, account: account).push(payloads: ["{}"])
+        }
+        await graph.pushOnce()
+        #expect(api.events.isEmpty)
+    }
+
+    @Test func `A PDF queued after the app signed out is removed and never uploaded`() async throws {
+        try group.appOpened()
+        let graph = try group.graph(api: api)
+        let source = group.root.appending(path: "Late.pdf")
+        try Data("%PDF-1.7\n1 0 obj\n".utf8).write(to: source)
+        try group.appSwitched()
+
+        let uploads = await graph.uploader.enqueue([source])
+
+        #expect(uploads.count == 1)
+        #expect(uploads.allSatisfy { !$0.isActive })
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: group.paths.pdfUploads.path)) ?? []
+        #expect(left.isEmpty)
+        #expect(api.events.isEmpty)
+    }
+
+    @Test func `Closing waits for a running write and refuses new ones`() async throws {
+        try group.appOpened()
+        let gate = ShareWriteGate(account: group.account())
+        let release = Gate()
+        let entered = Gate()
+        let committed = Mutex(false)
+        let write = Task {
+            try await gate.admit {
+                entered.open()
+                await release.wait()
+                committed.withLock { $0 = true }
+            }
+        }
+        await entered.wait()
+        let closing = Task { await gate.closeAndDrain() }
+        release.open()
+        await closing.value
+        #expect(committed.withLock { $0 })
+        try await write.value
+        await #expect(throws: ShareWriteGate.Closed.self) { try await gate.admit {} }
     }
 }
 
@@ -242,6 +334,10 @@ struct ShareConfigurationTests {
         let configuration = try #require(ShareConfiguration(infoDictionary: info))
         #expect(configuration.keychainAccessGroup == "ABCDE12345.app.sroka.dev.session")
         #expect(configuration.appVersion == "1.2.0")
+    }
+
+    @Test func `The Keychain service is the app's`() {
+        #expect(ShareConfiguration.keychainService == LiveConfiguration.keychainService)
     }
 
     @Test func `Without a team prefix the default Keychain group is used`() throws {

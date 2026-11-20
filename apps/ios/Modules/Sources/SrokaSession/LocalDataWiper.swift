@@ -18,7 +18,7 @@ public protocol LocalDataWiping: Sendable {
 ///   or before the sync engine exists) clears the tables directly with `MaintenanceDao.wipeAll`.
 /// - `deleteFiles`: articles, thumbs, pdf-uploads, temporary downloads. Exports and imports (owned here) are deleted
 ///   from `transferDirectories` in any case.
-/// Last, the token and the account marker are cleared.
+/// Then the token and the account marker are cleared, and last the tables and files once more (share extension).
 public final class LocalDataWiper: LocalDataWiping {
     public typealias Step = @Sendable () async -> Void
     public typealias ThrowingStep = @Sendable () async throws -> Void
@@ -101,6 +101,15 @@ public final class LocalDataWiper: LocalDataWiping {
         // An import or export that started while the token was still stored may have written since: clear again.
         importJobs.clear()
         removeTransferDirectories()
+        // The share extension writes from its own process and checks, at each commit, that the Keychain still holds
+        // its launch token. A share that committed after the first clear but before the token went is removed here;
+        // one after this point is refused there. Same for a PDF it queued into the shared upload directory.
+        do {
+            try await clearTables()
+        } catch {
+            sessionLog.error("Wipe: second table clear failed: \(String(describing: error), privacy: .public)")
+        }
+        await deleteFiles()
         return tablesCleared
     }
 

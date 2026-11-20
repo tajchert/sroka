@@ -106,10 +106,16 @@ final class ShareViewController: UIViewController, UISheetPresentationController
     private func complete() {
         guard !completed else { return }
         completed = true
-        for observer in hostObservers { NotificationCenter.default.removeObserver(observer) }
-        hostObservers = []
-        AppDatabase.suspend()
-        extensionContext?.completeRequest(returningItems: nil)
+        let graph = composition?.graph
+        Task { @MainActor [weak self] in
+            // A write still running (a tag save the editor left behind) commits before the database is suspended.
+            await graph?.closeWrites()
+            guard let self else { return }
+            for observer in hostObservers { NotificationCenter.default.removeObserver(observer) }
+            hostObservers = []
+            AppDatabase.suspend()
+            extensionContext?.completeRequest(returningItems: nil)
+        }
     }
 
     /// A share extension cannot call `UIApplication.shared`; `extensionContext.open` only works for some

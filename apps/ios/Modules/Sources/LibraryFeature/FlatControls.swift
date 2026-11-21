@@ -47,12 +47,32 @@ extension View {
     /// The tinted + button of the My List toolbar.
     func toolbarAddStyle() -> some View { modifier(ToolbarAccentStyle(isSave: false)) }
 
+    /// Tinted circular glass for the leading avatar button.
+    func toolbarAvatarStyle() -> some View { modifier(ToolbarAvatarStyle()) }
+
     /// `saveButtonStyle()` in a toolbar.
     func toolbarSaveStyle() -> some View { modifier(ToolbarAccentStyle(isSave: true)) }
 
     /// `.glass` (or `.glassProminent`), flat in snapshot tests.
     func glassControl(prominent: Bool = false) -> some View {
         modifier(GlassControlStyle(prominent: prominent))
+    }
+}
+
+/// The avatar letter button: the system glass circle itself carries the tint, so the fill covers the
+/// whole button (no custom circle inside it). Plain text in snapshot tests.
+private struct ToolbarAvatarStyle: ViewModifier {
+    @Environment(\.usesFlatControls) private var isFlat
+
+    func body(content: Content) -> some View {
+        if isFlat {
+            content.buttonStyle(.borderless)
+        } else {
+            content
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .tint(SrokaColor.tertiaryContainer)
+        }
     }
 }
 

@@ -53,9 +53,8 @@ struct AvatarButton: View {
             Text(letter)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SrokaColor.onTertiaryContainer)
-                .frame(width: 32, height: 32)
-                .background(SrokaColor.tertiaryContainer, in: .circle)
         }
+        .toolbarAvatarStyle()
         .accessibilityLabel(Text("Settings", bundle: #bundle))
     }
 }

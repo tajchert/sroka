@@ -468,7 +468,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             await retryMissingThumbnail(item: item, row: previous, generation: generation, api: api)
             return .alreadyCurrent
         }
-        if freeBytes() < Self.minFreeBytes { return .storageFull }
+        if !hasFreeSpace() { return .storageFull }
 
         let urls: ContentUrlsDto
         switch await contentUrls(itemId: itemId, api: api) {
@@ -574,7 +574,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             await retryMissingThumbnail(item: item, row: previous, generation: generation, api: api)
             return .alreadyCurrent
         }
-        if freeBytes() < Self.minFreeBytes { return .storageFull }
+        if !hasFreeSpace() { return .storageFull }
         guard await markDownloading(previous, itemId: itemId, contentId: contentId, generation: generation),
             let temp = paths.tmpDir(itemId)
         else { return .notReady }
@@ -779,6 +779,8 @@ public final class LiveContentStore: ContentStore, Sendable {
     private func markFailed(
         _ previous: ContentFileRecord?, itemId: String, contentId: String, error: String, generation: Int
     ) async {
+        // Short codes only (http_404, bad_zip, sha256_mismatch, …): never URLs or content.
+        log.notice("download failed: \(error, privacy: .public)")
         let attempts = previous.map { $0.contentId == contentId ? $0.attempts + 1 : 1 } ?? 1
         await writeRow(
             ContentFileRecord(
@@ -832,7 +834,9 @@ public final class LiveContentStore: ContentStore, Sendable {
             return .success(try await api.contentUrls(itemId: itemId))
         } catch let error as ApiError {
             switch error {
-            case .transport: return .failure(.network)
+            case .transport(let code):
+                log.notice("content urls: transport error \(code.rawValue, privacy: .public)")
+                return .failure(.network)
             case .http(let status, _, _, _):
                 if status == 409 { return .failure(.notReady) }
                 if status == 401 {
@@ -887,6 +891,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             case .http(let status, _, _, _): result = .http(status)
             case .transport(let code):
                 result = exceeded.withLock { $0 } ? .tooLarge : Self.isDiskFull(code) ? .diskFull : .network
+                log.notice("content download: transport error \(code.rawValue, privacy: .public)")
             case .invalidRequest: result = .badUrl
             case .malformedResponse: result = .network
             }
@@ -895,6 +900,14 @@ public final class LiveContentStore: ContentStore, Sendable {
         }
         if result != .ok { paths.removeIfPresent(destination) }
         return result
+    }
+
+    /// `freeBytes() >= minFreeBytes`; logs the measured value when it refuses (device-only diagnosis).
+    private func hasFreeSpace() -> Bool {
+        let free = freeBytes()
+        if free >= Self.minFreeBytes { return true }
+        log.notice("download skipped: \(free, privacy: .public) bytes free")
+        return false
     }
 
     private static func isDiskFull(_ code: URLError.Code) -> Bool {

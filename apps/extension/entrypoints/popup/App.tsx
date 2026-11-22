@@ -28,6 +28,7 @@ type Phase =
   | { k: "queued"; message: string }
   | { k: "failed"; message: string }
   | { k: "unsupported"; signedIn: boolean }
+  | { k: "welcome" }
   | { k: "removed" };
 
 const send = <T,>(m: Msg) => chrome.runtime.sendMessage(m) as Promise<T>;
@@ -52,6 +53,8 @@ export function App() {
   const [hint, setHint] = useState<string | null>(null);
   // Set once the user engages with the saved screen; it stays set until the next save starts.
   const engaged = useRef(false);
+  // Popup opened while signed out: the click was to sign in, not to save this page.
+  const openedSignedOut = useRef(false);
 
   const save = useCallback(async (t: Tab, signedIn = false) => {
     // chrome://, the new tab page, the Web Store…: nothing to save, and not an error (e.g. signing in on chrome://extensions).
@@ -75,7 +78,10 @@ export function App() {
       const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
       const tb = { id: t?.id, url: t?.url, title: t?.title };
       setTab(tb);
-      if ((await getSettings()).signedOut) return setPhase({ k: "signin" });
+      if ((await getSettings()).signedOut) {
+        openedSignedOut.current = true;
+        return setPhase({ k: "signin" });
+      }
       await save(tb);
     })().catch((e) => setPhase({ k: "failed", message: failedBody(describeError(e)) }));
   }, [save]);
@@ -139,6 +145,12 @@ export function App() {
   }, [phase.k, hint]);
 
   const onSignedIn = async () => {
+    if (openedSignedOut.current) {
+      // Nothing was queued by this popup; release what earlier saves left waiting for sign-in without blocking the screen.
+      setPhase({ k: "welcome" });
+      send({ type: "release-queue" }).catch(() => {});
+      return;
+    }
     // Background owns the queue: drop any queued copy of this page (we save it directly below), release the rest.
     await send({ type: "release-queue", skipUrl: tab.url });
     await save(tab, true);
@@ -193,6 +205,18 @@ export function App() {
           title={phase.signedIn ? "You’re signed in" : "Nothing to save here"}
           message="Sroka saves web pages. Open an article and click the Sroka icon to save it."
         >
+          <div className="pair">
+            <button className="btn btn-ghost" onClick={() => window.close()}>
+              Close
+            </button>
+            <button className="btn btn-primary" onClick={() => void openApp().then(() => window.close())}>
+              Open Sroka
+            </button>
+          </div>
+        </Notice>
+      )}
+      {phase.k === "welcome" && (
+        <Notice tone="muted" title="You’re signed in" message="You’re all set. Click the Sroka icon on any page to save it.">
           <div className="pair">
             <button className="btn btn-ghost" onClick={() => window.close()}>
               Close

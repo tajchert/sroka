@@ -16,6 +16,7 @@ Copy-paste text and images for both stores. The forms are legal declarations: ev
 Secrets: never commit `REVIEW_EMAIL`/`REVIEW_OTP` values. Set them as API worker secrets (`wrangler secret put` in `workers/api`) and paste them only into the store consoles.
 
 ## Chrome Web Store upload checklist
+Updates after the first upload: `scripts/release/extension.sh` (see `docs/releasing.md`).
 Prereqs: developer account ($5 one-time), reviewer secrets set, extension built with `apps/extension/analytics.config.json` present (see extension CLAUDE.md), then `npm run zip -w @sroka/extension` (store build, no manifest `key`).
 1. Dashboard > Add new item > upload `store/upload/srokaextension-0.6.0-chrome.zip`.
 2. Store listing tab: name and summary are read from the manifest; paste description from `chrome-web-store/listing.md`; category Productivity; language English; upload icon 128x128, screenshots 1280x800, small promo 440x280, marquee 1400x560 (optional) from `chrome-web-store/images/`; homepage/support/privacy URLs from the listing file.
@@ -25,6 +26,7 @@ Prereqs: developer account ($5 one-time), reviewer secrets set, extension built 
 6. Resolve the Mismatches below before submitting (at least: Google Fonts, policy wording).
 
 ## Google Play upload checklist
+Updates after the first upload: `scripts/release/android.sh` (see `docs/releasing.md`).
 Prereqs: developer account, `./gradlew :app:bundlePlayRelease` (JDK 21) producing a release-signed `.aab` in `store/upload/`. Reviewer secrets set.
 1. Create app: name from `google-play/listing.md`, default language English, App, Free.
 2. Main store listing: short and full description, icon 512x512, feature graphic 1024x500, phone screenshots (2-8), foldable screenshots (`images/foldable-*.png`, see `google-play/listing.md`), optional tablet screenshots.

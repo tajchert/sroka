@@ -19,3 +19,10 @@ apps/web/firebase.config.json
 
 # Store upload binaries (zip/aab), staged locally
 store/upload/
+
+# Store upload credentials live in ~/keystores/sroka-store (docs/releasing.md); never commit them
+*.p8
+*.jks
+*.keystore
+*service-account*.json
+.env.submit

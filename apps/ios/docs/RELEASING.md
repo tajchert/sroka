@@ -50,7 +50,8 @@ xcodebuild -exportArchive -archivePath build/Sroka.xcarchive -exportOptionsPlist
   -exportPath build/export -allowProvisioningUpdates
 scripts/release-preflight.sh build/export/Sroka.ipa
 
-# 4. Upload (Xcode Organizer → Distribute App, or):
+# 4. Upload (Xcode Organizer → Distribute App, or the altool line below).
+#    scripts/release/ios.sh (repo root) runs steps 1-4 in one go; see docs/releasing.md.
 xcrun altool --upload-app -f build/export/Sroka.ipa -t ios --apiKey <KEY_ID> --apiIssuer <ISSUER_ID>
 ```
 

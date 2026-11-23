@@ -2,7 +2,7 @@
 
 > Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
 
-Release builds are minified and signed with the Sroka release key. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants. There is no publishing automation yet.
+Release builds are minified and signed with the Sroka release key. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants. Uploads to a Play testing track are automated by `scripts/release/android.sh` (repo root, see `docs/releasing.md`).
 
 ## Flavors and Firebase config
 

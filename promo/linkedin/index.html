@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sroka Promo</title>
+<script>
+  // Decide the mode before first paint so capture never flashes the player chrome.
+  if (new URLSearchParams(location.search).get('capture') === '1') {
+    document.documentElement.classList.add('capture');
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=block" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #15171c;
+    --paper: #fbfaf7;
+    --cream: #f6f5f1;
+    --teal: #1e6f8f;
+    --wing: #4f9fbf;
+    --beak: #f2c84b;
+    --muted: #6d717a;
+    --font: Outfit, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --ctl-fg: #15171c;
+    --ctl-line: rgba(21, 23, 28, 0.16);
+    --ctl-soft: rgba(21, 23, 28, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ctl-fg: #ecebe7; --ctl-line: rgba(236, 235, 231, 0.2); --ctl-soft: rgba(236, 235, 231, 0.08); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+
+  /* ---------- Player shell (preview mode: fluid full width, no outer padding/background) ---------- */
+  .player { width: 100%; margin: 0 auto; padding: 0; }
+  .viewport {
+    position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 14px 36px -14px rgba(0,0,0,.24);
+    isolation: isolate;
+  }
+  #stage {
+    position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; overflow: hidden;
+    transform-origin: 0 0; color: var(--ink); background: var(--paper);
+  }
+
+  .controls { margin-top: 12px; color: var(--ctl-fg); user-select: none; -webkit-user-select: none; }
+  .controls .row { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: nowrap; }
+  .controls button {
+    appearance: none; border: 1px solid var(--ctl-line); background: transparent; color: inherit;
+    height: 32px; min-width: 32px; border-radius: 999px; display: inline-grid; place-items: center;
+    cursor: pointer; padding: 0; font: 600 12px/1 var(--mono); transition: background .15s, border-color .15s, color .15s;
+    flex: none;
+  }
+  .controls button:hover { background: var(--ctl-soft); }
+  .controls button:focus-visible { outline: 2px solid var(--wing); outline-offset: 2px; }
+  .controls svg { width: 14px; height: 14px; fill: currentColor; }
+  .beats { display: flex; gap: 4px; flex: none; }
+  .beats button { min-width: 32px; height: 32px; }
+  .beats button.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+  #timer {
+    margin-left: auto; font: 500 12px/1 var(--mono); letter-spacing: .01em; opacity: .78;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  @media (max-width: 440px) {
+    .controls .row { flex-wrap: wrap; gap: 6px; }
+    .beats button { min-width: 32px; height: 32px; }
+    #timer { margin-left: auto; font-size: 11px; }
+  }
+  #scrub {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; margin: 0; cursor: pointer; display: block;
+    --p: 0%;
+  }
+  #scrub::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 4px;
+    background: linear-gradient(to right, var(--teal) 0 var(--p), var(--ctl-line) var(--p) 100%);
+  }
+  #scrub::-moz-range-track { height: 4px; border-radius: 4px; background: var(--ctl-line); }
+  #scrub::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--teal); }
+  #scrub::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; margin-top: -5px;
+    background: #fff; border: 2px solid var(--teal); box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  #scrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--teal); }
+
+  /* ---------- Capture mode: flush 1080×1080 stage, no chrome ---------- */
+  html.capture, html.capture body { margin: 0; width: 1080px; height: 1080px; overflow: hidden; }
+  html.capture .player { max-width: none; margin: 0; padding: 0; }
+  html.capture .viewport { width: 1080px; height: 1080px; border-radius: 0; box-shadow: none; }
+  html.capture .controls { display: none; }
+
+  /* ---------- Stage primitives ---------- */
+  .abs { position: absolute; }
+  .beat { position: absolute; inset: 0; visibility: hidden; }
+  .fill { position: absolute; inset: 0; }
+  .anchor { position: absolute; width: 0; height: 0; }
+  .anchor > * { position: absolute; left: 0; top: 0; translate: -50% -50%; }
+  img { display: block; user-select: none; -webkit-user-drag: none; }
+  .mover { will-change: transform, opacity; }
+
+  .head { position: absolute; left: 88px; top: 76px; width: 904px; }
+  .hl { font-weight: 800; font-size: 84px; line-height: 1.02; letter-spacing: -0.038em; white-space: nowrap; }
+  .hl.xl { font-size: 112px; letter-spacing: -0.044em; }
+  .ln { overflow: hidden; padding: 0.06em 0 0.12em; margin: -0.06em 0 -0.12em; }
+  .ln > span { display: inline-block; will-change: transform; }
+  .micro { margin-top: 22px; font-size: 32px; font-weight: 400; color: var(--muted); letter-spacing: -0.005em; }
+  .teal { color: var(--teal); }
+  .wing { color: var(--wing); }
+  .on-dark { color: #f4f3ef; }
+  .on-dark .micro { color: rgba(244,243,239,.65); }
+
+  .band-wrap { position: absolute; transform: rotate(-12deg); }
+  .band-fill { position: absolute; inset: 0; background: var(--teal); will-change: transform; }
+
+  .shadow-lg { box-shadow: 0 2px 6px rgba(21,23,28,.07), 0 28px 56px -20px rgba(21,23,28,.34); }
+  .card { border-radius: 20px; overflow: hidden; background: #fff; border: 1px solid rgba(21,23,28,.08); }
+  .card img { width: 100%; height: auto; }
+  .mini-bar {
+    height: 36px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px; background: #f1efea; border-bottom: 1px solid rgba(21,23,28,.06);
+    font-size: 16px; font-weight: 600; color: #4a4c52;
+  }
+  .mini-bar code { font: 600 14px/1 var(--mono); color: #6d717a; }
+
+  .arrow-flow {
+    width: 68px; height: 68px; border-radius: 50%; background: var(--teal); color: #fff;
+    display: grid; place-items: center;
+    box-shadow: 0 14px 32px -10px rgba(30,111,143,.55), 0 0 0 6px rgba(251,250,247,.9);
+  }
+  .arrow-flow svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  .pill {
+    height: 68px; border-radius: 34px; background: var(--ink); color: #fff; display: flex; align-items: center;
+    gap: 14px; padding: 0 30px 0 10px; font-weight: 600; font-size: 27px; letter-spacing: -0.01em; white-space: nowrap;
+    clip-path: inset(0 calc((100% - 68px) * var(--k, 1)) 0 0 round 34px);
+    box-shadow: 0 20px 40px -16px rgba(21,23,28,.55);
+  }
+  .pill-ic { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--teal); display: grid; place-items: center; flex: none; }
+  .pill-ic .plane { width: 27px; height: 27px; fill: #fff; transform: rotate(90deg); }
+  .pill-ic .ring { position: absolute; inset: -4px; width: 56px; height: 56px; transform: rotate(-90deg); }
+  .pill-ic .ring circle { fill: none; stroke: var(--beak); stroke-width: 3; stroke-linecap: round; }
+
+  .rcard { width: 292px; height: 282px; border-radius: 24px; overflow: hidden; background: #222; position: absolute; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 28px 56px -22px rgba(0,0,0,.65); }
+  .rcard img { position: absolute; left: 0; width: 100%; height: auto; }
+  .lbl { width: 292px; text-align: center; font-size: 24px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: rgba(244,243,239,.82); }
+
+  .phone { padding: 9px; border-radius: 48px; background: #22262e; box-shadow: 0 0 0 1px rgba(255,255,255,.1) inset, 0 36px 72px -24px rgba(0,0,0,.55); }
+  .phone.light-frame { background: #1c1f26; box-shadow: 0 2px 8px rgba(21,23,28,.12), 0 36px 70px -24px rgba(21,23,28,.45); }
+  .phone .screen { position: relative; overflow: hidden; border-radius: 39px; background: #fff; }
+  .phone .screen img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .glow { border-radius: 50%; background: radial-gradient(closest-side, rgba(79,159,191,.34), rgba(79,159,191,0)); }
+
+  .device { padding: 10px; border-radius: 36px; background: #1d2026; box-shadow: 0 2px 6px rgba(21,23,28,.08), 0 36px 70px -28px rgba(21,23,28,.5); }
+  .device .screen { position: relative; overflow: hidden; border-radius: 26px; background: #fff; }
+  .device .center-img { position: absolute; left: 50%; top: 50%; translate: -50% -50%; max-width: none; }
+  .hinge { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,.22) 20%, rgba(0,0,0,.22) 80%, rgba(0,0,0,0)); }
+  .fold-shade { position: absolute; top: 0; bottom: 0; width: 50%; }
+  .fold-shade.l { left: 0; background: linear-gradient(to right, rgba(21,23,28,0), rgba(21,23,28,.18)); }
+  .fold-shade.r { right: 0; background: linear-gradient(to left, rgba(21,23,28,0), rgba(21,23,28,.18)); }
+  .ios { padding: 8px; border-radius: 46px; }
+  .ios .screen { border-radius: 38px; }
+  .ios .screen img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+  .chip {
+    width: 200px; height: 96px; border-radius: 22px; background: #fff; border: 1px solid rgba(21,23,28,.08);
+    display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 30px; font-weight: 600; letter-spacing: -0.01em;
+    box-shadow: 0 1px 2px rgba(21,23,28,.05), 0 16px 32px -20px rgba(21,23,28,.35);
+  }
+  .ico { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .chip .ico { color: var(--teal); }
+  .cf { width: 800px; height: 290px; border-radius: 30px; background: var(--ink); color: #f4f3ef; box-shadow: 0 40px 80px -36px rgba(21,23,28,.7); }
+  .cf-head { position: absolute; left: 36px; top: 30px; display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 600; color: rgba(244,243,239,.68); letter-spacing: .01em; }
+  .cf-head .ico { color: var(--beak); width: 30px; height: 30px; }
+  .tile {
+    position: absolute; top: 96px; width: 229px; height: 158px; border-radius: 20px; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1); padding: 26px 24px; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .tile .ico { color: var(--wing); width: 38px; height: 38px; }
+  .tile b { font-size: 27px; font-weight: 600; letter-spacing: -0.01em; }
+  #b5-lines { position: absolute; left: 0; top: 0; overflow: visible; }
+  #b5-lines path { fill: none; stroke: rgba(30,111,143,.45); stroke-width: 2.5; stroke-linecap: round; }
+  #b5-lines circle { fill: var(--teal); }
+
+  .tile-mark { width: 210px; height: 210px; border-radius: 48px; background: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(21,23,28,.08), 0 36px 64px -26px rgba(21,23,28,.42); }
+  .tile-mark svg { width: 210px; height: 210px; }
+  .domain { font-size: 134px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
+  .repo { font: 500 30px/1 var(--mono); color: var(--muted); letter-spacing: -0.01em; }
+</style>
+</head>
+<body>
+<div class="player">
+  <div class="viewport" id="viewport">
+    <div id="stage" aria-label="Sroka promo animation">
+      <div id="bg" class="fill"></div>
+
+      <!-- ============ Beat 1 · Hook (starts composed at frame 0 for LinkedIn thumbnail) ============ -->
+      <section class="beat" id="b1">
+        <div class="band-wrap" style="left:-260px; top:300px; width:1600px; height:128px;">
+          <div class="band-fill" id="b1-band"></div>
+        </div>
+        <div class="abs mover" id="b1-mark" style="left:435px; top:236px;">
+          <div class="tile-mark">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <polygon points="66,28 70,28 83,33.5 70,39 66,39" fill="#f2c84b"/>
+              <path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c"/>
+              <polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"/>
+              <circle cx="58" cy="32" r="4" fill="#ffffff"/>
+            </svg>
+          </div>
+        </div>
+        <div class="abs mover" id="b1-head" style="left:0; top:514px; width:1080px; text-align:center;">
+          <div class="hl xl">
+            <div class="ln"><span id="b1-l1">Save it now.</span></div>
+            <div class="ln"><span id="b1-l2" class="teal">Read it later.</span></div>
+          </div>
+        </div>
+        <div class="abs mover" id="b1-kicker" style="left:0; top:804px; width:1080px; text-align:center; font-size:32px; color:var(--muted);">Open-source read-later app</div>
+      </section>
+
+      <!-- ============ Beat 2 · Save anywhere → Native offline reader ============ -->
+      <section class="beat" id="b2">
+        <div class="head mover" id="b2-head">
+          <div class="hl">
+            <div class="ln"><span id="b2-l1">Fully offline</span></div>
+            <div class="ln"><span id="b2-l2">articles.</span></div>
+          </div>
+          <div class="micro mover" id="b2-micro">Native Android &amp; iOS · planes, trains, zero signal</div>
+        </div>
+
+        <!-- Left: Chrome extension one-click save -->
+        <div class="abs card shadow-lg mover" id="b2-ext" style="left:88px; top:438px; width:416px; z-index:2;">
+          <div class="mini-bar"><span>Chrome extension</span><code>Alt+Shift+S</code></div>
+          <img src="./assets/ext-saved.png" alt="">
+        </div>
+
+        <!-- Flow cue -->
+        <div class="abs arrow-flow mover" id="b2-arrow" style="left:498px; top:578px; z-index:4;">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+        </div>
+
+        <!-- Right-back: Android native library -->
+        <div class="abs phone light-frame mover" id="b2-and" style="left:546px; top:420px; z-index:2;">
+          <div class="screen" style="width:274px; height:486px;"><img src="./assets/android-library.png" alt=""></div>
+        </div>
+
+        <!-- Right-front: Native iOS reader -->
+        <div class="abs phone light-frame ios mover" id="b2-ios" style="left:722px; top:358px; z-index:3;">
+          <div class="screen" style="width:268px; height:574px;"><img src="./assets/ios-wiki-light.png" alt=""></div>
+        </div>
+
+        <!-- Offline badge perched cleanly below the cards, covering zero body text -->
+        <div class="abs mover" id="b2-pillwrap" style="left:552px; top:946px; z-index:5;">
+          <div class="pill" id="b2-pill">
+            <div class="pill-ic">
+              <svg class="ring" viewBox="0 0 56 56"><circle id="b2-ring" cx="28" cy="28" r="26"/></svg>
+              <svg class="plane" viewBox="0 0 24 24"><path d="M21 15.5v-1.8l-7.5-4.7V4.3a1.5 1.5 0 0 0-3 0V9L3 13.7v1.8l7.5-2.3V18l-2 1.5V21l3.5-1 3.5 1v-1.5l-2-1.5v-4.8z"/></svg>
+            </div>
+            <span>Offline ready</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Beat 3 · Calm reader & instant offline search ============ -->
+      <section class="beat" id="b3">
+        <div class="head on-dark mover" id="b3-head">
+          <div class="hl">
+            <div class="ln"><span id="b3-l1">Calm reader.</span></div>
+            <div class="ln"><span id="b3-l2" class="wing">Instant offline search.</span></div>
+          </div>
+        </div>
+        <div class="anchor" style="left:226px; top:560px;"><div class="rcard mover" id="b3-r0" style="z-index:1"><img id="b3-i0" src="./assets/ios-reader-light.png" alt=""></div></div>
+        <div class="anchor" style="left:540px; top:560px;"><div class="rcard mover" id="b3-r1" style="z-index:3"><img id="b3-i1" src="./assets/ios-reader-sepia.png" alt=""></div></div>
+        <div class="anchor" style="left:854px; top:560px;"><div class="rcard mover" id="b3-r2" style="z-index:2"><img id="b3-i2" src="./assets/ios-reader-dark.png" alt=""></div></div>
+        <div class="abs lbl mover" id="b3-t0" style="left:80px; top:728px;">Light</div>
+        <div class="abs lbl mover" id="b3-t1" style="left:394px; top:728px;">Sepia</div>
+        <div class="abs lbl mover" id="b3-t2" style="left:708px; top:728px;">Dark</div>
+        <div class="abs glow mover" id="b3-glow" style="left:520px; top:290px; width:600px; height:760px;"></div>
+        <div class="abs phone mover" id="b3-phone" style="left:640px; top:364px; z-index:4;">
+          <div class="screen" style="width:342px; height:608px;"><img src="./assets/android-search.png" alt=""></div>
+        </div>
+      </section>
+
+      <!-- ============ Beat 4 · Foldables & tablets ============ -->
+      <section class="beat" id="b4">
+        <div class="head mover" id="b4-head">
+          <div class="hl">
+            <div class="ln"><span id="b4-l1">Tablets and</span></div>
+            <div class="ln"><span id="b4-l2">foldables supported.</span></div>
+          </div>
+          <div class="micro mover" id="b4-micro">Native Jetpack Compose &amp; SwiftUI</div>
+        </div>
+        <div class="abs device mover" id="b4-dev">
+          <div class="screen" id="b4-screen">
+            <img class="center-img" id="b4-unfolded" src="./assets/android-unfolded.png" style="width:600px; height:450px;" alt="">
+            <img class="center-img" id="b4-folded" src="./assets/android-folded.png" style="width:330px; height:528px;" alt="">
+            <div class="fold-shade l" id="b4-shl"></div>
+            <div class="fold-shade r" id="b4-shr"></div>
+            <div class="hinge" id="b4-hinge"></div>
+          </div>
+        </div>
+        <div class="abs device ios mover" id="b4-ios" style="left:740px; top:413px;">
+          <div class="screen" style="width:248px; height:539px;"><img src="./assets/ios-wiki-light.png" alt=""></div>
+        </div>
+      </section>
+
+      <!-- ============ Beat 5 · Native & open source ============ -->
+      <section class="beat" id="b5">
+        <div class="head mover" id="b5-head">
+          <div class="hl">
+            <div class="ln"><span id="b5-l1">Native &amp;</span></div>
+            <div class="ln"><span id="b5-l2">open source.</span></div>
+          </div>
+          <div class="micro mover" id="b5-micro">Self-host on Cloudflare · Apache 2.0</div>
+        </div>
+        <svg id="b5-lines" width="1080" height="1080" viewBox="0 0 1080 1080" aria-hidden="true">
+          <path id="b5-p0" d="M204 494 C204 566 300 566 300 632"/>
+          <path id="b5-p1" d="M428 494 C428 566 450 566 450 632"/>
+          <path id="b5-p2" d="M652 494 C652 566 630 566 630 632"/>
+          <path id="b5-p3" d="M876 494 C876 566 780 566 780 632"/>
+          <circle id="b5-d0" r="6"/><circle id="b5-d1" r="6"/><circle id="b5-d2" r="6"/><circle id="b5-d3" r="6"/>
+        </svg>
+        <div class="abs chip mover" id="b5-c0" style="left:104px; top:398px;">
+          <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Web</div>
+        <div class="abs chip mover" id="b5-c1" style="left:328px; top:398px;">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M10 4.5a2 2 0 0 1 4 0V6h3.5a.5.5 0 0 1 .5.5V10h-1.5a2 2 0 0 0 0 4H18v3.5a.5.5 0 0 1-.5.5H14v-1.5a2 2 0 0 0-4 0V18H6.5a.5.5 0 0 1-.5-.5V14h1.5a2 2 0 0 0 0-4H6V6.5a.5.5 0 0 1 .5-.5H10z"/></svg>Chrome</div>
+        <div class="abs chip mover" id="b5-c2" style="left:552px; top:398px;">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Android</div>
+        <div class="abs chip mover" id="b5-c3" style="left:776px; top:398px;">
+          <svg class="ico" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="3.2"/><path d="M10.6 5.4h2.8"/></svg>iOS</div>
+        <div class="abs cf mover" id="b5-cf" style="left:140px; top:632px;">
+          <div class="cf-head"><svg class="ico" viewBox="0 0 24 24"><path d="M7 18.5h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7 9.5a4.5 4.5 0 0 0 0 9z"/></svg>Cloudflare</div>
+          <div class="tile mover" id="b5-t0" style="left:36px;"><svg class="ico" viewBox="0 0 24 24"><path d="M13 3 5.5 13.5H11l-1 7.5 7.5-10.5H12z"/></svg><b>Workers</b></div>
+          <div class="tile mover" id="b5-t1" style="left:285px;"><svg class="ico" viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg><b>Durable Objects</b></div>
+          <div class="tile mover" id="b5-t2" style="left:534px;"><svg class="ico" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6"/><path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></svg><b>R2</b></div>
+        </div>
+      </section>
+
+      <!-- ============ Beat 6 · Outro ============ -->
+      <section class="beat" id="b6">
+        <div class="band-wrap" style="left:-260px; top:322px; width:1600px; height:140px;">
+          <div class="band-fill" id="b6-band"></div>
+        </div>
+        <div class="abs mover" id="b6-tile" style="left:435px; top:286px;">
+          <div class="tile-mark">
+            <svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="66,28 70,28 83,33.5 70,39 66,39" fill="#f2c84b"/><path d="M30 20 H62 Q70 20 70 28 V82 L50 77 L30 82 Z" fill="#15171c"/><polygon points="30,56 70,46 70,58 30,68" fill="#1e6f8f"/><circle cx="58" cy="32" r="4" fill="#ffffff"/></svg>
+          </div>
+        </div>
+        <div class="abs" style="left:0; top:560px; width:1080px; text-align:center;">
+          <div class="ln"><span class="domain" id="b6-domain">sroka.app</span></div>
+        </div>
+        <div class="abs repo mover" id="b6-repo" style="left:0; top:752px; width:1080px; text-align:center;">github.com/tajchert/sroka</div>
+      </section>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <input id="scrub" type="range" min="0" max="23000" step="1" value="0" aria-label="Timeline" />
+    <div class="row">
+      <button id="play" aria-label="Pause"><svg viewBox="0 0 16 16" id="play-ic"></svg></button>
+      <button id="replay" aria-label="Replay"><svg viewBox="0 0 16 16"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7l1.4.5A4 4 0 1 0 8 4v2L4.8 3.2 8 .5z"/></svg></button>
+      <div class="beats" id="beats"></div>
+      <span id="timer">00.0s / 23.0s</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ===================== Config ===================== */
+  const DURATION = 23000;
+  const SIZE = 1080;
+  const CAPTURE = document.documentElement.classList.contains('capture');
+
+  // Beat start times (ms). Each beat gets a calm 1.4–2.1s settled hold before exit.
+  const BEATS = [0, 2600, 6900, 11700, 16100, 19900];
+
+  // iOS reader crops: aligned on the "Ada Reader @ada" quoted post, ending before sepia's toolbar.
+  const READER_CROP = [0.136, 0.436, 0.136];
+
+  const PAPER = [251, 250, 247], INK = [21, 23, 28], CREAM = [246, 245, 241];
+
+  /* ===================== Math ===================== */
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const prog = (t, start, dur) => clamp((t - start) / dur);
+  const easeOutExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+  const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+  const easeInCubic = (x) => x * x * x;
+  const easeInOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const easeOutBack = (x, s = 1.2) => { const c = s + 1; return 1 + c * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2); };
+  const mixRGB = (a, b, p) => `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], p))).join(',')})`;
+
+  /* ===================== DOM ===================== */
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage');
+  const E = {};
+  document.querySelectorAll('#stage [id]').forEach((el) => { E[el.id] = el; });
+
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  function tf(el, { x = 0, y = 0, s = 1, sx, sy, r = 0, o } = {}) {
+    el.style.transform = `translate3d(${r3(x)}px,${r3(y)}px,0) rotate(${r3(r)}deg) scale(${r3(sx ?? s)},${r3(sy ?? s)})`;
+    if (o !== undefined) el.style.opacity = r3(clamp(o));
+  }
+  const show = (el, on) => { el.style.visibility = on ? 'visible' : 'hidden'; };
+  function reveal(span, t, start, dur = 820) {
+    const p = easeOutExpo(prog(t, start, dur));
+    span.style.transform = `translate3d(0,${r3((1 - p) * 130)}%,0)`;
+  }
+  const exitP = (t, start, dur = 360) => easeInCubic(prog(t, start, dur));
+
+  /* ===================== Background ===================== */
+  const BG = [[0, PAPER], [6750, PAPER], [7150, INK], [11450, INK], [11850, CREAM], [15950, CREAM], [16350, PAPER]];
+  function background(t) {
+    let c = BG[BG.length - 1][1];
+    for (let i = 0; i < BG.length - 1; i++) {
+      const [t0, c0] = BG[i], [t1, c1] = BG[i + 1];
+      if (t < t1) { c = mixRGB(c0, c1, easeInOutCubic(prog(t, t0, t1 - t0))); break; }
+    }
+    E.bg.style.background = typeof c === 'string' ? c : mixRGB(c, c, 0);
+  }
+
+  /* ===================== Beat 1 · Hook (0–2600, composed at frame 0) ===================== */
+  function beat1(t) {
+    const on = t < 2700; show(E.b1, on); if (!on) return;
+    const e = exitP(t, 2240, 360);
+    // Diagonal band starts fully visible at frame 0, then glides out cleanly on exit.
+    const bandOut = easeInOutCubic(prog(t, 2120, 440));
+    E['b1-band'].style.transformOrigin = '100% 50%';
+    tf(E['b1-band'], { sx: 1 - bandOut, sy: 1 });
+
+    // Gentle alive settle in first 1.6s, crisp upward exit.
+    const breath = Math.sin(Math.PI * prog(t, 0, 1800));
+    tf(E['b1-mark'], { y: -6 * breath - 60 * e, s: 1 + 0.025 * breath - 0.06 * e, o: 1 - e });
+    E['b1-l1'].style.transform = 'translate3d(0,0,0)';
+    E['b1-l2'].style.transform = 'translate3d(0,0,0)';
+    tf(E['b1-head'], { y: -44 * e, o: 1 - e });
+    tf(E['b1-kicker'], { y: -28 * e, o: 1 - e });
+  }
+
+  /* ===================== Beat 2 · Save anywhere → Native offline (2600–6900) ===================== */
+  function beat2(t) {
+    const on = t > 2500 && t < 7000; show(E.b2, on); if (!on) return;
+    const e = exitP(t, 6540, 360);
+
+    // Headline enters immediately (zero blank top gap).
+    reveal(E['b2-l1'], t, 2660);
+    reveal(E['b2-l2'], t, 2780);
+    const mi = easeOutCubic(prog(t, 3050, 520));
+    tf(E['b2-micro'], { y: lerp(14, 0, mi), o: mi });
+    tf(E['b2-head'], { y: -48 * e, o: 1 - e });
+
+    // Left: Chrome extension save card slides in cleanly.
+    const ext = easeOutExpo(prog(t, 2800, 860));
+    const drift = easeInOutCubic(prog(t, 4400, 2100));
+    tf(E['b2-ext'], { x: lerp(-90, 0, ext), y: lerp(30, 0, ext) - 6 * drift - 30 * e, o: clamp(ext * 1.8) * (1 - e) });
+
+    // Flow arrow pops in between Chrome save and native devices.
+    const arr = prog(t, 3380, 520);
+    tf(E['b2-arrow'], { s: lerp(0.5, 1, easeOutBack(arr, 1.3)), o: clamp(arr * 2.5) * (1 - e) });
+
+    // Right: Native Android library + Native iOS reader rise in.
+    const andIn = easeOutExpo(prog(t, 3540, 900));
+    const iosIn = easeOutExpo(prog(t, 3720, 940));
+    tf(E['b2-and'], { x: lerp(70, 0, andIn), y: lerp(70, 0, andIn) - 10 * drift - 32 * e, r: lerp(3, 0, andIn), o: clamp(andIn * 1.8) * (1 - e) });
+    tf(E['b2-ios'], { x: lerp(90, 0, iosIn), y: lerp(90, 0, iosIn) - 14 * drift - 26 * e, r: lerp(4, 0, iosIn), o: clamp(iosIn * 1.8) * (1 - e) });
+
+    // Offline ready pill: perched cleanly below the devices, ring fills then expands, holds ~1.8s.
+    const pin = prog(t, 4150, 480);
+    const ring = easeInOutCubic(prog(t, 4300, 560));
+    const grow = easeOutExpo(prog(t, 4840, 620));
+    tf(E['b2-pillwrap'], { y: lerp(22, 0, easeOutExpo(pin)) - 24 * e, s: lerp(0.65, 1, easeOutBack(pin, 1.3)), o: clamp(pin * 3) * (1 - e) });
+    const C = 2 * Math.PI * 26;
+    E['b2-ring'].style.strokeDasharray = `${r3(C)}`;
+    E['b2-ring'].style.strokeDashoffset = `${r3(C * (1 - ring))}`;
+    E['b2-ring'].style.opacity = r3(1 - easeOutCubic(prog(t, 4940, 340)));
+    E['b2-pill'].style.setProperty('--k', r3(1 - grow));
+  }
+
+  /* ===================== Beat 3 · Calm reader & offline search (6900–11700) ===================== */
+  const B3_FAN = [
+    { x: 220 - 226, y: 690 - 560, r: -7 },
+    { x: 330 - 540, y: 666 - 560, r: 0 },
+    { x: 440 - 854, y: 690 - 560, r: 7 },
+  ];
+  function beat3(t) {
+    const on = t > 6800 && t < 11800; show(E.b3, on); if (!on) return;
+    const e = exitP(t, 11340, 360);
+    // Phase A (7100–8950): 3 reader themes hold cleanly ~1.4s; Phase B (8950–11340): fan + offline search holds ~1.6s.
+    const fan = easeInOutCubic(prog(t, 8950, 760));
+
+    for (let i = 0; i < 3; i++) {
+      const p = easeOutExpo(prog(t, 7060 + i * 110, 880));
+      const f = B3_FAN[i];
+      tf(E['b3-r' + i], {
+        x: f.x * fan, y: lerp(80, 0, p) + f.y * fan - 30 * e,
+        r: f.r * fan, s: lerp(0.94, 1, p) * lerp(1, 0.84, fan), o: clamp(p * 1.6) * (1 - e),
+      });
+      const lp = easeOutCubic(prog(t, 7380 + i * 100, 500));
+      tf(E['b3-t' + i], { y: lerp(12, 0, lp), o: lp * (1 - easeOutCubic(prog(t, 8850, 260))) });
+    }
+
+    const ph = easeOutExpo(prog(t, 9120, 880));
+    tf(E['b3-phone'], { x: lerp(320, 0, ph), y: -30 * e, r: lerp(5, 0, ph), o: clamp(ph * 2) * (1 - e) });
+    tf(E['b3-glow'], { x: lerp(180, 0, ph), o: ph * (1 - e) });
+
+    reveal(E['b3-l1'], t, 7100);
+    reveal(E['b3-l2'], t, 9180);
+    tf(E['b3-head'], { y: -48 * e, o: 1 - e });
+  }
+
+  /* ===================== Beat 4 · Foldables & tablets (11700–16100) ===================== */
+  const FOLD = { w: 330, h: 528, cx: 540, cy: 690 };
+  const OPEN = { w: 600, h: 450, cx: 398, cy: 690 };
+  function beat4(t) {
+    const on = t > 11600 && t < 16200; show(E.b4, on); if (!on) return;
+    const e = exitP(t, 15740, 360);
+    const enter = easeOutExpo(prog(t, 11850, 820));
+    const u = easeInOutCubic(prog(t, 12650, 760)); // brisk, clean unfold
+    const drift = easeInOutCubic(prog(t, 13800, 1900));
+
+    const w = lerp(FOLD.w, OPEN.w, u), h = lerp(FOLD.h, OPEN.h, u), cx = lerp(FOLD.cx, OPEN.cx, u);
+    E['b4-screen'].style.width = `${r3(w)}px`;
+    E['b4-screen'].style.height = `${r3(h)}px`;
+    E['b4-dev'].style.left = `${r3(cx - w / 2 - 10)}px`;
+    E['b4-dev'].style.top = `${r3(FOLD.cy - h / 2 - 10)}px`;
+    tf(E['b4-dev'], { y: lerp(70, 0, enter) - 8 * drift - 30 * e, s: lerp(0.95, 1, enter), o: clamp(enter * 1.6) * (1 - e) });
+
+    const fo = easeOutCubic(prog(t, 12700, 300));
+    tf(E['b4-folded'], { s: lerp(1, 1.04, fo), o: 1 - fo });
+    E['b4-unfolded'].style.opacity = r3(easeOutCubic(prog(t, 12740, 320)));
+    const shade = Math.sin(Math.PI * clamp(u * 1.05)) * (1 - u * 0.25);
+    E['b4-shl'].style.opacity = r3(shade * 0.42);
+    E['b4-shr'].style.opacity = r3(shade * 0.42);
+    E['b4-hinge'].style.opacity = r3(lerp(0, 0.14, u) + shade * 0.28);
+
+    const io = easeOutExpo(prog(t, 13260, 860));
+    tf(E['b4-ios'], { x: lerp(130, 0, io), y: lerp(18, 0, io) - 14 * drift - 30 * e, r: lerp(4, 0, io), o: clamp(io * 1.6) * (1 - e) });
+
+    reveal(E['b4-l1'], t, 11840);
+    reveal(E['b4-l2'], t, 11960);
+    const mi = easeOutCubic(prog(t, 12350, 520));
+    tf(E['b4-micro'], { y: lerp(14, 0, mi), o: mi });
+    tf(E['b4-head'], { y: -48 * e, o: 1 - e });
+  }
+
+  /* ===================== Beat 5 · Native & open source (16100–19900) ===================== */
+  const B5_PATHS = [[204, 300], [428, 450], [652, 630], [876, 780]];
+  const B5_Y0 = 494, B5_Y1 = 632, B5_YM = 566;
+  function bezier(p0, p1, p2, p3, u) {
+    const v = 1 - u;
+    return v * v * v * p0 + 3 * v * v * u * p1 + 3 * v * u * u * p2 + u * u * u * p3;
+  }
+  let pathLens = null;
+  function beat5(t) {
+    const on = t > 16000 && t < 20000; show(E.b5, on); if (!on) return;
+    const e = exitP(t, 19540, 360);
+    if (!pathLens) pathLens = [0, 1, 2, 3].map((i) => E['b5-p' + i].getTotalLength());
+
+    for (let i = 0; i < 4; i++) {
+      const c = easeOutExpo(prog(t, 16300 + i * 70, 760));
+      tf(E['b5-c' + i], { y: lerp(46, 0, c) - 40 * e, o: clamp(c * 1.7) * (1 - e) });
+
+      const d = easeInOutCubic(prog(t, 16650 + i * 50, 560));
+      const L = pathLens[i];
+      const path = E['b5-p' + i];
+      path.style.strokeDasharray = `${r3(L)}`;
+      path.style.strokeDashoffset = `${r3(L * (1 - d))}`;
+      path.style.opacity = r3(1 - e);
+
+      // All 4 client pulses travel cleanly during the generous hold (17250–19540).
+      const dot = E['b5-d' + i];
+      const local = t - 17200 - i * 140;
+      if (local > 0 && t < 19600) {
+        const u = (local % 950) / 950;
+        const [x0, x1] = B5_PATHS[i];
+        dot.setAttribute('cx', r3(bezier(x0, x0, x1, x1, u)));
+        dot.setAttribute('cy', r3(bezier(B5_Y0, B5_YM, B5_YM, B5_Y1, u)));
+        dot.style.opacity = r3(Math.sin(Math.PI * u) * (1 - e));
+      } else {
+        dot.style.opacity = 0;
+      }
+    }
+    const cf = easeOutExpo(prog(t, 16560, 860));
+    tf(E['b5-cf'], { y: lerp(80, 0, cf) - 26 * e, s: lerp(0.96, 1, cf), o: clamp(cf * 1.6) * (1 - e) });
+    for (let i = 0; i < 3; i++) {
+      const p = easeOutExpo(prog(t, 16880 + i * 95, 720));
+      tf(E['b5-t' + i], { y: lerp(24, 0, p), o: p });
+    }
+
+    reveal(E['b5-l1'], t, 16220);
+    reveal(E['b5-l2'], t, 16340);
+    const mi = easeOutCubic(prog(t, 16700, 520));
+    tf(E['b5-micro'], { y: lerp(14, 0, mi), o: mi });
+    tf(E['b5-head'], { y: -48 * e, o: 1 - e });
+  }
+
+  /* ===================== Beat 6 · Outro (19900–23000, ~2.1s hold) ===================== */
+  function beat6(t) {
+    const on = t > 19750; show(E.b6, on); if (!on) return;
+    const band = easeInOutCubic(prog(t, 19820, 640));
+    E['b6-band'].style.transformOrigin = '0% 50%';
+    tf(E['b6-band'], { sx: band, sy: 1 });
+
+    const tile = prog(t, 20020, 720);
+    tf(E['b6-tile'], { y: lerp(36, 0, easeOutExpo(tile)), s: lerp(0.76, 1, easeOutBack(tile, 1.2)), r: lerp(-5, 0, easeOutExpo(tile)), o: clamp(tile * 4) });
+
+    reveal(E['b6-domain'], t, 20240, 820);
+    const rp = easeOutCubic(prog(t, 20520, 560));
+    tf(E['b6-repo'], { y: lerp(14, 0, rp), o: rp });
+  }
+
+  /* ===================== Timeline ===================== */
+  let current = 0;
+  function setTime(ms) {
+    const t = clamp(Number(ms) || 0, 0, DURATION);
+    current = t;
+    background(t);
+    beat1(t); beat2(t); beat3(t); beat4(t); beat5(t); beat6(t);
+    onTick(t);
+  }
+
+  /* ===================== One-time layout ===================== */
+  function layoutOnce() {
+    for (let i = 0; i < 3; i++) {
+      const img = E['b3-i' + i];
+      const h = 292 * 2622 / 1206;
+      img.style.top = `${-READER_CROP[i] * h}px`;
+    }
+    document.querySelectorAll('#stage .head .hl').forEach((hl) => {
+      hl.style.fontSize = '';
+      const max = 904;
+      const widest = Math.max(...[...hl.querySelectorAll('.ln > span')].map((s) => s.offsetWidth));
+      if (widest > max) {
+        const base = parseFloat(getComputedStyle(hl).fontSize);
+        hl.style.fontSize = `${Math.floor(base * max / widest)}px`;
+      }
+    });
+  }
+  layoutOnce();
+
+  const imgs = [...document.querySelectorAll('#stage img')];
+  const ready = Promise.all([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    ...imgs.map((img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve())),
+  ]).then(() => { layoutOnce(); setTime(current); });
+
+  window.__ANIMATION__ = { durationMs: DURATION, width: SIZE, height: SIZE, setTime, ready };
+
+  /* ===================== Player (preview only) ===================== */
+  const scrub = $('scrub'), timer = $('timer'), playBtn = $('play'), playIc = $('play-ic'), beatsEl = $('beats');
+  const ICON_PLAY = '<path d="M4 2.5v11l9-5.5z"/>';
+  const ICON_PAUSE = '<path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/>';
+  const pills = BEATS.map((ms, i) => {
+    const b = document.createElement('button');
+    b.textContent = String(i + 1);
+    b.setAttribute('aria-label', `Jump to beat ${i + 1}`);
+    b.addEventListener('click', () => { clock = ms; setTime(ms); });
+    beatsEl.appendChild(b);
+    return b;
+  });
+
+  function onTick(t) {
+    if (CAPTURE) return;
+    scrub.value = String(Math.round(t));
+    scrub.style.setProperty('--p', `${(t / DURATION) * 100}%`);
+    timer.textContent = `${(t / 1000).toFixed(1).padStart(4, '0')}s / ${(DURATION / 1000).toFixed(1)}s`;
+    let idx = 0; BEATS.forEach((b, i) => { if (t >= b) idx = i; });
+    pills.forEach((p, i) => p.classList.toggle('on', i === idx));
+  }
+
+  function fit() {
+    if (CAPTURE) { stage.style.transform = 'none'; return; }
+    const w = $('viewport').clientWidth;
+    stage.style.transform = `scale(${w / SIZE})`;
+  }
+  fit();
+  if ('ResizeObserver' in window) new ResizeObserver(fit).observe($('viewport'));
+  else window.addEventListener('resize', fit);
+
+  let playing = !CAPTURE, clock = 0, last = null, wasPlaying = false;
+  function setPlaying(p) {
+    playing = p;
+    playIc.innerHTML = p ? ICON_PAUSE : ICON_PLAY;
+    playBtn.setAttribute('aria-label', p ? 'Pause' : 'Play');
+  }
+  function frame(now) {
+    if (playing && last !== null) {
+      clock += now - last;
+      if (clock >= DURATION) clock %= DURATION;
+      setTime(clock);
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  setTime(0);
+  if (!CAPTURE) {
+    setPlaying(true);
+    playBtn.addEventListener('click', () => setPlaying(!playing));
+    $('replay').addEventListener('click', () => { clock = 0; setTime(0); setPlaying(true); });
+    scrub.addEventListener('pointerdown', () => { wasPlaying = playing; setPlaying(false); });
+    scrub.addEventListener('input', () => { clock = Number(scrub.value); setTime(clock); });
+    scrub.addEventListener('change', () => { if (wasPlaying) setPlaying(true); wasPlaying = false; });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.code === 'Space' && ev.target === document.body) { ev.preventDefault(); setPlaying(!playing); }
+    });
+    ready.then(() => requestAnimationFrame(frame));
+  }
+})();
+</script>
+</body>
+</html>

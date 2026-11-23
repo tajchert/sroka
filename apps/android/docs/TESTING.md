@@ -4,7 +4,7 @@
 
 Six layers, each answering a different question, ordered by how fast they run.
 
-The included CI configuration targets GitHub Actions. On GitLab, run these commands locally or provide an equivalent pipeline; no GitLab CI configuration is included.
+Sroka has no CI: the repo contains no `.github/workflows`. Run these commands locally. Mentions of GitHub Actions jobs below come from the template.
 
 | Layer | Question | Location | Needs a device |
 |---|---|---|---|
@@ -83,7 +83,7 @@ behaviour, real lifecycle and process death, system UI interaction.
 
 ## Device and CI checks
 
-The GitHub Actions device job executes SQLite migrations and reopen persistence, feature lifecycle/accessibility tests, and functional app journeys. The journey APK lives in the existing `:benchmark` module so it can force-stop the app without killing its own test runner; these tests do not collect performance timings.
+The device tests (run locally; the template ran them in a GitHub Actions job) execute SQLite migrations and reopen persistence, feature lifecycle/accessibility tests, and functional app journeys. The journey APK lives in the existing `:benchmark` module so it can force-stop the app without killing its own test runner; these tests do not collect performance timings.
 
 ```bash
 ./gradlew :core:database:connectedDebugAndroidTest :feature:library:impl:connectedDebugAndroidTest
@@ -91,7 +91,7 @@ The GitHub Actions device job executes SQLite migrations and reopen persistence,
   -Pandroid.testInstrumentationRunnerArguments.class=app.sroka.benchmark.TasksSmokeTest
 ```
 
-A GitHub Actions job on macOS 15 validates screenshot references. Device jobs use an API 35 phone; locally test targetSdk behavior on API 37 and the minimum API 26 before shipping. Physical-device performance, TalkBack, foldable posture, and product-specific journeys remain manual/product work.
+Validate screenshot references locally (`validateDebugScreenshotTest`). Device jobs use an API 35 phone; locally test targetSdk behavior on API 37 and the minimum API 26 before shipping. Physical-device performance, TalkBack, foldable posture, and product-specific journeys remain manual/product work.
 
 ## Coverage
 

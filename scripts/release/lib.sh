@@ -47,3 +47,32 @@ require_clean_tree() {
   [ -z "$(git -C "$REPO_ROOT" status --porcelain)" ] \
     || die "working tree has uncommitted changes (commit first, or ALLOW_DIRTY=1)"
 }
+
+# GitHub Releases (--github-release): the same artifact that went to the store, on a tag at HEAD.
+# gh_release_preflight <tag>: run BEFORE uploading anything, so a store upload never strands without its release.
+gh_release_preflight() {
+  require_cmd gh
+  gh auth status >/dev/null 2>&1 || die "gh is not signed in (gh auth login)"
+  gh release view "$1" >/dev/null 2>&1 && die "GitHub release $1 already exists; bump the version"
+  git -C "$REPO_ROOT" fetch -q origin main
+  git -C "$REPO_ROOT" merge-base --is-ancestor HEAD origin/main \
+    || die "HEAD is not on origin/main; push it first so the release tag points at a published commit"
+}
+
+# gh_release_create <tag> <title> <notes-file> <asset>...
+gh_release_create() {
+  local tag=$1 title=$2 notes=$3
+  shift 3
+  step "GitHub release $tag"
+  gh release create "$tag" "$@" --title "$title" --notes-file "$notes" \
+    --target "$(git -C "$REPO_ROOT" rev-parse HEAD)"
+}
+
+# release_body <out> <heading> <notes-file> [footer]: markdown body in the style of earlier releases.
+release_body() {
+  {
+    printf '## %s\n\n' "$2"
+    cat "$3"
+    if [ -n "${4:-}" ]; then printf "\n%s\n" "$4"; fi
+  } >"$1"
+}

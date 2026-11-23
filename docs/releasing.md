@@ -49,7 +49,7 @@ Back this folder up somewhere private, such as a password manager. To revoke a k
    ```
 8. `scripts/release/android.sh --check` should print `ok: access to app.sroka; tracks: ...`. A fresh invite can take a while to propagate, sometimes hours. Until then the check reports a 403 "The caller does not have permission".
 
-**Every release:** bump `versionCode` and `versionName` in `apps/android/app/build.gradle.kts` and commit. Optionally add en-US release notes in `store/google-play/release-notes/<versionCode>.txt`, at most 500 characters. Then run `scripts/release/android.sh`.
+**Every release:** bump `versionCode` and `versionName` in `apps/android/app/build.gradle.kts` and commit. Optionally add en-US release notes in `store/google-play/release-notes/<versionCode>.txt`, at most 500 characters. Then run `scripts/release/android.sh` (add `--github-release` for the GitHub APK, see below).
 - The script refuses a dirty tree (override with `ALLOW_DIRTY=1`).
 - It needs `apps/android/keystore.properties`.
 - It runs `scripts/release-preflight.sh`.
@@ -79,7 +79,12 @@ Then test the internal-track build and promote it in Play Console → Testing �
 4. preflights the `.ipa` (strict signing check);
 5. uploads it with `xcrun altool`. altool reads the key from `API_PRIVATE_KEYS_DIR`, so the key path never appears in the command line.
 
-When processing finishes, the build shows up in TestFlight. Submit it for review in App Store Connect. If Apple removes `altool --upload-app`, set `destination` to `upload` in the generated `exportOptions.plist` and pass `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` to `xcodebuild -exportArchive` instead.
+When processing finishes, the build shows up in TestFlight. Then, in App Store Connect:
+
+1. TestFlight → **External Testing** → the public beta group (the README's `testflight.apple.com/join/…` link) → Builds → **+** → pick the build, and fill in "What to Test". The first build of a new version goes through Beta App Review, usually under a day; later builds of the same version are often approved automatically. The upload key has the Developer role, so it cannot do this step.
+2. For a store release: App Store tab → the version → Build → pick it → **Submit for Review**.
+
+If Apple removes `altool --upload-app`, set `destination` to `upload` in the generated `exportOptions.plist` and pass `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` to `xcodebuild -exportArchive` instead.
 
 ## Chrome Web Store (one-time setup)
 
@@ -101,8 +106,22 @@ This uses the Chrome Web Store API v2 with a service account, so no OAuth refres
 **Every release:** bump `version` in `apps/extension/package.json` (WXT copies it into the manifest), make sure `apps/extension/analytics.config.json` exists, commit, then:
 - `scripts/release/extension.sh` uploads a **draft**. Check it in the dashboard and submit it there.
 - `scripts/release/extension.sh --submit` uploads and submits for review as a **staged publish**: after approval you press Publish in the dashboard.
+- Add `--github-release --notes FILE` to either to publish the same zip on GitHub (see below).
 
 Store listing text, privacy answers and screenshots stay manual for all three stores. The copy-paste kit is in `store/`.
+
+## GitHub Releases (`--github-release`)
+
+The README links to signed builds on [GitHub Releases](https://github.com/tajchert/sroka/releases). `android.sh` and `extension.sh` can publish them in the same run, with the same artifact that went to the store:
+
+| Script | Tag / title | Asset | Notes |
+|---|---|---|---|
+| `scripts/release/android.sh --github-release [--github-notes FILE]` | `android-v<versionName>` / "Sroka Android <versionName>" | `sroka-<versionName>-release.apk` (play flavor, release-signed, preflighted) | `--github-notes` (markdown), else the Play notes file. An install line with the release-key SHA-256 is appended |
+| `scripts/release/extension.sh --github-release --notes FILE` | `ext-v<version>` / "Sroka extension <version>" | `srokaextension-<version>-chrome.zip` | `--notes` (markdown, required) |
+
+Before anything is built or uploaded, the scripts check three things: `gh` is signed in, the tag doesn't exist yet, and `HEAD` is already on `origin/main`. **Push the version-bump commit first.** The release is created only after the store upload succeeds, on a tag at `HEAD`. The generated body is kept in `store/upload/github-<tag>.md`. iOS has no GitHub release; testers use TestFlight.
+
+Notes style (as in earlier releases): a `### New` / `### Changed` / `### Fixed` list in user language, then a line saying what was not tested.
 
 ## Public-repo rules
 

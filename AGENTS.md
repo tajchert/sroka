@@ -23,7 +23,7 @@ Progress ledger: `docs/ledger.md`. Logging/metrics/alerts: `docs/observability.m
 - Extension: `npm run build -w @sroka/extension` → `apps/extension/.output/chrome-mv3`. Release: `npm run zip -w @sroka/extension` (Web Store zip, no manifest `key`; it then rebuilds the keyed `chrome-mv3`). An unpacked build without `key` gets a different extension id, which signs the user out and makes sign-in fail with "Invalid origin" (API `EXT_ID` is a comma-separated list of trusted ids: Web Store `mgeodllnkiehnjbdogljfjgdbadjdblh` and unpacked `gmfnkkciofcaafddbcgphofiikmplema`, see `workers/api/CLAUDE.md`; the web keeps the same ids in `EXTENSION_IDS` in `apps/web/src/lib/extension.ts`). A new id must be added in both places.
 - Android: in `apps/android` with JDK 21, `./gradlew testDebugUnitTest lintDebug assembleDebug` (details: `apps/android/CLAUDE.md`)
 - iOS: `apps/ios/scripts/verify.sh all` (format, unit, build Dev, build Prod; Xcode 27.2, own simulator via `SIM_NAME`; details: `apps/ios/AGENTS.md`)
-- Store uploads (Play internal track, TestFlight, Chrome draft): `scripts/release/{android,ios,extension}.sh` (`--check` tests credentials only). Keys live outside the repo in `~/keystores/sroka-store`; setup: `docs/releasing.md`.
+- Store uploads (Play internal track, TestFlight, Chrome draft): `scripts/release/{android,ios,extension}.sh` (`--check` tests credentials only); `--github-release` also publishes the APK/zip on GitHub Releases. Keys live outside the repo in `~/keystores/sroka-store`; setup: `docs/releasing.md`.
 - Each workspace has its own CLAUDE.md with specifics.
 
 ## Conventions

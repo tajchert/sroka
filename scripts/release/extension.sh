@@ -6,17 +6,22 @@
 #   scripts/release/extension.sh --submit    # zip -> upload -> submit for review, STAGED: after approval you
 #                                            #   press "Publish" in the dashboard
 #   scripts/release/extension.sh --skip-build
+#   scripts/release/extension.sh --github-release --notes FILE
+#                                            # also publish GitHub release ext-v<version> with the same zip
+#                                            #   (FILE: markdown body; the Web Store has no release notes)
 #
 # Credentials: $CREDS_DIR/chrome.env + $CREDS_DIR/chrome-service-account.json (docs/releasing.md, "Chrome Web Store").
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-CHECK=0 BUILD=1 SUBMIT=0
+CHECK=0 BUILD=1 SUBMIT=0 GH=0 NOTES=
 while [ $# -gt 0 ]; do
   case "$1" in
     --check) CHECK=1 ;;
     --skip-build) BUILD=0 ;;
     --submit) SUBMIT=1 ;;
+    --github-release) GH=1 ;;
+    --notes) NOTES=${2:?--notes needs a file}; shift ;;
     *) die "unknown option $1 (see header of $0)" ;;
   esac
   shift
@@ -45,6 +50,12 @@ if [ "$CHECK" = 1 ]; then
   exit
 fi
 
+TAG="ext-v$VERSION"
+if [ "$GH" = 1 ]; then
+  [ -n "$NOTES" ] && [ -f "$NOTES" ] || die "--github-release needs --notes FILE (markdown release notes)"
+  gh_release_preflight "$TAG"
+fi
+
 if [ "$BUILD" = 1 ]; then
   require_clean_tree
   [ -f "$EXT/analytics.config.json" ] || die "missing apps/extension/analytics.config.json (see apps/extension/CLAUDE.md)"
@@ -61,5 +72,11 @@ if [ "$SUBMIT" = 1 ]; then
 else
   step "upload $VERSION as a draft"
   submit --chrome-zip "$ZIP" --chrome-skip-submit-review
+fi
+
+if [ "$GH" = 1 ]; then
+  BODY="$REPO_ROOT/store/upload/github-$TAG.md"
+  release_body "$BODY" "Sroka extension $VERSION" "$NOTES"
+  gh_release_create "$TAG" "Sroka extension $VERSION" "$BODY" "$REPO_ROOT/store/upload/$(basename "$ZIP")"
 fi
 echo "commit: $(git -C "$REPO_ROOT" rev-parse --short HEAD)"

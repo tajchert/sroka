@@ -2,7 +2,7 @@
 
 > Inherited from the ai-android-template. The template's Tasks sample was removed; where this guide names `feature:tasks`, use the Sroka modules (`feature:library:impl`, `feature:reader:impl`, …). Sroka rulings in [DECISIONS](DECISIONS.md) override this guide.
 
-Release builds are minified and signed with the Sroka release key. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants. Uploads to a Play testing track are automated by `scripts/release/android.sh` (repo root, see `docs/releasing.md`).
+Release builds are minified and signed with the Sroka release key. `benchmarkRelease` and `nonMinifiedRelease` use the debug key for local tests; they are not distribution variants. Uploads to a Play testing track are automated by `scripts/release/android.sh` (repo root, see `docs/releasing.md`); `--github-release` also publishes the signed APK as GitHub release `android-v<versionName>`.
 
 ## Flavors and Firebase config
 
@@ -42,7 +42,7 @@ APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V |
 
 ## Prepare a product release
 
-1. Replace the template launcher icon with Sroka branding and review [security defaults](SECURITY_DEFAULTS.md). Configure CI on the forge you use; the included workflow targets GitHub Actions, not GitLab.
+1. Review [security defaults](SECURITY_DEFAULTS.md) when permissions, exported components or network config change. There is no CI; all checks run locally.
 2. Set `versionCode` and `versionName` in `app/build.gradle.kts`. Use an increasing code for successive product releases and define a user-visible naming policy.
 3. For Google Play, enroll in Play App Signing and upload with the Sroka release key (it becomes the upload key). For direct APK distribution it is the app signing key.
 4. Run [verification](TESTING.md#commands), relevant device tests, and screenshot checks. Regenerate reviewed Baseline Profiles when startup/common paths change.
@@ -57,7 +57,7 @@ See the official [app-signing guide](https://developer.android.com/studio/publis
 
 The bundle is under `app/build/outputs/bundle/playRelease/`. An AAB is not directly installable with `adb install`; use your channel's test delivery or generate device APKs with the official [bundletool](https://developer.android.com/tools/bundletool).
 
-Retain the exact distributed artifact, version, source commit, and signing-certificate identity. Archive the release R8 mapping from `app/build/outputs/mapping/playRelease/mapping.txt` with that version for crash retracing. The included CI verifies assembly; it does not publish or archive release mappings.
+Retain the exact distributed artifact, version, source commit, and signing-certificate identity. Archive the release R8 mapping from `app/build/outputs/mapping/playRelease/mapping.txt` with that version for crash retracing. `scripts/release/android.sh` keeps the uploaded AAB and its mapping in `store/upload/` (gitignored) and also uploads the mapping to Play.
 
 Before publishing any APK or AAB, run the preflight from the repo root. It fails on the placeholder Firebase project (`sroka-example`) and on debug-signed artifacts:
 

@@ -9,7 +9,7 @@ Sroka — Save for later
 
 ## Summary (dashboard field, max 132 chars; this text is 124)
 ```
-Save any page to read later in Sroka. One click or Alt+Shift+S. Keeps paywalled pages and Reddit, X and Hacker News threads.
+Save any page to read later in Sroka. One click or Ctrl+Shift+S. Keeps paywalled pages and Reddit, X and Hacker News threads.
 ```
 Note: the manifest `description` ("Save pages to read later in Sroka") is a different, shorter string. Optionally change it in `apps/extension/wxt.config.ts` to match before building the final zip.
 
@@ -17,10 +17,10 @@ Note: the manifest `description` ("Save pages to read later in Sroka") is a diff
 ```
 Sroka is a read-later app: save it now, read it later, on any device.
 
-This extension adds a save button to Chrome. Click the magpie in the toolbar (or press Alt+Shift+S) and the page goes into your Sroka library. Open it later in the Sroka web app or the Sroka Android app, in a clean reader view, even offline.
+This extension adds a save button to Chrome. Click the magpie in the toolbar (or press Ctrl+Shift+S, ⌘⇧S on Mac) and the page goes into your Sroka library. Open it later in the Sroka web app or the Sroka Android app, in a clean reader view, even offline.
 
 WHAT YOU CAN DO
-- Save the current page from the toolbar button or the keyboard shortcut (Alt+Shift+S, rebindable at chrome://extensions/shortcuts).
+- Save the current page from the toolbar button or the keyboard shortcut (Ctrl+Shift+S, ⌘⇧S on Mac). Change it or turn it off from the extension settings.
 - Save a link or a page from the right-click menu.
 - Add tags and mark favorites right from the popup. Sroka suggests tags you already use.
 - See on the toolbar badge that the page you are on is already saved. This check is done on your device; the address of the page you are visiting is not sent to Sroka for it.

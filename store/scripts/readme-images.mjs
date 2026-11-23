@@ -293,7 +293,7 @@ const CHROME_STUB = (state) => `(() => {
       getManifest: () => ({ version: "0.7.0" }),
       id: "stub",
     },
-    commands: { getAll: async () => [{ name: "_execute_action", shortcut: "Alt+Shift+S" }] },
+    commands: { getAll: async () => [{ name: "_execute_action", shortcut: "Ctrl+Shift+S" }] },
     permissions: { contains: async () => true, request: async () => true },
     alarms: { create() {}, clear: async () => true, onAlarm: { addListener() {} } },
   };
@@ -663,7 +663,7 @@ await renderShot(
     <div class="col-left">
       <span class="pill"><span class="num">1</span>Save from Chrome or mobile share sheet</span>
       <div class="card ext-card">
-        <div class="ext-bar"><span>Chrome extension</span><span style="opacity:.6">Alt+Shift+S</span></div>
+        <div class="ext-bar"><span>Chrome extension</span><span style="opacity:.6">Ctrl+Shift+S</span></div>
         <img src="${popupSaved}">
       </div>
       <div class="android-saved">

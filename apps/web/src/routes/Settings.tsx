@@ -131,7 +131,7 @@ export default function Settings() {
       </Section>
 
       <Section title="Browser extension">
-        <p className="text-sm text-ink2">Save any page with one click or Alt+Shift+S.</p>
+        <p className="text-sm text-ink2">Save any page with one click or Ctrl+Shift+S (⌘⇧S on Mac).</p>
         <a className="btn mt-3" href={EXTENSION_URL} target="_blank" rel="noopener noreferrer">Get the Chrome extension</a>
       </Section>
 

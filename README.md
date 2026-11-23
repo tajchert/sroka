@@ -32,7 +32,7 @@
 
 ## Save once. Read offline.
 
-Click the magpie in Chrome (`Alt+Shift+S`), paste a link on the web, or tap **Share → Sroka** from any app on Android, iPhone, or iPad — browsers, newsletters, Reddit, Hacker News, X, or PDFs.
+Click the magpie in Chrome (`Ctrl+Shift+S`, `⌘⇧S` on Mac), paste a link on the web, or tap **Share → Sroka** from any app on Android, iPhone, or iPad — browsers, newsletters, Reddit, Hacker News, X, or PDFs.
 
 On the native Android and Apple apps, **saved means offline**: article text, images, and supported discussions download automatically (over Wi-Fi by default, configurable in Settings) so your reading list is waiting in airplane mode, subway tunnels, or anywhere without signal. Article reading position syncs across devices once you're back online.
 

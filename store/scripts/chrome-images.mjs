@@ -116,7 +116,7 @@ const CHROME_STUB = (state) => `(() => {
     storage: { local: mk({ ...S.local }), session: mk({}) },
     tabs: { query: async () => [S.tab], create: async () => {} },
     runtime: { sendMessage: async (m) => (m.type === "save-tab" ? { ok: true, created: true, item: S.item } : { ok: true }), getManifest: () => ({ version: "0.6.0" }), id: "stub" },
-    commands: { getAll: async () => [{ name: "_execute_action", shortcut: "Alt+Shift+S" }] },
+    commands: { getAll: async () => [{ name: "_execute_action", shortcut: "Ctrl+Shift+S" }] },
     permissions: { contains: async () => true, request: async () => true },
     alarms: { create() {}, clear: async () => true, onAlarm: { addListener() {} } },
   };
@@ -257,7 +257,7 @@ writeFileSync(join(process.env.TMPDIR || "/tmp", "sroka-store-readerdebug.png"),
 
 // 1. popup saved
 await renderHtml(
-  frame(split("Save any page in one click", "Press the Sroka button, or Alt+Shift+S. It’s in your library, ready to read later.", b64(popupSaved), { shotW: 420, shotH: Math.round(420 * (await dims(popupSaved)).ratio), right: 120 })),
+  frame(split("Save any page in one click", "Press the Sroka button, or Ctrl+Shift+S. It’s in your library, ready to read later.", b64(popupSaved), { shotW: 420, shotH: Math.round(420 * (await dims(popupSaved)).ratio), right: 120 })),
   1280, 800, "screenshot-1-save.png");
 // 2. tags
 await renderHtml(

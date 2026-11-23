@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Mark } from "../../components/Mark.tsx";
 import { describeError, signOut } from "../../lib/api.ts";
 import { analyticsConfig, getConsent, PRIVACY_URL, setConsent as saveConsent, TERMS_URL, type Consent } from "../../lib/consent.ts";
+import { actionShortcut, openShortcutSettings } from "../../lib/shortcut.ts";
 import { DEFAULT_SERVER, getSettings, normalizeServerUrl, setSettings, clearSession, type Settings } from "../../lib/settings.ts";
 
 export function Options() {
@@ -10,6 +11,7 @@ export function Options() {
   const [consent, setConsent] = useState<Consent>({ analytics: null, errors: true });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [shortcut, setShortcut] = useState<string | null>(null);
 
   const load = async () => {
     const cur = await getSettings();
@@ -18,6 +20,17 @@ export function Options() {
   };
   useEffect(() => void load(), []);
   useEffect(() => void getConsent().then(setConsent), []);
+  // Re-read the binding when the user comes back from chrome://extensions/shortcuts.
+  useEffect(() => {
+    const refresh = () => void actionShortcut().then(setShortcut);
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
   const update = async (patch: Partial<Consent>) => setConsent(await saveConsent(patch));
 
   if (!s) return null;
@@ -87,6 +100,19 @@ export function Options() {
             </span>
           </span>
         </label>
+      </div>
+
+      <div className="section">
+        <p style={{ margin: "0 0 10px" }}>
+          Keyboard shortcut: {shortcut ? <kbd>{shortcut}</kbd> : <strong>Off</strong>}
+        </p>
+        <button className="btn" style={{ flex: "0 0 auto" }} onClick={() => void openShortcutSettings()}>
+          {shortcut ? "Change or turn off" : "Set a shortcut"}
+        </button>
+        <p className="hint">
+          Opens the page or saves it, like clicking the Sroka button. Chrome manages extension shortcuts: to turn it off,
+          clear the Sroka field on that page.
+        </p>
       </div>
 
       <div className="section">

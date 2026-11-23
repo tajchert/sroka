@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { actionShortcut, markShortcutHintSeen, shortcutHintToShow } from "./shortcut.ts";
+import { actionShortcut, markShortcutHintSeen, openShortcutSettings, SHORTCUTS_URL, shortcutHintToShow } from "./shortcut.ts";
 import { installChrome } from "./test-chrome.ts";
 
 let chromeMock: ReturnType<typeof installChrome> & { commands?: { getAll: ReturnType<typeof vi.fn> } };
@@ -13,8 +13,8 @@ beforeEach(() => {
 
 describe("shortcut hint", () => {
   it("returns the actual binding of _execute_action", async () => {
-    withCommands([{ name: "other", shortcut: "Ctrl+Q" }, { name: "_execute_action", shortcut: "Alt+Shift+S" }]);
-    expect(await actionShortcut()).toBe("Alt+Shift+S");
+    withCommands([{ name: "other", shortcut: "Ctrl+Q" }, { name: "_execute_action", shortcut: "Ctrl+Shift+S" }]);
+    expect(await actionShortcut()).toBe("Ctrl+Shift+S");
   });
 
   it("returns null when the shortcut is unbound or missing", async () => {
@@ -31,9 +31,19 @@ describe("shortcut hint", () => {
   });
 
   it("is shown until marked seen, then never again", async () => {
-    withCommands([{ name: "_execute_action", shortcut: "⌥⇧S" }]);
-    expect(await shortcutHintToShow()).toBe("⌥⇧S");
+    withCommands([{ name: "_execute_action", shortcut: "⇧⌘S" }]);
+    expect(await shortcutHintToShow()).toBe("⇧⌘S");
     await markShortcutHintSeen();
     expect(await shortcutHintToShow()).toBeNull();
+  });
+});
+
+describe("shortcut settings", () => {
+  it("opens Chrome's extension shortcuts page", async () => {
+    const create = vi.fn(async () => ({}));
+    (chromeMock as unknown as { tabs: unknown }).tabs = { create };
+    await openShortcutSettings();
+    expect(create).toHaveBeenCalledWith({ url: SHORTCUTS_URL });
+    expect(SHORTCUTS_URL).toBe("chrome://extensions/shortcuts");
   });
 });

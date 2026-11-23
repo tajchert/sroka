@@ -28,10 +28,10 @@ export default defineConfig({
     name: "Sroka — Save for later",
     description: "Save pages to read later in Sroka",
     ...(process.env.SROKA_STORE_BUILD ? {} : { key: EXT_PUBLIC_KEY }),
-    // Alt+Shift+S opens the popup, which saves the page (`_execute_action` needs no permission). Users can rebind it
+    // Ctrl+Shift+S (Mac: Command+Shift+S) opens the popup, which saves the page (`_execute_action` needs no permission). Users can rebind it
     // at chrome://extensions/shortcuts; the popup shows the actual binding once.
     commands: {
-      _execute_action: { suggested_key: { default: "Alt+Shift+S", mac: "Alt+Shift+S" }, description: "Save this page to Sroka" },
+      _execute_action: { suggested_key: { default: "Ctrl+Shift+S", mac: "Command+Shift+S" }, description: "Save this page to Sroka" },
     },
     permissions: ["activeTab", "contextMenus", "storage", "scripting", "alarms", "tabs"],
     host_permissions: [

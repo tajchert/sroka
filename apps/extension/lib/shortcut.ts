@@ -32,3 +32,14 @@ export async function markShortcutHintSeen(): Promise<void> {
     /* best effort */
   }
 }
+
+/**
+ * Chrome's own page for extension shortcuts. An extension cannot change or clear its command binding itself, so
+ * "turn off" means clearing it there (that also frees the key for typing). Extension pages may open chrome:// URLs
+ * with `tabs.create`.
+ */
+export const SHORTCUTS_URL = "chrome://extensions/shortcuts";
+
+export async function openShortcutSettings(): Promise<void> {
+  await ext().tabs.create({ url: SHORTCUTS_URL });
+}

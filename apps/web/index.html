@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="Sroka is a read-later app. Save any article in one click from your browser; it lands on your phone, downloaded and ready to read offline." />
+    <meta name="description" content="Sroka is a free, open-source read-later app — alternative to Pocket and Instapaper. Save articles, threads, and PDFs from web or mobile; read offline on Android, iPhone, and iPad, or self-host on Cloudflare." />
     <title>Sroka · Save it now. Read it later.</title>
     <link rel="canonical" href="https://sroka.app/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Sroka" />
     <meta property="og:url" content="https://sroka.app/" />
     <meta property="og:title" content="Sroka · Save it now. Read it later." />
-    <meta property="og:description" content="Sroka is a read-later app. Save any article in one click from your browser; it lands on your phone, downloaded and ready to read offline." />
+    <meta property="og:description" content="Free, open-source read-later app — alternative to Pocket and Instapaper. Save articles, threads, and PDFs on web or mobile; read offline on Android, iPhone, and iPad." />
     <meta property="og:image" content="https://sroka.app/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -60,6 +60,8 @@
         </a>
         <div class="nav-links">
           <a class="nav-how" href="#how">How it works</a>
+          <a class="nav-how" href="#open">Open source</a>
+          <a class="nav-how signed-out-link" href="/app/">Sign in</a>
           <a class="nav-gh" href="https://github.com/tajchert/sroka" target="_blank" rel="noopener noreferrer" aria-label="Sroka on GitHub" title="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><use href="#gh" /></svg></a>
           <a class="btn btn-solid btn-sm signed-out" href="#get">Get Sroka</a>
           <a class="btn btn-solid btn-sm signed-in" href="/app/">Open library</a>
@@ -69,23 +71,26 @@
       <div class="hero-body wrap">
         <div class="hero-copy">
           <div class="stripe" aria-hidden="true"></div>
-          <div class="chip"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span>Works offline</div>
+          <div class="chip"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span>Free · Open source · Works offline</div>
           <h1>
             <span class="sizer" aria-hidden="true">Save it now.<br />Read it in the waiting room.</span>
             <span class="typed-line" aria-hidden="true">Save it now.<br />Read it <span class="typed" data-typed>later.</span><span class="typed-emoji" data-typed-emoji></span><span class="caret" data-caret></span></span>
             <span class="sr-only">Save it now. Read it later.</span>
           </h1>
-          <p class="lede">Save any article in one click from your browser. It lands on your phone, downloaded and ready — on the train, on a plane, anywhere without signal.</p>
+          <p class="lede">Save articles, threads, and PDFs in one tap — downloaded offline on your phone and tablet. A free, open-source alternative to Pocket and Instapaper.</p>
           <div class="cta cta-signed-in signed-in">
             <a class="btn btn-solid btn-lg" href="/app/">Open your library<span class="btn-arrow" aria-hidden="true">→</span></a>
           </div>
           <div class="cta signed-out">
-            <a class="btn btn-solid btn-lg d-only" href="https://chromewebstore.google.com/detail/mgeodllnkiehnjbdogljfjgdbadjdblh" target="_blank" rel="noopener noreferrer">Add to Chrome, free</a>
-            <a class="btn btn-solid btn-lg m-only" href="https://play.google.com/store/apps/details?id=app.sroka" target="_blank" rel="noopener noreferrer">Get the Android app, free</a>
-            <a class="cta-alt d-only" href="https://play.google.com/store/apps/details?id=app.sroka" target="_blank" rel="noopener noreferrer">or get the Android app<span class="btn-arrow" aria-hidden="true">→</span></a>
-            <a class="cta-alt m-only" href="https://chromewebstore.google.com/detail/mgeodllnkiehnjbdogljfjgdbadjdblh" target="_blank" rel="noopener noreferrer">or add to Chrome<span class="btn-arrow" aria-hidden="true">→</span></a>
-            <a class="cta-alt m-only" href="https://testflight.apple.com/join/7nKJUGwN" target="_blank" rel="noopener noreferrer">or join the iPhone beta<span class="btn-arrow" aria-hidden="true">→</span></a>
-            <p class="platforms-line">Chrome · Android · iPhone (beta) · Web</p>
+            <a class="btn btn-solid btn-lg d-only d-desktop" href="https://chromewebstore.google.com/detail/mgeodllnkiehnjbdogljfjgdbadjdblh" target="_blank" rel="noopener noreferrer">Add to Chrome, free</a>
+            <a class="btn btn-solid btn-lg d-only d-ipad" href="https://testflight.apple.com/join/7nKJUGwN" target="_blank" rel="noopener noreferrer">Join the iPhone &amp; iPad beta</a>
+            <a class="cta-alt d-only" href="/app/">or open in browser<span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-solid btn-lg m-only m-android" href="https://play.google.com/store/apps/details?id=app.sroka" target="_blank" rel="noopener noreferrer">Get the Android app, free</a>
+            <a class="btn btn-solid btn-lg m-only m-ios" href="https://testflight.apple.com/join/7nKJUGwN" target="_blank" rel="noopener noreferrer">Join the iPhone &amp; iPad beta</a>
+            <a class="cta-alt m-only" href="/app/">or open in browser<span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="cta-alt m-only m-android" href="https://testflight.apple.com/join/7nKJUGwN" target="_blank" rel="noopener noreferrer">or join the iPhone &amp; iPad beta<span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="cta-alt m-only m-ios" href="https://play.google.com/store/apps/details?id=app.sroka" target="_blank" rel="noopener noreferrer">or get the Android app<span class="btn-arrow" aria-hidden="true">→</span></a>
+            <p class="platforms-line">Chrome · Android · iPhone &amp; iPad (beta) · Web · Self-hostable on Cloudflare</p>
           </div>
         </div>
 
@@ -136,12 +141,12 @@
           <li class="card">
             <div class="card-top"><span class="num">1</span></div>
             <h3>Spot it</h3>
-            <p>Click the magpie in your toolbar, or share from any app on your phone.</p>
+            <p>Click the magpie in Chrome (<code>Alt+Shift+S</code>), paste a link on the web, or share from any app on Android, iPhone, or iPad.</p>
           </li>
           <li class="card">
             <div class="card-top"><span class="num">2</span></div>
             <h3>Stash it</h3>
-            <p>Sroka grabs the article — text, images, everything — and tucks it into your list.</p>
+            <p>Sroka grabs the clean article — text, images, comment threads, or PDFs — and tucks it into your synced library.</p>
           </li>
           <li class="card">
             <div class="card-top">
@@ -149,7 +154,7 @@
               <span class="chip"><span class="chip-check"><svg viewBox="0 0 12 12"><use href="#check" /></svg></span>Works offline</span>
             </div>
             <h3>Read it</h3>
-            <p>Downloaded to every device. On the train, on a plane, offline — it’s waiting.</p>
+            <p>Native mobile apps download saved articles automatically (over Wi-Fi by default, according to your settings). On a plane, on the train, or in a tunnel — it’s waiting.</p>
           </li>
         </ol>
       </section>
@@ -159,12 +164,12 @@
           <div class="offline-copy">
             <div class="chip"><span class="chip-dot"></span>Offline</div>
             <h2>No signal? Keep reading.</h2>
-            <p>Every article you save is downloaded to your devices — text and images. Airplane mode, subway tunnels, mountain cabins: your list goes with you.</p>
+            <p>On Android, iPhone, and iPad, saved means offline — article text, images, and supported discussions download automatically according to your settings. Airplane mode, subway tunnels, mountain cabins: your list goes with you.</p>
           </div>
           <ul class="points">
-            <li><b>Downloaded on save</b><span>No extra step. Saved means available offline.</span></li>
-            <li><b>Images included</b><span>Articles look the same with or without a connection.</span></li>
-            <li><b>Progress syncs later</b><span>Where you stopped is remembered once you’re back online.</span></li>
+            <li><b>Downloaded on save</b><span>No extra step. Saved articles download over Wi-Fi by default so they’re ready offline in your native apps.</span></li>
+            <li><b>Images &amp; PDFs included</b><span>Articles and saved PDFs are stored locally so they open with or without a connection.</span></li>
+            <li><b>Progress syncs later</b><span>Where you stopped in an article syncs across every device once you’re back online.</span></li>
           </ul>
         </div>
       </section>
@@ -175,7 +180,7 @@
             <div class="chip"><span class="chip-dot"></span>Comments included</div>
             <h2>The discussion comes too.</h2>
           </div>
-          <p>Sometimes the comments are the best part. Save a post from Reddit, X or Hacker News and Sroka keeps the conversation with it — every reply in its place, readable offline.</p>
+          <p>Sometimes the comments are the best part. Save a Hacker News story or Reddit post (best via Chrome for full comment trees) to keep nested replies, or stitch an X thread into one clean page.</p>
         </div>
         <ul class="sources">
           <li class="source">
@@ -187,7 +192,7 @@
               <div class="thread-row r1"><i class="av av-grey"></i><b style="width:62%"></b></div>
             </div>
             <h3>Reddit</h3>
-            <p>The post and its whole comment tree, with nested replies kept right where they belong.</p>
+            <p>The post and its comment tree, with nested replies kept right where they belong.</p>
           </li>
           <li class="source">
             <div class="thread-mock" aria-hidden="true">
@@ -198,7 +203,7 @@
               <div class="thread-row r1"><i class="av av-grey"></i><b style="width:62%"></b></div>
             </div>
             <h3>X</h3>
-            <p>A long thread stitched into one clean page — quoted posts, images, polls and community notes included.</p>
+            <p>A long thread stitched into one clean page — quoted posts, images, polls, and community notes included.</p>
           </li>
           <li class="source">
             <div class="thread-mock" aria-hidden="true">
@@ -209,27 +214,88 @@
               <div class="thread-row r1"><i class="av av-grey"></i><b style="width:62%"></b></div>
             </div>
             <h3>Hacker News</h3>
-            <p>The story and every comment under it, in the same order you’d read it on HN.</p>
+            <p>The story and its comments in the same order you’d read them on HN.</p>
           </li>
         </ul>
         <p class="threads-note">Saved a link to a single comment? Sroka highlights it, along with the replies that led to it.</p>
       </section>
 
+      <section id="organize" class="organize wrap">
+        <div class="threads-head">
+          <div class="threads-title">
+            <div class="chip"><span class="chip-dot"></span>Organize &amp; search</div>
+            <h2>Find it again, even offline.</h2>
+          </div>
+          <p>Tag your saves, star favorites, filter by quick reads, and archive what you’ve finished. On Android, iPhone, and iPad, full-text search looks inside your downloaded articles with zero signal.</p>
+        </div>
+
+        <figure class="showcase">
+          <img src="/landing/organize-and-threads.png" width="1440" height="800" loading="lazy" decoding="async" alt="On-device full-text search on Android showing highlighted matches beside a saved Hacker News discussion with nested replies" />
+        </figure>
+
+        <div class="migrate">
+          <div class="migrate-copy">
+            <h3>Moving from Pocket or Instapaper?</h3>
+            <p>Import your existing Pocket export, Instapaper export, or browser bookmarks right in Settings — and export your reading list as CSV or JSON whenever you like.</p>
+          </div>
+          <a class="btn btn-solid btn-sm" href="/app/settings">Import your list<span class="btn-arrow" aria-hidden="true">→</span></a>
+        </div>
+      </section>
+
       <section class="words">
         <div class="words-inner wrap">
           <div class="words-copy">
+            <div class="chip chip-light"><span class="chip-dot"></span>Calm reader</div>
             <h2>Just the words.</h2>
-            <p>Ads, pop-ups and clutter stay behind. Your saved articles open in a calm reader view with adjustable type, dark mode, and progress that syncs everywhere.</p>
+            <p>Ads, pop-ups, and clutter stay behind. Open any saved article in a calm reader with adjustable font, size, line spacing, and Light, Sepia, and Dark themes — or open saved PDFs right beside them.</p>
           </div>
-          <div class="reader" aria-hidden="true">
-            <div class="reader-page">
-              <div class="reader-tools"><span>Aa</span><span class="moon"></span><span class="progress"><span></span></span></div>
-              <div class="reader-meta">longreads · 9 min</div>
-              <div class="reader-title">The slow art of reading on the internet</div>
-              <div class="reader-lines"><span></span><span></span><span></span><span class="short"></span></div>
-            </div>
-          </div>
+          <figure class="words-shot">
+            <img src="/landing/reader-themes.png" width="1440" height="700" loading="lazy" decoding="async" alt="Sroka native reader shown side by side in Light, Sepia, and Dark themes" />
+          </figure>
         </div>
+      </section>
+
+      <section id="native" class="native wrap">
+        <div class="threads-head">
+          <div class="threads-title">
+            <div class="chip"><span class="chip-dot"></span>Native craft</div>
+            <h2>Built for phones, foldables, and tablets.</h2>
+          </div>
+          <p>No sluggish webview wrappers. Android is built in Kotlin and Jetpack Compose with adaptive cover-screen and dual-pane foldable layouts; iPhone and iPad run native SwiftUI with split view and a native share sheet.</p>
+        </div>
+
+        <figure class="showcase">
+          <img src="/landing/adaptive-foldable-tablet.png" width="1600" height="900" loading="lazy" decoding="async" alt="Sroka on an Android foldable showing cover screen and dual-pane unfolded tags view alongside the native iOS SwiftUI reader and typography sheet" />
+        </figure>
+      </section>
+
+      <section id="open" class="open wrap">
+        <div class="threads-head">
+          <div class="threads-title">
+            <div class="chip"><span class="chip-dot"></span>Open source · Apache 2.0</div>
+            <h2>Built to stay around.</h2>
+          </div>
+          <p>Pocket shut down in 2025, and a lot of us lost our reading shelf. Sroka is free, has no ads, and puts every line of its code in the open — hosted at sroka.app or self-hosted on your own Cloudflare account.</p>
+        </div>
+
+        <ul class="steps">
+          <li class="card">
+            <h3>Free &amp; open source</h3>
+            <p>Licensed under Apache 2.0. Web app, Chrome extension, Android, iOS, and Cloudflare Workers all live in one public repository.</p>
+          </li>
+          <li class="card">
+            <h3>Private by default</h3>
+            <p>Passwordless email code sign-in. Nobody tracks what you read, analytics stay off until you opt in, and you can delete your account and data anytime.</p>
+          </li>
+          <li class="card">
+            <h3>Self-host on Cloudflare</h3>
+            <p>Run the exact same serverless backend (Workers, SQLite Durable Objects, Queues, R2) on your own Cloudflare account and point the apps at your server.</p>
+          </li>
+        </ul>
+
+        <p class="open-link">
+          <a class="cta-alt" href="https://github.com/tajchert/sroka" target="_blank" rel="noopener noreferrer">Explore the source on GitHub<span class="btn-arrow" aria-hidden="true">→</span></a>
+        </p>
       </section>
 
       <section id="get" class="get wrap">

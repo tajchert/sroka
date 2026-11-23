@@ -2,6 +2,11 @@
 const WORDS = ["later.", "offline.", "on the ✈️", "on your commute.", "in the waiting room.", "when you have time."];
 const PLANE = /✈️?/;
 
+// Flag iOS / iPadOS visitors so the mobile hero leads with the TestFlight beta instead of Google Play.
+const ua = navigator.userAgent || "";
+const isAppleMobile = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+if (isAppleMobile) document.documentElement.classList.add("is-ios");
+
 const typed = document.querySelector<HTMLElement>("[data-typed]");
 const emoji = document.querySelector<HTMLElement>("[data-typed-emoji]");
 const caret = document.querySelector<HTMLElement>("[data-caret]");

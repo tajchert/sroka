@@ -9,7 +9,7 @@
 //   PW_CORE=/path/to/node_modules/playwright-core node store/scripts/readme-images.mjs
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { homedir } from "node:os";
 
@@ -821,7 +821,14 @@ await renderShot(
   </body>`,
 );
 
+// Mirror landing-page showcase images into apps/web/public/landing/
+const landingOut = join(root, "apps/web/public/landing");
+mkdirSync(landingOut, { recursive: true });
+for (const f of ["organize-and-threads.png", "adaptive-foldable-tablet.png", "reader-themes.png"]) {
+  copyFileSync(join(out, f), join(landingOut, f));
+}
+
 await browser.close();
 ext.s.close();
 web.s.close();
-console.log("All README images generated.");
+console.log("All README & landing images generated.");

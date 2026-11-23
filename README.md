@@ -3,11 +3,11 @@
 <h1 align="center">Sroka</h1>
 
 <p align="center">
-  <strong>Save anywhere.<br/>Read offline.</strong>
+  <strong>Save it now.<br/>Read it later.</strong>
 </p>
 
 <p align="center">
-  Save articles, threads, and PDFs from your browser or phone — and read them later on a plane, on a train, or anywhere without signal.<br/>
+  Save articles, threads, and PDFs from your browser or phone — sync everywhere, and read offline on Android, iPhone, and iPad on a plane, on a train, or anywhere without signal.<br/>
   A free, open-source alternative to Instapaper and Pocket (which shut down in 2025), hosted at <a href="https://sroka.app">sroka.app</a> or self-hosted on your own Cloudflare account.
 </p>
 
@@ -34,7 +34,7 @@
 
 Click the magpie in Chrome (`Alt+Shift+S`), paste a link on the web, or tap **Share → Sroka** from any app on Android, iPhone, or iPad — browsers, newsletters, Reddit, Hacker News, X, or PDFs.
 
-On the native Android and Apple apps, **saved means offline**: article text, images, and supported discussions download automatically so your reading list is waiting in airplane mode, subway tunnels, or anywhere without signal. Reading position syncs across every device once you're back online.
+On the native Android and Apple apps, **saved means offline**: article text, images, and supported discussions download automatically (over Wi-Fi by default, configurable in Settings) so your reading list is waiting in airplane mode, subway tunnels, or anywhere without signal. Article reading position syncs across devices once you're back online.
 
 <p align="center">
   <img src="docs/readme/save-offline.png" width="100%" alt="Saving an article from the Chrome extension and Android share sheet into the clean offline reader" />
@@ -44,7 +44,7 @@ On the native Android and Apple apps, **saved means offline**: article text, ima
 
 - **Tags, favorites & archive.** Keep your queue focused with tags, stars, quick filters (*Under 10 min*, *Favorites*), and one-tap archiving.
 - **On-device full-text search.** On Android, iPhone, and iPad, search matches inside the full text of your downloaded articles and archive — even offline.
-- **Comments come along too.** Save a Hacker News story, Reddit post, or X thread and Sroka preserves nested replies (or highlights the exact comment you linked to) in the same calm reader.
+- **Discussions & threads come along too.** Save a Hacker News story or Reddit post (best via the Chrome extension for full Reddit trees) to keep nested replies — or save an X thread stitched into one clean page with quoted posts and images.
 - **PDFs alongside articles.** Drop a PDF on the web app or share one from your phone and keep it right next to your essays.
 
 <p align="center">
@@ -78,7 +78,7 @@ Sroka isn't a webview wrapper. Every client is built natively for its platform:
 | **Android** | [Google Play](https://play.google.com/store/apps/details?id=app.sroka) · signed APKs on [GitHub Releases](https://github.com/tajchert/sroka/releases) |
 | **iPhone & iPad** | [TestFlight public beta](https://testflight.apple.com/join/7nKJUGwN) |
 
-**Private by default:** Passwordless email one-time code sign-in, no ads, no tracking of what you read, analytics off until you opt in, and one-click full account & data deletion in Settings.
+**Private by default:** Passwordless email one-time code sign-in, no ads, no tracking of what you read, analytics off until you opt in, and full account & data deletion anytime in Settings.
 
 ## Open source — and self-hostable on Cloudflare
 

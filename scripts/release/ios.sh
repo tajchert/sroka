@@ -6,7 +6,9 @@
 #   scripts/release/ios.sh --skip-build   # upload build/export/Sroka.ipa as it is (still preflighted)
 #
 # The upload lands in TestFlight. Submitting for App Review stays a manual step in App Store Connect.
-# Signing uses the Xcode account on this Mac (automatic signing, -allowProvisioningUpdates).
+# The archive is signed by the Xcode account on this Mac (automatic signing). The export signs with a cloud-managed
+# distribution certificate through the API key, so the key needs the Admin role (xcodebuild run outside Xcode cannot
+# read the Xcode account, and a Developer key has no cloud-signing access).
 # Credentials: $CREDS_DIR/apple.env + $CREDS_DIR/AuthKey_<KEY_ID>.p8 (docs/releasing.md, "App Store").
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -68,7 +70,8 @@ if [ "$BUILD" = 1 ]; then
 </plist>
 PLIST
   xcodebuild -exportArchive -quiet -archivePath "$ARCHIVE" -exportOptionsPlist "$IOS/build/exportOptions.plist" \
-    -exportPath "$EXPORT" -allowProvisioningUpdates
+    -exportPath "$EXPORT" -allowProvisioningUpdates \
+    -authenticationKeyPath "$P8" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 fi
 [ -f "$IPA" ] || die "no .ipa at $IPA"
 

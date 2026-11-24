@@ -61,7 +61,7 @@ Then test the internal-track build and promote it in Play Console → Testing �
 ## App Store (one-time setup)
 
 1. In [App Store Connect](https://appstoreconnect.apple.com/), open **Users and Access** → **Integrations** → App Store Connect API → **Team Keys**. The first time, the Account Holder has to click "Request Access" once.
-2. Click **Generate API Key** (the "+" button). Name it `sroka-upload`, Access: **Developer**. That role can upload builds. Choose App Manager only if you later want the script to manage TestFlight groups.
+2. Click **Generate API Key** (the "+" button). Name it `sroka-upload`, Access: **Admin**. The export step signs with a cloud-managed distribution certificate through this key, and Apple gives that access only to Admin keys (a Developer key can upload but the export fails with "Cloud signing permission error").
 3. Note the **Issuer ID** shown above the key list and the new key's **Key ID**. Click **Download** next to the key. Apple allows the `.p8` to be downloaded **only once**.
 4. Move it into place and write `apple.env`:
    ```sh
@@ -69,7 +69,7 @@ Then test the internal-track build and promote it in Play Console → Testing �
    printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' '<KEY_ID>' '<ISSUER_ID>' > ~/keystores/sroka-store/apple.env
    chmod 600 ~/keystores/sroka-store/AuthKey_*.p8 ~/keystores/sroka-store/apple.env
    ```
-5. Signing uses the Xcode account on this Mac. Xcode → Settings → Accounts must list the team that `apps/ios/Config/Local.xcconfig` names in `DEVELOPMENT_TEAM`. `apps/ios/Config/GoogleService-Info.plist` must be the real file (see `apps/ios/docs/RELEASING.md`).
+5. The archive is signed by the Xcode account on this Mac; the export is signed through the API key (`xcodebuild` run outside Xcode reports "No Accounts" even when Xcode is signed in). Xcode → Settings → Accounts must list the team that `apps/ios/Config/Local.xcconfig` names in `DEVELOPMENT_TEAM`. `apps/ios/Config/GoogleService-Info.plist` must be the real file (see `apps/ios/docs/RELEASING.md`).
 6. `scripts/release/ios.sh --check` should print `ok: App Store Connect key works; app Sroka (app.sroka, id ...)`.
 
 **Every release:** bump `MARKETING_VERSION` and/or `CURRENT_PROJECT_VERSION` in `apps/ios/Config/Shared.xcconfig`, run `apps/ios/scripts/verify.sh all`, commit, then run `scripts/release/ios.sh`. The script:

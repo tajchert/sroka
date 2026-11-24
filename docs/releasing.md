@@ -81,7 +81,7 @@ Then test the internal-track build and promote it in Play Console → Testing �
 
 When processing finishes, the build shows up in TestFlight. Then, in App Store Connect:
 
-1. TestFlight → **External Testing** → the public beta group (the README's `testflight.apple.com/join/…` link) → Builds → **+** → pick the build, and fill in "What to Test". The first build of a new version goes through Beta App Review, usually under a day; later builds of the same version are often approved automatically. The upload key has the Developer role, so it cannot do this step.
+1. TestFlight → **External Testing** → the public beta group (the README's `testflight.apple.com/join/…` link) → Builds → **+** → pick the build, and fill in "What to Test". The first build of a new version goes through Beta App Review, usually under a day; later builds of the same version are often approved automatically. The script does not do this step.
 2. For a store release: App Store tab → the version → Build → pick it → **Submit for Review**.
 
 If Apple removes `altool --upload-app`, set `destination` to `upload` in the generated `exportOptions.plist` and pass `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` to `xcodebuild -exportArchive` instead.

@@ -85,7 +85,12 @@ check_signing() {
   team=$(grep '^TeamIdentifier=' <<<"$info" | head -1 | sed 's/^TeamIdentifier=//')
   ents=$(entitlements_of "$app")
   gta=$(printf '%s' "$ents" | plutil -extract get-task-allow raw -o - - 2>/dev/null || true)
-  [ -z "$ents" ] || [ "$gta" != "true" ] || bad "get-task-allow is true (development-signed, not for distribution)"
+  # A development-signed archive is normal with automatic signing: the export re-signs it for distribution, and the
+  # exported .ipa gets the strict checks. So get-task-allow and the profile's device list only count elsewhere.
+  local dev_archive=0
+  case "$kind:$auth" in archive:"Apple Development"*|archive:"iPhone Developer"*) dev_archive=1 ;; esac
+  [ -z "$ents" ] || [ "$gta" != "true" ] || [ "$dev_archive" = 1 ] ||
+    bad "get-task-allow is true (development-signed, not for distribution)"
   case "$kind" in
     ipa)
       case "$auth" in
@@ -113,7 +118,7 @@ check_signing() {
       bad "cannot decode embedded.mobileprovision"
     else
       # `if`, not `&&`: a non-matching grep as the function's last command would end the script under `set -e`.
-      if grep -q '<key>ProvisionedDevices</key>' <<<"$decoded"; then
+      if [ "$dev_archive" = 0 ] && grep -q '<key>ProvisionedDevices</key>' <<<"$decoded"; then
         bad "provisioning profile lists devices (development or ad hoc, not App Store)"
       fi
       if grep -q '<key>ProvisionsAllDevices</key>' <<<"$decoded"; then bad "enterprise provisioning profile"; fi

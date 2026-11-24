@@ -63,6 +63,22 @@ struct PackageInstallerTests {
         #expect(leftovers().isEmpty)
     }
 
+    /// A device keeps every container under `/private/var`; `/private/tmp` has the same "/private" alias.
+    @Test func `A package installs under a private-prefixed directory`() throws {
+        defer { dir.cleanUp() }
+        let root = URL(filePath: "/private/tmp/sroka-installer-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let zip = dir.file("p-\(UUID().uuidString).zip")
+        try makeZip(at: zip, validPackage())
+        let result = PackageInstaller().install(zip: zip, articlesDirectory: root, itemId: "item1")
+        guard case .installed = result else {
+            Issue.record("expected an installed package, got \(result)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "item1/article.html").path))
+    }
+
     @Test func `Case-insensitive duplicate names are rejected`() throws {
         defer { dir.cleanUp() }
         var entries = validPackage()

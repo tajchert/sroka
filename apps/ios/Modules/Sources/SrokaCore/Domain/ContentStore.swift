@@ -37,8 +37,10 @@ extension ContentStore {
             return .failed(.server)
         case .notReady:
             return .notReady
-        case .failed(let reason):
-            return .failed(reason)
+        case .failed(let reason, let code):
+            return .failed(reason, code: code)
+        case .storageFull(let code):
+            return .storageFull(code: code)
         }
     }
 }
@@ -47,14 +49,19 @@ public enum DownloadResult: Sendable, Hashable {
     case downloaded
     /// The server has not finished parsing the article yet (HTTP 409 `not_parsed`).
     case notReady
-    case failed(RemoteFailure)
+    /// `code` is a short ASCII diagnostic (`http_403`, `bad_zip`) for the reader's error screen; never personal data.
+    case failed(RemoteFailure, code: String? = nil)
+    /// The device is out of free space or a local write failed; not the server's fault. `code` is
+    /// `free_space <bytes>` or `io <domain> <code>`.
+    case storageFull(code: String)
 }
 
 public enum PdfFileResult: Sendable, Hashable {
     case ready(URL)
     /// The server has no document for this item (yet).
     case notReady
-    case failed(RemoteFailure)
+    case failed(RemoteFailure, code: String? = nil)
+    case storageFull(code: String)
 }
 
 private struct UnimplementedContentStore: ContentStore {

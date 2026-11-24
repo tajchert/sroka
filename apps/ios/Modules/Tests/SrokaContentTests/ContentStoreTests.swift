@@ -76,10 +76,38 @@ struct DownloadPipelineTests {
         defer { h.dir.cleanUp() }
         try h.database.insert(item("item1"))
         try h.servePackage("item1")
-        #expect(await h.store.fetch(itemId: "item1") == .failed(.server))
-        #expect(await h.store.download(itemId: "item1", api: h.api) == .storageFull)
+        #expect(
+            await h.store.fetch(itemId: "item1")
+                == .storageFull(code: "free_space \(LiveContentStore.minFreeBytes - 1)"))
+        #expect(
+            await h.store.download(itemId: "item1", api: h.api)
+                == .storageFull(code: "free_space \(LiveContentStore.minFreeBytes - 1)"))
         #expect(try h.database.row("item1") == nil)
         #expect(h.api.contentUrlCalls.isEmpty)
+    }
+
+    @Test func `Free space takes the largest reading and never blocks on unknown`() {
+        typealias Reading = ContentPaths.FreeSpaceReading
+        let big: Int64 = 5_000_000_000
+        // The important-usage key reports 0 but the plain capacity is large: allowed.
+        let skewed = [Reading(label: "a", bytes: 0), Reading(label: "b", bytes: big), Reading(label: "c", bytes: nil)]
+        #expect(ContentPaths.chooseAvailable(readings: skewed) == big)
+        #expect(ContentPaths.chooseAvailable(readings: skewed) >= LiveContentStore.minFreeBytes)
+        // Nothing readable: unknown must not block.
+        #expect(ContentPaths.chooseAvailable(readings: [Reading(label: "a", bytes: nil)]) == .max)
+        #expect(ContentPaths.chooseAvailable(readings: []) == .max)
+        // A genuinely full disk: every reading small.
+        let full = [Reading(label: "a", bytes: 0), Reading(label: "b", bytes: 1_000)]
+        #expect(ContentPaths.chooseAvailable(readings: full) < LiveContentStore.minFreeBytes)
+    }
+
+    @Test func `An HTTP failure on the package keeps its code`() async throws {
+        let h = try Harness()
+        defer { h.dir.cleanUp() }
+        try h.database.insert(item("item1"))
+        h.api.setUrls("item1", .success(contentUrls("item1")))
+        h.api.serve("https://content.test/item1/package.zip", .error(httpError(403)))
+        #expect(await h.store.fetch(itemId: "item1") == .failed(.server, code: "http_403"))
     }
 
     @Test func `A network error is not an attempt`() async throws {
@@ -98,7 +126,7 @@ struct DownloadPipelineTests {
         try h.database.insert(item("item1"))
         h.api.setUrls("item1", .failure(httpError(500)))
         for expected in 1...ContentFileDao.maxAttempts {
-            #expect(await h.store.fetch(itemId: "item1") == .failed(.server))
+            #expect(await h.store.fetch(itemId: "item1") == .failed(.server, code: "http_500"))
             #expect(try h.database.row("item1")?.attempts == expected)
         }
         #expect(try h.database.row("item1")?.state == .failed)
@@ -112,7 +140,7 @@ struct DownloadPipelineTests {
         var entries = validPackage()
         entries.append(.file("../escape.html", Data("x".utf8)))
         try h.servePackage("item1", entries)
-        #expect(await h.store.fetch(itemId: "item1") == .failed(.server))
+        #expect(await h.store.fetch(itemId: "item1") == .failed(.server, code: "unsafe_path"))
         let row = try #require(try h.database.row("item1"))
         #expect(row.state == .failed)
         #expect(row.attempts == 1)
@@ -126,7 +154,7 @@ struct DownloadPipelineTests {
         try h.database.insert(item("item1"))
         h.api.setUrls("item1", .success(contentUrls("item1")))
         h.api.serve("https://content.test/item1/package.zip", .progress(PackageInstaller.maxTotalBytes + 1))
-        #expect(await h.store.fetch(itemId: "item1") == .failed(.server))
+        #expect(await h.store.fetch(itemId: "item1") == .failed(.server, code: "too_large"))
         #expect(try h.database.row("item1")?.error == "too_large")
         #expect(try h.database.row("item1")?.attempts == 1)
     }
@@ -183,7 +211,7 @@ struct PdfDownloadTests {
         try pdfItem(h)
         h.api.setUrls("doc1", .success(contentUrls("doc1", documentUrl: "https://content.test/doc1/document.pdf")))
         h.api.serve("https://content.test/doc1/document.pdf", .data(Data("<html>login</html>".utf8)))
-        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server))
+        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server, code: "not_pdf"))
         #expect(try h.database.row("doc1")?.error == "not_pdf")
         #expect(await h.store.pdfFile(itemId: "doc1") == nil)
     }
@@ -219,7 +247,7 @@ struct PdfDownloadTests {
         try pdfItem(h)
         h.api.setUrls("doc1", .success(contentUrls("doc1", documentUrl: "https://content.test/doc1/document.pdf")))
         h.api.serve("https://content.test/doc1/document.pdf", .error(httpError(410)))
-        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server))
+        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server, code: "http_410"))
         #expect(h.api.contentUrlCalls.count == 2)
         #expect(try h.database.row("doc1")?.attempts == 1)
     }
@@ -229,7 +257,7 @@ struct PdfDownloadTests {
         defer { h.dir.cleanUp() }
         try pdfItem(h)
         h.api.setUrls("doc1", .success(contentUrls("doc1")))
-        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server))
+        #expect(await h.store.fetch(itemId: "doc1") == .failed(.server, code: "no_document_url"))
         #expect(try h.database.row("doc1")?.error == "no_document_url")
     }
 }

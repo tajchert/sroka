@@ -140,18 +140,45 @@ public struct ContentPaths: Sendable {
     /// Bytes on disk used by packages and thumbnails.
     func usageBytes() -> Int64 { Self.size(of: articles) + Self.size(of: thumbs) }
 
-    /// Free bytes for important data on the volume that holds the packages.
-    func availableBytes() -> Int64 {
+    /// One free-space measurement of a volume (`nil` = the key could not be read).
+    struct FreeSpaceReading: Sendable, Equatable {
+        var label: String
+        var bytes: Int64?
+    }
+
+    /// Free bytes on the volume that holds the packages. The "important usage" key is known to report 0 on real
+    /// devices for some locations, so the plain capacity of the same path and of the app's home directory are
+    /// read too and the largest value wins.
+    func availableBytes() -> Int64 { Self.chooseAvailable(readings: freeSpaceReadings()) }
+
+    func freeSpaceReadings() -> [FreeSpaceReading] {
+        var readings: [FreeSpaceReading] = []
         var dir: URL? = articles
         while let current = dir {
             if FileManager.default.fileExists(atPath: current.path) {
-                let values = try? current.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-                return values?.volumeAvailableCapacityForImportantUsage ?? Int64.max
+                readings += Self.readings(of: current, prefix: "path")
+                break
             }
             let parent = current.deletingLastPathComponent()
             dir = parent.path == current.path ? nil : parent
         }
-        return Int64.max
+        readings += Self.readings(of: URL(filePath: NSHomeDirectory(), directoryHint: .isDirectory), prefix: "home")
+        return readings
+    }
+
+    private static func readings(of url: URL, prefix: String) -> [FreeSpaceReading] {
+        let values = try? url.resourceValues(forKeys: [
+            .volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey,
+        ])
+        return [
+            FreeSpaceReading(label: "\(prefix)-important", bytes: values?.volumeAvailableCapacityForImportantUsage),
+            FreeSpaceReading(label: "\(prefix)-plain", bytes: values?.volumeAvailableCapacity.map { Int64($0) }),
+        ]
+    }
+
+    /// The largest reading; `Int64.max` when none could be read (unknown must not block downloads).
+    static func chooseAvailable(readings: [FreeSpaceReading]) -> Int64 {
+        readings.compactMap(\.bytes).max() ?? Int64.max
     }
 
     func removeIfPresent(_ url: URL) {

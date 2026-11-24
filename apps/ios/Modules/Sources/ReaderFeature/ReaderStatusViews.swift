@@ -47,6 +47,7 @@ struct ReaderDownloadingView: View {
 /// "Not saved for offline reading": the package is not on the device.
 struct ReaderNotDownloadedView: View {
     let reason: NotDownloadedReason
+    var code: String? = nil
     let isPdf: Bool
     let originalURL: URL?
     let theme: EffectiveTheme
@@ -63,6 +64,11 @@ struct ReaderNotDownloadedView: View {
                 Text("Sign in again to download this article.", bundle: #bundle)
             case .error:
                 Text("The article could not be downloaded.", bundle: #bundle)
+            case .storage:
+                Text("Not enough free space on this device to save the article.", bundle: #bundle)
+            }
+            if let code {
+                Text("Code: \(code)", bundle: #bundle).font(.caption).foregroundStyle(.secondary)
             }
         } actions: {
             Button(action: onRetry) { Text("Try again", bundle: #bundle) }

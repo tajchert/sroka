@@ -26,7 +26,7 @@ public struct PackageInstaller: Sendable {
         /// The package is broken or hostile; `reason` is a short code (never shown to users).
         case invalid(reason: String)
         /// Local I/O failure (typically a full disk): transient, not the package's fault.
-        case ioError
+        case ioError(domain: String, code: Int)
     }
 
     let maxTotalBytes: Int64
@@ -68,7 +68,8 @@ public struct PackageInstaller: Sendable {
             return .invalid(reason: error.reason)
         } catch {
             try? fileManager.removeItem(at: tmp)
-            return .ioError
+            let nsError = error as NSError
+            return .ioError(domain: nsError.domain, code: nsError.code)
         }
     }
 

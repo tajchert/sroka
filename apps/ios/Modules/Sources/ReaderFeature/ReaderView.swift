@@ -178,9 +178,9 @@ private struct ReaderContent: View {
                 onPage: { page, count in model.pdfPageChanged(page: page, pageCount: count) })
         case .downloading:
             ReaderDownloadingView(isPdf: model.isPdf, theme: theme)
-        case .notDownloaded(let reason):
+        case .notDownloaded(let reason, let code):
             ReaderNotDownloadedView(
-                reason: reason, isPdf: model.isPdf, originalURL: originalURL, theme: theme,
+                reason: reason, code: code, isPdf: model.isPdf, originalURL: originalURL, theme: theme,
                 onRetry: { model.retryTapped() })
         case .parsePending:
             ReaderParsePendingView(originalURL: originalURL, theme: theme)

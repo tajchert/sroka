@@ -1,5 +1,6 @@
 import Dependencies
 import Foundation
+import OSLog
 import Observation
 import SrokaCore
 
@@ -239,7 +240,8 @@ public final class ReaderViewModel {
         switch result {
         case .ready(let file): setState(.pdfReady(file))
         case .notReady: setState(.parsePending)
-        case .failed(let reason): setState(.notDownloaded(Self.reason(for: reason)))
+        case .failed(let reason, let code): setState(.notDownloaded(Self.reason(for: reason), code: code))
+        case .storageFull(let code): setState(.notDownloaded(.storage, code: code))
         }
     }
 
@@ -270,11 +272,16 @@ public final class ReaderViewModel {
         switch result {
         case .downloaded:
             if let html = await content.articleHtml(itemId: itemId) { return readyState(html) }
-            return .notDownloaded(.error)
+            // Installed but unreadable: nothing else records why, so log it and tag it for the error screen.
+            Logger(subsystem: "app.sroka", category: "content").error(
+                "download succeeded but article.html is unreadable")
+            return .notDownloaded(.error, code: "unreadable")
         case .notReady:
             return .parsePending
-        case .failed(let reason):
-            return .notDownloaded(Self.reason(for: reason))
+        case .failed(let reason, let code):
+            return .notDownloaded(Self.reason(for: reason), code: code)
+        case .storageFull(let code):
+            return .notDownloaded(.storage, code: code)
         }
     }
 

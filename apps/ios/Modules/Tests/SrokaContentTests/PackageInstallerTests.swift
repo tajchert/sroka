@@ -179,7 +179,7 @@ struct PackageInstallerTests {
         defer { dir.cleanUp() }
         _ = try install(validPackage(html: "<p>first</p>"))
         let result = try install(validPackage(html: "<p>second</p>"))
-        #expect(result != .ioError)
+        #expect(result != .ioError(domain: NSCocoaErrorDomain, code: CocoaError.fileWriteOutOfSpace.rawValue))
         let html = try String(contentsOf: articles.appending(path: "item1/article.html"), encoding: .utf8)
         #expect(html == "<p>second</p>")
         #expect(leftovers() == ["item1"])
@@ -193,7 +193,9 @@ struct PackageInstallerTests {
             if from.lastPathComponent.hasSuffix(".tmp") { throw CocoaError(.fileWriteOutOfSpace) }
             try FileManager.default.moveItem(at: from, to: to)
         }
-        #expect(try install(validPackage(html: "<p>second</p>"), installer: installer) == .ioError)
+        #expect(
+            try install(validPackage(html: "<p>second</p>"), installer: installer)
+                == .ioError(domain: NSCocoaErrorDomain, code: CocoaError.fileWriteOutOfSpace.rawValue))
         let html = try String(contentsOf: articles.appending(path: "item1/article.html"), encoding: .utf8)
         #expect(html == "<p>first</p>")
         #expect(leftovers() == ["item1"])

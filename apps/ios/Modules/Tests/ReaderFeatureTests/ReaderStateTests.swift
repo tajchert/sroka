@@ -60,6 +60,24 @@ struct ReaderStateTests {
         #expect(await h.until { h.model.state == .notDownloaded(reason) })
     }
 
+    @Test func `A full device shows the storage reason with its code`() async {
+        let item = makeItem(id: "remote-5")
+        let h = ReaderHarness(itemId: item.id, items: [item])
+        h.fakes.content.downloadResult.send(.storageFull(code: "free_space 0"))
+        h.start()
+        defer { h.stop() }
+        #expect(await h.until { h.model.state == .notDownloaded(.storage, code: "free_space 0") })
+    }
+
+    @Test func `A failed download carries its code to the error screen`() async {
+        let item = makeItem(id: "remote-6")
+        let h = ReaderHarness(itemId: item.id, items: [item])
+        h.fakes.content.downloadResult.send(.failed(.server, code: "http_403"))
+        h.start()
+        defer { h.stop() }
+        #expect(await h.until { h.model.state == .notDownloaded(.error, code: "http_403") })
+    }
+
     @Test func `The server not having parsed yet shows the preparing state`() async {
         let item = makeItem(id: "remote-3")
         let h = ReaderHarness(itemId: item.id, items: [item])

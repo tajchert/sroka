@@ -121,6 +121,17 @@
         }
       }
     },
+    "Code: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code: %@"
+          }
+        }
+      }
+    },
     "Connect to the internet to download this article, or open the original." : {
       "localizations" : {
         "en" : {
@@ -317,6 +328,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Normal"
+          }
+        }
+      }
+    },
+    "Not enough free space on this device to save the article." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space on this device to save the article."
           }
         }
       }

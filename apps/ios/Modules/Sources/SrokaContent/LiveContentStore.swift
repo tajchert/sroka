@@ -33,9 +33,11 @@ enum DownloadOutcome: Sendable, Equatable {
     /// The installed package was already current.
     case alreadyCurrent
     case notReady
-    case failed(RemoteFailure)
-    /// The device is (nearly) out of storage: transient, never counted as an attempt.
-    case storageFull
+    /// `code` is the short diagnostic code shown on the reader's error screen (`http_403`, `bad_zip`, …).
+    case failed(RemoteFailure, code: String? = nil)
+    /// The device is (nearly) out of storage or a local write failed: transient, never counted as an attempt.
+    /// `code` is `free_space <bytes>` or `io <domain> <code>`.
+    case storageFull(code: String)
     /// The calling task was cancelled; the row was put back as it was.
     case cancelled
 
@@ -43,8 +45,8 @@ enum DownloadOutcome: Sendable, Equatable {
         switch self {
         case .downloaded, .alreadyCurrent: .downloaded
         case .notReady: .notReady
-        case .failed(let reason): .failed(reason)
-        case .storageFull: .failed(.server)
+        case .failed(let reason, let code): .failed(reason, code: code)
+        case .storageFull(let code): .storageFull(code: code)
         case .cancelled: .failed(.network)
         }
     }
@@ -427,8 +429,8 @@ public final class LiveContentStore: ContentStore, Sendable {
             case .downloaded: values.downloaded += 1
             case .alreadyCurrent, .notReady: break
             case .storageFull: values.storageFull = true
-            case .failed(.network), .cancelled: values.failure = values.failure ?? .network
-            case .failed(.unauthorized): values.failure = .auth
+            case .failed(.network, _), .cancelled: values.failure = values.failure ?? .network
+            case .failed(.unauthorized, _): values.failure = .auth
             case .failed: break
             }
             return values.done
@@ -455,7 +457,10 @@ public final class LiveContentStore: ContentStore, Sendable {
                 (try ItemDao.item(db, id: itemId), try ContentFileDao.get(db, itemId: itemId))
             }),
             let item = snapshot.0
-        else { return .failed(.server) }
+        else {
+            log.error("download: item missing from local database")
+            return .failed(.server, code: "no_item")
+        }
         guard let contentId = item.contentId else { return .notReady }
         let previous = snapshot.1
         if item.kind == .pdf {
@@ -468,7 +473,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             await retryMissingThumbnail(item: item, row: previous, generation: generation, api: api)
             return .alreadyCurrent
         }
-        if !hasFreeSpace() { return .storageFull }
+        if let code = freeSpaceRefusal() { return .storageFull(code: code) }
 
         let urls: ContentUrlsDto
         switch await contentUrls(itemId: itemId, api: api) {
@@ -481,7 +486,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             case .unauthorized: return .failed(.unauthorized)
             case .http(let code, let reason):
                 await markFailed(previous, itemId: itemId, contentId: contentId, error: code, generation: generation)
-                return .failed(reason)
+                return .failed(reason, code: code)
             }
         }
 
@@ -507,20 +512,20 @@ public final class LiveContentStore: ContentStore, Sendable {
         case .ok: break
         case .tooLarge:
             await markFailed(previous, itemId: itemId, contentId: contentId, error: "too_large", generation: generation)
-            return .failed(.server)
+            return .failed(.server, code: "too_large")
         case .http(let status):
             await markFailed(
                 previous, itemId: itemId, contentId: contentId, error: "http_\(status)", generation: generation)
-            return .failed(.server)
+            return .failed(.server, code: "http_\(status)")
         case .badUrl:
             await markFailed(previous, itemId: itemId, contentId: contentId, error: "bad_url", generation: generation)
-            return .failed(.server)
+            return .failed(.server, code: "bad_url")
         case .network:
             await restore(previous, itemId: itemId, generation: generation)
             return .failed(.network)
-        case .diskFull:
+        case .diskFull(let code):
             await restore(previous, itemId: itemId, generation: generation)
-            return .storageFull
+            return .storageFull(code: "io NSURLErrorDomain \(code)")
         case .cancelled:
             await restore(previous, itemId: itemId, generation: generation)
             return .cancelled
@@ -531,16 +536,18 @@ public final class LiveContentStore: ContentStore, Sendable {
         case .invalid(let reason):
             log.notice("package rejected: \(reason, privacy: .public)")
             await markFailed(previous, itemId: itemId, contentId: contentId, error: reason, generation: generation)
-            return .failed(.server)
-        case .ioError:
+            return .failed(.server, code: reason)
+        case .ioError(let domain, let code):
             // Local I/O trouble (typically a full disk) is not the package's fault: no attempt counted.
+            log.error("package install I/O error: \(domain, privacy: .public) \(code, privacy: .public)")
             await restore(previous, itemId: itemId, generation: generation)
-            return .storageFull
+            return .storageFull(code: "io \(domain) \(code)")
         case .installed(let installed):
             bytes = installed
         }
 
         let html = paths.articleHtml(itemId).flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        if html.isEmpty { log.error("installed package has no readable article.html") }
         let body = HtmlText.extract(html)
         let downloadedAt = nowMs
         let committed = try? await database.write { db -> Bool in
@@ -574,7 +581,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             await retryMissingThumbnail(item: item, row: previous, generation: generation, api: api)
             return .alreadyCurrent
         }
-        if !hasFreeSpace() { return .storageFull }
+        if let code = freeSpaceRefusal() { return .storageFull(code: code) }
         guard await markDownloading(previous, itemId: itemId, contentId: contentId, generation: generation),
             let temp = paths.tmpDir(itemId)
         else { return .notReady }
@@ -590,7 +597,7 @@ public final class LiveContentStore: ContentStore, Sendable {
                 case .http(let code, let reason):
                     await markFailed(
                         previous, itemId: itemId, contentId: contentId, error: code, generation: generation)
-                    return .failed(reason)
+                    return .failed(reason, code: code)
                 case .notReady:
                     await restore(previous, itemId: itemId, generation: generation)
                     return .notReady
@@ -608,14 +615,14 @@ public final class LiveContentStore: ContentStore, Sendable {
             guard let documentUrl = urls.documentUrl else {
                 await markFailed(
                     previous, itemId: itemId, contentId: contentId, error: "no_document_url", generation: generation)
-                return .failed(.server)
+                return .failed(.server, code: "no_document_url")
             }
             switch await fetchFile(documentUrl, to: temp, cap: Limits.maxPdfBytes, api: api) {
             case .ok: break
             case .tooLarge:
                 await markFailed(
                     previous, itemId: itemId, contentId: contentId, error: "too_large", generation: generation)
-                return .failed(.server)
+                return .failed(.server, code: "too_large")
             case .http(let status):
                 if !refreshed, Self.urlExpiredStatuses.contains(status) {
                     // Signed URL expired or rejected: ask for fresh ones once.
@@ -624,17 +631,17 @@ public final class LiveContentStore: ContentStore, Sendable {
                 }
                 await markFailed(
                     previous, itemId: itemId, contentId: contentId, error: "http_\(status)", generation: generation)
-                return .failed(.server)
+                return .failed(.server, code: "http_\(status)")
             case .badUrl:
                 await markFailed(
                     previous, itemId: itemId, contentId: contentId, error: "bad_url", generation: generation)
-                return .failed(.server)
+                return .failed(.server, code: "bad_url")
             case .network:
                 await restore(previous, itemId: itemId, generation: generation)
                 return .failed(.network)
-            case .diskFull:
+            case .diskFull(let code):
                 await restore(previous, itemId: itemId, generation: generation)
-                return .storageFull
+                return .storageFull(code: "io NSURLErrorDomain \(code)")
             case .cancelled:
                 await restore(previous, itemId: itemId, generation: generation)
                 return .cancelled
@@ -642,7 +649,7 @@ public final class LiveContentStore: ContentStore, Sendable {
             guard Self.looksLikePdf(temp) else {
                 await markFailed(
                     previous, itemId: itemId, contentId: contentId, error: "not_pdf", generation: generation)
-                return .failed(.server)
+                return .failed(.server, code: "not_pdf")
             }
             let bytes = ContentPaths.fileSize(temp)
             let downloadedAt = nowMs
@@ -683,7 +690,8 @@ public final class LiveContentStore: ContentStore, Sendable {
         paths.deleteItemFiles(itemId)
         if committed == nil {
             _ = try? await database.write { db in try ContentFileDao.delete(db, itemId: itemId) }
-            return .storageFull
+            log.error("commit failed: database write or file move threw")
+            return .storageFull(code: "io commit")
         }
         return .notReady
     }
@@ -858,7 +866,7 @@ public final class LiveContentStore: ContentStore, Sendable {
         case http(Int)
         case badUrl
         case network
-        case diskFull
+        case diskFull(Int)
         case cancelled
     }
 
@@ -890,7 +898,8 @@ public final class LiveContentStore: ContentStore, Sendable {
             switch error {
             case .http(let status, _, _, _): result = .http(status)
             case .transport(let code):
-                result = exceeded.withLock { $0 } ? .tooLarge : Self.isDiskFull(code) ? .diskFull : .network
+                result =
+                    exceeded.withLock { $0 } ? .tooLarge : Self.isDiskFull(code) ? .diskFull(code.rawValue) : .network
                 log.notice("content download: transport error \(code.rawValue, privacy: .public)")
             case .invalidRequest: result = .badUrl
             case .malformedResponse: result = .network
@@ -902,12 +911,16 @@ public final class LiveContentStore: ContentStore, Sendable {
         return result
     }
 
-    /// `freeBytes() >= minFreeBytes`; logs the measured value when it refuses (device-only diagnosis).
-    private func hasFreeSpace() -> Bool {
+    /// nil when `freeBytes() >= minFreeBytes`; otherwise the failure code (`free_space <bytes>`) after logging every
+    /// individual reading (device-only diagnosis).
+    private func freeSpaceRefusal() -> String? {
         let free = freeBytes()
-        if free >= Self.minFreeBytes { return true }
-        log.notice("download skipped: \(free, privacy: .public) bytes free")
-        return false
+        if free >= Self.minFreeBytes { return nil }
+        let readings = paths.freeSpaceReadings()
+            .map { "\($0.label)=\($0.bytes.map(String.init) ?? "nil")" }
+            .joined(separator: " ")
+        log.error("download skipped: \(free, privacy: .public) bytes free; readings \(readings, privacy: .public)")
+        return "free_space \(free)"
     }
 
     private static func isDiskFull(_ code: URLError.Code) -> Bool {

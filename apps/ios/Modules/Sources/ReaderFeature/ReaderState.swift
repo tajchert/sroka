@@ -6,6 +6,8 @@ enum NotDownloadedReason: Sendable, Hashable {
     case offline
     case signIn
     case error
+    /// The device is out of free space or a local write failed.
+    case storage
 }
 
 /// The raw article document handed to the web view; the view wraps it with theme and restore point.
@@ -23,7 +25,8 @@ enum ReaderState: Sendable, Equatable {
     /// A PDF item whose document is on disk; shown by the native viewer.
     case pdfReady(URL)
     case downloading
-    case notDownloaded(NotDownloadedReason)
+    /// `code` is a short diagnostic shown as small secondary text (`http_403`, `free_space 0`).
+    case notDownloaded(NotDownloadedReason, code: String? = nil)
     /// The server has not finished parsing.
     case parsePending
     /// `error` is the server's short reason code; show it only through `Vocabulary.failureReason`.

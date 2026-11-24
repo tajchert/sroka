@@ -107,10 +107,8 @@ public struct PackageInstaller: Sendable {
         if !files.isDisjoint(with: directories) { throw InvalidPackage("path_conflict") }
 
         // Pass 2: write, counting real bytes.
-        // Compared by path components, never through `standardizedFileURL`: under `/private/var` (every container on a
-        // device) it drops "/private" for a path that exists and keeps it for one that does not yet, so the existing
-        // root and a file about to be written never shared a prefix and every package was refused as `unsafe_path`.
-        // `name` is already free of "..", "." and absolute segments (`safeRelativePath`), so this is a second check.
+        // Compare path components, not `standardizedFileURL` paths: under `/private/var` (every container on a device)
+        // that drops "/private" only for paths that exist, so the root and a file not yet written never match.
         let root = dir.pathComponents
         var total: Int64 = 0
         for (entry, name) in entries {

@@ -146,9 +146,8 @@ public struct ContentPaths: Sendable {
         var bytes: Int64?
     }
 
-    /// Free bytes on the volume that holds the packages. The "important usage" key is known to report 0 on real
-    /// devices for some locations, so the plain capacity of the same path and of the app's home directory are
-    /// read too and the largest value wins.
+    /// Free bytes on the volume that holds the packages: the largest of the "important usage" and plain capacity of
+    /// the packages path and of the app's home directory, so one odd reading cannot block every download.
     func availableBytes() -> Int64 { Self.chooseAvailable(readings: freeSpaceReadings()) }
 
     func freeSpaceReadings() -> [FreeSpaceReading] {
